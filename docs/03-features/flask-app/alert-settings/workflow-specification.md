@@ -79,8 +79,7 @@ flowchart TD
     Start([URL直接アクセス]) --> Auth[認証チェック<br>Databricks<br>リバースプロキシヘッダ<br>確認]
     Auth --> CheckAuth{認証済み?}
 
-    CheckAuth -->|未認証| API[401エラーを返却]
-    API --> LoginRedirect[ログイン画面へ<br>リダイレクト]
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へ<br>リダイレクト]
     LoginRedirect --> End([処理完了])
 
     CheckAuth -->|認証済み| CheckPage{クエリパラメータに<br>pageがある?}
@@ -451,8 +450,7 @@ flowchart TD
     Insert --> CheckDB{DBクエリ結果}
     
     CheckDB --> |失敗| Rollback[トランザクション<br>ロールバック]
-    Rollback --> API[500エラーを返却]
-    API --> ErrorMsg[エラーメッセージを<br>登録確認モーダル内に表示]
+    Rollback --> ErrorMsg[500エラーポップアップモーダル表示]
     ErrorMsg --> End
 
     CheckDB --> |成功| Commit[トランザクションコミット]
