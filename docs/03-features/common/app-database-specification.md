@@ -454,10 +454,10 @@
 | 4   | device_id                                          | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                          |
 | 5   | alert_conditions_measurement_item_id               | アラート発生条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート発生条件式の測定項目のID                               |
 | 6   | alert_conditions_operator                          | アラート発生条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート発生条件式の比較演算子                               |
-| 7   | alert_conditions_threshold                         | アラート発生条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                     |
+| 7   | alert_conditions_threshold                         | アラート発生条件_閾値       | DOUBLE        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                     |
 | 8   | alert_recovery_conditions_measurement_item_id      | アラート復旧条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート復旧条件式の測定項目のID                               |
 | 9   | alert_recovery_conditions_operator                 | アラート復旧条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート復旧条件式の比較演算子                               |
-| 10  | alert_recovery_conditions_threshold                | アラート復旧条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                     |
+| 10  | alert_recovery_conditions_threshold                | アラート復旧条件_閾値       | DOUBLE        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                     |
 | 11  | judgment_time                                      | 判定時間                    | INT          | NOT NULL | -   | -   | 5                 | アラート判定の時間窓                                         |
 | 12  | alert_level_id                                     | アラートレベルID            | INT          | NOT NULL | -   | ○   | -                 | アラートレベル（alert_level_master参照）                     |
 | 13  | alert_notification_flag                            | アラート通知フラグ          | BOOLEAN      | NOT NULL | -   | -   | TRUE              | アラート通知を行うか（TRUE:する, FALSE:しない）              |

@@ -1,7 +1,7 @@
-﻿# A5:ER FORMAT:19
+﻿# A5:ER FORMAT:21
 # A5:ER ENCODING:UTF8
 # A5:ER Mk-1 Copyright © 2007 m.matsubara
-# A5:SQL Mk-2 Version 2.20.4 Copyright © 1997 - 2025 m.matsubara
+# A5:SQL Mk-2 Version 2.21.0 Copyright © 1997 - 2026 m.matsubara
 #  https://a5m2.mmatsubara.com
 
 [Manager]
@@ -9,12 +9,9 @@ ProjectName=DatabricksIoT_デバイス管理
 Author=
 MaxEntityRowShow=1000
 ReadOnlyRecommend=0
-Page=Main
 PageInfo="Main",7,"B3Landscape",$FFFFFF
 LogicalView=1
 DecodeDomain=0
-ViewModePageIndividually=1
-ViewMode=7
 ViewFormat=0
 UseNondependenceDashLine=0
 FontName=メイリオ
@@ -37,6 +34,7 @@ SqlSeparator=0
 UpperCaseKeyword=0
 ShowTag=1
 ShowCommonAttributes=0
+ShowDisableAttributes=0
 BugFixEntityWidth=1
 
 [Entity]
@@ -69,7 +67,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133024
-Position="MAIN",2200,1000
+Position="Main",2200,1000
 ZOrder=1
 
 [Entity]
@@ -102,7 +100,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132939
-Position="MAIN",1000,100
+Position="Main",1000,100
 ZOrder=3
 
 [Entity]
@@ -125,7 +123,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133226
-Position="MAIN",3350,1050
+Position="Main",3350,1050
 ZOrder=4
 
 [Entity]
@@ -148,7 +146,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132711
-Position="MAIN",50,100
+Position="Main",50,100
 ZOrder=7
 
 [Entity]
@@ -166,10 +164,10 @@ Field="アラート名","alert_name","VARCHAR(100)","NOT NULL",,"","",$FFFFFFFF,
 Field="デバイスID","device_id","INT","NOT NULL",,"","",$00FF4100,""
 Field="アラート発生条件_測定項目ID","alert_conditions_measurement_item_id","INT","NOT NULL",,"","",$00FF0000,""
 Field="アラート発生条件_比較演算子","alert_conditions_operator","VARCHAR(10)","NOT NULL",,"","",$FFFFFFFF,""
-Field="アラート発生条件_閾値","alert_conditions_threshold","FLOAT","NOT NULL",,"","",$FFFFFFFF,""
+Field="アラート発生条件_閾値","alert_conditions_threshold","DOUBLE","NOT NULL",,"","",$FFFFFFFF,""
 Field="アラート復旧条件_測定項目ID","alert_recovery_conditions_measurement_item_id","INT","NOT NULL",,"","",$00FF0000,""
 Field="アラート復旧条件_比較演算子","alert_recovery_conditions_operator","VARCHAR(10)","NOT NULL",,"","",$FFFFFFFF,""
-Field="アラート復旧条件_閾値","alert_recovery_conditions_threshold","FLOAT","NOT NULL",,"","",$FFFFFFFF,""
+Field="アラート復旧条件_閾値","alert_recovery_conditions_threshold","DOUBLE","NOT NULL",,"","",$FFFFFFFF,""
 Field="判定時間","judgment_time","INT","NOT NULL",,"5","",$FFFFFFFF,""
 Field="アラートレベルID","alert_level_id","INT","NOT NULL",,"","",$00FF4100,""
 Field="アラート通知フラグ","alert_notification_flag","BOOLEAN","NOT NULL",,"TRUE","",$FFFFFFFF,""
@@ -182,8 +180,8 @@ Field="削除フラグ","delete_flag","BOOLEAN","NOT NULL",,"FALSE","",$FFFFFFFF
 EffectMode=None
 Color=$000000
 BkColor=$00F5FF
-ModifiedDateTime=20260121151528
-Position="MAIN",50,1300
+ModifiedDateTime=20260127151919
+Position="Main",50,1300
 ZOrder=8
 
 [Entity]
@@ -215,7 +213,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133041
-Position="MAIN",2200,100
+Position="Main",2200,100
 ZOrder=10
 
 [Entity]
@@ -234,7 +232,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260106131014
-Position="MAIN",3350,100
+Position="Main",3350,100
 ZOrder=11
 
 [Entity]
@@ -259,7 +257,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132808
-Position="MAIN",50,450
+Position="Main",50,450
 ZOrder=13
 
 [Entity]
@@ -282,7 +280,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133140
-Position="MAIN",3350,300
+Position="Main",3350,300
 ZOrder=14
 
 [Entity]
@@ -305,7 +303,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133206
-Position="MAIN",3350,650
+Position="Main",3350,650
 ZOrder=15
 
 [Entity]
@@ -328,7 +326,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260121151439
-Position="MAIN",50,2150
+Position="Main",50,2150
 ZOrder=16
 
 [Relation]
@@ -527,7 +525,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133103
-Position="MAIN",3000,1900
+Position="Main",3000,1900
 ZOrder=31
 
 [Entity]
@@ -550,7 +548,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133241
-Position="MAIN",3350,1450
+Position="Main",3350,1450
 ZOrder=33
 
 [Relation]
@@ -638,7 +636,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20251223143216
-Position="MAIN",50,2550
+Position="Main",50,2550
 ZOrder=42
 
 [Entity]
@@ -659,7 +657,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20251223132335
-Position="MAIN",2200,1850,741,201
+Position="Main",2200,1850,741,201
 ZOrder=43
 
 [Relation]
@@ -727,7 +725,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132836
-Position="MAIN",50,900
+Position="Main",50,900
 ZOrder=47
 
 [Relation]
@@ -779,7 +777,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260121140805
-Position="MAIN",2000,2200
+Position="Main",2000,2200
 ZOrder=53
 
 [Entity]
@@ -802,7 +800,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133118
-Position="MAIN",3000,2500
+Position="Main",3000,2500
 ZOrder=54
 
 [Relation]
@@ -954,7 +952,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116162359
-Position="MAIN",950,2250
+Position="Main",950,2250
 ZOrder=65
 
 [Relation]
@@ -998,7 +996,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116162857
-Position="MAIN",1050,2850
+Position="Main",1050,2850
 ZOrder=68
 
 [Relation]
@@ -1043,7 +1041,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116165522
-Position="MAIN",950,900
+Position="Main",950,900
 ZOrder=71
 
 [Relation]
@@ -1087,7 +1085,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260120141306
-Position="MAIN",50,2950,857,270
+Position="Main",50,2950,857,270
 ZOrder=73
 
 [Relation]
