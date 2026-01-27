@@ -50,13 +50,12 @@
 **対象:**
 - Flask SSRルート（サーバーサイドレンダリング）
 - HTMLレスポンスまたはリダイレクト
-- Databricks Apps環境でのホスティング
 
 **アーキテクチャ:**
 - **Webフレームワーク**: Flask + Jinja2
 - **認証基盤**: Databricks認証（Entra ID統合）
 - **データベース**: MySQL互換DB（OLTP）、Unity Catalog（分析）
-- **デプロイ環境**: Databricks Apps (App Compute)
+- **デプロイ環境**: Azure App Service
 
 ---
 

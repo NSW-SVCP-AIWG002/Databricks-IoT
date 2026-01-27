@@ -195,7 +195,8 @@
 
 **要件**:
 - 適切な認証・認可機能を実装すること
-  - **重要**: ログイン認証はDatabricks標準機能であり、Flaskアプリでは実装しない
+  - **認証共通モジュール**: Azure/AWS/オンプレミス環境に対応可能な共通モジュールとして実装
+  - **OAuth トークン フェデレーション**: Databricks接続時、ユーザー単位の認証とデータスコープ制御を実現
 - ロールベースアクセス制御（RBAC）を実装すること
 - ユーザーごとにアクセス権限を制御すること
 
@@ -210,29 +211,30 @@
 | サービス利用者 | 本システムで管理するサービスを実際に利用しているユーザ。エンドユーザ | 参照機能とアラート設定のみアクセス可能   | エンドユーザ             |
 
 **認証基盤**:
-- **Databricks User認証**: Databricks標準機能（Flaskアプリでは実装しない）
-- **Entra ID (Azure Active Directory)**: ユーザ認証・トークン発行の中核
+- **認証共通モジュール**: 「Azure環境(Easy Auth)」、「AWS環境(ALB＋cognito)」、「オンプレミス環境(自前認証)」の三パターンに対応可能
+- **Azure環境での認証**:
   - インターネット → Entra ID でユーザ認証・トークン発行
-  - Databricks Apps → Entra ID でユーザアカウント制御
-- **Databricks コントロールプレーン**: ワークスペースUI/API認証
-  - インターネット → Databricks コントロールプレーンでユーザ認証・トークン発行
-  - ワークスペースUI/API共通の認証経路
-- **Flaskアプリ**: リバースプロキシヘッダからユーザー情報を取得してユーザー識別
+  - アプリケーション → Easy Auth (Entra ID)でユーザアカウント制御
+- **Databricks接続**: OAuth トークン フェデレーションによるユーザー単位認証
+  - IdP発行トークン → Databricks Token Exchange → Unity Catalog接続
+  - データスコープ制御を実現
+- **Flaskアプリ**: リバースプロキシヘッダからユーザー情報を取得し、OAuth Token Exchangeを実行
 - **アクセス元IP制限**:
   - Databricks ワークスペースへのアクセス元IP制限を実施
-  - Databricks Apps 公開フロントへのアクセス元IP制限を実施
+  - 公開フロントへのアクセス元IP制限を実施
 
-**認証フロー**:
+**認証フロー（Azure環境の例）**:
 1. ユーザがインターネット経由でEntra IDにアクセス
 2. Entra IDがユーザ認証・トークン発行
-3. Databricks コントロールプレーンで認証後にサーバーレスコンピューティングプレーン経路へ
-4. Databricks Appsのリバースプロキシがヘッダにユーザー識別情報を付与
+3. リバースプロキシ（Easy Auth）がヘッダにユーザー識別情報とトークンを付与
+4. Flaskアプリで受信したトークンを使用してOAuth Token Exchangeを実行
+5. Unity Catalog接続時、OAuth トークン フェデレーションによりユーザー単位のデータスコープ制御を実現
 
 **実装方針**:
-- **ログイン認証**: Databricks User認証（Databricks標準機能、Flaskアプリでは実装しない）
-- **Entra ID連携**: シングルサインオン
+- **認証共通モジュール**: AuthProviderパターンによる抽象化（Azure/AWS/オンプレミス対応）
+- **OAuth Token Exchange**: Databricks SDK + databricks-sql-connector
 - **リバースプロキシ**: 認証後、ヘッダにユーザー識別子・アクセストークンを付与
-- **Flaskアプリ**: リバースプロキシヘッダからユーザー情報を取得してユーザー識別
+- **Flaskアプリ**: リバースプロキシヘッダからユーザー情報を取得し、Unity Catalog接続時にToken Exchangeを実行
 - データベースまたはUnity Catalogにロール情報を保存
 - Flask Blueprintレベルでの権限チェックデコレーター実装
 - サービスプリンシパル権限とユーザー認可APIの使い分け
