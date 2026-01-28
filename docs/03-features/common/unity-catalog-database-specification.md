@@ -26,6 +26,7 @@
       - [1. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#1-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
       - [2. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#2-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
       - [3. センサーデータ年次サマリ (gold\_sensor\_data\_yearly\_summary)](#3-センサーデータ年次サマリ-gold_sensor_data_yearly_summary)
+      - [4. サマリー計算手法マスタ（gold\_summary\_method\_master）](#4-サマリー計算手法マスタgold_summary_method_master)
     - [外部DBのマスタ類を同期するテーブル](#外部dbのマスタ類を同期するテーブル)
       - [1. デバイスマスタ（device\_master）](#1-デバイスマスタdevice_master)
       - [2. 組織マスタ（organization\_master）](#2-組織マスタorganization_master)
@@ -125,7 +126,8 @@ iot_catalog/                                        # Unity Catalogカタログ
 ├── gold/                                           # ゴールド層スキーマ
 │   ├── gold_sensor_data_daily_summary              # センサーデータ日次サマリ
 │   ├── gold_sensor_data_monthly_summary            # センサーデータ月次サマリ
-│   └── gold_sensor_data_yearly_summary             # センサーデータ年次サマリ
+│   ├── gold_sensor_data_yearly_summary             # センサーデータ年次サマリ
+│   └── gold_summary_method_master                  # サマリ作成時の算術マスタ
 ├── views/                                          # 動的ビュースキーマ
 │   └── sensor_data_view                            # センサーデータビュー
 └── oltp_db/                                        # 外部DBの内容を同期するスキーマ
@@ -145,9 +147,9 @@ iot_catalog/                                        # Unity Catalogカタログ
 
 ### シルバー層
 
-| #   | テーブル物理名           | テーブル論理名   | 説明                                         |
-| --- | ------------------------ | ---------------- | -------------------------------------------- |
-| 1   | silver_sensor_data       | センサーデータ   | 構造化済みセンサーデータ                     |
+| #   | テーブル物理名                  | テーブル論理名   | 説明                                         |
+| --- | ------------------------------- | ---------------- | -------------------------------------------- |
+| 1   | silver_sensor_data              | センサーデータ   | 構造化済みセンサーデータ                     |
 | 2   | silver_email_notification_queue | メール送信キュー | アラート発生時のメール送信待ちキューテーブル |
 | 3   | silver_alert_abnormal_state     | アラート異常状態 | デバイス×アラート設定ごとの異常継続状態管理  |
 
@@ -358,19 +360,19 @@ TBLPROPERTIES (
 
 **概要**: デバイス×アラート設定ごとの異常継続状態を管理するテーブル。アラート設定マスタの判定時間（judgment_time）を超えて異常値が継続した場合にアラートを発砲するための状態管理に使用する。
 
-| #   | カラム物理名        | カラム論理名     | データ型  | NULL     | PK  | FK  | 説明                                             |
-| --- | ------------------- | ---------------- | --------- | -------- | --- | --- | ------------------------------------------------ |
-| 1   | device_id           | デバイスID       | INT       | NOT NULL | 〇  |     | 対象デバイスID                                   |
-| 2   | alert_id            | アラートID       | INT       | NOT NULL | 〇  |     | アラート設定ID（alert_setting_master参照）       |
-| 3   | is_abnormal         | 異常状態フラグ   | BOOLEAN   | NOT NULL |     |     | 現在異常状態か（TRUE:異常、FALSE:正常）          |
-| 4   | abnormal_start_time | 異常開始時刻     | TIMESTAMP | NULL     |     |     | 異常が開始した時刻（正常時はNULL）               |
-| 5   | last_event_time     | 最終イベント時刻 | TIMESTAMP | NOT NULL |     |     | 最後に評価したセンサーデータのイベント時刻       |
-| 6   | last_sensor_value   | 最終センサー値   | DOUBLE    | NULL     |     |     | 最後に評価したセンサー値                         |
-| 7   | alert_fired         | アラート発砲済   | BOOLEAN   | NOT NULL |     |     | 今回の異常期間でアラートを発砲済みか             |
-| 8   | alert_fired_time    | アラート発砲時刻 | TIMESTAMP | NULL     |     |     | アラートを発砲した時刻（未発砲時はNULL）         |
+| #   | カラム物理名        | カラム論理名     | データ型  | NULL     | PK  | FK  | 説明                                                    |
+| --- | ------------------- | ---------------- | --------- | -------- | --- | --- | ------------------------------------------------------- |
+| 1   | device_id           | デバイスID       | INT       | NOT NULL | 〇  |     | 対象デバイスID                                          |
+| 2   | alert_id            | アラートID       | INT       | NOT NULL | 〇  |     | アラート設定ID（alert_setting_master参照）              |
+| 3   | is_abnormal         | 異常状態フラグ   | BOOLEAN   | NOT NULL |     |     | 現在異常状態か（TRUE:異常、FALSE:正常）                 |
+| 4   | abnormal_start_time | 異常開始時刻     | TIMESTAMP | NULL     |     |     | 異常が開始した時刻（正常時はNULL）                      |
+| 5   | last_event_time     | 最終イベント時刻 | TIMESTAMP | NOT NULL |     |     | 最後に評価したセンサーデータのイベント時刻              |
+| 6   | last_sensor_value   | 最終センサー値   | DOUBLE    | NULL     |     |     | 最後に評価したセンサー値                                |
+| 7   | alert_fired         | アラート発砲済   | BOOLEAN   | NOT NULL |     |     | 今回の異常期間でアラートを発砲済みか                    |
+| 8   | alert_fired_time    | アラート発砲時刻 | TIMESTAMP | NULL     |     |     | アラートを発砲した時刻（未発砲時はNULL）                |
 | 9   | alert_history_id    | アラート履歴ID   | INT       | NULL     |     |     | OLTP DBのアラート履歴ID（復旧時更新用、未発砲時はNULL） |
-| 10  | create_time         | 作成日時         | TIMESTAMP | NOT NULL |     |     | レコード作成日時                                 |
-| 11  | update_time         | 更新日時         | TIMESTAMP | NOT NULL |     |     | レコード更新日時                                 |
+| 10  | create_time         | 作成日時         | TIMESTAMP | NOT NULL |     |     | レコード作成日時                                        |
+| 11  | update_time         | 更新日時         | TIMESTAMP | NOT NULL |     |     | レコード更新日時                                        |
 
 **クラスタリングキー**: `device_id`, `alert_id`
 
@@ -422,22 +424,20 @@ TBLPROPERTIES (
 
 ### ゴールド層テーブル
 
-以下テーブル内で記載のある集約対象項目（summary_item）、集約方法（summary_method）は、ゴールド層テーブルを利用する要件が発生した場合に追加で定義する。
-
 #### 1. センサーデータ日次サマリ (gold_sensor_data_daily_summary)
 
 **概要**: センサーデータを日次で集計したテーブル
 
-| #   | カラム物理名    | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
-| --- | --------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
-| 1   | device_id       | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
-| 2   | organization_id | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
-| 3   | collection_date | 集約日       | DATE      | NOT NULL | 〇  |     | センサーデータを集約した日時          |
-| 4   | summary_item    | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
-| 5   | summary_method  | 集約方法     | INT       | NOT NULL |     |     | 集約方法（平均、分散など）            |
-| 6   | summary_value   | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
-| 7   | data_count      | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
-| 8   | create_time     | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
+| --- | ----------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
+| 3   | collection_date   | 集約日       | DATE      | NOT NULL | 〇  |     | センサーデータを集約した日時          |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
+| 7   | data_count        | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
 
 **クラスタリングキー**: `collection_date`, `device_id`
 
@@ -448,7 +448,7 @@ CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_sensor_data_daily_summary (
     organization_id INT NOT NULL, 
     collection_date DATE NOT NULL, 
     summary_item INT NOT NULL,
-    summary_method INT NOT NULL, 
+    summary_method_id INT NOT NULL, 
     summary_value DOUBLE NOT NULL, 
     data_count INT NOT NULL, 
     create_time TIMESTAMP NOT NULL 
@@ -474,7 +474,7 @@ TBLPROPERTIES (
 | 2   | organization_id       | 組織ID       | INT        | NOT NULL | 〇  |     | 所属組織ID                              |
 | 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | 〇  |     | センサーデータを集約した年月（YYYY/MM） |
 | 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | 〇  |     | 集約対象の項目                          |
-| 5   | summary_method        | 集約方法     | INT        | NOT NULL |     |     | 集約方法（平均、分散など）              |
+| 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL |     |     | 集約方法ID（平均、分散など）            |
 | 6   | summary_value         | 集約値       | DOUBLE     | NOT NULL |     |     | 集約結果                                |
 | 7   | data_count            | データ数     | INT        | NOT NULL |     |     | 集約したデータ数                        |
 | 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     |     | レコード作成日時                        |
@@ -488,7 +488,7 @@ CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_sensor_data_monthly_summary (
     organization_id INT NOT NULL, 
     collection_year_month VARCHAR(7) NOT NULL, 
     summary_item INT NOT NULL,
-    summary_method INT NOT NULL, 
+    summary_method_id INT NOT NULL, 
     summary_value DOUBLE NOT NULL, 
     data_count INT NOT NULL, 
     create_time TIMESTAMP NOT NULL 
@@ -508,16 +508,16 @@ TBLPROPERTIES (
 
 **概要**: センサーデータを年次で集計したテーブル
 
-| #   | カラム物理名    | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
-| --- | --------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
-| 1   | device_id       | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
-| 2   | organization_id | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
-| 3   | collection_year | 集約年       | INT       | NOT NULL | 〇  |     | センサーデータを集約した年（YYYY）    |
-| 4   | summary_item    | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
-| 5   | summary_method  | 集約方法     | INT       | NOT NULL |     |     | 集約方法（平均、分散など）            |
-| 6   | summary_value   | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
-| 7   | data_count      | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
-| 8   | create_time     | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
+| --- | ----------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
+| 3   | collection_year   | 集約年       | INT       | NOT NULL | 〇  |     | センサーデータを集約した年（YYYY）    |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
+| 7   | data_count        | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
 
 **クラスタリングキー**: `collection_year`, `device_id`
 
@@ -528,7 +528,7 @@ CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_sensor_data_yearly_summary (
     organization_id INT NOT NULL, 
     collection_year INT NOT NULL, 
     summary_item INT NOT NULL,
-    summary_method INT NOT NULL, 
+    summary_method_id INT NOT NULL, 
     summary_value DOUBLE NOT NULL, 
     data_count INT NOT NULL, 
     create_time TIMESTAMP NOT NULL 
@@ -543,6 +543,64 @@ TBLPROPERTIES (
     'delta.tuneFileSizesForRewrites' = 'true'
 );
 ```
+
+#### 4. サマリー計算手法マスタ（gold_summary_method_master）
+
+**概要**: サマリ作成時にどの計算手法にのっとって作成されたものかを表現するマスタ
+
+| #   | カラム物理名        | カラム論理名   | データ型    | NULL     | PK  | FK  | 説明                                           |
+| --- | ------------------- | -------------- | ----------- | -------- | --- | --- | ---------------------------------------------- |
+| 1   | summary_method_id   | 集約方法ID     | INT         | NOT NULL | 〇  |     | システム内での一意識別子                       |
+| 2   | summary_method_code | 集約方法コード | VARCHAR(20) | NOT NULL |     |     | 集約方法をコードで表現したもの（MAX、MINなど） |
+| 3   | summary_method_name | 集約方法名     | VARCHAR(30) | NOT NULL |     |     | 集約方法名（最大値、最小値など）               |
+| 4   | delete_flag         | 削除フラグ     | BOOLEAN     | NOT NULL |     |     | 論理削除時使用                                 |
+| 5   | create_time         | 作成日時       | TIMESTAMP   | NOT NULL |     |     | レコード作成日時                               |
+| 6   | creator             | 作成者ID       | INT         | NOT NULL |     |     | レコード作成ユーザのユーザID                   |
+| 7   | update_time         | 更新日時       | TIMESTAMP   | NOT NULL |     |     | レコード更新日時                               |
+| 8   | updater             | 更新者ID       | INT         | NOT NULL |     |     | レコード更新ユーザのユーザID                   |
+
+サマリー計算手法マスタに登録されている内容は以下のとおりとする。
+
+| summary_method_id | summary_method_code | 集約方法名    |
+| ----------------- | ------------------- | ------------- |
+| 1                 | AVG                 | 平均値        |
+| 2                 | MAX                 | 最大値        |
+| 3                 | MIN                 | 最小値        |
+| 4                 | P25                 | 第1四分位数   |
+| 5                 | MEDIAN              | 中央値        |
+| 6                 | P75                 | 第3四分位数   |
+| 7                 | STDDEV              | 標準偏差      |
+| 8                 | P95                 | 上側5％境界値 |
+
+**テーブルプロパティ**：
+```sql
+-- テーブルが既に存在する場合は削除（必要に応じて調整）
+-- DROP TABLE IF EXISTS m_summary_methods;
+
+CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_summary_method_master (
+  summary_method_id INT NOT NULL,
+  summary_method_code VARCHAR(20) NOT NULL,
+  summary_method_name VARCHAR(30) NOT NULL,
+  delete_flag BOOLEAN NOT NULL DEFAULT false,
+  create_time TIMESTAMP NOT NULL DEFAULT current_timestamp(),
+  creator INT NOT NULL,
+  update_time TIMESTAMP NOT NULL DEFAULT current_timestamp(),
+  updater INT NOT NULL,
+)
+USING delta;
+
+INSERT INTO m_summary_methods (summary_method_id, summary_method_code, summary_method_name, creator, updater) VALUES
+(1, 'AVG',    '平均値',         999, 999),
+(2, 'MAX',    '最大値',         999, 999),
+(3, 'MIN',    '最小値',         999, 999),
+(4, 'P25',    '第1四分位数',    999, 999),
+(5, 'MEDIAN', '中央値',         999, 999),
+(6, 'P75',    '第3四分位数',    999, 999),
+(7, 'STDDEV', '標準偏差',       999, 999),
+(8, 'P95',    '上側5％境界値', 999, 999);
+-- 作成者ID、更新者IDをシステム保守者の仮ID「999」として記載している
+```
+
 
 ---
 
@@ -722,8 +780,8 @@ VACUUM iot_catalog.silver.silver_sensor_data;
 | テーブル                         | クラスタリングキー                   | 目的                                |
 | -------------------------------- | ------------------------------------ | ----------------------------------- |
 | silver_sensor_data               | `DATE(event_timestamp)`, `device_id` | 時系列クエリの最適化                |
-| silver_email_notification_queue         | `status`, `queued_time`              | ステータス別キュー取得の最適化      |
-| silver_alert_abnormal_state             | `device_id`, `alert_id`              | デバイス×アラート別状態取得の最適化 |
+| silver_email_notification_queue  | `status`, `queued_time`              | ステータス別キュー取得の最適化      |
+| silver_alert_abnormal_state      | `device_id`, `alert_id`              | デバイス×アラート別状態取得の最適化 |
 | gold_sensor_data_daily_summary   | `collection_date`, `device_id`       | 集計単位でのアクセス最適化          |
 | gold_sensor_data_monthly_summary | `collection_year_month`, `device_id` | 集計単位でのアクセス最適化          |
 | gold_sensor_data_yearly_summary  | `collection_year`, `device_id`       | 集計単位でのアクセス最適化          |
