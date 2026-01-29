@@ -447,27 +447,27 @@
 
 **概要**: アラート検知条件と通知設定を管理するテーブル
  
-| #   | カラム物理名                                  | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
-| --- | --------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
-| 1   | alert_id                                      | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                      |
-| 2   | alert_uuid                                    | アラートUUID                | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | アラート設定の外部公開用識別子（URLパスパラメータとして使用） |
-| 3   | alert_name                                    | アラート名                  | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラート設定の表示名                                          |
-| 4   | device_id                                     | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                           |
-| 5   | alert_conditions_measurement_item_id          | アラート発生条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート発生条件式の測定項目のID                              |
-| 6   | alert_conditions_operator                     | アラート発生条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート発生条件式の比較演算子                                |
-| 7   | alert_conditions_threshold                    | アラート発生条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                      |
-| 8   | alert_recovery_conditions_measurement_item_id | アラート復旧条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート復旧条件式の測定項目のID                              |
-| 9   | alert_recovery_conditions_operator            | アラート復旧条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート復旧条件式の比較演算子                                |
-| 10  | alert_recovery_conditions_threshold           | アラート復旧条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                      |
-| 11  | judgment_time                                 | 判定時間                    | INT          | NOT NULL | -   | -   | 5                 | アラート判定の時間窓                                          |
-| 12  | alert_level_id                                | アラートレベルID            | INT          | NOT NULL | -   | ○   | -                 | アラートレベル（alert_level_master参照）                      |
-| 13  | alert_notification_flag                       | アラート通知フラグ          | BOOLEAN      | NOT NULL | -   | -   | TRUE              | アラート通知を行うか（TRUE:する, FALSE:しない）               |
-| 14  | alert_email_flag                              | メール送信フラグ            | BOOLEAN      | NOT NULL | -   | -   | TRUE              | メール通知を行うか（TRUE:する, FALSE:しない）                 |
-| 15  | create_date                                   | 作成日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
-| 16  | creator                                       | 作成者                      | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
-| 17  | update_date                                   | 更新日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
-| 18  | modifier                                      | 更新者                      | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
-| 19  | delete_flag                                   | 削除フラグ                  | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
+| #   | カラム物理名                                       | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
+| --- | -------------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
+| 1   | alert_id                                           | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                     |
+| 2   | alert_uuid                                         | アラートUUID                | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | アラート設定の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | alert_name                                         | アラート名                  | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラート設定の表示名                                         |
+| 4   | device_id                                          | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                          |
+| 5   | alert_conditions_measurement_item_id               | アラート発生条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート発生条件式の測定項目のID                               |
+| 6   | alert_conditions_operator                          | アラート発生条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート発生条件式の比較演算子                               |
+| 7   | alert_conditions_threshold                         | アラート発生条件_閾値       | DOUBLE        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                     |
+| 8   | alert_recovery_conditions_measurement_item_id      | アラート復旧条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート復旧条件式の測定項目のID                               |
+| 9   | alert_recovery_conditions_operator                 | アラート復旧条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート復旧条件式の比較演算子                               |
+| 10  | alert_recovery_conditions_threshold                | アラート復旧条件_閾値       | DOUBLE        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                     |
+| 11  | judgment_time                                      | 判定時間                    | INT          | NOT NULL | -   | -   | 5                 | アラート判定の時間窓                                         |
+| 12  | alert_level_id                                     | アラートレベルID            | INT          | NOT NULL | -   | ○   | -                 | アラートレベル（alert_level_master参照）                     |
+| 13  | alert_notification_flag                            | アラート通知フラグ          | BOOLEAN      | NOT NULL | -   | -   | TRUE              | アラート通知を行うか（TRUE:する, FALSE:しない）              |
+| 14  | alert_email_flag                                   | メール送信フラグ            | BOOLEAN      | NOT NULL | -   | -   | TRUE              | メール通知を行うか（TRUE:する, FALSE:しない）                |
+| 15  | create_date                                        | 作成日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
+| 16  | creator                                            | 作成者                      | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                     |
+| 17  | update_date                                        | 更新日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                         |
+| 18  | modifier                                           | 更新者                      | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                     |
+| 19  | delete_flag                                        | 削除フラグ                  | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                      |
 
 **外部キー:**
 - `device_id` → `device_master.device_id`
