@@ -294,6 +294,7 @@ JUDGMENT_TIMES = [
 - [UI仕様書](./ui-specification.md) - アラート設定管理画面のUI仕様
 - [ワークフロー仕様書](./workflow-specification.md) - ワークフロー・処理フロー詳細
 - [共通仕様書](../../03-features/common/common-specification.md) - HTTPステータスコード、エラーコード等
+- [認証仕様書](../../03-features/common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 - [UI共通仕様書](../../03-features/common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ### 要件定義

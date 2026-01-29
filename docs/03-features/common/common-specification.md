@@ -53,9 +53,9 @@
 
 **アーキテクチャ:**
 - **Webフレームワーク**: Flask + Jinja2
-- **認証基盤**: Databricks認証（Entra ID統合）
+- **認証基盤**: 認証共通モジュール（Azure/AWS/オンプレミス対応）※詳細は[認証仕様書](./authentication-specification.md)を参照
 - **データベース**: MySQL互換DB（OLTP）、Unity Catalog（分析）
-- **デプロイ環境**: Azure App Service
+- **デプロイ環境**: Azure App Service / AWS EC2 / オンプレミスサーバー
 
 ---
 
@@ -68,7 +68,7 @@
 | 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                  |
 | 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                         |
 | 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error       |
-| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                 |
+| 401    | Unauthorized          | 認証エラー                         | ログインページへリダイレクト         |
 | 403    | Forbidden             | 権限不足                           | `render_template('errors/403.html')` |
 | 404    | Not Found             | リソース未検出                     | `render_template('errors/404.html')` |
 | 409    | Conflict              | 競合エラー（重複登録など）         | `render_template()` with error       |
@@ -85,17 +85,17 @@
 
 アプリケーション内部で使用するエラーコードを定義します。
 
-| コード             | 説明                 | HTTPステータス | 表示方法                             |
-| ------------------ | -------------------- | -------------- | ------------------------------------ |
-| AUTH_FAILED        | 認証失敗             | 401            | Databricksログイン画面へリダイレクト |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ    |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                         |
-| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ             |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ             |
-| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ             |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                         |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                         |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                         |
+| コード             | 説明                 | HTTPステータス | 表示方法                          |
+| ------------------ | -------------------- | -------------- | --------------------------------- |
+| AUTH_FAILED        | 認証失敗             | 401            | ログインページへリダイレクト      |
+| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                      |
+| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ          |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ          |
+| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ          |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                      |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                      |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                      |
 
 **Flask実装例:**
 
@@ -134,16 +134,16 @@ except Exception as e:
 
 ### エラー分類とHTTPステータス
 
-| エラー分類           | 説明                           | 対応方針                   | HTTPステータス | トランザクション       |
-| -------------------- | ------------------------------ | -------------------------- | -------------- | ---------------------- |
-| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示       | 400, 422       | 開始前                 |
-| 認証エラー           | 認証失敗                       | Databricksログイン画面へ   | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーページまたはFlash    | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash    | 404            | 読み取りのみ           |
-| 競合エラー           | データの重複・競合             | フォームにエラー表示       | 409            | 開始後（ロールバック） |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ | 502            | 開始後（ロールバック） |
-| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ | 504            | 開始後（ロールバック） |
+| エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
+| -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
+| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示         | 400, 422       | 開始前                 |
+| 認証エラー           | 認証失敗                       | ログインページへリダイレクト | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | エラーページまたはFlash      | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash      | 404            | 読み取りのみ           |
+| 競合エラー           | データの重複・競合             | フォームにエラー表示         | 409            | 開始後（ロールバック） |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ   | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ   | 502            | 開始後（ロールバック） |
+| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ   | 504            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 
@@ -173,51 +173,64 @@ except Exception as e:
 
 ## 認証・認可
 
+**詳細仕様:** 認証アーキテクチャの詳細は[認証仕様書](./authentication-specification.md)を参照してください。
+
 ### 認証方式
 
-| 項目           | 内容                                                          |
-| -------------- | ------------------------------------------------------------- |
-| 認証基盤       | Databricks認証（Entra ID統合）                                |
-| 認証方式       | Databricksワークスペース認証（Databricks標準機能）            |
-| セッション管理 | Databricksが自動管理                                          |
-| アクセス制限   | アクセス元IP制限（Databricksワークスペース、Databricks Apps） |
+| 項目           | 内容                                                                |
+| -------------- | ------------------------------------------------------------------- |
+| 認証基盤       | 認証共通モジュール（Azure/AWS/オンプレミス対応）                    |
+| 認証方式       | AuthProviderパターンによる抽象化                                    |
+| セッション管理 | 環境に応じた管理（Azure: Easy Auth連動、AWS: ALB連動、自前: Flask） |
+| アクセス制限   | アクセス元IP制限（Databricksワークスペース）                        |
 
-**重要:** Flaskアプリケーション内で認証処理は実装しません。Databricks Appsのリバースプロキシが認証を処理します。
+**対応環境:**
+
+| 環境         | 認証方式              | 認証プロバイダー        |
+| ------------ | --------------------- | ----------------------- |
+| Azure        | Easy Auth（Entra ID） | `AzureEasyAuthProvider` |
+| AWS          | ALB + Cognito         | `AWSCognitoProvider`    |
+| オンプレミス | 自前認証（Flask IdP） | `LocalIdPProvider`      |
 
 ### 認証フロー
 
-1. ユーザーがDatabricks Appsにアクセス
-2. Databricksが自動的にEntra ID認証を要求
-3. 認証成功後、リバースプロキシがリクエストヘッダーにユーザー情報を付与
-4. Flaskアプリケーションはヘッダーからユーザー情報を取得
-5. 組織IDでデータスコープを制限
+認証フローは環境によって異なりますが、共通して以下の処理を行います:
+
+1. ユーザーがアプリケーションにアクセス
+2. 認証プロバイダー（IdP）による認証
+3. 認証成功後、リバースプロキシがリクエストヘッダーにユーザー情報・JWTを付与
+4. Flaskアプリケーションはヘッダーからユーザー情報を取得（AuthProviderパターン）
+5. OAuth Token ExchangeによりDatabricksアクセストークンを取得
+6. Unity Catalog接続時、ユーザー単位のデータスコープ制御を実現
+
+**注:** 認証フローの詳細は[認証仕様書](./authentication-specification.md)を参照してください。
 
 ### ユーザー情報取得
 
-Flaskアプリケーションは、リバースプロキシから以下のヘッダーでユーザー情報を取得します：
+FlaskアプリケーションはAuthProviderを通じてユーザー情報を取得します:
 
 ```python
-from flask import request
+from flask import g
+from auth.middleware import get_auth_provider
 
 def get_current_user():
-    """リバースプロキシヘッダーからユーザー情報を取得"""
-    user_id = request.headers.get('X-Forwarded-User')
-    email = request.headers.get('X-Forwarded-Email')
+    """AuthProviderからユーザー情報を取得"""
+    if hasattr(g, 'user'):
+        return g.user
 
-    if not user_id or not email:
-        # 認証エラー（通常は発生しない）
-        abort(401)
+    provider = get_auth_provider()
+    user_info = provider.get_user_info(request)
 
     # データベースからユーザー情報を取得
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(email=user_info['email']).first()
     if not user:
-        # ユーザーが未登録の場合の処理
         abort(403)
 
+    g.user = user
     return user
 ```
 
-**注:** ヘッダー名（`X-Forwarded-User`、`X-Forwarded-Email`）は、Databricks Appsの実際の仕様に合わせて調整してください。
+**注:** 環境変数`AUTH_TYPE`（azure/aws/local）により、使用するAuthProviderが決定されます。
 
 ### ロール定義
 
@@ -769,6 +782,10 @@ db.session.commit()
 ---
 
 ## 関連ドキュメント
+
+### 認証・セキュリティ
+
+- [認証仕様書](./authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 
 ### 機能設計・仕様
 
