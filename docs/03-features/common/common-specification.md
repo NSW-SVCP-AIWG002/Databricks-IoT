@@ -521,15 +521,6 @@ flowchart LR
 - **操作:** Cookieから検索条件取得 → pageパラメータでページ番号を上書き → Cookie更新せず
 - **目的:** 検索条件を維持したままページ遷移する
 
-```mermaid
-flowchart LR
-    A[GET /admin/users?page=2] --> B[Cookieから検索条件取得]
-    B --> C[pageパラメータを上書き]
-    C --> D[DB検索実行]
-    D --> E[レンダリング]
-    E --> F[HTMLレスポンス返却<br/>Cookie更新なし]
-```
-
 #### 3. 検索実行時（POST）
 - **操作:** Cookieの検索条件をクリア → 新しい検索条件で検索（page=1にリセット） → Cookieに検索条件を格納
 - **目的:** 新しい検索条件を適用し、1ページ目から表示する
