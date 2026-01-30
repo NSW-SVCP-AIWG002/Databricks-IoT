@@ -32,6 +32,8 @@
     - [20. アラート履歴 (alert\_history)](#20-アラート履歴-alert_history)
     - [21. アラートステータスマスタ (alert\_status\_master)](#21-アラートステータスマスタ-alert_status_master)
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
+  - [VIEW定義](#view定義)
+    - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -774,6 +776,151 @@
 | 3         | 組織             | 組織マスタ             |
 | 4         | アラート設定      | アラート設定マスタ     |
 | 5         | デバイス在庫情報  | デバイス在庫情報マスタ  |
+
+---
+
+## VIEW定義
+
+このセクションでは、アプリケーションで使用するデータベースVIEWを定義します。
+
+**VIEW使用の目的:**
+- **データスコープ制御**: ログインユーザーが参照可能な組織配下のデータのみを取得
+- **クエリの簡素化**: 複雑な結合処理をVIEWにカプセル化し、アプリケーション側のコードを簡潔に保つ
+- **セキュリティ強化**: 組織階層（organization_closure）に基づいたアクセス制御を一元管理
+
+---
+
+### 1. デバイス一覧用VIEW (v_device_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のデバイス情報を取得するためのVIEW。
+
+**目的:**
+- デバイス一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のデバイスのみを取得
+- organization_closureテーブルを使用した組織階層の権限制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_device_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    d.device_id,
+    d.organization_id AS device_organization_id,
+    d.device_type_id,
+    d.device_name,
+    d.device_model,
+    d.device_stock_id,
+    d.sim_id,
+    d.mac_address,
+    d.software_version,
+    d.device_location,
+    d.certificate_expiration_date,
+    d.create_date,
+    d.creator,
+    d.update_date,
+    d.modifier,
+    d.delete_flag,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名                  | カラム論理名         | データ型     | 説明                                           |
+| ---------------------------- | ------------------- | ------------ | --------------------------------------------- |
+| user_id                      | ユーザーID           | INT          | ログインユーザーのID                            |
+| user_name                    | ユーザー名           | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id         | ユーザー組織ID       | INT          | ログインユーザーの所属組織ID                    |
+| device_id                    | デバイスID           | VARCHAR(100) | デバイスの一意識別子                            |
+| device_organization_id       | デバイス組織ID       | INT          | デバイスが所属する組織ID                        |
+| device_type_id               | デバイス種別ID       | INT          | デバイス種別ID                                  |
+| device_name                  | デバイス名           | VARCHAR(100) | デバイスの表示名                                |
+| device_model                 | モデル情報           | VARCHAR(100) | デバイスのモデル名・型番                        |
+| device_stock_id              | デバイス在庫ID       | INT          | デバイス在庫ID                                  |
+| sim_id                       | SIMID                | VARCHAR(100) | デバイスのSIM ID                                |
+| mac_address                  | MACアドレス          | VARCHAR(100) | デバイスのMACアドレス                           |
+| software_version             | ソフトウェアバージョン | VARCHAR(100) | デバイスのファームウェアバージョン              |
+| device_location              | 設置場所             | VARCHAR(100) | デバイスの設置場所                              |
+| certificate_expiration_date  | 証明書期限           | DATETIME     | SSL証明書期限                                   |
+| create_date                  | 作成日時             | DATETIME     | レコード作成日時                                |
+| creator                      | 作成者               | INT          | レコード作成者のユーザーID                      |
+| update_date                  | 更新日時             | DATETIME     | レコード最終更新日時                            |
+| modifier                     | 更新者               | INT          | レコード更新者のユーザーID                      |
+| delete_flag                  | 削除フラグ           | BOOLEAN      | 論理削除状態                                    |
+| depth                        | 組織階層深さ         | INT          | ユーザー組織からデバイス組織までの階層の深さ    |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全デバイスを取得
+SELECT
+    device_id,
+    device_name,
+    device_model,
+    device_organization_id,
+    depth
+FROM v_device_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY device_name;
+
+-- 直接配下の組織（depth=1）のデバイスのみ取得
+SELECT *
+FROM v_device_master_by_user
+WHERE user_id = 123
+  AND depth = 1
+  AND delete_flag = FALSE;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/devices', methods=['GET'])
+def list_devices():
+    """デバイス一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してデバイスを取得
+    query = text("""
+        SELECT
+            device_id,
+            device_name,
+            device_model,
+            device_organization_id,
+            mac_address,
+            software_version,
+            depth
+        FROM v_device_master_by_user
+        WHERE user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY device_name
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    devices = result.fetchall()
+
+    return render_template('devices/list.html', devices=devices)
+```
+
+**ビジネスルール:**
+- このVIEWは、ユーザーの所属組織とその配下の全組織に紐づくデバイスを返す
+- `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
+- 論理削除されたデバイス（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- ユーザーが存在しない組織に所属している場合、結果は0件となる
 
 ---
 
