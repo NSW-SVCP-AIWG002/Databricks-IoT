@@ -34,6 +34,12 @@
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
   - [VIEW定義](#view定義)
     - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
+    - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
+    - [3. 組織一覧用VIEW (v\_organization\_master\_by\_user)](#3-組織一覧用view-v_organization_master_by_user)
+    - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
+    - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
+    - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
+    - [7. メール通知履歴一覧用VIEW (v\_mail\_history\_by\_user)](#7-メール通知履歴一覧用view-v_mail_history_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -921,6 +927,829 @@ def list_devices():
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除されたデバイス（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
 - ユーザーが存在しない組織に所属している場合、結果は0件となる
+
+---
+
+### 2. ユーザー一覧用VIEW (v_user_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のユーザー情報を取得するためのVIEW。
+
+**目的:**
+- ユーザー一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のユーザーのみを取得
+- organization_closureテーブルを使用した組織階層の権限制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_user_master_by_user AS
+SELECT
+    u.user_id AS login_user_id,
+    u.user_name AS login_user_name,
+    u.organization_id AS login_user_organization_id,
+    target.user_id,
+    target.databricks_user_id,
+    target.user_name,
+    target.organization_id,
+    target.email_address,
+    target.user_type_id,
+    target.language_code,
+    target.region_id,
+    target.address,
+    target.status,
+    target.alert_notification_flag,
+    target.system_notification_flag,
+    target.create_date,
+    target.creator,
+    target.update_date,
+    target.modifier,
+    target.delete_flag,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN user_master target
+        ON oc.subsidiary_organization_id = target.organization_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名                  | カラム論理名               | データ型     | 説明                                           |
+| ---------------------------- | ------------------------- | ------------ | --------------------------------------------- |
+| login_user_id                | ログインユーザーID         | INT          | ログインユーザーのID                            |
+| login_user_name              | ログインユーザー名         | VARCHAR(20)  | ログインユーザーの名前                          |
+| login_user_organization_id   | ログインユーザー組織ID     | INT          | ログインユーザーの所属組織ID                    |
+| user_id                      | ユーザーID                | INT          | 対象ユーザーのID                                |
+| databricks_user_id           | DatabricksユーザーID      | VARCHAR(36)  | Databricks SCIM APIから返されるユーザーID       |
+| user_name                    | 名称                      | VARCHAR(20)  | 対象ユーザーの表示名                            |
+| organization_id              | 組織ID                    | INT          | 対象ユーザーの所属組織ID                        |
+| email_address                | メールアドレス            | VARCHAR(254) | 対象ユーザーのメールアドレス                    |
+| user_type_id                 | ユーザー種別ID            | INT          | ユーザー種別ID                                  |
+| language_code                | 言語コード                | VARCHAR(10)  | 表示言語コード                                  |
+| region_id                    | 地域ID                    | INT          | ユーザーの所在地域ID                            |
+| address                      | 住所                      | VARCHAR(500) | ユーザーの住所                                  |
+| status                       | ステータス                | INT          | ユーザーステータス（0：ロック済み、1：アクティブ）|
+| alert_notification_flag      | アラート通知フラグ        | BOOLEAN      | アラート通知の有効/無効                         |
+| system_notification_flag     | システム通知フラグ        | BOOLEAN      | システム通知の有効/無効                         |
+| create_date                  | 作成日時                  | DATETIME     | レコード作成日時                                |
+| creator                      | 作成者                    | INT          | レコード作成者のユーザーID                      |
+| update_date                  | 更新日時                  | DATETIME     | レコード最終更新日時                            |
+| modifier                     | 更新者                    | INT          | レコード更新者のユーザーID                      |
+| delete_flag                  | 削除フラグ                | BOOLEAN      | 論理削除状態                                    |
+| depth                        | 組織階層深さ              | INT          | ログインユーザー組織から対象ユーザー組織までの階層の深さ |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全ユーザーを取得
+SELECT
+    user_id,
+    user_name,
+    email_address,
+    organization_id,
+    depth
+FROM v_user_master_by_user
+WHERE login_user_id = 123
+  AND delete_flag = FALSE
+ORDER BY user_name;
+
+-- 同じ組織（depth=0）のユーザーのみ取得
+SELECT *
+FROM v_user_master_by_user
+WHERE login_user_id = 123
+  AND depth = 0
+  AND delete_flag = FALSE;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/users', methods=['GET'])
+def list_users():
+    """ユーザー一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してユーザーを取得
+    query = text("""
+        SELECT
+            user_id,
+            user_name,
+            email_address,
+            organization_id,
+            user_type_id,
+            status,
+            depth
+        FROM v_user_master_by_user
+        WHERE login_user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY user_name
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    users = result.fetchall()
+
+    return render_template('users/list.html', users=users)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織に所属するユーザーを返す
+- `depth`カラムで組織階層の深さを確認可能（0=同じ組織、1=直下の組織、2以上=孫組織以降）
+- 論理削除されたユーザー（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- ログインユーザー自身も結果に含まれる（depth=0の自己参照）
+
+---
+
+### 3. 組織一覧用VIEW (v_organization_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織情報を取得するためのVIEW。
+
+**目的:**
+- 組織一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織のみを取得
+- organization_closureテーブルを使用した組織階層の権限制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_organization_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    o.organization_id,
+    o.organization_name,
+    o.organization_type_id,
+    o.address,
+    o.phone_number,
+    o.fax_number,
+    o.contact_person,
+    o.contract_status_id,
+    o.contract_start_date,
+    o.contract_end_date,
+    o.databricks_group_id,
+    o.create_date,
+    o.creator,
+    o.update_date,
+    o.modifier,
+    o.delete_flag,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN organization_master o
+        ON oc.subsidiary_organization_id = o.organization_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名           | カラム論理名         | データ型     | 説明                                           |
+| --------------------- | ------------------- | ------------ | --------------------------------------------- |
+| user_id               | ユーザーID           | INT          | ログインユーザーのID                            |
+| user_name             | ユーザー名           | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id  | ユーザー組織ID       | INT          | ログインユーザーの所属組織ID                    |
+| organization_id       | 組織ID               | INT          | 対象組織のID                                    |
+| organization_name     | 組織名               | VARCHAR(200) | 対象組織の表示名                                |
+| organization_type_id  | 組織種別ID           | INT          | 組織種別ID                                      |
+| address               | 住所                 | VARCHAR(500) | 組織の所在地住所                                |
+| phone_number          | 電話番号             | VARCHAR(20)  | 組織の電話番号                                  |
+| fax_number            | FAX                  | VARCHAR(20)  | 組織のFAX番号                                   |
+| contact_person        | 担当者名             | VARCHAR(20)  | 組織の担当者名                                  |
+| contract_status_id    | 契約状態ID           | INT          | 契約状態ID                                      |
+| contract_start_date   | 契約開始日           | DATE         | サービス契約開始日                              |
+| contract_end_date     | 契約終了日           | DATE         | サービス契約終了日                              |
+| databricks_group_id   | DatabricksグループID | VARCHAR(20)  | Databricksグループの一意の識別子                |
+| create_date           | 作成日時             | DATETIME     | レコード作成日時                                |
+| creator               | 作成者               | INT          | レコード作成者のユーザーID                      |
+| update_date           | 更新日時             | DATETIME     | レコード最終更新日時                            |
+| modifier              | 更新者               | INT          | レコード更新者のユーザーID                      |
+| delete_flag           | 削除フラグ           | BOOLEAN      | 論理削除状態                                    |
+| depth                 | 組織階層深さ         | INT          | ユーザー組織から対象組織までの階層の深さ        |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全組織を取得
+SELECT
+    organization_id,
+    organization_name,
+    organization_type_id,
+    contract_status_id,
+    depth
+FROM v_organization_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY organization_name;
+
+-- 自組織（depth=0）のみ取得
+SELECT *
+FROM v_organization_master_by_user
+WHERE user_id = 123
+  AND depth = 0
+  AND delete_flag = FALSE;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/organizations', methods=['GET'])
+def list_organizations():
+    """組織一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用して組織を取得
+    query = text("""
+        SELECT
+            organization_id,
+            organization_name,
+            organization_type_id,
+            contract_status_id,
+            contract_start_date,
+            contract_end_date,
+            depth
+        FROM v_organization_master_by_user
+        WHERE user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY organization_name
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    organizations = result.fetchall()
+
+    return render_template('organizations/list.html', organizations=organizations)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織を返す
+- `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
+- 論理削除された組織（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- ユーザーの所属組織自身も結果に含まれる（depth=0の自己参照）
+
+---
+
+### 4. デバイス在庫情報一覧用VIEW (v_device_stock_info_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のデバイス在庫情報を取得するためのVIEW。
+
+**目的:**
+- デバイス在庫情報一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のデバイス在庫情報のみを取得
+- device_stock_info_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_device_stock_info_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    dsi.device_stock_id,
+    dsi.stock_status_id,
+    dsi.purchase_date,
+    dsi.estimated_ship_date,
+    dsi.ship_date,
+    dsi.manufacturer_warranty_end_date,
+    dsi.vendor_warranty_end_date,
+    dsi.stock_location,
+    dsi.create_date,
+    dsi.creator,
+    dsi.update_date,
+    dsi.modifier,
+    dsi.delete_flag,
+    d.device_id,
+    d.organization_id AS device_organization_id,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id
+    INNER JOIN device_stock_info_master dsi
+        ON d.device_stock_id = dsi.device_stock_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名                      | カラム論理名           | データ型     | 説明                                           |
+| -------------------------------- | --------------------- | ------------ | --------------------------------------------- |
+| user_id                          | ユーザーID             | INT          | ログインユーザーのID                            |
+| user_name                        | ユーザー名             | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id             | ユーザー組織ID         | INT          | ログインユーザーの所属組織ID                    |
+| device_stock_id                  | デバイス在庫ID         | INT          | デバイス在庫の一意識別子                        |
+| stock_status_id                  | 在庫状況ID             | INT          | 在庫状況ID                                      |
+| purchase_date                    | 購入日                 | DATETIME     | デバイス購入日                                  |
+| estimated_ship_date              | 出荷予定日             | DATETIME     | デバイス出荷予定日                              |
+| ship_date                        | 出荷日                 | DATETIME     | デバイス出荷日                                  |
+| manufacturer_warranty_end_date   | メーカー保証終了日     | DATETIME     | メーカー保証の終了日                            |
+| vendor_warranty_end_date         | ベンダー保証終了日     | DATETIME     | ベンダー保証の終了日                            |
+| stock_location                   | 在庫場所               | VARCHAR(100) | 現在の在庫保管場所                              |
+| create_date                      | 作成日時               | DATETIME     | レコード作成日時                                |
+| creator                          | 作成者                 | INT          | レコード作成者のユーザーID                      |
+| update_date                      | 更新日時               | DATETIME     | レコード最終更新日時                            |
+| modifier                         | 更新者                 | INT          | レコード更新者のユーザーID                      |
+| delete_flag                      | 削除フラグ             | BOOLEAN      | 論理削除状態                                    |
+| device_id                        | デバイスID             | VARCHAR(100) | 関連するデバイスID                              |
+| device_organization_id           | デバイス組織ID         | INT          | デバイスが所属する組織ID                        |
+| depth                            | 組織階層深さ           | INT          | ユーザー組織からデバイス組織までの階層の深さ    |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全デバイス在庫情報を取得
+SELECT
+    device_stock_id,
+    device_id,
+    stock_status_id,
+    purchase_date,
+    stock_location,
+    depth
+FROM v_device_stock_info_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY purchase_date DESC;
+
+-- 保証期限が近いデバイス在庫を取得（30日以内）
+SELECT *
+FROM v_device_stock_info_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+  AND manufacturer_warranty_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY);
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/device-stocks', methods=['GET'])
+def list_device_stocks():
+    """デバイス在庫情報一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してデバイス在庫情報を取得
+    query = text("""
+        SELECT
+            device_stock_id,
+            device_id,
+            stock_status_id,
+            purchase_date,
+            stock_location,
+            manufacturer_warranty_end_date,
+            vendor_warranty_end_date,
+            depth
+        FROM v_device_stock_info_master_by_user
+        WHERE user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY purchase_date DESC
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    device_stocks = result.fetchall()
+
+    return render_template('device_stocks/list.html', device_stocks=device_stocks)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスの在庫情報を返す
+- device_stock_info_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
+- `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
+- 論理削除されたデバイス在庫情報（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+
+---
+
+### 5. アラート設定一覧用VIEW (v_alert_setting_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のアラート設定情報を取得するためのVIEW。
+
+**目的:**
+- アラート設定一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のアラート設定のみを取得
+- alert_setting_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_alert_setting_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    a.alert_id,
+    a.alert_uuid,
+    a.alert_name,
+    a.device_id,
+    a.alert_conditions_measurement_item_id,
+    a.alert_conditions_operator,
+    a.alert_conditions_threshold,
+    a.alert_recovery_conditions_measurement_item_id,
+    a.alert_recovery_conditions_operator,
+    a.alert_recovery_conditions_threshold,
+    a.judgment_time,
+    a.alert_level_id,
+    a.alert_notification_flag,
+    a.alert_email_flag,
+    a.create_date,
+    a.creator,
+    a.update_date,
+    a.modifier,
+    a.delete_flag,
+    d.organization_id AS device_organization_id,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id
+    INNER JOIN alert_setting_master a
+        ON d.device_id = a.device_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名                                    | カラム論理名                | データ型     | 説明                                           |
+| ---------------------------------------------- | -------------------------- | ------------ | --------------------------------------------- |
+| user_id                                        | ユーザーID                  | INT          | ログインユーザーのID                            |
+| user_name                                      | ユーザー名                  | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id                           | ユーザー組織ID              | INT          | ログインユーザーの所属組織ID                    |
+| alert_id                                       | アラートID                  | INT          | アラート設定の一意識別子                        |
+| alert_uuid                                     | アラートUUID                | VARCHAR(36)  | アラート設定の外部公開用識別子                  |
+| alert_name                                     | アラート名                  | VARCHAR(100) | アラート設定の表示名                            |
+| device_id                                      | デバイスID                  | VARCHAR(100) | 対象デバイスID                                  |
+| alert_conditions_measurement_item_id           | アラート発生条件_測定項目ID | INT          | アラート発生条件式の測定項目のID                |
+| alert_conditions_operator                      | アラート発生条件_比較演算子 | VARCHAR(10)  | アラート発生条件式の比較演算子                  |
+| alert_conditions_threshold                     | アラート発生条件_閾値       | FLOAT        | アラート発生条件式の閾値                        |
+| alert_recovery_conditions_measurement_item_id  | アラート復旧条件_測定項目ID | INT          | アラート復旧条件式の測定項目のID                |
+| alert_recovery_conditions_operator             | アラート復旧条件_比較演算子 | VARCHAR(10)  | アラート復旧条件式の比較演算子                  |
+| alert_recovery_conditions_threshold            | アラート復旧条件_閾値       | FLOAT        | アラート復旧条件式の閾値                        |
+| judgment_time                                  | 判定時間                    | INT          | アラート判定の時間窓                            |
+| alert_level_id                                 | アラートレベルID            | INT          | アラートレベル                                  |
+| alert_notification_flag                        | アラート通知フラグ          | BOOLEAN      | アラート通知を行うか                            |
+| alert_email_flag                               | メール送信フラグ            | BOOLEAN      | メール通知を行うか                              |
+| create_date                                    | 作成日時                    | DATETIME     | レコード作成日時                                |
+| creator                                        | 作成者                      | INT          | レコード作成者のユーザーID                      |
+| update_date                                    | 更新日時                    | DATETIME     | レコード最終更新日時                            |
+| modifier                                       | 更新者                      | INT          | レコード更新者のユーザーID                      |
+| delete_flag                                    | 削除フラグ                  | BOOLEAN      | 論理削除状態                                    |
+| device_organization_id                         | デバイス組織ID              | INT          | デバイスが所属する組織ID                        |
+| depth                                          | 組織階層深さ                | INT          | ユーザー組織からデバイス組織までの階層の深さ    |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全アラート設定を取得
+SELECT
+    alert_id,
+    alert_name,
+    device_id,
+    alert_level_id,
+    alert_notification_flag,
+    depth
+FROM v_alert_setting_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY alert_name;
+
+-- Criticalレベルのアラート設定のみ取得
+SELECT *
+FROM v_alert_setting_master_by_user
+WHERE user_id = 123
+  AND alert_level_id = 1
+  AND delete_flag = FALSE;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/alert-settings', methods=['GET'])
+def list_alert_settings():
+    """アラート設定一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してアラート設定を取得
+    query = text("""
+        SELECT
+            alert_id,
+            alert_uuid,
+            alert_name,
+            device_id,
+            alert_level_id,
+            alert_notification_flag,
+            alert_email_flag,
+            depth
+        FROM v_alert_setting_master_by_user
+        WHERE user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY alert_name
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    alert_settings = result.fetchall()
+
+    return render_template('alert_settings/list.html', alert_settings=alert_settings)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスのアラート設定を返す
+- alert_setting_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
+- `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
+- 論理削除されたアラート設定（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+
+---
+
+### 6. アラート履歴一覧用VIEW (v_alert_history_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のアラート履歴情報を取得するためのVIEW。
+
+**目的:**
+- アラート履歴一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のアラート履歴のみを取得
+- alert_historyは組織IDを直接持たないため、alert_setting_master → device_masterを経由して組織階層の権限制御を適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_alert_history_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    ah.alert_history_id,
+    ah.alert_history_uuid,
+    ah.alert_id,
+    ah.alert_occurrence_datetime,
+    ah.alert_recovery_datetime,
+    ah.alert_status_id,
+    ah.alert_value,
+    ah.create_date,
+    ah.creator,
+    ah.update_date,
+    ah.modifier,
+    ah.delete_flag,
+    a.device_id,
+    d.organization_id AS device_organization_id,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id
+    INNER JOIN alert_setting_master a
+        ON d.device_id = a.device_id
+    INNER JOIN alert_history ah
+        ON a.alert_id = ah.alert_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名               | カラム論理名         | データ型     | 説明                                           |
+| ------------------------- | ------------------- | ------------ | --------------------------------------------- |
+| user_id                   | ユーザーID           | INT          | ログインユーザーのID                            |
+| user_name                 | ユーザー名           | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id      | ユーザー組織ID       | INT          | ログインユーザーの所属組織ID                    |
+| alert_history_id          | アラート履歴ID       | INT          | アラート履歴の一意識別子                        |
+| alert_history_uuid        | アラート履歴UUID     | VARCHAR(36)  | アラート履歴のUUID                              |
+| alert_id                  | アラートID           | INT          | アラート設定の一意識別子                        |
+| alert_occurrence_datetime | アラート発生日時     | DATETIME     | アラートの発生日時                              |
+| alert_recovery_datetime   | アラート復旧日時     | DATETIME     | アラートの復旧日時                              |
+| alert_status_id           | アラートステータスID | INT          | アラートステータスの一意識別子                  |
+| alert_value               | アラート発生値       | FLOAT        | アラート発生時の値                              |
+| create_date               | 作成日時             | DATETIME     | レコード作成日時                                |
+| creator                   | 作成者               | INT          | レコード作成者のユーザーID                      |
+| update_date               | 更新日時             | DATETIME     | レコード最終更新日時                            |
+| modifier                  | 更新者               | INT          | レコード更新者のユーザーID                      |
+| delete_flag               | 削除フラグ           | BOOLEAN      | 論理削除状態                                    |
+| device_id                 | デバイスID           | VARCHAR(100) | 関連するデバイスID                              |
+| device_organization_id    | デバイス組織ID       | INT          | デバイスが所属する組織ID                        |
+| depth                     | 組織階層深さ         | INT          | ユーザー組織からデバイス組織までの階層の深さ    |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全アラート履歴を取得
+SELECT
+    alert_history_id,
+    alert_id,
+    device_id,
+    alert_occurrence_datetime,
+    alert_recovery_datetime,
+    alert_status_id,
+    depth
+FROM v_alert_history_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY alert_occurrence_datetime DESC;
+
+-- 発生中のアラート（未復旧）のみ取得
+SELECT *
+FROM v_alert_history_by_user
+WHERE user_id = 123
+  AND alert_status_id = 1
+  AND delete_flag = FALSE
+ORDER BY alert_occurrence_datetime DESC;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/alert-history', methods=['GET'])
+def list_alert_history():
+    """アラート履歴一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してアラート履歴を取得
+    query = text("""
+        SELECT
+            alert_history_id,
+            alert_history_uuid,
+            alert_id,
+            device_id,
+            alert_occurrence_datetime,
+            alert_recovery_datetime,
+            alert_status_id,
+            alert_value,
+            depth
+        FROM v_alert_history_by_user
+        WHERE user_id = :user_id
+          AND delete_flag = FALSE
+        ORDER BY alert_occurrence_datetime DESC
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    alert_history = result.fetchall()
+
+    return render_template('alert_history/list.html', alert_history=alert_history)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスのアラート履歴を返す
+- alert_historyは組織IDを持たないため、alert_setting_master → device_masterを経由してアクセス制御を実現
+- `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
+- 論理削除されたアラート履歴（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+
+---
+
+### 7. メール通知履歴一覧用VIEW (v_mail_history_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織配下のメール通知履歴情報を取得するためのVIEW。
+
+**目的:**
+- メール通知履歴一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のメール通知履歴のみを取得
+- organization_closureテーブルを使用した組織階層の権限制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_mail_history_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    m.mail_history_id,
+    m.mail_history_uuid,
+    m.mail_type,
+    m.sender_email,
+    m.recipients,
+    m.subject,
+    m.body,
+    m.sent_at,
+    m.user_id AS mail_user_id,
+    m.organization_id AS mail_organization_id,
+    m.create_date,
+    m.creator,
+    m.update_date,
+    m.modifier,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN mail_history m
+        ON oc.subsidiary_organization_id = m.organization_id;
+```
+
+**カラム一覧:**
+
+| カラム物理名          | カラム論理名             | データ型     | 説明                                           |
+| -------------------- | ----------------------- | ------------ | --------------------------------------------- |
+| user_id              | ユーザーID               | INT          | ログインユーザーのID                            |
+| user_name            | ユーザー名               | VARCHAR(20)  | ログインユーザーの名前                          |
+| user_organization_id | ユーザー組織ID           | INT          | ログインユーザーの所属組織ID                    |
+| mail_history_id      | メール送信履歴ID         | INT          | メール送信履歴の一意識別子                      |
+| mail_history_uuid    | メール送信履歴UUID       | VARCHAR(32)  | UUID（外部公開用一意識別子）                    |
+| mail_type            | メール種別ID             | INT          | メール種別ID                                    |
+| sender_email         | 送信元メールアドレス     | VARCHAR(254) | 送信元のメールアドレス                          |
+| recipients           | 送信先メールアドレス     | JSON         | 送信先のメールアドレス（JSON形式）              |
+| subject              | メール件名               | VARCHAR(500) | メールの件名                                    |
+| body                 | メール本文               | TEXT         | メールの本文                                    |
+| sent_at              | 送信日時                 | DATETIME     | メール送信日時                                  |
+| mail_user_id         | 関連ユーザーID           | INT          | 関連するユーザーID                              |
+| mail_organization_id | 関連組織ID               | INT          | メール送信に関連する組織ID                      |
+| create_date          | 作成日時                 | DATETIME     | レコード作成日時                                |
+| creator              | 作成者                   | INT          | レコード作成者のユーザーID                      |
+| update_date          | 更新日時                 | DATETIME     | レコード最終更新日時                            |
+| modifier             | 更新者                   | INT          | レコード更新者のユーザーID                      |
+| depth                | 組織階層深さ             | INT          | ユーザー組織からメール関連組織までの階層の深さ  |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全メール通知履歴を取得
+SELECT
+    mail_history_id,
+    mail_type,
+    sender_email,
+    subject,
+    sent_at,
+    mail_organization_id,
+    depth
+FROM v_mail_history_by_user
+WHERE user_id = 123
+ORDER BY sent_at DESC;
+
+-- アラート通知メールのみ取得（mail_type=1）
+SELECT *
+FROM v_mail_history_by_user
+WHERE user_id = 123
+  AND mail_type = 1
+ORDER BY sent_at DESC;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@bp.route('/mail-history', methods=['GET'])
+def list_mail_history():
+    """メール通知履歴一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してメール通知履歴を取得
+    query = text("""
+        SELECT
+            mail_history_id,
+            mail_history_uuid,
+            mail_type,
+            sender_email,
+            recipients,
+            subject,
+            sent_at,
+            mail_organization_id,
+            depth
+        FROM v_mail_history_by_user
+        WHERE user_id = :user_id
+        ORDER BY sent_at DESC
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    mail_history = result.fetchall()
+
+    return render_template('mail_history/list.html', mail_history=mail_history)
+```
+
+**ビジネスルール:**
+- このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくメール通知履歴を返す
+- `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
+- mail_historyテーブルにはdelete_flagがないため、全てのレコードが結果に含まれる
+- recipientsフィールドはJSON形式のため、アプリケーション側でパースが必要
 
 ---
 
