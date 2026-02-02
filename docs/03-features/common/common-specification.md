@@ -76,19 +76,15 @@
 
 すべてのFlaskルートで使用する共通HTTPステータスコードを定義します。
 
-| コード | 説明                  | 使用場面                           | Flask実装                            |
-| ------ | --------------------- | ---------------------------------- | ------------------------------------ |
-| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                  |
-| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                         |
-| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error       |
-| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                 |
-| 403    | Forbidden             | 権限不足                           | `render_template('errors/403.html')` |
-| 404    | Not Found             | リソース未検出                     | `render_template('errors/404.html')` |
-| 409    | Conflict              | 競合エラー（重複登録など）         | `render_template()` with error       |
-| 422    | Unprocessable Entity  | バリデーションエラー               | `render_template()` with form errors |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')` |
-| 502    | Bad Gateway           | 外部API連携エラー                  | `render_template('errors/502.html')` |
-| 503    | Service Unavailable   | メンテナンス中                     | `render_template('errors/503.html')` |
+| コード | 説明                  | 使用場面                           | Flask実装                              |
+| ------ | --------------------- | ---------------------------------- | -------------------------------------- |
+| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                    |
+| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                           |
+| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error modal   |
+| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
+| 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
+| 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
+| 500    | Internal Server Error | サーバーエラー                     | `render_template()` with error modal   |
 
 **注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
 
@@ -100,34 +96,35 @@
 
 | コード             | 説明                 | HTTPステータス | 表示方法                             |
 | ------------------ | -------------------- | -------------- | ------------------------------------ |
-| AUTH_FAILED        | 認証失敗             | 401            | Databricksログイン画面へリダイレクト |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ    |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                         |
-| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ             |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ             |
-| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ             |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                         |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                         |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                         |
+| AUTH_FAILED        | 認証失敗             | 401            | ログイン画面へリダイレクト |
+| PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーメッセージモーダル表示                         |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーメッセージモーダル表示                         |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーメッセージモーダル表示                         |
 
 **Flask実装例:**
 
 ```python
-# フォームバリデーションエラー
-if not form.validate_on_submit():
-    # エラーメッセージはフォームフィールドに表示
-    return render_template('users/form.html', form=form), 422
+# パラメータ不正エラー
+if not valid_parameter:
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': 'パラメータが不正です'}), 400
 
 # リソース不在エラー
 user = User.query.get(user_id)
 if not user:
-    flash('指定されたユーザーが見つかりません', 'error')
-    return render_template('errors/404.html'), 404
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': '指定されたユーザーが見つかりません'}), 404
 
 # 権限エラー
 if not current_user.has_permission('user:delete'):
-    flash('この操作を実行する権限がありません', 'error')
-    return render_template('errors/403.html'), 403
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': 'この操作を実行する権限がありません'}), 403
 
 # データベースエラー（例外ハンドラで処理）
 try:
@@ -135,8 +132,9 @@ try:
 except Exception as e:
     db.session.rollback()
     logger.error(f"Database error: {e}")
-    flash('データベースエラーが発生しました', 'error')
-    return render_template('errors/500.html'), 500
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': 'データベースエラーが発生しました'}), 500
 ```
 
 ---
@@ -147,16 +145,14 @@ except Exception as e:
 
 ### エラー分類とHTTPステータス
 
-| エラー分類           | 説明                           | 対応方針                   | HTTPステータス | トランザクション       |
-| -------------------- | ------------------------------ | -------------------------- | -------------- | ---------------------- |
-| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示       | 400, 422       | 開始前                 |
-| 認証エラー           | 認証失敗                       | Databricksログイン画面へ   | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーページまたはFlash    | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash    | 404            | 読み取りのみ           |
-| 競合エラー           | データの重複・競合             | フォームにエラー表示       | 409            | 開始後（ロールバック） |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ | 502            | 開始後（ロールバック） |
-| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ | 504            | 開始後（ロールバック） |
+| エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
+| -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
+| パラメータ不正       | 入力パラメータの形式・値が不正 | エラーメッセージモーダル表示 | 400            | 開始前                 |
+| 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 
@@ -262,8 +258,9 @@ def require_role(*roles):
         def decorated_function(*args, **kwargs):
             current_user = get_current_user()
             if current_user.role not in roles:
-                flash('この操作を実行する権限がありません', 'error')
-                return render_template('errors/403.html'), 403
+                # エラーメッセージモーダルを表示
+                return render_template(request.endpoint.replace('.', '/') + '.html',
+                                     error_modal={'message': 'この操作を実行する権限がありません'}), 403
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -797,16 +794,13 @@ def create_user():
 
 以下のいずれかのエラーが発生した場合、トランザクションをロールバックします：
 
-| エラー種別                 | 発生タイミング                          | ロールバック実施 | 理由                   |
-| -------------------------- | --------------------------------------- | ---------------- | ---------------------- |
-| バリデーションエラー       | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
-| 認証・認可エラー           | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
-| リソース不在エラー         | 読み取り処理中                          | ❌ 不要           | データ変更なし         |
-| **競合エラー**             | 更新処理中                              | ✅ **実施**       | データ整合性保持       |
-| **データベースエラー**     | SQL実行時                               | ✅ **実施**       | データ整合性保持       |
-| **外部API連携エラー**      | API呼び出し時（トランザクション開始後） | ✅ **実施**       | データ整合性保持       |
-| **ビジネスロジックエラー** | ビジネスルール違反検出時                | ✅ **実施**       | データ整合性保持       |
-| **タイムアウト**           | 処理時間超過                            | ✅ **実施**       | 不完全なデータ登録防止 |
+| エラー種別             | 発生タイミング                          | ロールバック実施 | 理由                   |
+| ---------------------- | --------------------------------------- | ---------------- | ---------------------- |
+| パラメータ不正         | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
+| 認証・認可エラー       | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
+| リソース不在エラー     | 読み取り処理中                          | ❌ 不要           | データ変更なし         |
+| **データベースエラー** | SQL実行時                               | ✅ **実施**       | データ整合性保持       |
+| **外部API連携エラー**  | API呼び出し時（トランザクション開始後） | ✅ **実施**       | データ整合性保持       |
 
 **注:** エラー分類の詳細は[エラーハンドリング方針](#エラーハンドリング方針)セクションを参照してください。
 
