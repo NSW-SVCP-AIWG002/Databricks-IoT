@@ -100,6 +100,8 @@
 
 **注**: 詳細なテーブル定義は [データベース設計書](../../common/app-database-specification.md) を参照してください。
 
+**認証関連テーブル（オンプレミス環境のみ）**: オンプレミス環境では、ユーザー登録時に`user_password`、`password_reset_token`テーブルも使用します。詳細は[認証仕様書](../../common/authentication-specification.md)を参照してください。
+
 ### リレーション
 
 ```mermaid
@@ -201,11 +203,13 @@ erDiagram
 
 #### 連携タイミングと処理順序
 
-| 操作         | 処理順序                                                                       | 説明                                                                                        |
-| ------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| ユーザー登録 | ① Databricks User作成<br>② Unity Catalog INSERT<br>③ OLTP DB INSERT            | POST /api/2.0/preview/scim/v2/Users でユーザー作成後、Unity CatalogとOLTP DBに登録          |
-| ユーザー更新 | ① Databricks User更新<br>②Unity Catalog UPDATE<br>③ OLTP DB UPDATE<br>③        | PATCH /api/2.0/preview/scim/v2/Users/{id} でユーザー更新後、Unity CatalogとOLTP DBを更新    |
-| ユーザー削除 | ① Unity Catalog DELETE<br>② OLTP DB UPDATE (論理削除)<br>③ Databricks User削除 | Unity Catalog物理削除、OLTP DB論理削除後、DELETE /api/2.0/preview/scim/v2/Users/{id} で削除 |
+| 操作         | 処理順序                                                                                            | 説明                                                                                        |
+| ------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| ユーザー登録 | ① Databricks User作成<br>② Unity Catalog INSERT<br>③ OLTP DB INSERT<br>④ 招待メール送信※1          | POST /api/2.0/preview/scim/v2/Users でユーザー作成後、Unity CatalogとOLTP DBに登録          |
+| ユーザー更新 | ① Databricks User更新<br>② Unity Catalog UPDATE<br>③ OLTP DB UPDATE                                 | PATCH /api/2.0/preview/scim/v2/Users/{id} でユーザー更新後、Unity CatalogとOLTP DBを更新    |
+| ユーザー削除 | ① Unity Catalog DELETE<br>② OLTP DB UPDATE (論理削除)<br>③ Databricks User削除                      | Unity Catalog物理削除、OLTP DB論理削除後、DELETE /api/2.0/preview/scim/v2/Users/{id} で削除 |
+
+※1 オンプレミス環境（`AUTH_TYPE=local`）のみ。user_password、password_reset_tokenテーブルへの登録と招待メール送信を行います。Azure/AWS環境ではIdP（Entra ID/Cognito）がユーザー認証を管理するため、この処理はスキップされます。
 
 #### 認証方式
 

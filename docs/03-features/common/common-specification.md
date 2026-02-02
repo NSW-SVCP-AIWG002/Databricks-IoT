@@ -210,13 +210,18 @@ except Exception as e:
 FlaskアプリケーションはAuthProviderを通じてユーザー情報を取得します:
 
 ```python
-from flask import g
-from auth.middleware import get_auth_provider
+from flask import g, request, abort
+from auth.factory import get_auth_provider
 
 def get_current_user():
-    """AuthProviderからユーザー情報を取得"""
-    if hasattr(g, 'user'):
-        return g.user
+    """AuthProviderからユーザー情報を取得
+
+    注意: 通常はAuthMiddleware（before_request）で認証処理が行われ、
+    g.current_userが設定されます。この関数は認証済みユーザーへの
+    アクセスを提供するヘルパーです。
+    """
+    if hasattr(g, 'current_user'):
+        return g.current_user
 
     provider = get_auth_provider()
     user_info = provider.get_user_info(request)
@@ -226,7 +231,7 @@ def get_current_user():
     if not user:
         abort(403)
 
-    g.user = user
+    g.current_user = user
     return user
 ```
 
