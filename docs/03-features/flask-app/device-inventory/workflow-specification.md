@@ -53,7 +53,7 @@
 | 4 | 台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 参照モーダル表示 | HTML (partial) | AJAX対応 |
 | 5 | 台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 | HTML (partial) | AJAX対応 |
 | 6 | 台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 | リダイレクト (302) | 成功時: 一覧へ |
-| 7 | 台帳削除実行 | `/admin/device-inventory/<device_stock_uuid>/delete` | POST | 削除処理 | リダイレクト (302) | 論理削除 |
+| 7 | 台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理 | リダイレクト (302) | 論理削除、複数選択対応 |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 | CSV | 検索条件適用 |
 
 ---
@@ -62,14 +62,14 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|---------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /admin/device-inventory` | `page=1` | HTML（一覧画面） | エラーページ表示 |
+| 画面初期表示 | URL直接アクセス | `GET /admin/device-inventory` | `page=1` | HTML（一覧画面） | エラーモーダル表示 |
 | 検索ボタン押下 | フォーム送信 | `GET /admin/device-inventory` | 検索条件 | HTML（検索結果） | エラーメッセージ表示 |
-| 台帳登録ボタン押下 | リンククリック | `GET /admin/device-inventory/create` | なし | HTML（登録モーダル） | エラーページ表示 |
+| 台帳登録ボタン押下 | リンククリック | `GET /admin/device-inventory/create` | なし | HTML（登録モーダル） | エラーモーダル表示 |
 | 登録実行 | フォーム送信 | `POST /admin/device-inventory/create` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| デバイスIDクリック | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>` | device_stock_uuid | HTML（参照モーダル） | エラーページ表示 |
-| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>/edit` | device_stock_uuid | HTML（更新モーダル） | エラーページ表示 |
+| 参照ボタン押下 | ボタンクリック | `GET /admin/device-inventory/<device_stock_uuid>` | device_stock_uuid | HTML（参照モーダル） | エラーモーダル表示 |
+| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>/edit` | device_stock_uuid | HTML（更新モーダル） | エラーモーダル表示 |
 | 更新実行 | フォーム送信 | `POST /admin/device-inventory/<device_stock_uuid>/update` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/<device_stock_uuid>/delete` | device_stock_uuid | リダイレクト → 一覧 | エラーメッセージ表示 |
+| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/delete` | device_stock_uuids（配列） | リダイレクト → 一覧 | エラーメッセージ表示 |
 | CSVエクスポート押下 | リンククリック | `GET /admin/device-inventory?export=csv` | 検索条件 | CSVファイル | エラーメッセージ表示 |
 
 ---
@@ -100,7 +100,7 @@ flowchart TD
 
     CheckPerm -->|権限OK| CheckPage{クエリパラメータに<br>pageがある?}
 
-    CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
+    CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> InitParams[検索条件にデフォルト値を<br>入力]
     InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM stock_status_master]
     LoadMaster --> CheckMaster{マスタ取得結果}
@@ -111,7 +111,7 @@ flowchart TD
     CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>SELECT COUNT（*） FROM device_stock_info_master<br>WHERE delete_flag=FALSE]
     Count --> CheckCount{件数取得結果}
 
-    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
+    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
     OverridePage --> LoadMaster
 
@@ -124,7 +124,7 @@ flowchart TD
     
     CheckDB -->|成功| CheckInitial{クエリパラメータに<br>pageがあるか?}
     
-    CheckInitial -->|No 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
+    CheckInitial -->|No 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>set_search_conditions_cookie]
     SaveCookie --> Template[Jinja2テンプレートレンダリング<br>render_template<br>'admin/device_stock_info_master/list.html']
 
     CheckInitial -->|Yes ページング| Template
@@ -164,19 +164,22 @@ def list_device_stock_info_master():
 **② クエリパラメータ取得**
 
 ```python
+from common.cookie_utils import get_search_conditions_cookie
+
 # ページングの場合（pageパラメータあり）: Cookieから検索条件を取得し、pageのみ上書き
 # 初期表示の場合（pageパラメータなし）: デフォルト値を使用
 if 'page' in request.args:
-    # ページング時: Cookieから検索条件を取得
-    device_name = request.cookies.get('device_name', '')
-    device_type = request.cookies.get('device_type', 'all')
-    stock_status = request.cookies.get('stock_status', 'all')
-    stock_location = request.cookies.get('stock_location', '')
-    purchase_date_from = request.cookies.get('purchase_date_from', None)
-    purchase_date_to = request.cookies.get('purchase_date_to', None)
+    # ページング時: Cookieから検索条件を取得（共通関数使用）
+    conditions = get_search_conditions_cookie('device_inventory')
+    device_name = conditions.get('device_name', '')
+    device_type = conditions.get('device_type', 'all')
+    stock_status = conditions.get('stock_status', 'all')
+    stock_location = conditions.get('stock_location', '')
+    purchase_date_from = conditions.get('purchase_date_from', None)
+    purchase_date_to = conditions.get('purchase_date_to', None)
     page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
-    sort_column = request.cookies.get('sort_column', '')
-    sort_order = request.cookies.get('sort_order', '')
+    sort_column = conditions.get('sort_column', '')
+    sort_order = conditions.get('sort_order', '')
 else:
     # 初期表示時: デフォルト値を使用
     device_name = ''
@@ -308,7 +311,7 @@ flowchart TD
     ValidCheck -->|エラー| ValidError[エラーメッセージ付きで<br>フォーム再表示]
     ValidError --> End
 
-    ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア]
+    ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
     Convert --> Count[表示件数取得DBクエリ実行<br>device_stock_info_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN stock_status_master<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
@@ -321,7 +324,7 @@ flowchart TD
 
     CheckDB2 -->|失敗| Error500
 
-    CheckDB2 -->|成功| PutParams[Cookieに検索条件を格納<br>max_age=86400]
+    CheckDB2 -->|成功| PutParams[Cookieに検索条件を格納<br>set_search_conditions_cookie]
     PutParams --> Template[Jinja2<br>テンプレートレンダリング]
     Template --> Response[HTMLレスポンス返却]
     Response --> End
@@ -720,11 +723,9 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳削除実行 | `POST /admin/device-inventory/<device_stock_uuid>/delete` | 論理削除（delete_flag=TRUE） |
+| 台帳削除実行 | `POST /admin/device-inventory/delete` | 論理削除（delete_flag=TRUE） |
 
-**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
-
-**注**: 複数選択削除の場合は、デバイス在庫UUIDをカンマ区切りで送信し、サーバー側で分割処理
+**フォームデータ**: `device_stock_uuids` - 削除対象のデバイス在庫UUIDリスト（`request.form.getlist('device_stock_uuids')`で取得）
 
 ---
 
@@ -820,7 +821,7 @@ def list_device_stock_info_master():
         df = pd.DataFrame([{
             'デバイス名': d.device.device_name,
             'デバイス種別': d.device.device_type.device_type_name,
-            'モデル情報': d.device.model_info or '',
+            'モデル情報': d.device.device_model or '',
             'SIMID': d.device.sim_id or '',
             'MACアドレス': d.device.mac_address or '',
             '在庫状況': d.stock_status.stock_status_name,
@@ -918,7 +919,7 @@ device_stock_info_master (dsi)
 **検証項目:**
 - device_name: 最大100文字、必須
 - device_type: 必須（マスタ値のみ）
-- model_info: 最大100文字、必須
+- device_model: 最大100文字、必須
 - sim_id: 最大50文字
 - mac_address: XX:XX:XX:XX:XX:XX形式
 - stock_status: 必須（マスタ値のみ）
