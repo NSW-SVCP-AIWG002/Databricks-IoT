@@ -1,0 +1,5 @@
+# Flask Web Framework
+flask>=3.0.0
+
+# Data manipulation
+pandas>=2.0.0
