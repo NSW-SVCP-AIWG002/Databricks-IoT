@@ -11,9 +11,9 @@
   - [ソート](#ソート)
   - [ページング](#ページング)
   - [デバイス台帳登録](#デバイス台帳登録)
-  - [デバイス台帳参照](#デバイス台帳参照)
   - [デバイス台帳更新](#デバイス台帳更新)
   - [デバイス台帳削除](#デバイス台帳削除)
+  - [デバイス台帳参照](#デバイス台帳参照)
   - [CSVエクスポート](#csvエクスポート)
 - [使用データベース詳細](#使用データベース詳細)
 - [トランザクション管理](#トランザクション管理)
@@ -50,10 +50,10 @@
 | 1 | 台帳一覧表示 | `/admin/device-inventory` | GET | 一覧・検索表示 | HTML | ページング・検索対応 |
 | 2 | 台帳登録画面 | `/admin/device-inventory/create` | GET | 登録モーダル表示 | HTML (partial) | AJAX対応 |
 | 3 | 台帳登録実行 | `/admin/device-inventory/create` | POST | 登録処理 | リダイレクト (302) | 成功時: 一覧へ |
-| 4 | 台帳詳細表示 | `/admin/device-inventory/<inventory_id>` | GET | 参照モーダル表示 | HTML (partial) | AJAX対応 |
-| 5 | 台帳更新画面 | `/admin/device-inventory/<inventory_id>/edit` | GET | 更新モーダル表示 | HTML (partial) | AJAX対応 |
-| 6 | 台帳更新実行 | `/admin/device-inventory/<inventory_id>/update` | POST | 更新処理 | リダイレクト (302) | 成功時: 一覧へ |
-| 7 | 台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理 | リダイレクト (302) | 複数選択対応 |
+| 4 | 台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 参照モーダル表示 | HTML (partial) | AJAX対応 |
+| 5 | 台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 | HTML (partial) | AJAX対応 |
+| 6 | 台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 | リダイレクト (302) | 成功時: 一覧へ |
+| 7 | 台帳削除実行 | `/admin/device-inventory/<device_stock_uuid>/delete` | POST | 削除処理 | リダイレクト (302) | 論理削除 |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 | CSV | 検索条件適用 |
 
 ---
@@ -66,10 +66,10 @@
 | 検索ボタン押下 | フォーム送信 | `GET /admin/device-inventory` | 検索条件 | HTML（検索結果） | エラーメッセージ表示 |
 | 台帳登録ボタン押下 | リンククリック | `GET /admin/device-inventory/create` | なし | HTML（登録モーダル） | エラーページ表示 |
 | 登録実行 | フォーム送信 | `POST /admin/device-inventory/create` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| デバイスIDクリック | リンククリック | `GET /admin/device-inventory/<id>` | inventory_id | HTML（参照モーダル） | エラーページ表示 |
-| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<id>/edit` | inventory_id | HTML（更新モーダル） | エラーページ表示 |
-| 更新実行 | フォーム送信 | `POST /admin/device-inventory/<id>/update` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/delete` | inventory_ids[] | リダイレクト → 一覧 | エラーメッセージ表示 |
+| デバイスIDクリック | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>` | device_stock_uuid | HTML（参照モーダル） | エラーページ表示 |
+| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>/edit` | device_stock_uuid | HTML（更新モーダル） | エラーページ表示 |
+| 更新実行 | フォーム送信 | `POST /admin/device-inventory/<device_stock_uuid>/update` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
+| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/<device_stock_uuid>/delete` | device_stock_uuid | リダイレクト → 一覧 | エラーメッセージ表示 |
 | CSVエクスポート押下 | リンククリック | `GET /admin/device-inventory?export=csv` | 検索条件 | CSVファイル | エラーメッセージ表示 |
 
 ---
@@ -91,40 +91,59 @@ flowchart TD
     Start([URL直接アクセス]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    LoginRedirect --> End([処理完了])
 
-    CheckAuth -->|認証済み| Permission[権限チェック<br>SYSTEM_ADMIN ロール確認]
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラーページ表示]
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
 
-    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1, per_page=25<br>sort_by=device_id, order=asc]
-    Init --> Scope[データスコープ制限適用<br>organization_closure テーブル参照]
-    Scope --> Query[DBクエリ実行<br>SELECT * FROM device_inventory<br>WHERE deleted_flag=FALSE<br>AND organization_id IN scope]
+    CheckPerm -->|権限OK| CheckPage{クエリパラメータに<br>pageがある?}
+
+    CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
+    ClearCookie --> InitParams[検索条件にデフォルト値を<br>入力]
+    InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM stock_status_master]
+    LoadMaster --> CheckMaster{マスタ取得結果}
+
+    CheckMaster -->|失敗| Error500[500エラーモーダル表示]
+    Error500 --> End
+
+    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>SELECT COUNT（*） FROM device_stock_info_master<br>WHERE delete_flag=FALSE]
+    Count --> CheckCount{件数取得結果}
+
+    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
+    GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
+    OverridePage --> LoadMaster
+
+    CheckCount -->|失敗| Error500
+
+    CheckCount -->|成功| Query[検索結果取得DBクエリ実行<br>SELECT * FROM device_stock_info_master<br>WHERE delete_flag=FALSE<br>LIMIT per_page OFFSET offset]
     Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>'admin/device_inventory/list.html']
+    CheckDB -->|失敗| Error500
+    
+    CheckDB -->|成功| CheckInitial{クエリパラメータに<br>pageがあるか?}
+    
+    CheckInitial -->|No 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
+    SaveCookie --> Template[Jinja2テンプレートレンダリング<br>render_template<br>'admin/device_stock_info_master/list.html']
+
+    CheckInitial -->|Yes ページング| Template
     Template --> Response[HTMLレスポンス返却]
-
-    CheckDB -->|失敗| Error500[500エラーページ表示]
-
-    LoginRedirect --> End([処理完了])
-    Error403 --> End
     Response --> End
-    Error500 --> End
 ```
 
 #### Flaskルート
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `keyword`, `device_type`, `stock_status`, `storage_location`, `purchase_date_from`, `purchase_date_to`, `sort_by`, `order` |
+| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_name`, `device_type`, `stock_status`, `stock_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
 
 #### バリデーション
 
 **実行タイミング:** なし（初期表示のため、デフォルト値を使用）
 
 **データスコープ制限:**
-- ログインユーザーの `organization_id` でデータを自動的にフィルタリング
-- `organization_closure` テーブルを使用して下位組織も含む
+- なし（システム保守者は全デバイス台帳データにアクセス可能）
 
 #### 処理詳細（サーバーサイド）
 
@@ -132,101 +151,139 @@ flowchart TD
 
 ```python
 from flask import request, abort
-from functools import wraps
+from decorators.auth import get_current_user, require_role
+from models.role import Role
 
-def require_role(*allowed_roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            user_id = request.headers.get('X-Databricks-User-Id')
-            if not user_id:
-                abort(401)
-
-            user = User.query.filter_by(user_id=user_id).first()
-            if not user or user.role not in [role.value for role in allowed_roles]:
-                abort(403)
-
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-@device_inventory_bp.route('/admin/device-inventory')
+@device_stock_info_master_bp.route('/admin/device-inventory', methods=['GET'])
 @require_role(Role.SYSTEM_ADMIN)
-def list_device_inventory():
-    # 処理続行
-    pass
+def list_device_stock_info_master():
+    # 認証チェック（リバースプロキシヘッダ）
+    current_user = get_current_user()
 ```
 
 **② クエリパラメータ取得**
 
 ```python
-page = request.args.get('page', 1, type=int)
+# ページングの場合（pageパラメータあり）: Cookieから検索条件を取得し、pageのみ上書き
+# 初期表示の場合（pageパラメータなし）: デフォルト値を使用
+if 'page' in request.args:
+    # ページング時: Cookieから検索条件を取得
+    device_name = request.cookies.get('device_name', '')
+    device_type = request.cookies.get('device_type', 'all')
+    stock_status = request.cookies.get('stock_status', 'all')
+    stock_location = request.cookies.get('stock_location', '')
+    purchase_date_from = request.cookies.get('purchase_date_from', None)
+    purchase_date_to = request.cookies.get('purchase_date_to', None)
+    page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
+    sort_column = request.cookies.get('sort_column', '')
+    sort_order = request.cookies.get('sort_order', '')
+else:
+    # 初期表示時: デフォルト値を使用
+    device_name = ''
+    device_type = 'all'
+    stock_status = 'all'
+    stock_location = ''
+    purchase_date_from = None
+    purchase_date_to = None
+    page = 1
+    sort_column = ''
+    sort_order = ''
+
 per_page = 25  # 固定
-sort_by = request.args.get('sort_by', 'device_id')
-order = request.args.get('order', 'asc')
 ```
 
-**③ データベースクエリ実行**
-
-```sql
-SELECT
-  di.inventory_id,
-  di.device_id,
-  di.device_name,
-  di.device_type,
-  di.sim_id,
-  di.mac_address,
-  di.stock_status,
-  di.purchase_date,
-  di.manufacturer_warranty_end,
-  di.vendor_warranty_end,
-  di.storage_location
-FROM
-  device_inventory di
-WHERE
-  di.deleted_flag = FALSE
-  AND di.organization_id IN (
-    SELECT oc.subsidiary_organization_id
-    FROM organization_closure oc
-    WHERE oc.parent_organization_id = :current_user_organization_id
-  )
-ORDER BY
-  {sort_by} {order}
-LIMIT :per_page OFFSET :offset
-```
-
-**④ HTMLレンダリング**
+**③ 検索条件用マスタデータ取得**
 
 ```python
-return render_template('admin/device_inventory/list.html',
+from models import device_type_master, stock_status_master
+
+# デバイス種別マスタ取得
+device_types = (
+    device_type_master.query
+    .filter(device_type_master.delete_flag == False)
+    .order_by(device_type_master.device_type_name)
+    .all()
+)
+
+# 在庫状況マスタ取得
+stock_statuses = (
+    stock_status_master.query
+    .filter(stock_status_master.delete_flag == False)
+    .order_by(stock_status_master.stock_status_id)
+    .all()
+)
+```
+
+**④ データベースクエリ実行**
+
+```python
+from models import device_stock_info_master, device_master, device_type_master, stock_status_master
+
+query = (
+    device_stock_info_master.query
+    .join(device_master, device_stock_info_master.device_stock_id == device_master.device_stock_id)
+    .filter(device_master.delete_flag == False)
+    .join(device_type_master, device_master.device_type_id == device_type_master.device_type_id)
+    .filter(device_type_master.delete_flag == False)
+    .join(stock_status_master, device_stock_info_master.stock_status_id == stock_status_master.stock_status_id)
+    .filter(stock_status_master.delete_flag == False)
+    .filter(device_stock_info_master.delete_flag == False)
+)
+
+# データスコープ制限なし（システム保守者は全データにアクセス可能）
+
+# ソート
+if sort_column:
+    # sort_orderが未選択の場合は昇順をデフォルトとする
+    order_direction = sort_order if sort_order else 'asc'
+    query = query.order_by(
+        getattr(device_master, sort_column).asc() if order_direction == 'asc'
+        else getattr(device_master, sort_column).desc()
+    )
+else:
+    query = query.order_by(device_master.device_name.asc())
+
+# 件数取得
+total = query.count()
+
+# ページング
+offset = (page - 1) * per_page
+inventories = query.limit(per_page).offset(offset).all()
+```
+
+**⑤ HTMLレンダリング**
+
+```python
+return render_template('admin/device_stock_info_master/list.html',
                       inventories=inventories,
                       total=total,
                       page=page,
                       per_page=per_page,
-                      sort_by=sort_by,
-                      order=order)
+                      sort_column=sort_column,
+                      sort_order=sort_order,
+                      device_name=device_name,
+                      device_type=device_type,
+                      stock_status=stock_status,
+                      stock_location=stock_location,
+                      purchase_date_from=purchase_date_from,
+                      purchase_date_to=purchase_date_to,
+                      device_types=device_types,
+                      stock_statuses=stock_statuses)
 ```
-
-#### 表示メッセージ
-
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| ERR_001 | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
-| INFO_001 | デバイス台帳が見つかりませんでした | 検索結果が0件 | データテーブル内 |
 
 #### エラーハンドリング
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 403 | 権限エラー | 403エラーページ表示 | この操作を実行する権限がありません |
-| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
+| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
 
 ---
 
 ### 検索・絞り込み
 
-**トリガー:** (2.7) 検索ボタンクリック（フォーム送信）
+**トリガー:** (2.9) 検索ボタンクリック（フォーム送信）
 
 **前提条件:**
 - 検索条件が入力されている（空でも可）
@@ -235,119 +292,145 @@ return render_template('admin/device_inventory/list.html',
 
 ```mermaid
 flowchart TD
-    Start([検索ボタンクリック<br>フォーム送信]) --> Validate[サーバーサイドバリデーション<br>WTForms検証]
-    Validate --> ValidCheck{バリデーション結果}
+    Start([検索ボタンクリック<br>フォーム送信]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
 
-    ValidCheck -->|エラー| ValidError[フォーム再表示<br>エラーメッセージ付き]
-    ValidError --> ValidEnd([処理中断])
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
 
-    ValidCheck -->|OK| Convert[検索条件をクエリパラメータに変換<br>page=1にリセット]
-    Convert --> Scope[データスコープ制限適用]
-    Scope --> Query[DBクエリ実行<br>検索条件を適用]
-    Query --> CheckDB{DBクエリ結果}
+    CheckPerm -->|権限OK| Validate[サーバーサイド<br>バリデーション<br>WTForms検証]
+    Validate --> ValidCheck{バリデーション<br>結果}
 
-    CheckDB -->|成功| Template[テンプレートレンダリング]
-    Template --> Response[HTMLレスポンス返却]
+    ValidCheck -->|エラー| ValidError[エラーメッセージ付きで<br>フォーム再表示]
+    ValidError --> End
 
-    CheckDB -->|失敗| Error500[500エラーページ表示]
+    ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア]
+    ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
+    Convert --> Count[表示件数取得DBクエリ実行<br>device_stock_info_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN stock_status_master<br>検索条件を適用]
+    Count --> CheckDB{DBクエリ結果}
 
-    ValidEnd --> End([処理完了])
-    Response --> End
+    CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
+
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_stock_info_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN stock_status_master<br>検索条件を適用]
+    Query --> CheckDB2{DBクエリ結果}
+
+    CheckDB2 -->|失敗| Error500
+
+    CheckDB2 -->|成功| PutParams[Cookieに検索条件を格納<br>max_age=86400]
+    PutParams --> Template[Jinja2<br>テンプレートレンダリング]
+    Template --> Response[HTMLレスポンス返却]
+    Response --> End
 ```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_name`, `device_type`, `stock_status`, `stock_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
 
 #### バリデーション
 
-**実行タイミング:** フォーム送信直後（サーバーサイド）
+**実行タイミング:** 検索ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (2.1) キーワード、(2.5)〜(2.6) 購入日範囲
+**バリデーション対象:** (2.1) デバイス名、(2.4) 在庫場所、(2.5)〜(2.6) 購入日範囲
 
 **バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (2) 検索フォーム > バリデーション を参照
 
+**データスコープ制限:** システム保守者は全デバイス台帳にアクセス可能
+
 #### 処理詳細（サーバーサイド）
 
-**① フォーム検証**
+**検索クエリ実行:**
 
 ```python
-class SearchForm(FlaskForm):
-    keyword = StringField('キーワード', validators=[Length(max=100)])
-    device_type = SelectField('デバイス種別', choices=[...])
-    stock_status = SelectField('在庫状況', choices=[...])
-    storage_location = SelectField('在庫場所', choices=[...])
-    purchase_date_from = DateField('購入日（開始）', validators=[Optional()])
-    purchase_date_to = DateField('購入日（終了）', validators=[Optional()])
+from models import device_stock_info_master, device_master, device_type_master, stock_status_master
 
-form = SearchForm(request.args)
-if not form.validate():
-    return render_template('admin/device_inventory/list.html',
-                          form=form,
-                          inventories=[],
-                          errors=form.errors)
-```
+query = (
+    device_stock_info_master.query
+    .join(device_master, device_stock_info_master.device_stock_id == device_master.device_stock_id)
+    .filter(device_master.delete_flag == False)
+    .join(device_type_master, device_master.device_type_id == device_type_master.device_type_id)
+    .filter(device_type_master.delete_flag == False)
+    .join(stock_status_master, device_stock_info_master.stock_status_id == stock_status_master.stock_status_id)
+    .filter(stock_status_master.delete_flag == False)
+    .filter(device_stock_info_master.delete_flag == False)
+)
 
-**② 検索クエリ実行**
+# データスコープ制限なし（システム保守者は全データにアクセス可能）
 
-```python
-query = DeviceInventory.query.filter_by(deleted_flag=False)
+# デバイス名検索（部分一致）
+device_name = request.args.get('device_name', '')
+if device_name:
+    query = query.filter(device_master.device_name.like(f'%{device_name}%'))
 
-# データスコープ制限
-query = query.filter(DeviceInventory.organization_id.in_(
-    get_accessible_organization_ids(current_user.organization_id)
-))
-
-# キーワード検索
-if keyword:
-    query = query.filter(
-        or_(
-            DeviceInventory.device_id.like(f'%{keyword}%'),
-            DeviceInventory.device_name.like(f'%{keyword}%')
-        )
-    )
-
-# デバイス種別フィルタ
+# デバイス種別絞り込み
+device_type = request.args.get('device_type', 'all')
 if device_type and device_type != 'all':
-    query = query.filter(DeviceInventory.device_type == device_type)
+    query = query.filter(device_master.device_type_id == device_type)
 
-# 在庫状況フィルタ
+# 在庫状況絞り込み
+stock_status = request.args.get('stock_status', 'all')
 if stock_status and stock_status != 'all':
-    query = query.filter(DeviceInventory.stock_status == stock_status)
+    query = query.filter(device_stock_info_master.stock_status_id == stock_status)
+
+# 在庫場所検索（部分一致）
+stock_location = request.args.get('stock_location', '')
+if stock_location:
+    query = query.filter(device_stock_info_master.stock_location.like(f'%{stock_location}%'))
 
 # 購入日範囲フィルタ
+purchase_date_from = request.args.get('purchase_date_from')
+purchase_date_to = request.args.get('purchase_date_to')
 if purchase_date_from:
-    query = query.filter(DeviceInventory.purchase_date >= purchase_date_from)
+    query = query.filter(device_stock_info_master.purchase_date >= purchase_date_from)
 if purchase_date_to:
-    query = query.filter(DeviceInventory.purchase_date <= purchase_date_to)
+    query = query.filter(device_stock_info_master.purchase_date <= purchase_date_to)
 
-inventories = query.order_by(...).limit(per_page).offset(offset).all()
-total = query.count()
+# ソート・ページング
+# ...
 ```
 
 ---
 
 ### ソート
 
-**トリガー:** (4) データテーブルのソート可能カラムのヘッダークリック
+**トリガー:** (2.7) ソート項目、(2.8) ソート順の選択後、(2.9) 検索ボタンクリック
 
 #### 処理フロー
 
 ソート条件を変更して `GET /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
 ```
-GET /admin/device-inventory?keyword=...&sort_by=device_name&order=desc&page=1
+GET /admin/device-inventory?device_name=...&sort_column=device_name&sort_order=desc&page=1
 ```
+
+---
+
+### ページ内ソート
+
+**トリガー:**（3）データテーブルのソート可能カラム（デバイス名、デバイス種別、SIMID、MACアドレス、在庫状況、購入日、保証期限、在庫場所）のヘッダをクリック
+
+#### 処理詳細
+データテーブルのヘッダをクリックすることで、ページ内で閉じたソートを行う。
+詳細は[UI共通仕様書](../../common/ui-common-specification.md)参照のこと
 
 ---
 
 ### ページング
 
-**トリガー:** (4.12) ページネーションのページ番号ボタンクリック
+**トリガー:** (3.12) ページネーションのページ番号ボタンクリック
 
 #### 処理フロー
 
 ページ番号を変更して `GET /admin/device-inventory` へリダイレクト。検索条件とソート条件は保持。
 
 ```
-GET /admin/device-inventory?keyword=...&sort_by=device_id&order=asc&page=3
+GET /admin/device-inventory?device_name=...&sort_column=device_name&sort_order=asc&page=3
 ```
 
 ---
@@ -356,182 +439,140 @@ GET /admin/device-inventory?keyword=...&sort_by=device_id&order=asc&page=3
 
 #### 登録モーダル表示
 
-**トリガー:** (3.2) 台帳登録ボタンクリック
+**トリガー:** (1.4) 登録ボタンクリック
 
 #### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([台帳登録ボタンクリック]) --> Auth[認証・権限チェック]
-    Auth --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー]
+    Start([メイン画面上の登録ボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
 
-    CheckPerm -->|権限OK| LoadMaster[マスタデータ取得<br>デバイス種別、在庫状況選択肢]
-    LoadMaster --> Template[登録モーダルレンダリング]
-    Template --> Response[HTML（モーダル）返却]
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
 
-    Error403 --> End([処理完了])
+    CheckPerm -->|権限OK| LoadMaster[デバイス種別マスタ、<br>在庫状況マスタを取得]
+    LoadMaster --> QueryDB{DBクエリ結果}
+
+    QueryDB -->|失敗| Error500[500エラーモーダル表示]
+    Error500 --> End
+
+    QueryDB -->|成功| Template[登録モーダルレンダリング]
+    Template --> Response[登録モーダル表示]
+
+    CheckPerm -->|権限なし| Error403[403エラー返却 ※]
+    Error403 --> Response
+
     Response --> End
 ```
 
+※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
+
 #### 登録実行
 
-**トリガー:** (6.14) 登録ボタンクリック
+**トリガー:** (7.13) 登録モーダルの登録ボタンクリック
 
-#### 処理フロー
+#### 処理フロー（登録実行）
 
 ```mermaid
 flowchart TD
-    Start([登録ボタンクリック]) --> Validate[サーバーサイドバリデーション<br>WTForms検証]
+    Start([登録モーダルの登録ボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
+
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
+
+    CheckPerm -->|権限OK| Validate[サーバーサイドバリデーション<br>WTForms検証]
     Validate --> ValidCheck{バリデーション結果}
 
-    ValidCheck -->|エラー| ValidError[モーダル再表示<br>エラーメッセージ付き]
-    ValidError --> ValidEnd([処理中断])
+    ValidCheck -->|エラー| ValidError[登録モーダル再表示<br>エラーメッセージ付き]
+    ValidError --> End
 
-    ValidCheck -->|OK| DupCheck[重複チェック<br>device_id の一意性確認]
-    DupCheck --> DupResult{重複あり?}
+    ValidCheck -->|OK| OpenModal{登録確認モーダル表示}
 
-    DupResult -->|重複あり| DupError[エラーメッセージ表示<br>このデバイスIDは既に登録されています]
-    DupError --> ValidEnd
+    OpenModal -->|キャンセルボタン押下| CloseModal[確認モーダルを閉じる]
+    CloseModal --> End
 
-    DupResult -->|重複なし| BeginTx[トランザクション開始]
-    BeginTx --> Insert[INSERTクエリ実行<br>device_inventory テーブル]
-    Insert --> InsertResult{INSERT結果}
-
-    InsertResult -->|成功| Commit[トランザクションコミット]
-    Commit --> Flash[成功メッセージをセッションに設定<br>デバイス台帳を登録しました]
-    Flash --> Redirect[リダイレクト<br>GET /admin/device-inventory]
+    OpenModal -->|登録ボタン押下| BeginTx[トランザクション開始]
+    BeginTx --> InsertStock[device_stock_info_masterに<br>在庫情報を追加]
+    InsertStock --> InsertDevice[device_masterに<br>デバイス情報を追加]
+    InsertDevice --> InsertResult{INSERT結果}
 
     InsertResult -->|失敗| Rollback[トランザクションロールバック]
-    Rollback --> Error500[エラーメッセージ表示]
-
-    ValidEnd --> End([処理完了])
-    Redirect --> End
+    Rollback --> Error500[500エラーモーダル表示]
     Error500 --> End
+
+    InsertResult -->|成功| Commit[トランザクションコミット]
+    Commit --> ShowComplete[登録完了モーダル表示]
+    ShowComplete --> UserOK[OKボタン押下]
+    UserOK --> Redirect[リダイレクト<br>GET /admin/device-inventory]
+    Redirect --> End
 ```
 
 #### バリデーション
 
 **実行タイミング:** 登録ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (6.1)〜(6.13) 全フォーム項目
+**バリデーション対象:** (4.1)〜(4.12) 全フォーム項目
 
-**バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (6) 登録モーダル > バリデーション を参照
+**バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (4) 登録モーダル > バリデーション を参照
 
 #### 処理詳細（サーバーサイド）
 
 ```python
-@device_inventory_bp.route('/admin/device-inventory/create', methods=['POST'])
+import uuid
+from flask import request, redirect, url_for, flash
+from models import device_stock_info_master, device_master, db
+from forms.device_stock_info_master_form import DeviceStockInfoMasterForm
+
+@device_stock_info_master_bp.route('/admin/device-inventory/create', methods=['POST'])
 @require_role(Role.SYSTEM_ADMIN)
-def create_device_inventory():
-    form = DeviceInventoryForm()
+def create_device_stock_info_master():
+    form = DeviceStockInfoMasterForm(request.form)
 
-    if not form.validate_on_submit():
-        return render_template('admin/device_inventory/form.html', form=form)
-
-    # 重複チェック
-    existing = DeviceInventory.query.filter_by(
-        device_id=form.device_id.data,
-        deleted_flag=False
-    ).first()
-    if existing:
-        form.device_id.errors.append('このデバイスIDは既に登録されています')
-        return render_template('admin/device_inventory/form.html', form=form)
+    if not form.validate():
+        return render_template('admin/device_stock_info_master/form.html', form=form)
 
     try:
-        inventory = DeviceInventory(
-            inventory_id=str(uuid.uuid4()),
-            device_id=form.device_id.data,
-            device_name=form.device_name.data,
-            device_type=form.device_type.data,
-            model_info=form.model_info.data,
-            sim_id=form.sim_id.data,
-            mac_address=form.mac_address.data,
-            stock_status=form.stock_status.data,
-            storage_location=form.storage_location.data,
+        # トランザクション開始
+        # device_stock_info_master にINSERT（在庫情報）
+        device_stock = device_stock_info_master(
+            device_stock_uuid=str(uuid.uuid4()),
+            stock_status_id=form.stock_status.data,
             purchase_date=form.purchase_date.data,
-            scheduled_ship_date=form.scheduled_ship_date.data,
-            ship_date=form.ship_date.data,
-            manufacturer_warranty_end=form.manufacturer_warranty_end.data,
-            vendor_warranty_end=form.vendor_warranty_end.data,
-            organization_id=current_user.organization_id,
-            created_by=current_user.user_id,
-            updated_by=current_user.user_id
+            # ... 他のフィールド ...
+            creator=current_user.user_id,
+            modifier=current_user.user_id,
+            delete_flag=False
         )
-        db.session.add(inventory)
+        db.session.add(device_stock)
+        db.session.flush()
+
+        # device_master にINSERT（デバイス情報）
+        device = device_master(
+            device_stock_id=device_stock.device_stock_id,
+            device_name=form.device_name.data,
+            # ... 他のフィールド ...
+            creator=current_user.user_id,
+            modifier=current_user.user_id,
+            delete_flag=False
+        )
+        db.session.add(device)
         db.session.commit()
 
         flash('デバイス台帳を登録しました', 'success')
-        return redirect(url_for('device_inventory.list_device_inventory'))
+        return redirect(url_for('device_stock_info_master.list_device_stock_info_master'))
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"デバイス台帳登録失敗: {e}")
         flash('デバイス台帳の登録に失敗しました', 'error')
-        return render_template('admin/device_inventory/form.html', form=form)
-```
-
-#### 表示メッセージ
-
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| INV_001 | デバイス台帳を登録しました | 登録成功時 | メッセージ表示エリア（成功） |
-| ERR_002 | デバイス台帳の登録に失敗しました | 登録失敗時 | モーダル内（エラー） |
-| ERR_003 | このデバイスIDは既に登録されています | デバイスID重複時 | デバイスIDフィールド下 |
-
----
-
-### デバイス台帳参照
-
-**トリガー:** (4.2) デバイスIDリンククリック または (4.11) 詳細ボタンクリック
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([詳細リンククリック]) --> Auth[認証・権限チェック]
-    Auth --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー]
-
-    CheckPerm -->|権限OK| Query[DBクエリ実行<br>inventory_id で取得]
-    Query --> CheckDB{データ存在?}
-
-    CheckDB -->|存在しない| Error404[404エラー<br>データが見つかりません]
-
-    CheckDB -->|存在する| ScopeCheck[データスコープチェック<br>アクセス権限確認]
-    ScopeCheck --> ScopeResult{スコープ内?}
-
-    ScopeResult -->|スコープ外| Error404_2[404エラー<br>データが見つかりません]
-
-    ScopeResult -->|スコープ内| Template[参照モーダルレンダリング]
-    Template --> Response[HTML（モーダル）返却]
-
-    Error403 --> End([処理完了])
-    Error404 --> End
-    Error404_2 --> End
-    Response --> End
-```
-
-#### 処理詳細（サーバーサイド）
-
-```python
-@device_inventory_bp.route('/admin/device-inventory/<inventory_id>')
-@require_role(Role.SYSTEM_ADMIN)
-def view_device_inventory(inventory_id):
-    inventory = DeviceInventory.query.filter_by(
-        inventory_id=inventory_id,
-        deleted_flag=False
-    ).first()
-
-    if not inventory:
-        abort(404)
-
-    # データスコープチェック
-    if not is_in_scope(inventory.organization_id, current_user.organization_id):
-        abort(404)
-
-    return render_template('admin/device_inventory/detail.html',
-                          inventory=inventory)
+        return render_template('admin/device_stock_info_master/form.html', form=form)
 ```
 
 ---
@@ -540,305 +581,266 @@ def view_device_inventory(inventory_id):
 
 #### 更新モーダル表示
 
-**トリガー:** (4.11) 編集ボタンクリック または (7) 参照モーダル内の編集ボタンクリック
+**トリガー:** (3.11) 更新ボタンクリック
 
-#### 更新実行
-
-**トリガー:** 更新モーダル内の更新ボタンクリック
-
-#### 処理フロー
+#### 処理フロー（更新モーダル表示）
 
 ```mermaid
 flowchart TD
-    Start([更新ボタンクリック]) --> Auth[認証・権限チェック]
-    Auth --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー]
+    Start([メイン画面上の更新ボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
 
-    CheckPerm -->|権限OK| Query[対象データ取得]
-    Query --> CheckDB{データ存在?}
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
 
-    CheckDB -->|存在しない| Error404[404エラー]
+    CheckPerm -->|権限OK| Query[在庫情報UUIDを取得<br>SELECT * FROM<br>device_stock_info_master<br>WHERE device_stock_uuid = :uuid]
+    Query --> GetMaster[在庫状況マスタ、<br>デバイスマスタ、<br>デバイス種別マスタを取得]
+    GetMaster --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|存在する| Validate[サーバーサイドバリデーション]
+    CheckDB -->|データなし| Error404[404エラーモーダル表示]
+    Error404 --> End
+
+    CheckDB -->|成功| Template[更新モーダルをレンダリング<br>フォームに既定値を設定]
+    Template --> OpenModal[更新モーダルを開く]
+
+    CheckPerm -->|権限なし| Error403[403エラー ※]
+    Error403 --> OpenModal
+
+    OpenModal --> End
+```
+
+※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
+
+#### 更新実行
+
+**トリガー:** (8) 更新モーダルの更新ボタンクリック
+
+#### 処理フロー（更新実行）
+
+```mermaid
+flowchart TD
+    Start([更新モーダルの更新ボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
+
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
+
+    CheckPerm -->|権限OK| Validate[サーバーサイドバリデーション<br>WTForms検証]
     Validate --> ValidCheck{バリデーション結果}
 
-    ValidCheck -->|エラー| ValidError[モーダル再表示<br>エラーメッセージ付き]
-    ValidError --> ValidEnd([処理中断])
+    ValidCheck -->|エラー| ValidError[更新モーダル再表示<br>エラーメッセージ付き]
+    ValidError --> End
 
-    ValidCheck -->|OK| BeginTx[トランザクション開始]
-    BeginTx --> Update[UPDATEクエリ実行]
-    Update --> UpdateResult{UPDATE結果}
+    ValidCheck -->|OK| OpenConfirmModal{確認モーダルを開く}
 
-    UpdateResult -->|成功| Commit[コミット]
-    Commit --> Flash[成功メッセージ設定]
-    Flash --> Redirect[リダイレクト → 一覧]
+    OpenConfirmModal -->|キャンセルボタン押下| CancelMsg[確認モーダルを閉じる]
+    CancelMsg --> End
 
-    UpdateResult -->|失敗| Rollback[ロールバック]
-    Rollback --> Error500[エラーメッセージ表示]
+    OpenConfirmModal -->|更新ボタン押下| BeginTx[トランザクション開始]
+    BeginTx --> Update[UPDATE<br>device_stock_info_master<br>SET ... <br>WHERE device_stock_uuid = :uuid]
+    Update --> UpdateResult{DBクエリ結果}
 
-    Error403 --> End([処理完了])
+    UpdateResult -->|0件更新| Error404[404エラーモーダル表示]
     Error404 --> End
-    ValidEnd --> End
-    Redirect --> End
+
+    UpdateResult -->|失敗| Rollback[トランザクションロールバック]
+    Rollback --> Error500[500エラーモーダル表示]
     Error500 --> End
+
+    UpdateResult -->|成功| Commit[トランザクションコミット]
+    Commit --> ShowComplete[更新完了モーダル表示]
+    ShowComplete --> UserOK[OKボタン押下]
+    UserOK --> Redirect[一覧画面へリダイレクト]
+    Redirect --> End
 ```
 
-#### 処理詳細（サーバーサイド）
+##### Flaskルート
 
-```python
-@device_inventory_bp.route('/admin/device-inventory/<inventory_id>/update', methods=['POST'])
-@require_role(Role.SYSTEM_ADMIN)
-def update_device_inventory(inventory_id):
-    inventory = DeviceInventory.query.filter_by(
-        inventory_id=inventory_id,
-        deleted_flag=False
-    ).first()
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 台帳更新フォーム表示 | `GET /admin/device-inventory/<device_stock_uuid>/edit` | 現在の設定値を含むフォームを返却。デバイス・在庫状況・デバイス種別をDBから取得 |
+| 台帳更新実行 | `POST /admin/device-inventory/<device_stock_uuid>/update` | フォームデータを受け取り、DB更新 |
 
-    if not inventory:
-        abort(404)
-
-    if not is_in_scope(inventory.organization_id, current_user.organization_id):
-        abort(404)
-
-    form = DeviceInventoryForm()
-
-    if not form.validate_on_submit():
-        return render_template('admin/device_inventory/form.html',
-                              form=form,
-                              inventory=inventory)
-
-    try:
-        # 更新前の在庫状況をログ用に保存
-        old_stock_status = inventory.stock_status
-
-        inventory.device_name = form.device_name.data
-        inventory.device_type = form.device_type.data
-        inventory.model_info = form.model_info.data
-        inventory.sim_id = form.sim_id.data
-        inventory.mac_address = form.mac_address.data
-        inventory.stock_status = form.stock_status.data
-        inventory.storage_location = form.storage_location.data
-        inventory.purchase_date = form.purchase_date.data
-        inventory.scheduled_ship_date = form.scheduled_ship_date.data
-        inventory.ship_date = form.ship_date.data
-        inventory.manufacturer_warranty_end = form.manufacturer_warranty_end.data
-        inventory.vendor_warranty_end = form.vendor_warranty_end.data
-        inventory.updated_by = current_user.user_id
-        inventory.updated_at = datetime.utcnow()
-
-        db.session.commit()
-
-        # 在庫状況が変更された場合、ログ出力
-        if old_stock_status != inventory.stock_status:
-            logger.info(f"在庫状況変更 - inventory_id: {inventory_id}, "
-                       f"変更前: {old_stock_status}, 変更後: {inventory.stock_status}, "
-                       f"操作者: {current_user.user_id}")
-
-        flash('デバイス台帳を更新しました', 'success')
-        return redirect(url_for('device_inventory.list_device_inventory'))
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"デバイス台帳更新失敗: {e}")
-        flash('デバイス台帳の更新に失敗しました', 'error')
-        return render_template('admin/device_inventory/form.html',
-                              form=form,
-                              inventory=inventory)
-```
-
-#### 表示メッセージ
-
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| INV_002 | デバイス台帳を更新しました | 更新成功時 | メッセージ表示エリア（成功） |
-| ERR_004 | デバイス台帳の更新に失敗しました | 更新失敗時 | モーダル内（エラー） |
+**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
 
 ---
 
 ### デバイス台帳削除
 
-**トリガー:** (3.3) 削除ボタンクリック → (8) 削除確認モーダルで「削除する」ボタンクリック
-
 **前提条件:**
-- 1件以上のチェックボックスが選択されている
+- 1件以上のチェックボックス (3.1) が選択されている（未選択時は削除ボタンが非活性のため操作不可）
+
+#### 削除実行
+
+**トリガー:** (1.5) 削除ボタンクリック
+
+#### 処理フロー（削除実行）
+
+```mermaid
+flowchart TD
+    Start([メイン画面上の削除ボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
+
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
+
+    CheckPerm -->|権限OK| OpenModal{削除確認モーダル表示}
+    OpenModal -->|キャンセルボタン押下| CloseModal[確認モーダルを閉じる]
+    CloseModal --> End
+
+    OpenModal -->|削除ボタン押下| StartTx[トランザクション開始]
+    StartTx --> Delete[UPDATE<br>device_stock_info_master<br>SET delete_flag = TRUE<br>WHERE device_stock_uuid IN :uuids]
+    Delete --> Query{DBクエリ結果}
+
+    Query -->|0件削除| Error404[404エラーモーダル表示]
+    Error404 --> End
+
+    Query -->|失敗| Rollback[トランザクション<br>ロールバック]
+    Rollback --> Error500[500エラーモーダル表示]
+    Error500 --> End
+
+    Query -->|成功| Commit[トランザクションコミット]
+    Commit --> ShowModal[完了モーダル表示]
+    ShowModal --> ClickOK[OKボタン押下]
+    ClickOK --> Redirect[一覧画面へリダイレクト]
+    Redirect --> End
+```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 台帳削除実行 | `POST /admin/device-inventory/<device_stock_uuid>/delete` | 論理削除（delete_flag=TRUE） |
+
+**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
+
+**注**: 複数選択削除の場合は、デバイス在庫UUIDをカンマ区切りで送信し、サーバー側で分割処理
+
+---
+
+### デバイス台帳参照
+
+**トリガー:** (3.2) デバイス名リンククリック または (3.10) 参照ボタンクリック
 
 #### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([削除するボタンクリック]) --> Auth[認証・権限チェック]
-    Auth --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー]
+    Start([参照ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
 
-    CheckPerm -->|権限OK| CheckIds[選択IDリスト取得]
-    CheckIds --> CheckEmpty{選択あり?}
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
 
-    CheckEmpty -->|選択なし| Error400[エラー: 削除対象を選択してください]
+    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_stock_info_master<br>JOIN device_master<br>JOIN stock_status_master<br>JOIN device_type_master<br>WHERE device_stock_uuid = :uuid]
+    Query --> CheckDB{DBクエリ結果}
 
-    CheckEmpty -->|選択あり| BeginTx[トランザクション開始]
-    BeginTx --> Loop[各IDに対して処理]
-    Loop --> Query[対象データ取得]
-    Query --> CheckDB{データ存在?}
+    CheckDB -->|データなし| Error404[404エラーモーダル表示]
+    Error404 --> End
 
-    CheckDB -->|存在しない| Skip[スキップ（処理続行）]
-    Skip --> Loop
-
-    CheckDB -->|存在する| ScopeCheck[データスコープチェック]
-    ScopeCheck --> ScopeResult{スコープ内?}
-
-    ScopeResult -->|スコープ外| Skip
-
-    ScopeResult -->|スコープ内| Update[論理削除<br>deleted_flag = TRUE]
-    Update --> Loop
-
-    Loop -->|全件処理完了| Commit[コミット]
-    Commit --> Flash[成功メッセージ設定<br>N件のデバイス台帳を削除しました]
-    Flash --> Redirect[リダイレクト → 一覧]
-
-    Error403 --> End([処理完了])
-    Error400 --> End
-    Redirect --> End
+    CheckDB -->|成功| Template[参照モーダルレンダリング]
+    Template --> Response[HTML（モーダル）返却]
+    Response --> End
 ```
 
-#### 処理詳細（サーバーサイド）
+#### Flaskルート
 
-```python
-@device_inventory_bp.route('/admin/device-inventory/delete', methods=['POST'])
-@require_role(Role.SYSTEM_ADMIN)
-def delete_device_inventory():
-    inventory_ids = request.form.getlist('inventory_ids[]')
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 台帳詳細表示 | `GET /admin/device-inventory/<device_stock_uuid>` | デバイス台帳の詳細情報を返却。デバイス・在庫状況・デバイス種別名をDBから取得 |
 
-    if not inventory_ids:
-        flash('削除対象を選択してください', 'error')
-        return redirect(url_for('device_inventory.list_device_inventory'))
-
-    try:
-        deleted_count = 0
-        for inventory_id in inventory_ids:
-            inventory = DeviceInventory.query.filter_by(
-                inventory_id=inventory_id,
-                deleted_flag=False
-            ).first()
-
-            if not inventory:
-                continue
-
-            if not is_in_scope(inventory.organization_id, current_user.organization_id):
-                continue
-
-            inventory.deleted_flag = True
-            inventory.updated_by = current_user.user_id
-            inventory.updated_at = datetime.utcnow()
-            deleted_count += 1
-
-        db.session.commit()
-
-        flash(f'{deleted_count}件のデバイス台帳を削除しました', 'success')
-        return redirect(url_for('device_inventory.list_device_inventory'))
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"デバイス台帳削除失敗: {e}")
-        flash('デバイス台帳の削除に失敗しました', 'error')
-        return redirect(url_for('device_inventory.list_device_inventory'))
-```
-
-#### 表示メッセージ
-
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| INV_003 | {n}件のデバイス台帳を削除しました | 削除成功時 | メッセージ表示エリア（成功） |
-| ERR_005 | デバイス台帳の削除に失敗しました | 削除失敗時 | メッセージ表示エリア（エラー） |
-| ERR_006 | 削除対象を選択してください | 未選択時 | メッセージ表示エリア（エラー） |
+**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
 
 ---
 
 ### CSVエクスポート
 
-**トリガー:** (3.1) CSVエクスポートボタンクリック
+**トリガー:** (1.3) CSVエクスポートボタンクリック
 
 #### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([CSVエクスポートボタンクリック]) --> Auth[認証・権限チェック]
-    Auth --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー]
+    Start([エクスポートボタン<br>クリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
+    Error401 --> End([処理完了])
 
-    CheckPerm -->|権限OK| GetParams[現在の検索条件を取得]
-    GetParams --> Query[DBクエリ実行<br>検索条件適用]
-    Query --> CheckDB{DBクエリ結果}
+    CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
+    Error403 --> End
 
-    CheckDB -->|失敗| Error500[エラーメッセージ表示]
+    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_stock_info_master<br>JOIN stock_status_master<br>JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
+    GetParams --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Generate[CSVデータ生成<br>UTF-8 BOM付き]
-    Generate --> Response[CSVファイルレスポンス返却<br>Content-Disposition: attachment]
-
-    Error403 --> End([処理完了])
+    CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
+
+    CheckDB -->|成功| Generate[CSVデータ生成]
+    Generate --> Response[CSVファイルレスポンス返却<br>Content-Type: text/csv<br>filename:<br>device_inventory<br>_YYYYMMDD_HHmmss.csv]
     Response --> End
 ```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| CSVエクスポート | `GET /admin/device-inventory?export=csv` | 検索条件を適用してCSVダウンロード。デバイス・在庫状況・デバイス種別名をDBから取得 |
 
 #### 処理詳細（サーバーサイド）
 
 ```python
-@device_inventory_bp.route('/admin/device-inventory')
+import pandas as pd
+from datetime import datetime
+from models import device_stock_info_master, device_master, device_type_master, stock_status_master
+
+@device_stock_info_master_bp.route('/admin/device-inventory', methods=['GET'])
 @require_role(Role.SYSTEM_ADMIN)
-def list_device_inventory():
-    # CSVエクスポートリクエストの判定
+def list_device_stock_info_master():
+    # ... 検索条件適用済みクエリ（各テーブルをJOIN済み、各テーブルのdelete_flag == Falseでフィルタ済み） ...
+
+    # CSVエクスポート処理
     if request.args.get('export') == 'csv':
-        return export_device_inventory_csv()
+        data = query.all()
+        df = pd.DataFrame([{
+            'デバイス名': d.device.device_name,
+            'デバイス種別': d.device.device_type.device_type_name,
+            'モデル情報': d.device.model_info or '',
+            'SIMID': d.device.sim_id or '',
+            'MACアドレス': d.device.mac_address or '',
+            '在庫状況': d.stock_status.stock_status_name,
+            '購入日': d.purchase_date.strftime('%Y/%m/%d') if d.purchase_date else '',
+            '出荷予定日': d.estimated_ship_date.strftime('%Y/%m/%d') if d.estimated_ship_date else '',
+            '出荷日': d.ship_date.strftime('%Y/%m/%d') if d.ship_date else '',
+            'メーカー保証終了日': d.manufacturer_warranty_end_date.strftime('%Y/%m/%d') if d.manufacturer_warranty_end_date else '',
+            'ベンダー保証終了日': d.vendor_warranty_end_date.strftime('%Y/%m/%d') if d.vendor_warranty_end_date else '',
+            '在庫場所': d.stock_location or ''
+        } for d in data])
 
-    # 通常の一覧表示処理
-    ...
+        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
 
-def export_device_inventory_csv():
-    # 検索条件を適用してデータ取得
-    inventories = get_filtered_inventories()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'device_inventory_{timestamp}.csv'
 
-    # CSVデータ生成
-    import csv
-    from io import StringIO
-
-    output = StringIO()
-    # UTF-8 BOM
-    output.write('\ufeff')
-
-    writer = csv.writer(output)
-
-    # ヘッダー
-    writer.writerow([
-        'デバイスID', 'デバイス名', 'デバイス種別', 'モデル情報',
-        'SIMID', 'MACアドレス', '在庫状況', '購入日', '出荷予定日',
-        '出荷日', 'メーカー保証終了日', 'ベンダー保証終了日', '在庫場所'
-    ])
-
-    # データ行
-    for inv in inventories:
-        writer.writerow([
-            inv.device_id,
-            inv.device_name,
-            inv.device_type,
-            inv.model_info or '',
-            inv.sim_id or '',
-            inv.mac_address or '',
-            inv.stock_status,
-            inv.purchase_date.strftime('%Y/%m/%d') if inv.purchase_date else '',
-            inv.scheduled_ship_date.strftime('%Y/%m/%d') if inv.scheduled_ship_date else '',
-            inv.ship_date.strftime('%Y/%m/%d') if inv.ship_date else '',
-            inv.manufacturer_warranty_end.strftime('%Y/%m/%d') if inv.manufacturer_warranty_end else '',
-            inv.vendor_warranty_end.strftime('%Y/%m/%d') if inv.vendor_warranty_end else '',
-            inv.storage_location or ''
-        ])
-
-    # レスポンス生成
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'device_inventory_{timestamp}.csv'
-
-    response = make_response(output.getvalue())
-    response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
-    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
+        response = make_response(csv_data)
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 ```
 
 ---
@@ -849,21 +851,27 @@ def export_device_inventory_csv():
 
 | No | テーブル名 | 論理名 | 操作種別 | ワークフロー | 目的 |
 |----|-----------|--------|---------|------------|------|
-| 1 | device_inventory | デバイス台帳 | SELECT | 初期表示、検索、参照 | 台帳情報取得 |
-| 2 | device_inventory | デバイス台帳 | INSERT | 登録 | 新規台帳作成 |
-| 3 | device_inventory | デバイス台帳 | UPDATE | 更新、削除 | 台帳情報更新、論理削除 |
-| 4 | organization_closure | 組織階層 | SELECT | 全操作 | データスコープ制限 |
-| 5 | users | ユーザー | SELECT | 認証 | 現在ユーザー情報取得 |
+| 1 | device_stock_info_master | デバイス在庫情報マスタ | SELECT | 初期表示、検索、参照 | 在庫情報取得 |
+| 2 | device_stock_info_master | デバイス在庫情報マスタ | INSERT | 登録 | 新規在庫情報作成 |
+| 3 | device_stock_info_master | デバイス在庫情報マスタ | UPDATE | 更新、削除 | 在庫情報更新、論理削除 |
+| 4 | device_master | デバイスマスタ | SELECT | 初期表示、検索、参照 | デバイス情報取得（結合） |
+| 5 | device_master | デバイスマスタ | INSERT | 登録 | 新規デバイス情報作成 |
+| 6 | device_master | デバイスマスタ | UPDATE | 更新、削除 | デバイス情報更新、論理削除 |
+| 7 | device_type_master | デバイス種別マスタ | SELECT | 初期表示、検索、登録、更新 | デバイス種別選択肢取得（結合） |
+| 8 | stock_status_master | 在庫状況マスタ | SELECT | 初期表示、検索、登録、更新 | 在庫状況選択肢取得（結合） |
+| 9 | users | ユーザー | SELECT | 認証 | 現在ユーザー情報取得 |
 
-### インデックス最適化
+### テーブル結合関係
 
-**使用するインデックス:**
-- device_inventory.inventory_id: PRIMARY KEY - 主キー
-- device_inventory.device_id: UNIQUE INDEX - デバイスID重複チェック
-- device_inventory.organization_id: INDEX - データスコープ制限
-- device_inventory.stock_status: INDEX - 在庫状況検索
-- device_inventory.device_type: INDEX - デバイス種別検索
-- organization_closure.(parent_organization_id, subsidiary_organization_id): INDEX - 組織階層検索
+```
+device_stock_info_master (dsi)
+    ├── INNER JOIN device_master (dm)
+    │       ON dsi.device_stock_id = dm.device_stock_id
+    │       └── INNER JOIN device_type_master (dtm)
+    │               ON dm.device_type_id = dtm.device_type_id
+    └── INNER JOIN stock_status_master (ssm)
+            ON dsi.stock_status_id = ssm.stock_status_id
+```
 
 ---
 
@@ -892,38 +900,36 @@ def export_device_inventory_csv():
 ### 認証・認可実装
 
 **認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Databricks-User-Id`, `X-Databricks-Access-Token`）
+- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`, `X-Forwarded-Email`）
 
 **認可ロジック:**
-- `SYSTEM_ADMIN` ロールのみアクセス可能
+- `system_admin` ロールのみアクセス可能
 - `@require_role(Role.SYSTEM_ADMIN)` デコレーターで制御
 
 ### データスコープ制限
 
 **実装方式:**
-- `organization_closure` テーブルを使用して下位組織リストを取得
-- すべてのクエリにスコープフィルタを自動適用
+- なし（デバイス台帳管理はシステム保守者専用機能のため、データスコープ制限は適用しない）
 
-```python
-def get_accessible_organization_ids(user_organization_id):
-    """アクセス可能な組織IDリストを取得"""
-    closure = db.session.query(OrganizationClosure.subsidiary_organization_id).filter(
-        OrganizationClosure.parent_organization_id == user_organization_id
-    ).all()
-    return [c[0] for c in closure]
-
-def is_in_scope(target_organization_id, user_organization_id):
-    """対象データがユーザーのスコープ内かチェック"""
-    accessible_ids = get_accessible_organization_ids(user_organization_id)
-    return target_organization_id in accessible_ids
-```
+**認可ロジック:** システム保守者は全デバイス台帳データにアクセス可能
 
 ### 入力検証
 
 **検証項目:**
-- device_id: 半角英数字/ハイフン/アンダースコアのみ、最大50文字、重複チェック
 - device_name: 最大100文字、必須
+- device_type: 必須（マスタ値のみ）
+- model_info: 最大100文字、必須
+- sim_id: 最大50文字
 - mac_address: XX:XX:XX:XX:XX:XX形式
+- stock_status: 必須（マスタ値のみ）
+- stock_location: 最大100文字、必須
+- purchase_date: 必須、日付形式
+- estimated_ship_date: 購入日以降
+- ship_date: 出荷予定日以降
+- manufacturer_warranty_end_date: 必須、購入日以降
+- vendor_warranty_end_date: 必須、購入日以降
+
+**セキュリティ対策:**
 - SQLインジェクション対策: SQLAlchemy ORM使用
 - XSS対策: Jinja2自動エスケープ
 - CSRF対策: Flask-WTF CSRF保護
@@ -934,7 +940,7 @@ def is_in_scope(target_organization_id, user_organization_id):
 - リクエストID
 - ユーザーID（操作者）
 - 操作種別（登録、更新、削除）
-- 対象リソースID（inventory_id）
+- 対象リソースID（device_stock_id）
 - 処理結果（成功/失敗）
 - 在庫状況変更時: 変更前後の値
 
@@ -952,7 +958,7 @@ def is_in_scope(target_organization_id, user_organization_id):
 
 ### アーキテクチャ設計
 - [バックエンド設計](../../../../01-architecture/backend.md) - Flask/LDP設計、Blueprint構成
-- [データベース設計](../../../../01-architecture/database.md) - テーブル定義、インデックス設計
+- [データベース設計](../../../../01-architecture/database.md) - テーブル定義
 
 ### 共通仕様
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等

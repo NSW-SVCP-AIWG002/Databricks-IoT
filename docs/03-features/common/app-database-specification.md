@@ -390,21 +390,22 @@
 
 **概要**: デバイスの在庫・配備状況を管理するテーブル
 
-| #   | カラム物理名                   | カラム論理名       | データ型     | NULL      | PK  | FK  | デフォルト値      | 説明                                    |
-| --- | ------------------------------ | ------------------ | ------------ | --------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | device_stock_id                | デバイス在庫ID     | INT          | NOT NULL  | ○   | -   | -                 | デバイス在庫ID                          |
-| 2   | stock_status_id                | 在庫状況ID         | INT          | NOT NULL  | -   | ○   | -                 | 在庫状況ID（stock_status_master参照）   |
-| 3   | purchase_date                  | 購入日             | DATETIME     | NOT NULL  | -   | -   | -                 | デバイス購入日                          |
-| 4   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷予定日                      |
-| 5   | ship_date                      | 出荷日             | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷日                          |
-| 6   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL  | -   | -   | -                 | メーカー保証の終了日                    |
-| 7   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL  | -   | -   | -                 | ベンダー保証の終了日                    |
-| 8   | stock_location                 | 在庫場所           | VARCHAR(100) | NOT  NULL | -   | -   | -                 | 現在の在庫保管場所                      |
-| 9   | create_date                    | 作成日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 10  | creator                        | 作成者             | INT          | NOT NULL  | -   | -   | -                 | レコード作成者のユーザID                |
-| 11  | update_date                    | 更新日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
-| 12  | modifier                       | 更新者             | INT          | NOT NULL  | -   | -   | -                 | レコード更新者のユーザID                |
-| 13  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL  | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
+| --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
+| 1   | device_stock_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
+| 2   | device_stock_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | stock_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（stock_status_master参照）                         |
+| 4   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
+| 5   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
+| 6   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
+| 7   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                          |
+| 8   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | ベンダー保証の終了日                                          |
+| 9   | stock_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
+| 10  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
+| 11  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
+| 12  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
+| 13  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
+| 14  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
 **外部キー:**
 - `stock_status_id` → `stock_status_master.stock_status_id`
@@ -425,7 +426,7 @@
 
 | #   | カラム物理名      | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ----------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | stock_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | -                 | 在庫状況の一意識別子                    |
+| 1   | stock_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
 | 2   | stock_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
 | 3   | create_date       | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator           | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -439,6 +440,11 @@
 **初期データ:**
 | stock_status_id | stock_status_name | 説明 |
 | --------------- | ----------------- | ---- |
+| 1               | 在庫中            | 倉庫に保管中 |
+| 2               | 出荷済み          | 顧客へ出荷完了 |
+| 3               | 修理中            | 修理・メンテナンス中 |
+| 4               | 廃棄予定          | 廃棄待ち |
+| 5               | 廃棄済み          | 廃棄完了 |
 
 ---
 
