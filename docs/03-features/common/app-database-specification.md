@@ -32,6 +32,10 @@
     - [20. アラート履歴 (alert\_history)](#20-アラート履歴-alert_history)
     - [21. アラートステータスマスタ (alert\_status\_master)](#21-アラートステータスマスタ-alert_status_master)
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
+    - [23. ユーザーパスワード (user\_password)](#23-ユーザーパスワード-user_password)
+    - [24. パスワードリセットトークン (password\_reset\_token)](#24-パスワードリセットトークン-password_reset_token)
+    - [25. ログイン履歴 (login\_history)](#25-ログイン履歴-login_history)
+    - [26. アカウントロック管理 (account\_lock)](#26-アカウントロック管理-account_lock)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -92,35 +96,43 @@
 - アラート設定マスタ ← アラートレベルマスタ
 - メール送信履歴 ← メール種別マスタ
 - アラート履歴 ← アラートステータスマスタ
+- ユーザーパスワード ← ユーザーマスタ（オンプレミス環境専用）
+- パスワードリセットトークン ← ユーザーマスタ（オンプレミス環境専用）
+- ログイン履歴 ← ユーザーマスタ（オンプレミス環境専用）
+- アカウントロック管理 ← ユーザーマスタ（オンプレミス環境専用）
 
 ---
 
 ## テーブル一覧
 
-| #   | テーブル物理名           | テーブル論理名         | 説明                                                                           |
-| --- | ------------------------ | ---------------------- | ------------------------------------------------------------------------------ |
-| 1   | user_master              | ユーザーマスタ           | システム利用ユーザーの情報を管理                                               |
-| 2   | user_type_master         | ユーザー種別マスタ       | ユーザーの種別（権限）を管理                                                   |
-| 3   | language_master          | 言語マスタ              | システム表示言語を管理                                                         |
-| 4   | organization_master      | 組織マスタ              | 組織（顧客、販社等）の情報を管理                                               |
-| 5   | organization_type_master | 組織種別マスタ          | 組織の種別を管理                                                               |
-| 6   | contract_status_master   | 契約状態マスタ          | 組織の契約状態を管理                                                           |
-| 7   | organization_closure     | 組織閉方テーブル        | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
-| 8   | device_master            | デバイスマスタ          | IoTデバイスの情報を管理                                                        |
-| 9   | device_type_master       | デバイス種別マスタ      | デバイスの種別を管理                                                           |
-| 10  | device_stock_info_master | デバイス在庫情報マスタ   | デバイスの在庫・配備状況を管理                                                 |
-| 11  | stock_status_master      | 在庫状況マスタ          | デバイス在庫状況のステータスを管理                                             |
-| 12  | alert_setting_master     | アラート設定マスタ       | アラート検知条件・通知設定を管理                                               |
-| 13  | measurement_item_master  | 測定項目マスタ           | センサーで読み取る、機器に関する測定項目の名前を格納                             |
-| 14  | alert_level_master       | アラートレベルマスタ     | アラートの重要度レベルを管理                                                   |
-| 15  | sort_item_master         | ソート項目マスタ         | 一覧画面のソート項目を管理                                                     |
-| 16  | device_status_data       | デバイスステータス       | デバイスの接続状態を保持                                                       |
-| 17  | region_master            | 地域マスタ              | 地域情報を管理                                                                 |
-| 18  | mail_history             | メール送信履歴          | システムから送信されたメールの履歴を管理                                       |
-| 19  | mail_type_master         | メール種別マスタ        | メールの種別を管理                                                             |
-| 20  | alert_history            | アラート履歴            | アラート履歴を管理                                                             |
-| 21  | alert_status_master      | アラートステータスマスタ | アラートのステータスを管理                                                       |
-| 22  | master_list              | マスタ一覧              | CSVインポート・エクスポートするマスタを管理                                      |
+| #   | テーブル物理名           | テーブル論理名             | 説明                                                                           |
+| --- | ------------------------ | -------------------------- | ------------------------------------------------------------------------------ |
+| 1   | user_master              | ユーザーマスタ             | システム利用ユーザーの情報を管理                                               |
+| 2   | user_type_master         | ユーザー種別マスタ         | ユーザーの種別（権限）を管理                                                   |
+| 3   | language_master          | 言語マスタ                 | システム表示言語を管理                                                         |
+| 4   | organization_master      | 組織マスタ                 | 組織（顧客、販社等）の情報を管理                                               |
+| 5   | organization_type_master | 組織種別マスタ             | 組織の種別を管理                                                               |
+| 6   | contract_status_master   | 契約状態マスタ             | 組織の契約状態を管理                                                           |
+| 7   | organization_closure     | 組織閉方テーブル           | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
+| 8   | device_master            | デバイスマスタ             | IoTデバイスの情報を管理                                                        |
+| 9   | device_type_master       | デバイス種別マスタ         | デバイスの種別を管理                                                           |
+| 10  | device_stock_info_master | デバイス在庫情報マスタ     | デバイスの在庫・配備状況を管理                                                 |
+| 11  | stock_status_master      | 在庫状況マスタ             | デバイス在庫状況のステータスを管理                                             |
+| 12  | alert_setting_master     | アラート設定マスタ         | アラート検知条件・通知設定を管理                                               |
+| 13  | measurement_item_master  | 測定項目マスタ             | センサーで読み取る、機器に関する測定項目の名前を格納                           |
+| 14  | alert_level_master       | アラートレベルマスタ       | アラートの重要度レベルを管理                                                   |
+| 15  | sort_item_master         | ソート項目マスタ           | 一覧画面のソート項目を管理                                                     |
+| 16  | device_status_data       | デバイスステータス         | デバイスの接続状態を保持                                                       |
+| 17  | region_master            | 地域マスタ                 | 地域情報を管理                                                                 |
+| 18  | mail_history             | メール送信履歴             | システムから送信されたメールの履歴を管理                                       |
+| 19  | mail_type_master         | メール種別マスタ           | メールの種別を管理                                                             |
+| 20  | alert_history            | アラート履歴               | アラート履歴を管理                                                             |
+| 21  | alert_status_master      | アラートステータスマスタ   | アラートのステータスを管理                                                     |
+| 22  | master_list              | マスタ一覧                 | CSVインポート・エクスポートするマスタを管理                                    |
+| 23  | user_password            | ユーザーパスワード         | ユーザーのパスワード情報を管理 ※オンプレミス環境でのみ使用                     |
+| 24  | password_reset_token     | パスワードリセットトークン | パスワードリセット・招待用トークンを管理 ※オンプレミス環境でのみ使用           |
+| 25  | login_history            | ログイン履歴               | ログイン試行（成功・失敗）の履歴を管理 ※オンプレミス環境でのみ使用             |
+| 26  | account_lock             | アカウントロック管理       | アカウントロック状態を管理 ※オンプレミス環境でのみ使用                         |
 
 
 ---
@@ -446,27 +458,27 @@
 
 **概要**: アラート検知条件と通知設定を管理するテーブル
  
-| #   | カラム物理名                                       | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
-| --- | -------------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
-| 1   | alert_id                                           | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                     |
-| 2   | alert_uuid                                         | アラートUUID                | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | アラート設定の外部公開用識別子（URLパスパラメータとして使用） |
-| 3   | alert_name                                         | アラート名                  | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラート設定の表示名                                         |
-| 4   | device_id                                          | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                          |
-| 5   | alert_conditions_measurement_item_id               | アラート発生条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート発生条件式の測定項目のID                               |
-| 6   | alert_conditions_operator                          | アラート発生条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート発生条件式の比較演算子                               |
-| 7   | alert_conditions_threshold                         | アラート発生条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                     |
-| 8   | alert_recovery_conditions_measurement_item_id      | アラート復旧条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート復旧条件式の測定項目のID                               |
-| 9   | alert_recovery_conditions_operator                 | アラート復旧条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート復旧条件式の比較演算子                               |
-| 10  | alert_recovery_conditions_threshold                | アラート復旧条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                     |
-| 11  | judgment_time                                      | 判定時間                    | INT          | NOT NULL | -   | -   | 5                 | アラート判定の時間窓                                         |
-| 12  | alert_level_id                                     | アラートレベルID            | INT          | NOT NULL | -   | ○   | -                 | アラートレベル（alert_level_master参照）                     |
-| 13  | alert_notification_flag                            | アラート通知フラグ          | BOOLEAN      | NOT NULL | -   | -   | TRUE              | アラート通知を行うか（TRUE:する, FALSE:しない）              |
-| 14  | alert_email_flag                                   | メール送信フラグ            | BOOLEAN      | NOT NULL | -   | -   | TRUE              | メール通知を行うか（TRUE:する, FALSE:しない）                |
-| 15  | create_date                                        | 作成日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
-| 16  | creator                                            | 作成者                      | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                     |
-| 17  | update_date                                        | 更新日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                         |
-| 18  | modifier                                           | 更新者                      | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                     |
-| 19  | delete_flag                                        | 削除フラグ                  | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                      |
+| #   | カラム物理名                                  | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
+| --- | --------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
+| 1   | alert_id                                      | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                      |
+| 2   | alert_uuid                                    | アラートUUID                | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | アラート設定の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | alert_name                                    | アラート名                  | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラート設定の表示名                                          |
+| 4   | device_id                                     | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                           |
+| 5   | alert_conditions_measurement_item_id          | アラート発生条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート発生条件式の測定項目のID                              |
+| 6   | alert_conditions_operator                     | アラート発生条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート発生条件式の比較演算子                                |
+| 7   | alert_conditions_threshold                    | アラート発生条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート発生条件式の閾値                                      |
+| 8   | alert_recovery_conditions_measurement_item_id | アラート復旧条件_測定項目ID | INT          | NOT NULL | -   | ○   | -                 | アラート復旧条件式の測定項目のID                              |
+| 9   | alert_recovery_conditions_operator            | アラート復旧条件_比較演算子 | VARCHAR(10)  | NOT NULL | -   | -   | -                 | アラート復旧条件式の比較演算子                                |
+| 10  | alert_recovery_conditions_threshold           | アラート復旧条件_閾値       | FLOAT        | NOT NULL | -   | -   | -                 | アラート復旧条件式の閾値                                      |
+| 11  | judgment_time                                 | 判定時間                    | INT          | NOT NULL | -   | -   | 5                 | アラート判定の時間窓                                          |
+| 12  | alert_level_id                                | アラートレベルID            | INT          | NOT NULL | -   | ○   | -                 | アラートレベル（alert_level_master参照）                      |
+| 13  | alert_notification_flag                       | アラート通知フラグ          | BOOLEAN      | NOT NULL | -   | -   | TRUE              | アラート通知を行うか（TRUE:する, FALSE:しない）               |
+| 14  | alert_email_flag                              | メール送信フラグ            | BOOLEAN      | NOT NULL | -   | -   | TRUE              | メール通知を行うか（TRUE:する, FALSE:しない）                 |
+| 15  | create_date                                   | 作成日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
+| 16  | creator                                       | 作成者                      | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
+| 17  | update_date                                   | 更新日時                    | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
+| 18  | modifier                                      | 更新者                      | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
+| 19  | delete_flag                                   | 削除フラグ                  | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
 **外部キー:**
 - `device_id` → `device_master.device_id`
@@ -501,30 +513,30 @@
 - PRIMARY KEY: `measurement_item_id`
 
 **初期データ:**
-| measurement_item_id | measurement_item_name          |
-|---------------------|--------------------------------|
-| 1                   | 共通外気温度[℃]                |
-| 2                   | 第1冷凍設定温度[℃]            |
-| 3                   | 第1冷凍庫内センサー温度[℃]    |
-| 4                   | 第1冷凍表示温度[℃]            |
-| 5                   | 第1冷凍DF温度[℃]              |
-| 6                   | 第1冷凍凝縮温度[℃]            |
-| 7                   | 第1冷凍微調整後庫内温度[℃]    |
-| 8                   | 第2冷凍設定温度[℃]            |
-| 9                   | 第2冷凍庫内センサー温度[℃]    |
-| 10                  | 第2冷凍表示温度[℃]            |
-| 11                  | 第2冷凍DF温度[℃]              |
-| 12                  | 第2冷凍凝縮温度[℃]            |
-| 13                  | 第2冷凍微調整後庫内温度[℃]    |
-| 14                  | 第1冷凍圧縮機回転数[rpm]      |
-| 15                  | 第2冷凍圧縮機回転数[rpm]      |
-| 16                  | 第1ファンモータ回転数[rpm]    |
-| 17                  | 第2ファンモータ回転数[rpm]    |
-| 18                  | 第3ファンモータ回転数[rpm]    |
-| 19                  | 第4ファンモータ回転数[rpm]    |
-| 20                  | 第5ファンモータ回転数[rpm]    |
-| 21                  | 防露ヒータ出力(1)[%]          |
-| 22                  | 防露ヒータ出力(2)[%]          |
+| measurement_item_id | measurement_item_name      |
+| ------------------- | -------------------------- |
+| 1                   | 共通外気温度[℃]            |
+| 2                   | 第1冷凍設定温度[℃]         |
+| 3                   | 第1冷凍庫内センサー温度[℃] |
+| 4                   | 第1冷凍表示温度[℃]         |
+| 5                   | 第1冷凍DF温度[℃]           |
+| 6                   | 第1冷凍凝縮温度[℃]         |
+| 7                   | 第1冷凍微調整後庫内温度[℃] |
+| 8                   | 第2冷凍設定温度[℃]         |
+| 9                   | 第2冷凍庫内センサー温度[℃] |
+| 10                  | 第2冷凍表示温度[℃]         |
+| 11                  | 第2冷凍DF温度[℃]           |
+| 12                  | 第2冷凍凝縮温度[℃]         |
+| 13                  | 第2冷凍微調整後庫内温度[℃] |
+| 14                  | 第1冷凍圧縮機回転数[rpm]   |
+| 15                  | 第2冷凍圧縮機回転数[rpm]   |
+| 16                  | 第1ファンモータ回転数[rpm] |
+| 17                  | 第2ファンモータ回転数[rpm] |
+| 18                  | 第3ファンモータ回転数[rpm] |
+| 19                  | 第4ファンモータ回転数[rpm] |
+| 20                  | 第5ファンモータ回転数[rpm] |
+| 21                  | 防露ヒータ出力(1)[%]       |
+| 22                  | 防露ヒータ出力(2)[%]       |
 
 ---
 
@@ -534,7 +546,7 @@
 
 | #   | カラム物理名     | カラム論理名     | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ---------------- | ---------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | alert_level_id   | アラートレベルID | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、アラートレベルの一意識別子      |
+| 1   | alert_level_id   | アラートレベルID | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、アラートレベルの一意識別子    |
 | 2   | alert_level_name | アラートレベル名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラートレベルの表示名                  |
 | 3   | create_date      | 作成日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator          | 作成者           | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -687,20 +699,20 @@
 
 **概要**: IoTデバイスのアラート履歴を管理するテーブル
 
-| #   | カラム物理名               | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                            |
-| --- | ------------------------- | ------------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------- |
-| 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement） |
+| #   | カラム物理名              | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
+| --- | ------------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
+| 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement）  |
 | 2   | alert_history_uuid        | アラート履歴UUID     | VARCHAR(36) | NOT NULL | -   | -   | -                 | 参照モーダル表示でアラート履歴を特定するためのUUID |
-| 3   | alert_id                  | アラートID          | INT          | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）              |
-| 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME     | NOT NULL | -   | -   | -                 | アラートの発生日時                              |
-| 5   | alert_recovery_datetime   | アラート復旧日時     | DATETIME     | NULL     | -   | -   | -                 | アラートの復旧日時                              |
-| 6   | alert_status_id           | アラートステータスID | INT          | NOT NULL | -   | ○   | -                 | アラートステータスの一意識別子（外部キー）        |
-| 7   | alert_value               | アラート発生値       | FLOAT        | NULL     | -   | -   | -                 | アラート発生時の値                              |
-| 8   | create_date               | 作成日時            | DATETIME      | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                |
-| 9   | creator                   | 作成者              | INT           | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                       |
-| 10  | update_date               | 更新日時            | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                             |
-| 11  | modifier                  | 更新者              | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                       |
-| 12  | delete_flag               | 削除フラグ          | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| 3   | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
+| 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
+| 5   | alert_recovery_datetime   | アラート復旧日時     | DATETIME    | NULL     | -   | -   | -                 | アラートの復旧日時                                 |
+| 6   | alert_status_id           | アラートステータスID | INT         | NOT NULL | -   | ○   | -                 | アラートステータスの一意識別子（外部キー）         |
+| 7   | alert_value               | アラート発生値       | FLOAT       | NULL     | -   | -   | -                 | アラート発生時の値                                 |
+| 8   | create_date               | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                   |
+| 9   | creator                   | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
+| 10  | update_date               | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
+| 11  | modifier                  | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
+| 12  | delete_flag               | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE            |
 
 **外部キー:**
 - `alert_id` → `alert_setting_master.alert_id`
@@ -718,15 +730,15 @@
 
 **概要**: アラートのステータスを管理するマスタテーブル
 
-| #   | カラム物理名       | カラム論理名        | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                                 |
-| --- | ----------------- | ------------------ | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
-| 1   | alert_status_id   | アラートステータスID | INT         | NOT NULL | ○   | -   | -                 | アラートステータスの一意識別子（主キー、AutoIncrement）|
-| 2   | alert_status_name | アラートステータス名 | VARCHAR(10) | NOT NULL | -   | -   | -                 | アラートステータス名（発生中、復旧済み）               |
-| 3   | create_date       | 作成日時            | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                     |
-| 4   | creator           | 作成者              | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                            |
-| 5   | update_date       | 更新日時            | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                  |
-| 6   | modifier          | 更新者              | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                            |
-| 7   | delete_flag       | 削除フラグ          | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                |
+| #   | カラム物理名      | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                                    |
+| --- | ----------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | ------------------------------------------------------- |
+| 1   | alert_status_id   | アラートステータスID | INT         | NOT NULL | ○   | -   | -                 | アラートステータスの一意識別子（主キー、AutoIncrement） |
+| 2   | alert_status_name | アラートステータス名 | VARCHAR(10) | NOT NULL | -   | -   | -                 | アラートステータス名（発生中、復旧済み）                |
+| 3   | create_date       | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                        |
+| 4   | creator           | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                              |
+| 5   | update_date       | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                    |
+| 6   | modifier          | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                              |
+| 7   | delete_flag       | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                 |
 
 **インデックス:**
 - PRIMARY KEY: `alert_status_id`
@@ -737,8 +749,8 @@
 **初期データ:**
 | alert_status_id | alert_status_name | 説明             |
 | --------------- | ----------------- | ---------------- |
-| 1               | 発生中             | アラート発生中    |
-| 2               | 復旧済み           | アラート復旧済み  |
+| 1               | 発生中            | アラート発生中   |
+| 2               | 復旧済み          | アラート復旧済み |
 
 ---
 
@@ -746,16 +758,16 @@
 
 **概要**: CSVインポート・エクスポート対象のマスタを管理するテーブル
 
-| #   | カラム物理名  | カラム論理名    | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                   |
-| --- | ------------ | -------------- | ----------- | -------- | --- | --- | ----------------- | ------------------------------------ |
+| #   | カラム物理名 | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| --- | ------------ | -------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
 | 1   | master_id    | マスタID       | INT         | NOT NULL | ○   | -   | -                 | マスタの一意識別子（主キー）            |
-| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | -   | -   | -                 | アクセス可能なユーザーID（主キー）       |
-| 2   | master_name  | マスタ名       | VARCHAR(20) | NOT NULL | -   | -   | -                 | マスタの名称                           |
-| 3   | create_date  | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                       |
+| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | -   | -   | -                 | アクセス可能なユーザーID（主キー）      |
+| 2   | master_name  | マスタ名       | VARCHAR(20) | NOT NULL | -   | -   | -                 | マスタの名称                            |
+| 3   | create_date  | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator      | 作成者         | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID              |
 | 5   | update_date  | 更新日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
 | 6   | modifier     | 更新者         | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID              |
-| 7   | delete_flag  | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE  |
+| 7   | delete_flag  | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **外部キー:**
 - `user_type_id` → `user_type_master.user_type_id`
@@ -767,13 +779,144 @@
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 **初期データ:**
-| master_id | master_name      | 説明                 |
-| --------- | ---------------- | -------------------- |
-| 1         | デバイス          | デバイスマスタ        |
-| 2         | ユーザー          | ユーザーマスタ        |
+| master_id | master_name      | 説明                   |
+| --------- | ---------------- | ---------------------- |
+| 1         | デバイス         | デバイスマスタ         |
+| 2         | ユーザー         | ユーザーマスタ         |
 | 3         | 組織             | 組織マスタ             |
-| 4         | アラート設定      | アラート設定マスタ     |
-| 5         | デバイス在庫情報  | デバイス在庫情報マスタ  |
+| 4         | アラート設定     | アラート設定マスタ     |
+| 5         | デバイス在庫情報 | デバイス在庫情報マスタ |
+
+---
+
+### 23. ユーザーパスワード (user_password)
+
+**概要**: ユーザーのパスワード情報を管理するテーブル
+
+> **注**: 本テーブルはオンプレミス環境（自前IdP認証）でのみ使用します。
+> クラウド環境（Azure Easy Auth / AWS Cognito）ではIdPが認証を担うため、テーブルは作成されますがデータは格納されません。
+
+| #   | カラム物理名          | カラム論理名       | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                          |
+| --- | --------------------- | ------------------ | ----------- | -------- | --- | --- | ----------------- | --------------------------------------------- |
+| 1   | user_id               | ユーザーID         | INT         | NOT NULL | ○   | ○   | -                 | ユーザーID（user_master参照）                 |
+| 2   | password_hash         | パスワードハッシュ | VARCHAR(60) | NULL     | -   | -   | -                 | bcryptハッシュ値（NULL=パスワード未設定）     |
+| 3   | password_update_date  | パスワード更新日時 | DATETIME    | NULL     | -   | -   | -                 | パスワード更新日時                            |
+| 4   | password_expires_date | パスワード有効期限 | DATETIME    | NULL     | -   | -   | -                 | パスワード有効期限（NULL=パスワード未設定時） |
+| 5   | create_date           | 作成日時           | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                              |
+| 6   | update_date           | 更新日時           | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                          |
+
+**外部キー:**
+- `user_id` → `user_master.user_id`
+
+**インデックス:**
+- PRIMARY KEY: `user_id`
+
+**ビジネスルール:**
+- user_masterと1:1の関係（user_idがPKかつFK）
+- 新規ユーザー登録時（INVITE方式）は`password_hash=NULL`で作成
+- ユーザーが招待リンクからパスワードを設定した時点で`password_hash`が設定される
+- 詳細は[認証仕様書](./authentication-specification.md) 5.4.1節参照
+
+---
+
+### 24. パスワードリセットトークン (password_reset_token)
+
+**概要**: パスワードリセット・招待用トークンを管理するテーブル
+
+> **注**: 本テーブルはオンプレミス環境（自前IdP認証）でのみ使用します。
+> クラウド環境（Azure Easy Auth / AWS Cognito）ではIdPが認証を担うため、テーブルは作成されますがデータは格納されません。
+
+| #   | カラム物理名 | カラム論理名     | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                   |
+| --- | ------------ | ---------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------- |
+| 1   | token_hash   | トークンハッシュ | VARCHAR(64) | NOT NULL | ○   | -   | -                 | トークンのSHA-256ハッシュ値（PK）      |
+| 2   | user_id      | ユーザーID       | INT         | NOT NULL | -   | ○   | -                 | ユーザーID（user_master参照）          |
+| 3   | token_type   | トークン種別     | TINYINT     | NOT NULL | -   | -   | -                 | 1:INVITE（招待） / 2:RESET（リセット） |
+| 4   | expires_date | トークン有効期限 | DATETIME    | NOT NULL | -   | -   | -                 | トークン有効期限                       |
+| 5   | used_date    | トークン使用日時 | DATETIME    | NULL     | -   | -   | -                 | 使用日時（NULL=未使用）                |
+| 6   | create_date  | 作成日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                       |
+| 7   | update_date  | 更新日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                   |
+
+**外部キー:**
+- `user_id` → `user_master.user_id`
+
+**インデックス:**
+- PRIMARY KEY: `token_hash`
+- INDEX: `user_id`
+- INDEX: `expires_date`
+
+**ビジネスルール:**
+- トークンは`secrets.token_urlsafe(32)`で生成し、SHA-256でハッシュ化して保存
+- INVITE（招待）トークンの有効期限: 7日間
+- RESET（リセット）トークンの有効期限: 1時間
+- 使用済みトークンは`used_date`に使用日時を記録
+- 詳細は[認証仕様書](./authentication-specification.md) 5.2節参照
+
+---
+
+### 25. ログイン履歴 (login_history)
+
+**概要**: すべてのログイン試行（成功・失敗）を記録するテーブル
+
+> **注**: 本テーブルはオンプレミス環境（自前IdP認証）でのみ使用します。
+> クラウド環境（Azure Easy Auth / AWS Cognito）ではIdPが認証を担うため、テーブルは作成されますがデータは格納されません。
+
+| #   | カラム物理名     | カラム論理名   | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                          |
+| --- | ---------------- | -------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------- |
+| 1   | login_history_id | ログイン履歴ID | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | ログイン履歴ID（PK）                          |
+| 2   | user_id          | ユーザーID     | INT          | NULL     | -   | ○   | -                 | ユーザーID、成功時のみ設定（user_master参照） |
+| 3   | email            | メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 入力されたメールアドレス                      |
+| 4   | login_date       | ログイン日時   | DATETIME     | NOT NULL | -   | -   | -                 | ログイン試行日時                              |
+| 5   | ip_address       | IPアドレス     | VARCHAR(45)  | NOT NULL | -   | -   | -                 | クライアントIPアドレス（IPv6対応）            |
+| 6   | user_agent       | UserAgent      | TEXT         | NOT NULL | -   | -   | -                 | ブラウザUserAgent                             |
+| 7   | success          | ログイン成否   | BOOLEAN      | NOT NULL | -   | -   | -                 | TRUE:成功 / FALSE:失敗                        |
+| 8   | failure_reason   | 失敗理由       | VARCHAR(100) | NULL     | -   | -   | -                 | ログイン失敗理由（成功時はNULL）              |
+| 9   | create_date      | 作成日時       | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                              |
+| 10  | update_date      | 更新日時       | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                          |
+
+**外部キー:**
+- `user_id` → `user_master.user_id`
+
+**インデックス:**
+- PRIMARY KEY: `login_history_id`
+- INDEX: `user_id`
+- INDEX: `email`
+- INDEX: `login_date`
+
+**ビジネスルール:**
+- ログイン履歴は作成のみで更新は行わない（監査ログとして保持）
+- failure_reasonの値: `user_not_found`, `password_not_set`, `account_locked`, `invalid_credentials`
+- 詳細は[認証仕様書](./authentication-specification.md) 5.4.3節参照
+
+---
+
+### 26. アカウントロック管理 (account_lock)
+
+**概要**: アカウントロック状態を管理するテーブル
+
+> **注**: 本テーブルはオンプレミス環境（自前IdP認証）でのみ使用します。
+> クラウド環境（Azure Easy Auth / AWS Cognito）ではIdPが認証を担うため、テーブルは作成されますがデータは格納されません。
+
+| #   | カラム物理名      | カラム論理名       | データ型 | NULL     | PK  | FK  | デフォルト値 | 説明                                  |
+| --- | ----------------- | ------------------ | -------- | -------- | --- | --- | ------------ | ------------------------------------- |
+| 1   | user_id           | ユーザーID         | INT      | NOT NULL | ○   | ○   | -            | ユーザーID（user_master参照）         |
+| 2   | failed_attempts   | 連続失敗回数       | INT      | NOT NULL | -   | -   | 0            | 連続ログイン失敗回数                  |
+| 3   | last_failed_date  | 最終失敗日時       | DATETIME | NULL     | -   | -   | -            | 最後のログイン失敗日時                |
+| 4   | locked_date       | ロック日時         | DATETIME | NULL     | -   | -   | -            | アカウントロック日時（NULL=未ロック） |
+| 5   | lock_expires_date | ロック解除予定日時 | DATETIME | NULL     | -   | -   | -            | ロック自動解除予定日時                |
+
+**外部キー:**
+- `user_id` → `user_master.user_id`
+
+**インデックス:**
+- PRIMARY KEY: `user_id`
+
+**ビジネスルール:**
+- user_masterと1:1の関係（user_idがPKかつFK）
+- 連続失敗5回でアカウントロック（`locked_date = NOW`, `lock_expires_date = NOW + 15分`）
+- `lock_expires_date > NOW` の場合、アカウントはロック中
+- ログイン成功時に`failed_attempts = 0`にリセット
+- 管理者による手動ロック解除も可能
+- 詳細は[認証仕様書](./authentication-specification.md) 5.4.2節参照
 
 ---
 
@@ -804,6 +947,15 @@ CREATE INDEX IX_alert_setting_level ON alert_setting_master(alert_level);
 -- デバイス在庫情報マスタ
 CREATE INDEX IX_device_stock_device_id ON device_stock_info_master(device_stock_id);
 CREATE INDEX IX_device_stock_status_id ON device_stock_info_master(stock_status_id);
+
+-- パスワードリセットトークン（オンプレミス環境専用）
+CREATE INDEX IX_password_reset_token_user_id ON password_reset_token(user_id);
+CREATE INDEX IX_password_reset_token_expires ON password_reset_token(expires_date);
+
+-- ログイン履歴（オンプレミス環境専用）
+CREATE INDEX IX_login_history_user_id ON login_history(user_id);
+CREATE INDEX IX_login_history_email ON login_history(email);
+CREATE INDEX IX_login_history_login_date ON login_history(login_date);
 ```
 
 #### 複合インデックス（検索条件が複数の場合）
@@ -914,6 +1066,26 @@ REFERENCES alert_level_master(alert_level_id);
 ALTER TABLE device_stock_info_master
 ADD CONSTRAINT FK_device_stock_status FOREIGN KEY (stock_status_id)
 REFERENCES stock_status_master(stock_status_id);
+
+-- ユーザーパスワードの外部キー（オンプレミス環境専用）
+ALTER TABLE user_password
+ADD CONSTRAINT FK_user_password_user FOREIGN KEY (user_id)
+REFERENCES user_master(user_id);
+
+-- パスワードリセットトークンの外部キー（オンプレミス環境専用）
+ALTER TABLE password_reset_token
+ADD CONSTRAINT FK_password_reset_token_user FOREIGN KEY (user_id)
+REFERENCES user_master(user_id);
+
+-- ログイン履歴の外部キー（オンプレミス環境専用）
+ALTER TABLE login_history
+ADD CONSTRAINT FK_login_history_user FOREIGN KEY (user_id)
+REFERENCES user_master(user_id);
+
+-- アカウントロック管理の外部キー（オンプレミス環境専用）
+ALTER TABLE account_lock
+ADD CONSTRAINT FK_account_lock_user FOREIGN KEY (user_id)
+REFERENCES user_master(user_id);
 ```
 
 ### 3. デフォルト値
