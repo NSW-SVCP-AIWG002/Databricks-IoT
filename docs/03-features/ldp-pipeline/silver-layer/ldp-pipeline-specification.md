@@ -236,7 +236,7 @@ flowchart TB
 
     OLTP -.->|アラート発報/復旧条件参照| Threshold
 
-    OLTP -->|1分間隔で取得| BatchJob
+    OLTP -->|1分間隔でメール送信待機列を取得| BatchJob
     BatchJob --> SMTP
 ```
 
@@ -478,8 +478,8 @@ flowchart TD
     Sensor(センサーデータ受信) --> Threshold{閾値超過?}
 
     Threshold -->|No| CheckState1{異常状態<br>テーブル確認}
-    CheckState1 -->|発報済み| RecoveryProcess[復旧処理]
-    CheckState1 -->|異常中/未発報| ResetState[状態リセット<br>abnormal_start_time=NULL]
+    CheckState1 -->|異常中かつ発報済み| RecoveryProcess[復旧処理]
+    CheckState1 -->|異常中かつ未発報| ResetState[状態リセット<br>abnormal_start_time=NULL]
     CheckState1 -->|正常| NoAction1[処理なし]
 
     RecoveryProcess --> UpdateHistory[アラート履歴更新<br>復旧日時・ステータス]
@@ -496,7 +496,7 @@ flowchart TD
     CheckFired -->|No| FireAlert[アラート発報<br>alert_fired_time=現在時刻]
 
     FireAlert --> InsertHistory[アラート履歴登録<br>alert_history_id取得]
-    InsertHistory --> UpdateOLTP[OLTP.アラート履歴更新]
+    InsertHistory --> UpdateOLTP[OLTP.アラート異常状態に<br>alert_history_idを登録]
     UpdateOLTP --> Queue[OLTP.メール送信キュー登録]
 
     ResetStateWithHistory　--> End(処理終了)
@@ -1118,14 +1118,14 @@ def enqueue_email_notification(batch_df, batch_id):
 
 ### キュー登録の設計方針
 
-| 項目               | 方針                                    |
-| ------------------ | --------------------------------------- |
-| 登録タイミング     | LDPストリーミング処理内（foreachBatch） |
-| 初期ステータス     | PENDING                                 |
-| 登録条件           | alert_email_flag=TRUE                   |
-| 送信先アドレス取得 | ユーザマスタから組織IDで取得            |
-| メール本文生成     | アラート情報を含む定型フォーマット      |
-| 詳細情報           | alert_detail_jsonにJSON形式で格納       |
+| 項目               | 方針                                                            |
+| ------------------ | --------------------------------------------------------------- |
+| 登録タイミング     | LDPストリーミング処理内（foreachBatch）                         |
+| 初期ステータス     | PENDING                                                         |
+| 登録条件           | alert_email_flag=TRUE, user_master.alert_notification_flag=TRUE |
+| 送信先アドレス取得 | ユーザマスタから組織IDで取得                                    |
+| メール本文生成     | アラート情報を含む定型フォーマット                              |
+| 詳細情報           | alert_detail_jsonにJSON形式で格納                               |
 
 ### メール送信バッチジョブ
 
@@ -1928,8 +1928,8 @@ mysql_password = dbutils.secrets.get("iot-pipeline-scope", "mysql-password")
 
 システム障害を迅速に検知するため、以下のエラー発生時にTeamsのシステム保守者連絡チャネルへ通知を行う。
 
-- **OLTP接続エラー**: MySQL接続が3回連続で失敗した場合
-- **キュー書込みエラー**: メール送信キューへのDelta Lake書込みが3回連続で失敗した場合
+- **OLTP接続エラー**: MySQL接続が4回連続で失敗した場合
+- **キュー書込みエラー**: メール送信キューへのDelta Lake書込みが4回連続で失敗した場合
 - **Delta Lake書込みエラー**: センサーデータのDelta Lake書込み時に例外が発生した場合
 
 通知にはエラー種別、発生日時、エラー詳細、影響範囲が含まれる。
