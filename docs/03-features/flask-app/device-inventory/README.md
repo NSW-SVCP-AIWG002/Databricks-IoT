@@ -132,7 +132,7 @@
 | 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 詳細モーダル表示 |
 | 5 | デバイス台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 |
 | 6 | デバイス台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 |
-| 7 | デバイス台帳削除実行 | `/admin/device-inventory/<device_stock_uuid>/delete` | POST | 削除処理（論理削除） |
+| 7 | デバイス台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理（論理削除、複数選択対応） |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 |
 
 ---
