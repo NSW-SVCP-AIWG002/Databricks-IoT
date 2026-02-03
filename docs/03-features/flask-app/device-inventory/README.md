@@ -9,7 +9,6 @@
 - [Flaskルート一覧](#flaskルート一覧)
 - [アクセス権限](#アクセス権限)
 - [関連ドキュメント](#関連ドキュメント)
-- [実装ステータス](#実装ステータス)
 
 ---
 
@@ -53,48 +52,73 @@
 | 画面ID | 画面名 | スラッグ | 概要 |
 |--------|--------|---------|------|
 | ADM-013 | デバイス台帳一覧画面 | `/admin/device-inventory` | 一覧・検索・削除 |
-| ADM-014 | デバイス台帳登録画面 | `/admin/device-inventory/register` | 登録（モーダル） |
-| ADM-015 | デバイス台帳更新画面 | `/admin/device-inventory/update` | 更新（モーダル） |
-| ADM-016 | デバイス台帳参照画面 | `/admin/device-inventory/detail/:id` | 詳細表示（モーダル） |
+| ADM-014 | デバイス台帳登録画面 | `/admin/device-inventory/create` | 登録（モーダル） |
+| ADM-015 | デバイス台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | 更新（モーダル） |
+| ADM-016 | デバイス台帳参照画面 | `/admin/device-inventory/<device_stock_uuid>` | 詳細表示（モーダル） |
+| ADM-017 | デバイス台帳登録確認画面 | - | 登録確認（モーダル） |
+| ADM-018 | デバイス台帳更新確認画面 | - | 更新確認（モーダル） |
+| ADM-019 | デバイス台帳削除確認画面 | - | 削除確認（モーダル） |
+| ADM-020 | デバイス台帳登録完了画面 | - | 登録完了通知（モーダル） |
+| ADM-021 | デバイス台帳更新完了画面 | - | 更新完了通知（モーダル） |
+| ADM-022 | デバイス台帳削除完了画面 | - | 削除完了通知（モーダル） |
 
 ---
 
 ## データモデル
 
-### device_inventory テーブル
+### デバイス在庫情報マスタ (device_stock_info_master)
 
-| カラム名 | 論理名 | データ型 | NULL | PK | FK | 説明 |
-|---------|--------|----------|------|----|----|------|
-| inventory_id | 台帳ID | VARCHAR(36) | NO | ○ | - | UUID形式 |
-| device_id | デバイスID | VARCHAR(50) | NO | - | - | デバイスの一意識別子 |
-| device_name | デバイス名 | VARCHAR(100) | NO | - | - | デバイスの名称 |
-| device_type | デバイス種別 | VARCHAR(50) | NO | - | - | センサー/ゲートウェイ/コントローラー/その他 |
-| model_info | モデル情報 | VARCHAR(100) | YES | - | - | モデル番号等 |
-| sim_id | SIMID | VARCHAR(50) | YES | - | - | SIMカードのID |
-| mac_address | MACアドレス | VARCHAR(17) | YES | - | - | XX:XX:XX:XX:XX:XX形式 |
-| stock_status | 在庫状況 | VARCHAR(20) | NO | - | - | 在庫中/出荷済み/修理中/廃棄予定/廃棄済み |
-| purchase_date | 購入日 | DATE | YES | - | - | デバイス購入日 |
-| scheduled_ship_date | 出荷予定日 | DATE | YES | - | - | 出荷予定の日付 |
-| ship_date | 出荷日 | DATE | YES | - | - | 実際の出荷日 |
-| manufacturer_warranty_end | メーカー保証終了日 | DATE | YES | - | - | メーカー保証の終了日 |
-| vendor_warranty_end | ベンダー保証終了日 | DATE | YES | - | - | ベンダー保証の終了日 |
-| storage_location | 在庫場所 | VARCHAR(100) | YES | - | - | 保管場所 |
-| organization_id | 組織ID | VARCHAR(36) | NO | - | ○ | データスコープ制限用 |
-| deleted_flag | 削除フラグ | BOOLEAN | NO | - | - | 論理削除フラグ（デフォルト: FALSE） |
-| created_at | 作成日時 | DATETIME | NO | - | - | レコード作成日時 |
-| created_by | 作成者 | VARCHAR(36) | NO | - | - | 作成者のユーザーID |
-| updated_at | 更新日時 | DATETIME | NO | - | - | レコード更新日時 |
-| updated_by | 更新者 | VARCHAR(36) | NO | - | - | 更新者のユーザーID |
+**概要**: デバイスの在庫・配備状況を管理するテーブル
 
-### インデックス
+| #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
+| --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
+| 1   | device_stock_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
+| 2   | device_stock_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | stock_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（stock_status_master参照）                         |
+| 4   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
+| 5   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
+| 6   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
+| 7   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                          |
+| 8   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | ベンダー保証の終了日                                          |
+| 9   | stock_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
+| 10  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
+| 11  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
+| 12  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
+| 13  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
+| 14  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
-| インデックス名 | カラム | 種別 | 用途 |
-|---------------|--------|------|------|
-| PRIMARY | inventory_id | PRIMARY KEY | 主キー |
-| idx_device_inventory_device_id | device_id | UNIQUE | デバイスID重複チェック |
-| idx_device_inventory_org_id | organization_id | INDEX | データスコープ制限 |
-| idx_device_inventory_stock_status | stock_status | INDEX | 在庫状況検索 |
-| idx_device_inventory_device_type | device_type | INDEX | デバイス種別検索 |
+**外部キー:**
+- `stock_status_id` → `stock_status_master.stock_status_id`
+
+**ビジネスルール:**
+- device_stock_idは1デバイスにつき1レコード（1:1関係）
+- stock_status_idで在庫状態を管理
+- デバイス情報（device_id, device_name等）はdevice_masterテーブルからdevice_stock_idで参照
+
+---
+
+### 在庫状況マスタ (stock_status_master)
+
+**概要**: デバイス在庫状況のステータスを管理するマスタテーブル
+
+| #   | カラム物理名      | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| --- | ----------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
+| 1   | stock_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
+| 2   | stock_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
+| 3   | create_date       | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| 4   | creator           | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
+| 5   | update_date       | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
+| 6   | modifier          | 更新者       | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                |
+| 7   | delete_flag       | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+
+**初期データ:**
+| stock_status_id | stock_status_name | 説明 |
+| --------------- | ----------------- | ---- |
+| 1               | 在庫中            | 倉庫に保管中 |
+| 2               | 出荷済み          | 顧客へ出荷完了 |
+| 3               | 修理中            | 修理・メンテナンス中 |
+| 4               | 廃棄予定          | 廃棄待ち |
+| 5               | 廃棄済み          | 廃棄完了 |
 
 ---
 
@@ -105,10 +129,10 @@
 | 1 | デバイス台帳一覧表示 | `/admin/device-inventory` | GET | 一覧・検索表示 |
 | 2 | デバイス台帳登録画面 | `/admin/device-inventory/create` | GET | 登録モーダル表示 |
 | 3 | デバイス台帳登録実行 | `/admin/device-inventory/create` | POST | 登録処理 |
-| 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<inventory_id>` | GET | 詳細モーダル表示 |
-| 5 | デバイス台帳更新画面 | `/admin/device-inventory/<inventory_id>/edit` | GET | 更新モーダル表示 |
-| 6 | デバイス台帳更新実行 | `/admin/device-inventory/<inventory_id>/update` | POST | 更新処理 |
-| 7 | デバイス台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理（複数選択対応） |
+| 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 詳細モーダル表示 |
+| 5 | デバイス台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 |
+| 6 | デバイス台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 |
+| 7 | デバイス台帳削除実行 | `/admin/device-inventory/<device_stock_uuid>/delete` | POST | 削除処理（論理削除） |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 |
 
 ---
@@ -131,8 +155,8 @@
 ### 権限制御の実装
 
 - **グローバルメニュー:** システム保守者以外には非表示
-- **ルートレベル:** `@role_required(Role.SYSTEM_ADMIN)` デコレーター
-- **データスコープ:** 組織階層ベースのフィルタリング適用
+- **ルートレベル:** `@require_role(Role.SYSTEM_ADMIN)` デコレーター
+- **データスコープ:** なし（システム保守者は全データにアクセス可能）
 
 ---
 
@@ -147,6 +171,7 @@
 
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード等
 - [UI共通仕様書](../../common/ui-common-specification.md) - 共通UI仕様
+- [アプリケーションDB仕様書](../../common/app-database-specification.md) - テーブル定義（device_stock_info_master）
 
 ### 要件定義
 
@@ -166,21 +191,6 @@
 
 ---
 
-## 実装ステータス
-
-| フェーズ | 機能 | ステータス | 備考 |
-|---------|------|----------|------|
-| フェーズ2 | デバイス台帳一覧・検索 | 未着手 | - |
-| フェーズ2 | デバイス台帳登録 | 未着手 | - |
-| フェーズ2 | デバイス台帳更新 | 未着手 | - |
-| フェーズ2 | デバイス台帳削除 | 未着手 | - |
-| フェーズ2 | デバイス台帳参照 | 未着手 | - |
-| フェーズ2 | CSVエクスポート | 未着手 | - |
-
-**注:** デバイス台帳管理はフェーズ2（拡張機能）での実装予定
-
----
-
 **作成日:** 2026-01-26
-**最終更新日:** 2026-01-26
+**最終更新日:** 2026-01-29
 **作成者:** Claude
