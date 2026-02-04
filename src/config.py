@@ -8,6 +8,10 @@ class Config:
     """Base configuration."""
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
+    # Flask Server Configuration
+    FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
+    FLASK_PORT = int(os.getenv("FLASK_PORT", 8080))
+
     # MySQL Configuration
     MYSQL_HOST = os.getenv("MYSQL_HOST", "db")
     MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
