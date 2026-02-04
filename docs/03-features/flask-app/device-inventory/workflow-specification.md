@@ -409,7 +409,7 @@ if purchase_date_to:
 ソート条件を変更して `GET /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_name&sort_order=desc&page=1
+GET /admin/device-inventory?device_name=...&sort_column=device_id&sort_order=desc&page=1
 ```
 
 ---
@@ -433,7 +433,7 @@ GET /admin/device-inventory?device_name=...&sort_column=device_name&sort_order=d
 ページ番号を変更して `GET /admin/device-inventory` へリダイレクト。検索条件とソート条件は保持。
 
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_name&sort_order=asc&page=3
+GET /admin/device-inventory?device_name=...&sort_column=device_id&sort_order=asc&page=3
 ```
 
 ---
