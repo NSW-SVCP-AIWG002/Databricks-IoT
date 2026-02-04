@@ -18,9 +18,13 @@
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
+				"ms-python.vscode-pylance",
 				"ms-python.debugpy",
+				"cstrap.flask-snippets",
+				"wholroyd.jinja",
 				"mtxr.sqltools",
-				"mtxr.sqltools-driver-mysql"
+				"mtxr.sqltools-driver-mysql",
+				"bierner.markdown-mermaid"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python"
