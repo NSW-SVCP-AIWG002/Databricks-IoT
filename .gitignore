@@ -8,9 +8,14 @@
 !/docs/**
 
 # .gitignore自体を許可
-!.gitignore
-docs/03-features/ldp-pipeline/gold_layer/review-comments.md
-docs/03-features/ldp-pipeline/silver-layer/review-comments.md
 .gitignore
+
+docs/03-features/ldp-pipeline/gold_layer/review-comments.md
+
+docs/03-features/ldp-pipeline/silver-layer/review-comments.md
+
 docs/AIレビューコメント/review-comments-silver.md
+
 docs/AIレビューコメント/review-comments‐gold.md
+
+docs/03-features/flask-app/conversational-ai-chat

@@ -33,7 +33,7 @@
 
 | データソース                      | 形式                  | 説明                                                                                      |
 | --------------------------------- | --------------------- | ----------------------------------------------------------------------------------------- |
-| Azure Event Hubs (Kafka Endpoint) | Binary / JSON (UTF-8) | IoTデバイスから送信されるテレメトリデータをKafka互換APIで取得。Databricksでデコード処理。 |
+| Azure Event Hubs (Kafka Endpoint) | Binary/JSON (UTF-8) | IoTデバイスから送信されるテレメトリデータをKafka互換APIで取得。Databricksでデコード処理。 |
 
 ### 出力テーブル（Unity Catalog）
 
