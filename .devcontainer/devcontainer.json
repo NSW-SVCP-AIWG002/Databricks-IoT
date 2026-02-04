@@ -1,28 +1,26 @@
 {
-	"name": "Databricks-IoT Python Flask",
-	"image": "mcr.microsoft.com/devcontainers/python:3.12",
-
-	"mounts": [
-		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
-		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached"
-	],
+	"name": "Databricks-IoT Python Flask + MySQL",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/workspaces/Databricks-IoT",
 
 	"features": {
-		"ghcr.io/devcontainers/features/python:1": {
-			"version": "3.12"
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
 		}
 	},
 
-	"forwardPorts": [5000],
+	"forwardPorts": [5000, 3306],
 
-	"postCreateCommand": "pip install -r requirements.txt",
-	"postStartCommand": "chmod 600 ~/.ssh/id_* 2>/dev/null || true",
+	"postCreateCommand": "pip install -r requirements.txt && npm install -g @anthropic-ai/claude-code",
 
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
-				"ms-python.debugpy"
+				"ms-python.debugpy",
+				"mtxr.sqltools",
+				"mtxr.sqltools-driver-mysql"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python"

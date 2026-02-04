@@ -19,12 +19,23 @@
 !/src/
 !/src/**
 
+# DB初期化スクリプト
+!/init/
+!/init/**
+
+# テストコード
+!/tests/
+!/tests/**
+
 # 依存関係・設定ファイル
 !/requirements.txt
 !/Dockerfile
 
 # 環境変数テンプレート（実際の.envは除外）
 !/.env.example
+
+# エディタ設定
+!/.editorconfig
 
 # Git設定
 !.gitignore
