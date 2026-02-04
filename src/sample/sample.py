@@ -60,4 +60,4 @@ def get_device(device_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host=Config.FLASK_HOST, port=Config.FLASK_PORT, debug=True)
