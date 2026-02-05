@@ -920,7 +920,7 @@ device_stock_info_master (dsi)
 - device_name: 最大100文字、必須
 - device_type: 必須（マスタ値のみ）
 - device_model: 最大100文字、必須
-- sim_id: 最大50文字
+- sim_id: 最大20文字
 - mac_address: XX:XX:XX:XX:XX:XX形式
 - stock_status: 必須（マスタ値のみ）
 - stock_location: 最大100文字、必須
