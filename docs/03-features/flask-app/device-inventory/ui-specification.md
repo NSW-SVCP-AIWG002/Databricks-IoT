@@ -384,11 +384,11 @@
 | (3.1) | チェックボックス | select_checkbox | Checkbox | I | - | - | - | - | 削除対象選択用 |
 | (3.2) | デバイス名 | device_name | Label | O | - | 100 | - | DB: device_master.device_name | ソート可 |
 | (3.3) | デバイス種別 | device_type | Label | O | - | - | - | DB: device_type_master.device_type_name | ソート可 |
-| (3.4) | SIMID | sim_id | Label | O | - | 100 | - | DB: device_master.sim_id | ソート可 |
-| (3.5) | MACアドレス | mac_address | Label | O | - | 100 | - | DB: device_master.mac_address | ソート可 |
+| (3.4) | SIMID | sim_id | Label | O | - | 20 | - | DB: device_master.sim_id | ソート可 |
+| (3.5) | MACアドレス | mac_address | Label | O | - | 17 | - | DB: device_master.mac_address | ソート可 |
 | (3.6) | 在庫状況 | stock_status | Label | O | - | - | - | DB: stock_status_master.stock_status_name | バッジ表示、ソート可 |
 | (3.7) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_stock_info_master.purchase_date | YYYY/MM/DD形式、ソート可 |
-| (3.8) | 保証期限 | warranty_status | Label | O | - | - | - | 計算: 保証終了日の早い方 | 警告アイコン付き、ソート可 |
+| (3.8) | 保証期限 | warranty_status | Label | O | - | - | - | 計算: メーカーかベンダーで保証終了日の早い方 | 警告アイコン付き、ソート可 |
 | (3.9) | 在庫場所 | stock_location | Label | O | - | 100 | - | DB: device_stock_info_master.stock_location | ソート可 |
 | (3.10) | 参照ボタン | reference_button | Button | I | - | - | - | 固定値:「参照」 | プライマリボタン |
 | (3.11) | 更新ボタン | update_button | Button | I | - | - | - | 固定値:「更新」 | プライマリボタン |
@@ -397,7 +397,7 @@
 | (4.1) | デバイス名 | device_name | Text | I/O | ○ | 100 | - | - | テキストエリア |
 | (4.2) | デバイス種別 | device_type | Select | I/O | ○ | - | - | マスタ: device_type_master | ドロップダウン |
 | (4.3) | モデル情報 | model_info | Text | I/O | ○ | 100 | - | - | テキストエリア |
-| (4.4) | SIMID | sim_id | Text | I/O | - | 50 | - | - | テキストエリア |
+| (4.4) | SIMID | sim_id | Text | I/O | - | 20 | - | - | テキストエリア |
 | (4.5) | MACアドレス | mac_address | Text | I/O | - | 17 | - | - | XX:XX:XX:XX:XX:XX形式 |
 | (4.6) | 在庫状況 | stock_status | Select | I/O | ○ | - | 在庫中 | マスタ: stock_status_master | ドロップダウン |
 | (4.7) | 在庫場所 | stock_location | Text | I/O | ○ | 100 | - | - | テキストエリア |
@@ -793,7 +793,7 @@
 | 4.2 デバイス種別 | 必須 | 「デバイス種別を選択してください」 |
 | 4.3 モデル情報 | 必須 | 「モデル情報を入力してください」 |
 | 4.3 モデル情報 | 最大100文字 | 「モデル情報は100文字以下で入力してください」 |
-| 4.4 SIMID | 最大50文字 | 「SIMIDは50文字以下で入力してください」 |
+| 4.4 SIMID | 最大20文字 | 「SIMIDは50文字以下で入力してください」 |
 | 4.5 MACアドレス | 形式チェック | 「MACアドレスはXX:XX:XX:XX:XX:XX形式で入力してください」 |
 | 4.6 在庫状況 | 必須 | 「在庫状況を選択してください」 |
 | 4.7 在庫場所 | 必須 | 「在庫場所を入力してください」 |
