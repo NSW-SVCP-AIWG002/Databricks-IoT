@@ -1109,7 +1109,9 @@ alert_operators:
   - operator_id: lte
     operator_symbol: "<="
   - operator_id: eq
-    operator_symbol: "=="
+    operator_symbol: "="
+  - operator_id: neq
+    operator_symbol: "!="
 
 # 判定時間（分）
 judgment_times: [1, 5, 10, 15, 30, 60]
