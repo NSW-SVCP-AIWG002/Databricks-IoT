@@ -8,7 +8,7 @@
    - 3.1 [認証処理フロー](#31-認証処理フロー)
    - 3.2 [認証除外パス判定](#32-認証除外パス判定)
    - 3.3 [IdP認証チェック](#33-idp認証チェック)
-   - 3.4 [ユーザーマスタ照合](#34-ユーザーマスタ照合)
+   - 3.4 [パスワード期限切れ時のアクセス制御](#34-パスワード期限切れ時のアクセス制御オンプレミス環境のみ)
    - 3.5 [Databricksトークン確保](#35-databricksトークン確保)
    - 3.6 [実装例](#36-実装例)
    - 3.7 [エラーハンドリング](#37-エラーハンドリング)
@@ -34,6 +34,8 @@
 | Azure環境        | Easy Auth（Entra ID） | Azure App Serviceでのホスティング    |
 | AWS環境          | ALB + Cognito         | AWS EC2/ECSでのホスティング          |
 | オンプレミス環境 | 自前認証（Flask IdP） | オンプレミスサーバーでのホスティング |
+
+- **オンプレミス環境における認証機能については一時凍結、スコープ対象外とする**
 
 ---
 
@@ -180,21 +182,21 @@ app/
 
 #### 2.4.2 ファイル責務一覧
 
-| ファイル                            | 責務                                                                                           | 参照セクション |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------- | -------------- |
-| `auth/factory.py`                   | 環境変数に基づきAuthProviderインスタンスを生成                                                 | 2.3            |
-| `auth/middleware.py`                | before_requestフックで認証チェック・ユーザーマスタ照合を実行                                   | 3.1〜3.6       |
-| `auth/routes.py`                    | ログイン・ログアウト・パスワードリセット画面のルート定義                                       | 5.1〜5.2       |
-| `auth/services.py`                  | 認証関連データアクセス（ユーザー検索は全環境共通、パスワード検証・ロック管理等はオンプレのみ） | 3.4, 5.1, 5.4  |
-| `auth/token_exchange.py`            | IdP JWTをDatabricksトークンに交換、キャッシュ管理                                              | 3.5            |
-| `auth/jwt_issuer.py`                | RS256署名によるJWT発行（オンプレミス環境のみ使用）                                             | 4.3.2          |
-| `auth/well_known.py`                | `/.well-known/openid-configuration`, `/.well-known/jwks.json` を提供                           | 4.3.3          |
-| `auth/exceptions.py`                | 認証関連の例外クラス定義（AuthError, TokenExchangeError等）                                    | 3.7.2          |
-| `auth/providers/base.py`            | AuthProvider抽象基底クラス、UserInfo型定義                                                     | 2.2.1          |
-| `auth/providers/azure_easy_auth.py` | X-MS-*ヘッダーからユーザー情報・JWT取得                                                        | 4.1            |
-| `auth/providers/aws_cognito.py`     | X-Amzn-Oidc-*ヘッダーからユーザー情報・JWT取得                                                 | 4.2            |
-| `auth/providers/local_idp.py`       | Flaskセッションからユーザー情報取得、JWT再発行                                                 | 4.3            |
-| `common/error_handlers.py`          | 認証エラー含む全HTTPエラーハンドラーを一元登録                                                 | 3.7.3          |
+| ファイル                            | 責務                                                                 | 参照セクション |
+| ----------------------------------- | -------------------------------------------------------------------- | -------------- |
+| `auth/factory.py`                   | 環境変数に基づきAuthProviderインスタンスを生成                       | 2.3            |
+| `auth/middleware.py`                | before_requestフックで認証チェックを実行                             | 3.1〜3.5       |
+| `auth/routes.py`                    | ログイン・ログアウト・パスワードリセット画面のルート定義             | 5.1〜5.2       |
+| `auth/services.py`                  | 認証関連データアクセス（パスワード検証・ロック管理等はオンプレのみ） | 5.1, 5.4       |
+| `auth/token_exchange.py`            | IdP JWTをDatabricksトークンに交換、キャッシュ管理                    | 3.4            |
+| `auth/jwt_issuer.py`                | RS256署名によるJWT発行（オンプレミス環境のみ使用）                   | 4.3.2          |
+| `auth/well_known.py`                | `/.well-known/openid-configuration`, `/.well-known/jwks.json` を提供 | 4.3.3          |
+| `auth/exceptions.py`                | 認証関連の例外クラス定義（AuthError, TokenExchangeError等）          | 3.6.2          |
+| `auth/providers/base.py`            | AuthProvider抽象基底クラス、UserInfo型定義                           | 2.2.1          |
+| `auth/providers/azure_easy_auth.py` | X-MS-*ヘッダーからユーザー情報・JWT取得                              | 4.1            |
+| `auth/providers/aws_cognito.py`     | X-Amzn-Oidc-*ヘッダーからユーザー情報・JWT取得                       | 4.2            |
+| `auth/providers/local_idp.py`       | Flaskセッションからユーザー情報取得、JWT再発行                       | 4.3            |
+| `common/error_handlers.py`          | 認証エラー含む全HTTPエラーハンドラーを一元登録                       | 3.6.3          |
 
 #### 2.4.3 補足
 
@@ -225,12 +227,7 @@ flowchart TD
     RedirectLogin --> End1([認証エラー])
 
     CheckIdP -->|Yes| SyncSession[Flaskセッション同期<br>_sync_session]
-    SyncSession --> CheckUser{ユーザーマスタ<br>照合}
-
-    CheckUser -->|存在しない/無効| Error403[403エラーページ]
-    Error403 --> End2([権限エラー])
-
-    CheckUser -->|有効| CheckDBToken{Databricksトークン<br>有効?}
+    SyncSession --> CheckDBToken{Databricksトークン<br>有効?}
 
     CheckDBToken -->|Yes| Execute[ビジネスロジック実行]
     Execute --> End3([正常終了])
@@ -260,9 +257,9 @@ flowchart TD
 
 **ポイント**:
 - IdP認証失敗・JWT取得失敗時は、Flaskセッションをクリアしてから IdPログインへリダイレクト
-- これにより、IdPセッションとFlaskセッションの整合性を保つ（詳細は[3.6.5 IdPセッションとFlaskセッションの同期](#365-idpセッションとflaskセッションの同期)を参照）
+- これにより、IdPセッションとFlaskセッションの整合性を保つ（詳細は[3.3.2 セッション同期](#332-セッション同期)を参照）
 - Token Exchange失敗（Databricks側エラー）は500エラーページへ遷移
-- 実装例は[3.3.4 実装例](#334-実装例)を参照
+- 実装例は[3.6 実装例](#36-実装例)を参照
 
 ### 3.2 認証除外パス判定
 
@@ -346,41 +343,33 @@ Easy Auth / ALB管理           Flask管理
 
 ---
 
-### 3.4 ユーザーマスタ照合
+### 3.4 パスワード期限切れ時のアクセス制御（オンプレミス環境のみ）
 
-IdP認証成功後、アプリケーションのユーザーマスタと照合する処理です。
+オンプレミス環境では、セッションに`password_expired=True`が設定されている場合、許可パス以外へのアクセスをブロックし、パスワード変更画面へリダイレクトします。
 
-#### 3.4.1 照合SQL
+#### 3.4.1 許可パス
 
-```sql
-SELECT
-    user_id,
-    email_address,
-    user_type_id,
-    delete_flag
-FROM user_master
-WHERE email_address = :email
-  AND delete_flag = FALSE
-```
+| パスパターン               | 説明               |
+| -------------------------- | ------------------ |
+| `/account/password/change` | パスワード変更画面 |
+| `/auth/logout`             | ログアウト         |
 
-#### 3.4.2 エラーケース
+**注**: 認証除外パス（3.2節）は本チェックの前にスキップされるため、静的ファイル等は影響を受けません。
 
-| ケース               | HTTPステータス | 対応                                                             |
-| -------------------- | -------------- | ---------------------------------------------------------------- |
-| ユーザーが存在しない | 403 Forbidden  | エラーページ表示「このアカウントはシステムに登録されていません」 |
-| ユーザーが削除済み   | 403 Forbidden  | エラーページ表示「このアカウントは無効です」                     |
+#### 3.4.2 判定ロジック
 
-#### 3.4.3 パスワード期限切れチェック（オンプレミス環境のみ）
+| 条件                                                       | 処理                                     |
+| ---------------------------------------------------------- | ---------------------------------------- |
+| `session.get('password_expired')` が False または未設定    | 通常処理を継続                           |
+| `session.get('password_expired')` が True かつ許可パス     | 通常処理を継続                           |
+| `session.get('password_expired')` が True かつ許可パス以外 | `/account/password/change`へリダイレクト |
 
-オンプレミス環境では、パスワード期限切れ時にパスワード変更画面へ強制リダイレクトします。
+#### 3.4.3 フラグの設定・解除タイミング
 
-| 条件                                               | 処理                                 |
-| -------------------------------------------------- | ------------------------------------ |
-| `auth_provider.requires_additional_setup()` がTrue | パスワード期限切れチェックを実施     |
-| `session['password_expired']` がTrue               | パスワード変更画面へリダイレクト     |
-| `/account/password/change` へのアクセス            | 期限切れ状態でも許可（変更するため） |
-
-**注**: Azure/AWS環境では`requires_additional_setup()`がFalseを返すため、このチェックはスキップされます。
+| タイミング           | 処理                                                                             |
+| -------------------- | -------------------------------------------------------------------------------- |
+| ログイン成功時       | `password_expires_date < NOW` の場合、`session['password_expired'] = True`を設定 |
+| パスワード変更完了時 | `session.pop('password_expired', None)`でフラグを解除                            |
 
 ---
 
@@ -637,25 +626,15 @@ def authenticate_request():
     # 3. Flaskセッション同期（IdP認証成功 = セッション有効）
     _sync_session(idp_user_info)
 
-    email = idp_user_info['email']
+    # 4. グローバルコンテキストに保存（セッションから取得）
+    g.current_user_id = session.get('user_id')
+    g.current_user_type_id = session.get('user_type_id')
 
-    # 4. ユーザーマスタ照合
-    user = get_user_by_email(email)
-
-    if not user:
-        abort(403, description='このアカウントはシステムに登録されていません')
-
-    if user.delete_flag:
-        abort(403, description='このアカウントは無効です')
-
-    # 5. グローバルコンテキストに保存
-    g.current_user = user
-    g.current_user_type_id = user.user_type_id
-
-    # 6. パスワード期限切れチェック（オンプレミス環境のみ）
+    # 5. パスワード期限切れチェック（オンプレミス環境のみ）
     if auth_provider.requires_additional_setup():
-        # パスワード変更画面へのアクセスは許可
-        if request.path == '/account/password/change':
+        # 許可パス（パスワード変更画面・ログアウト）へのアクセスは許可
+        allowed_paths = ['/account/password/change', '/auth/logout']
+        if request.path in allowed_paths:
             return None
 
         # パスワード期限切れ状態の場合、パスワード変更画面にリダイレクト
@@ -663,7 +642,7 @@ def authenticate_request():
             flash('パスワードの有効期限が切れました。パスワードを変更してください。', 'warning')
             return redirect(url_for('account.password_change'))
 
-    # 7. Token Exchange（有効なDatabricksトークンを確保）
+    # 6. Token Exchange（有効なDatabricksトークンを確保）
     try:
         from auth.token_exchange import TokenExchanger
         token_exchanger = TokenExchanger()
@@ -702,7 +681,7 @@ def _sync_session(idp_user_info):
 | エラー種別         | HTTPステータス            | 対応                                             |
 | ------------------ | ------------------------- | ------------------------------------------------ |
 | 未認証             | 401 Unauthorized          | ログインページへリダイレクト                     |
-| 権限不足           | 403 Forbidden             | エラーページ表示                                 |
+| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示                     |
 | Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                       |
 | セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                     |
 | パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ） |
@@ -726,7 +705,7 @@ class ForbiddenError(AuthError):
 
 class TokenExchangeError(AuthError):
     """Token Exchangeエラー"""
-    pass
+    ERROR_CODE = 'token_exchange_failed'
 
 class SessionExpiredError(AuthError):
     """セッション期限切れエラー"""
@@ -748,14 +727,22 @@ class PasswordExpiredError(AuthError):
     """パスワード期限切れエラー（パスワード変更画面へリダイレクト）"""
     pass
 
-# 自前IdP固有
+# 自前IdP固有（ERROR_CODEはlogin_historyのfailure_reasonに記録）
+class UserNotFoundError(AuthError):
+    """ユーザー未存在エラー"""
+    ERROR_CODE = 'user_not_found'
+
+class PasswordNotSetError(AuthError):
+    """パスワード未設定エラー"""
+    ERROR_CODE = 'password_not_set'
+
 class PasswordAuthError(AuthError):
-    """パスワード認証エラー"""
-    pass
+    """パスワード認証エラー（パスワード不一致）"""
+    ERROR_CODE = 'invalid_credentials'
 
 class AccountLockedError(AuthError):
     """アカウントロックエラー"""
-    pass
+    ERROR_CODE = 'account_locked'
 
 class PasswordResetError(AuthError):
     """パスワードリセットエラー"""
@@ -812,7 +799,7 @@ def register_error_handlers(app):
 
 ```python
 session = {
-    'user_id': str,              # ユーザーID
+    'user_id': int,              # ユーザーID
     'email': str,                # メールアドレス
     'user_type_id': int,         # ユーザー種別ID（user_type_master参照）
     'databricks_token': str,     # Databricksアクセストークン
@@ -1274,6 +1261,8 @@ Databricks Account Consoleで以下を設定:
 
 ### 4.3 オンプレミス環境（基本設定）
 
+- **オンプレミス環境における認証機能については作業凍結、スコープ対象外**
+
 #### 4.3.1 概要
 
 オンプレミス環境では、Flaskアプリケーション自体がIdP（Identity Provider）として機能し、ユーザー認証とJWT発行を行います。
@@ -1546,6 +1535,7 @@ echo "パーミッション: 400 (所有者のみ読み取り可能)"
 ## 5. オンプレミス認証機能仕様
 
 本セクションでは、オンプレミス環境固有の認証機能（ログイン、パスワードリセット等）の実装詳細を記載します。
+- **オンプレミス環境における認証機能については作業凍結、スコープ対象外**
 
 ### 5.1 パスワード認証フロー
 
@@ -1565,32 +1555,33 @@ flowchart TD
 
     ValidateInput -->|OK| CheckLocked{アカウントロック中?<br>lock_expires_date > NOW}
 
-    CheckLocked -->|Yes| ShowLockErr[メッセージモーダル表示<br>flash: ロックエラー]
+    CheckLocked -->|Yes| RecordLockFail[ログイン失敗記録<br>login_history INSERT<br>reason: AccountLockedError.ERROR_CODE]
+    RecordLockFail --> ShowLockErr[メッセージモーダル表示<br>flash: ロックエラー]
     ShowLockErr --> End1
 
     CheckLocked -->|No| AuthUser[パスワード検証<br>authenticate_user<br>bcrypt.checkpw]
     AuthUser --> CheckAuth{認証結果}
 
-    CheckAuth -->|失敗| RecordFail[ログイン失敗記録<br>login_history INSERT<br>failed_attempts +1]
-    RecordFail --> CheckLock{連続失敗<br>5回以上?}
+    CheckAuth -->|失敗| UpdateFailCount[連続失敗回数更新<br>account_lock UPSERT<br>failed_attempts +1<br>last_failed_date = NOW]
+    UpdateFailCount --> RecordLoginFail[ログイン失敗記録<br>login_history INSERT<br>reason: PasswordAuthError.ERROR_CODE]
+    RecordLoginFail --> CheckLock{連続失敗<br>5回以上?}
 
     CheckLock -->|Yes| LockAccount[アカウントロック<br>locked_date = NOW<br>lock_expires_date = NOW + 15分]
     CheckLock -->|No| ShowAuthErr[メッセージモーダル表示<br>flash: 認証エラー]
     LockAccount --> ShowAuthErr
     ShowAuthErr --> End1
 
-    CheckAuth -->|成功| ResetFail[失敗カウントリセット<br>failed_attempts = 0]
-    ResetFail --> CreateSession[セッション作成<br>session固定攻撃対策<br>session.regenerate]
-
-    CreateSession --> TokenExchange[Token Exchange実行<br>JWT都度発行→交換<br>grant_type: token-exchange]
+    CheckAuth -->|成功| TokenExchange[Token Exchange実行<br>JWT都度発行→交換<br>grant_type: token-exchange]
 
     TokenExchange --> CheckExchange{Token Exchange<br>結果}
 
-    CheckExchange -->|失敗| Error500[500エラーページ表示]
+    CheckExchange -->|失敗| RecordExchangeFail[ログイン失敗記録<br>login_history INSERT<br>reason: TokenExchangeError.ERROR_CODE]
+    RecordExchangeFail --> Error500[500エラーページ表示]
     Error500 --> End1
 
-    CheckExchange -->|成功| SaveSession[セッション保存<br>databricks_token<br>user_id, email, user_type_id]
-    SaveSession --> RecordSuccess[ログイン成功記録<br>login_history INSERT<br>success = TRUE]
+    CheckExchange -->|成功| ResetFail[失敗カウントリセット<br>account_lock UPDATE<br>failed_attempts = 0]
+    ResetFail --> CreateSession[セッション作成・保存<br>session固定攻撃対策<br>databricks_token<br>user_id, email, user_type_id]
+    CreateSession --> RecordSuccess[ログイン成功記録<br>login_history INSERT<br>success = TRUE]
 
     RecordSuccess --> CheckPwExpiry{パスワード期限切れ?<br>password_expires_date < NOW}
 
@@ -1611,6 +1602,10 @@ flowchart TD
 # auth/routes.py
 import time
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from auth.exceptions import (
+    UserNotFoundError, PasswordNotSetError, AccountLockedError,
+    PasswordAuthError, TokenExchangeError
+)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -1625,20 +1620,20 @@ def login():
     # ユーザー存在確認
     user = get_user_by_email(email)
     if not user:
-        record_login_attempt(email, success=False, reason='user_not_found')
+        record_login_attempt(email, success=False, reason=UserNotFoundError.ERROR_CODE)
         flash('メールアドレスまたはパスワードが正しくありません', 'error')
         return render_template('auth/login.html')
 
     # パスワード未設定チェック（新規ユーザーで初回パスワード設定前）
     user_password = get_user_password(user.user_id)
     if not user_password or not user_password.password_hash:
-        record_login_attempt(email, success=False, reason='password_not_set')
+        record_login_attempt(email, success=False, reason=PasswordNotSetError.ERROR_CODE)
         flash('パスワードが設定されていません。メールに送信されたリンクからパスワードを設定してください。', 'error')
         return render_template('auth/login.html')
 
     # アカウントロックチェック（パスワード検証前に実施）
     if is_account_locked(user.user_id):
-        record_login_attempt(email, success=False, reason='account_locked')
+        record_login_attempt(email, success=False, reason=AccountLockedError.ERROR_CODE)
         flash('アカウントがロックされています。しばらく待ってから再試行してください', 'error')
         return render_template('auth/login.html')
 
@@ -1647,7 +1642,7 @@ def login():
 
     if not user:
         # ログイン失敗記録
-        record_login_attempt(email, success=False, reason='invalid_credentials')
+        record_login_attempt(email, success=False, reason=PasswordAuthError.ERROR_CODE)
         increment_failed_attempts(email)
 
         # 連続失敗5回以上でアカウントロック
@@ -1657,17 +1652,7 @@ def login():
         flash('メールアドレスまたはパスワードが正しくありません', 'error')
         return render_template('auth/login.html')
 
-    # 失敗カウントリセット
-    reset_failed_attempts(user.user_id)
-
-    # セッション作成（セッション固定攻撃対策）
-    session.clear()
-    session['user_id'] = user.user_id
-    session['email'] = user.email
-    session['user_type_id'] = user.user_type_id
-    session.permanent = True
-
-    # Token Exchange実行
+    # Token Exchange実行（セッション作成前に実行）
     # JWTはget_jwt_for_token_exchange内で都度発行される（セッションには保存しない）
     try:
         from auth.factory import get_auth_provider
@@ -1678,11 +1663,23 @@ def login():
 
         jwt_token = auth_provider.get_jwt_for_token_exchange(request)
         result = token_exchanger.exchange_token(jwt_token)
-        session['databricks_token'] = result['access_token']
-        session['databricks_token_expires'] = time.time() + result['expires_in'] - 60
     except TokenExchangeError as e:
-        # 500エラーページへ遷移
+        # Token Exchange失敗時はログイン失敗記録後、500エラーページへ遷移（セッション未作成のまま）
+        record_login_attempt(email, success=False, reason=TokenExchangeError.ERROR_CODE)
         abort(500)
+
+    # Token Exchange成功後の処理
+    # 失敗カウントリセット
+    reset_failed_attempts(user.user_id)
+
+    # セッション作成・保存（セッション固定攻撃対策）
+    session.clear()
+    session['user_id'] = user.user_id
+    session['email'] = user.email
+    session['user_type_id'] = user.user_type_id
+    session['databricks_token'] = result['access_token']
+    session['databricks_token_expires'] = time.time() + result['expires_in'] - 60
+    session.permanent = True
 
     # ログイン成功記録
     record_login_attempt(email, success=True)
@@ -1730,9 +1727,12 @@ flowchart TD
     CheckUser -->|存在しない| ShowSuccess[セキュリティ上<br>成功メッセージを表示<br>※ユーザー存在有無を漏らさない]
     ShowSuccess --> End1
 
-    CheckUser -->|存在| GenToken[トークン生成<br>secrets.token_urlsafe 32]
+    CheckUser -->|存在| CheckExistingToken{有効トークン存在?<br>password_reset_token SELECT<br>WHERE user_id = ?<br>AND expires_date > NOW}
+
+    CheckExistingToken -->|存在| ShowSuccess
+    CheckExistingToken -->|なし| GenToken[トークン生成<br>secrets.token_urlsafe 32]
     GenToken --> HashToken[トークンハッシュ化<br>SHA-256]
-    HashToken --> SaveToken[トークン保存<br>password_reset_token INSERT<br>expires_at = NOW + 1hour]
+    HashToken --> SaveToken[トークン保存<br>password_reset_token INSERT<br>expires_date = NOW + 1hour]
 
     SaveToken --> BuildURL[リセットURL構築<br>/auth/password-reset/token]
     BuildURL --> SendEmail[メール送信<br>リセットURLを通知]
@@ -1748,23 +1748,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start([GET/POST /auth/password-reset/token]) --> GetToken[URLからトークン取得]
-    GetToken --> ValidateToken[トークン検証<br>password_reset_token SELECT<br>WHERE token_hash = ?]
+    Start([GET/POST /auth/password-reset/token]) --> CheckMethod1{リクエスト<br>メソッド}
 
-    ValidateToken --> CheckToken{トークン有効?<br>expires_date > NOW<br>AND used_date IS NULL}
+    CheckMethod1 -->|GET| GetTokenURL[トークン取得<br>URLパスパラメータ]
+    CheckMethod1 -->|POST| GetTokenForm[トークン取得<br>フォームhidden]
+
+    GetTokenURL --> ValidateToken[トークン検証<br>password_reset_token SELECT<br>WHERE token_hash = ?]
+    GetTokenForm --> ValidateToken
+
+    ValidateToken --> CheckToken{トークン有効?<br>レコード存在<br>AND expires_date > NOW}
 
     CheckToken -->|無効/期限切れ| ShowInvalidErr[無効なトークンエラー<br>400 Bad Request]
     ShowInvalidErr --> End1([処理完了])
 
-    CheckToken -->|使用済み| ShowUsedErr[使用済みトークンエラー<br>400 Bad Request]
-    ShowUsedErr --> End1
+    CheckToken -->|有効| CheckMethod2{リクエスト<br>メソッド}
 
-    CheckToken -->|有効| CheckMethod{リクエスト<br>メソッド}
-
-    CheckMethod -->|GET| ShowNewPwForm[新パスワード入力フォーム表示<br>render_template<br>auth/password_reset_form.html]
+    CheckMethod2 -->|GET| ShowNewPwForm[新パスワード入力フォーム表示<br>render_template<br>auth/password_reset_form.html<br>hiddenにトークン埋め込み]
     ShowNewPwForm --> End1
 
-    CheckMethod -->|POST| ValidateComplexity{パスワードポリシー検証<br>8〜64文字<br>現在パスワードと異なる}
+    CheckMethod2 -->|POST| ValidateComplexity{パスワードポリシー検証<br>8〜64文字<br>現在パスワードと異なる}
 
     ValidateComplexity -->|不合格| ShowComplexErr[検証エラー<br>メッセージモーダル表示<br>文字数、旧パスワード一致]
     ShowComplexErr --> End1
@@ -1773,8 +1775,8 @@ flowchart TD
     HashPassword --> BeginTx[トランザクション開始]
 
     BeginTx --> UpdatePw[パスワード更新<br>password_hash = ?<br>password_expires_date = NOW + 設定ファイルの有効期限]
-    UpdatePw --> InvalidateToken[トークン無効化<br>used_at = NOW]
-    InvalidateToken --> ClearSessions[既存セッション無効化<br>強制ログアウト]
+    UpdatePw --> DeleteToken[トークン削除<br>password_reset_token DELETE<br>WHERE token_hash = ?]
+    DeleteToken --> ClearSessions[既存セッション無効化<br>強制ログアウト]
     ClearSessions --> CommitTx[トランザクション<br>コミット]
     CommitTx --> ShowResetSuccess[リセット完了メッセージ<br>ログイン画面へリダイレクト]
     ShowResetSuccess --> End1
@@ -1824,8 +1826,14 @@ flowchart TD
 ```python
 @auth_bp.route('/password-reset/<token>', methods=['GET', 'POST'])
 def password_reset_execute(token):
+    # トークン取得（GET: URLパスパラメータ、POST: フォームhidden）
+    if request.method == 'GET':
+        target_token = token
+    else:
+        target_token = request.form.get('token')
+
     # トークン検証
-    token_record = validate_reset_token(token)
+    token_record = validate_reset_token(target_token)
     if not token_record:
         abort(400, 'リンクが無効または期限切れです')
 
@@ -1834,7 +1842,9 @@ def password_reset_execute(token):
     page_title = 'パスワード設定' if is_invite else 'パスワード再設定'
 
     if request.method == 'GET':
+        # フォームにトークンを埋め込んで表示
         return render_template('auth/password_reset_form.html',
+                               token=token,
                                page_title=page_title,
                                is_invite=is_invite)
 
@@ -1852,8 +1862,8 @@ def password_reset_execute(token):
         # 新規レコードを作成（INVITE）
         create_user_password(token_record.user_id, hash_password(new_password))
 
-    # トークン無効化
-    invalidate_token(token_record.token_hash)
+    # トークン削除
+    delete_token(token_record.token_hash)
 
     # 完了メッセージ
     message = 'パスワードを設定しました。' if is_invite else 'パスワードをリセットしました。'
@@ -1909,7 +1919,7 @@ def password_change():
     return redirect(url_for('account.index'))
 ```
 
-**注**: 期限切れ状態（`password_expired=True`）のユーザーは、パスワード変更画面以外へのアクセスがAuthMiddlewareによりブロックされます（3.3.4節参照）。
+**注**: 期限切れ状態（`password_expired=True`）のユーザーは、パスワード変更画面以外へのアクセスがAuthMiddlewareによりブロックされます（3.4節参照）。
 
 ### 5.4 セキュリティ要件
 
@@ -1973,14 +1983,13 @@ def password_change():
 | user_id      | ユーザーID       | INT          | ○    | ユーザーID（FK→users.user_id）       |
 | token_type   | トークン種別     | TINYINT      | ○    | リセットの種別（1:INVITE / 2:RESET） |
 | expires_date | トークン有効期限 | DATETIME     | ○    | トークン有効期限                     |
-| used_date    | トークン使用日時 | DATETIME     |      | 使用日時（NULL=未使用）              |
 | created_date | 作成日時         | DATETIME     | ○    | レコード作成日時                     |
 | updated_date | 更新日時         | DATETIME     | ○    | レコード最終更新日時                 |
 
 #### login_history（ログイン履歴テーブル）
 
 | カラム名         | 論理名         | 型           | 必須 | 説明                                                     |
-| ---------------- | -------------- | ------------ | ---- |
+| ---------------- | -------------- | ------------ | ---- | -------------------------------------------------------- |
 | login_history_id | ログイン履歴ID | INT          | ○    | ログイン履歴ID（PK, AUTO_INCREMENT）                     |
 | user_id          | ユーザーID     | INT          |      | ユーザーID、成功時のみ設定（FK→users.user_id）           |
 | email            | メールアドレス | VARCHAR(254) | ○    | 入力されたメールアドレス                                 |
@@ -1995,12 +2004,12 @@ def password_change():
 #### account_lock（アカウントロック管理テーブル）
 
 | カラム名          | 論理名             | 型       | 必須 | 説明                               |
-| ----------------- | ------------------ | -------- | ---- |
+| ----------------- | ------------------ | -------- | ---- | ---------------------------------- |
 | user_id           | ユーザーID         | INT      | ○    | ユーザーID（PK, FK→users.user_id） |
 | failed_attempts   | 連続失敗回数       | INT      | ○    | 連続失敗回数                       |
 | last_failed_date  | 最終失敗日時       | DATETIME | ○    | 最後の失敗日時                     |
-| locked_date       | ロック日時         | DATETIME | ○    | ロック日時（NULL=ロック解除）      |
-| lock_expires_date | ロック解除予定日時 | DATETIME | ○    | ロック解除予定日時                 |
+| locked_date       | ロック日時         | DATETIME |      | ロック日時（NULL=ロック解除）      |
+| lock_expires_date | ロック解除予定日時 | DATETIME |      | ロック解除予定日時                 |
 
 ### 5.6 ユーザー新規登録時の認証処理
 
@@ -2104,3 +2113,11 @@ https://{domain}/auth/password-reset/{token}
 | 2026-02-03 | 3.5        | Claude | オンプレミス認証フロー図の判定条件を具体化: 5.1パスワード認証フロー（入力バリデーション、アカウントロック判定、パスワード期限切れ判定、ロック期間設定）、5.2パスワードリセットフロー（トークン有効性判定、パスワードポリシー検証）にDB項目・閾値を追記                                      |
 | 2026-02-03 | 3.6        | Claude | パスワード有効期限設定の記載を整理: 5.4.1パスワードポリシーに全パスワード設定・変更時の有効期限設定ルールを明記、5.2.3からINVITE固有記載を削除し共通ルール参照に変更、5.2フロー図・5.3処理フローに有効期限設定を追記                                                                        |
 | 2026-02-03 | 3.7        | Claude | 5.1パスワード認証フロー図修正: アカウントロック判定をパスワード検証前に移動（実装例コードとの整合性確保、ブルートフォース攻撃対策）                                                                                                                                                         |
+| 2026-02-04 | 3.8        | Claude | リクエスト認証処理からユーザーマスタ照合を削除: 旧3.4セクション削除、セクション番号リナンバリング（3.5→3.4〜3.9→3.8）、3.1フロー図・3.5実装例からユーザーマスタ照合処理を削除、ファイル責務一覧・相互参照を更新                                                                             |
+| 2026-02-04 | 3.9        | Claude | パスワード期限切れ時のアクセス制御を仕様化: 新セクション3.4追加（許可パス・判定ロジック・フラグ設定タイミング）、セクション番号リナンバリング（旧3.4→3.5〜旧3.8→3.9）、3.6実装例に/auth/logout許可パス追加、目次・相互参照を更新                                                            |
+| 2026-02-04 | 3.10       | Claude | 5.1パスワード認証フロー図: ログイン失敗時の処理を2ノードに分割（連続失敗回数更新: account_lock UPSERT、ログイン失敗記録: login_history INSERT）、account_lockレコードの生成タイミング（初回失敗時）を明示化                                                                                 |
+| 2026-02-04 | 3.11       | Claude | パスワード認証フロー順序修正: Token Exchangeをセッション作成前に移動、Token Exchange成功後に失敗カウントリセット→セッション作成・保存→ログイン成功記録の順に変更（Token Exchange失敗時に空セッションが残る問題を解消）、5.1フロー図・5.3実装例を修正                                        |
+| 2026-02-04 | 3.12       | Claude | ログイン履歴記録の網羅性向上: アカウントロック時・Token Exchange失敗時にもログイン失敗記録（login_history INSERT）を追加、5.1フロー図・5.3実装例を修正、DB設計書にfailure_reason値`token_exchange_failed`を追加                                                                             |
+| 2026-02-04 | 3.13       | Claude | 例外クラスにERROR_CODE定数を追加: UserNotFoundError/PasswordNotSetError/PasswordAuthError/AccountLockedError/TokenExchangeErrorにERROR_CODE定義、5.1フロー図・5.3実装例でERROR_CODEを参照する形式に修正（静的文字列によるハードコードを防止）                                               |
+| 2026-02-04 | 3.14       | Claude | 5.2パスワードリセット実行画面のトークン取得方法を明確化: GET時はURLパスパラメータ、POST時はフォームhiddenから取得するようフロー図・実装例を修正、GETでフォームにトークンを埋め込む処理を追加                                                                                                |
+| 2026-02-04 | 3.15       | Claude | 5.2パスワードリセットフロー修正: 要求画面に有効トークン存在チェック追加（連続送信防止）、実行画面のトークン無効化→トークン削除に変更、DB設計書からused_dateカラム削除・ビジネスルール更新、5.2フロー図・5.4テーブル定義からused_date関連を削除                                              |

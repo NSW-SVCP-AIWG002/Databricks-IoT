@@ -832,9 +832,8 @@
 | 2   | user_id      | ユーザーID       | INT         | NOT NULL | -   | ○   | -                 | ユーザーID（user_master参照）          |
 | 3   | token_type   | トークン種別     | TINYINT     | NOT NULL | -   | -   | -                 | 1:INVITE（招待） / 2:RESET（リセット） |
 | 4   | expires_date | トークン有効期限 | DATETIME    | NOT NULL | -   | -   | -                 | トークン有効期限                       |
-| 5   | used_date    | トークン使用日時 | DATETIME    | NULL     | -   | -   | -                 | 使用日時（NULL=未使用）                |
-| 6   | create_date  | 作成日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                       |
-| 7   | update_date  | 更新日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                   |
+| 5   | create_date  | 作成日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                       |
+| 6   | update_date  | 更新日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                   |
 
 **外部キー:**
 - `user_id` → `user_master.user_id`
@@ -848,7 +847,7 @@
 - トークンは`secrets.token_urlsafe(32)`で生成し、SHA-256でハッシュ化して保存
 - INVITE（招待）トークンの有効期限: 7日間
 - RESET（リセット）トークンの有効期限: 1時間
-- 使用済みトークンは`used_date`に使用日時を記録
+- 使用済みトークンはレコードを削除（監査証跡はuser_passwordのUPDATEログで追跡可能）
 - 詳細は[認証仕様書](./authentication-specification.md) 5.2節参照
 
 ---
@@ -884,7 +883,7 @@
 
 **ビジネスルール:**
 - ログイン履歴は作成のみで更新は行わない（監査ログとして保持）
-- failure_reasonの値: `user_not_found`, `password_not_set`, `account_locked`, `invalid_credentials`
+- failure_reasonの値: `user_not_found`, `password_not_set`, `account_locked`, `invalid_credentials`, `token_exchange_failed`
 - 詳細は[認証仕様書](./authentication-specification.md) 5.4.3節参照
 
 ---
@@ -900,7 +899,7 @@
 | --- | ----------------- | ------------------ | -------- | -------- | --- | --- | ------------ | ------------------------------------- |
 | 1   | user_id           | ユーザーID         | INT      | NOT NULL | ○   | ○   | -            | ユーザーID（user_master参照）         |
 | 2   | failed_attempts   | 連続失敗回数       | INT      | NOT NULL | -   | -   | 0            | 連続ログイン失敗回数                  |
-| 3   | last_failed_date  | 最終失敗日時       | DATETIME | NULL     | -   | -   | -            | 最後のログイン失敗日時                |
+| 3   | last_failed_date  | 最終失敗日時       | DATETIME | NOT NULL | -   | -   | -            | 最後のログイン失敗日時                |
 | 4   | locked_date       | ロック日時         | DATETIME | NULL     | -   | -   | -            | アカウントロック日時（NULL=未ロック） |
 | 5   | lock_expires_date | ロック解除予定日時 | DATETIME | NULL     | -   | -   | -            | ロック自動解除予定日時                |
 
