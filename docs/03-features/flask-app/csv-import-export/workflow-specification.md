@@ -93,7 +93,7 @@
 | 3 | デバイス一覧CSVエクスポート | `/admin/devices?export=csv` | GET | デバイス一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
 | 4 | ユーザー一覧CSVエクスポート | `/admin/users?export=csv` | GET | ユーザー一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
 | 5 | 組織一覧CSVエクスポート | `/admin/organizations?export=csv` | GET | 組織一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
-| 6 | アラート一覧マスタCSVエクスポート | `/admin/alert-settings?export=csv` | GET | アラート設定一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 6 | アラート一覧マスタCSVエクスポート | `/alert/alert-setting?export=csv` | GET | アラート設定一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
 | 7 | デバイス在庫一覧CSVエクスポート | `/admin/device-inventory?export=csv` | GET | デバイス在庫一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
 
 **注:**
@@ -116,7 +116,7 @@
 | デバイスマスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/devices?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
 | ユーザーマスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/users?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
 | 組織マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/organizations?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
-| アラート設定マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/alert-settings?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| アラート設定マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /alert/alert-setting?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
 | デバイス在庫マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/device-inventory?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
 
 ---
@@ -594,11 +594,26 @@ WTFormsを使用してフォームデータを検証します。
 
 **実装例:**
 ```python
-from flask import request, render_template, redirect, url_for, flash
+from flask import request, render_template, redirect, url_for, flash, abort, g
 from werkzeug.utils import secure_filename
 
+def require_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = request.headers.get('X-Forwarded-User')
+        if not user_id:
+            abort(401)
+
+        user = User.query.filter_by(user_id=user_id, delete_flag=0).first()
+        if not user:
+            abort(403)
+
+        g.current_user = user
+        return f(*args, **kwargs)
+    return decorated_function
+
 class CSVImportForm(FlaskForm):
-    master_type_id = SelectField('マスタ種別', validators=[DataRequired()], choices=[])
+    master_type_id = SelectField('マスタ種別', validators=[DataRequired()], choices=[], g.current_user.user_type_id)
     csv_file = FileField('CSVファイル', validators=[
         DataRequired(),
         FileAllowed(['csv'], 'CSVファイルを選択してください'),
@@ -622,7 +637,7 @@ def csv_import_execute():
 **処理内容:**
 - ファイル内容をバイナリで読み込み
 - chardetで文字エンコーディングを検出
-- 対応文字コード: UTF-8（BOM付き/なし）、Shift-JIS、EUC-JP
+- 対応文字コード: UTF-8（BOM付き/なし）
 
 **変数・パラメータ:**
 - `file_content`: bytes - CSVファイルの内容（バイナリ）
@@ -686,7 +701,7 @@ CSVデータのフォーマットを検証します。
 - 必須カラムの存在チェック
 - データ型チェック（文字列長、数値形式、日付形式）
 - 必須項目チェック（NULL不可）
-- 重複チェック（主キー重複）
+- 重複チェック（主キー、UNIQUE制約）
 - データスコープ制限チェック
 
 **変数・パラメータ:**
@@ -721,6 +736,64 @@ if missing_columns:
     return render_template('transfer/csv-import.html',
                           form=form,
                           errors=errors)
+
+# 主キー・UNIQUE制約カラムの取得
+pk_constraint = inspector.get_pk_constraint(table_name)
+pk_columns = pk_constraint.get('constrained_columns', [])
+unique_constraints = inspector.get_unique_constraints(table_name)
+unique_column_sets = [uc['column_names'] for uc in unique_constraints]
+
+# CSV内の重複チェック（主キー）
+if pk_columns and all(col in df.columns for col in pk_columns):
+    duplicated_mask = df.duplicated(subset=pk_columns, keep=False)
+    if duplicated_mask.any():
+        for idx in df[duplicated_mask].index.tolist():
+            errors.append({
+                'row': idx + 2,
+                'column': ', '.join(pk_columns),
+                'message': '主キーがCSV内で重複しています'
+            })
+
+# CSV内の重複チェック（UNIQUE制約）
+for uc_columns in unique_column_sets:
+    if all(col in df.columns for col in uc_columns):
+        duplicated_mask = df.duplicated(subset=uc_columns, keep=False)
+        if duplicated_mask.any():
+            for idx in df[duplicated_mask].index.tolist():
+                errors.append({
+                    'row': idx + 2,
+                    'column': ', '.join(uc_columns),
+                    'message': 'UNIQUE制約がCSV内で重複しています'
+                })
+
+# DB既存データとの重複チェック（主キー）
+if pk_columns and all(col in df.columns for col in pk_columns):
+    existing_df = pd.read_sql_table(table_name, engine, columns=pk_columns)
+    for index, row in df.iterrows():
+        match = existing_df
+        for col in pk_columns:
+            match = match[match[col] == row[col]]
+        if not match.empty:
+            errors.append({
+                'row': index + 2,
+                'column': ', '.join(pk_columns),
+                'message': '主キーがDBに既に存在します'
+            })
+
+# DB既存データとの重複チェック（UNIQUE制約）
+for uc_columns in unique_column_sets:
+    if all(col in df.columns for col in uc_columns):
+        existing_df = pd.read_sql_table(table_name, engine, columns=uc_columns)
+        for index, row in df.iterrows():
+            match = existing_df
+            for col in uc_columns:
+                match = match[match[col] == row[col]]
+            if not match.empty:
+                errors.append({
+                    'row': index + 2,
+                    'column': ', '.join(uc_columns),
+                    'message': 'UNIQUE制約がDBの既存データと重複しています'
+                })
 
 # 各行のバリデーション
 for index, row in df.iterrows():
@@ -1024,6 +1097,7 @@ pandasを使用してCSVファイルを生成します。
 **処理内容:**
 - データをpandas DataFrameに変換
 - カラム名を日本語ヘッダーに変換
+- 先頭列に操作列を追加
 - CSVフォーマットで出力（UTF-8 BOM付き）
 
 **変数・パラメータ:**
@@ -1042,6 +1116,7 @@ def export_devices_csv():
     data = []
     for device in devices:
         data.append({
+            '操作列': '',
             'デバイスID': device.device_id,
             'デバイス名': device.device_name,
             '組織ID': device.organization_id,

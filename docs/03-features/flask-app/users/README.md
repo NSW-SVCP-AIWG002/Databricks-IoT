@@ -164,7 +164,7 @@ erDiagram
 | 6   | ユーザー更新画面     | `/admin/users/<databricks_user_id>/edit`   | GET      | ユーザー更新画面表示        | HTML（モーダル）   |
 | 7   | ユーザー更新実行     | `/admin/users/<databricks_user_id>/update` | POST     | ユーザー更新処理            | リダイレクト (302) |
 | 8   | ユーザー削除実行     | `/admin/users/<databricks_user_id>/delete` | POST     | ユーザー削除処理            | リダイレクト (302) |
-| 9   | CSVエクスポート      | `/admin/users?export=csv`                  | POST     | ユーザー一覧CSVダウンロード | CSV                |
+| 9   | CSVエクスポート      | `/admin/users?export=csv`                  | GET     | ユーザー一覧CSVダウンロード | CSV                |
 
 **Flask SSRの特徴**:
 - JSONレスポンスではなく、HTMLレスポンス（`render_template()`）またはリダイレクト（`redirect()`）を返す

@@ -58,7 +58,7 @@
 | 6   | デバイス更新画面 | `/admin/devices/<device_id>/edit`   | GET      | デバイス更新フォーム表示    | HTML（モーダル）   | 現在の値を初期表示                               |
 | 7   | デバイス更新実行 | `/admin/devices/<device_id>/update` | POST     | デバイス更新処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
 | 8   | デバイス削除実行 | `/admin/devices/<device_id>/delete` | POST     | デバイス削除処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
-| 9   | CSVエクスポート  | `/admin/devices?export=csv`         | POST      | デバイス一覧CSVダウンロード | CSV                | 現在の検索条件を適用                             |
+| 9   | CSVエクスポート  | `/admin/devices?export=csv`         | GET      | デバイス一覧CSVダウンロード | CSV                | 現在の検索条件を適用                             |
 
 **注:**
 - **レスポンス形式**:
@@ -82,7 +82,7 @@
 | 更新ボタン押下   | ボタンクリック  | `GET /admin/devices/<device_id>/edit`    | device_id                                                                                                                   | HTML（更新モーダル）                | 404エラーページ                        |
 | 更新実行         | フォーム送信    | `POST /admin/devices/update` | フォームデータ                                                                                                              | リダイレクト → `GET /admin/devices` | フォーム再表示（エラーメッセージ付き） |
 | 削除実行         | フォーム送信    | `POST /admin/devices/delete` | device_id                                                                                                                   | リダイレクト → `GET /admin/devices` | エラーメッセージ表示                   |
-| CSVエクスポート  | ボタンクリック  | `POST /admin/devices?export=csv`          | 検索条件                                                                                                                    | CSVダウンロード                     | エラーメッセージ表示                   |
+| CSVエクスポート  | ボタンクリック  | `GET /admin/devices?export=csv`          | 検索条件                                                                                                                    | CSVダウンロード                     | エラーメッセージ表示                   |
 
 ---
 

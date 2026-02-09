@@ -118,7 +118,7 @@
 | 6   | ユーザー更新画面             | `/admin/users/<databricks_user_id>/edit`   | GET      | ユーザー更新フォーム表示         | HTML（モーダル）   | 現在の値を初期表示                             |
 | 7   | ユーザー更新実行             | `/admin/users/<databricks_user_id>/update` | POST     | ユーザー更新処理                 | リダイレクト (302) | 成功時: `/admin/users`                         |
 | 8   | ユーザー削除実行             | `/admin/users/<databricks_user_id>/delete` | POST     | ユーザー削除処理                 | リダイレクト (302) | 成功時: `/admin/users`                         |
-| 9   | CSVエクスポート              | `/admin/users?export=csv`                  | POST     | ユーザー一覧CSVダウンロード      | CSV                | 現在の検索条件を適用                           |
+| 9   | CSVエクスポート              | `/admin/users?export=csv`                  | GET     | ユーザー一覧CSVダウンロード      | CSV                | 現在の検索条件を適用                           |
 
 **注:**
 - **レスポンス形式**:
@@ -142,7 +142,7 @@
 | 更新ボタン押下   | ボタンクリック  | `GET /admin/users/<user_id>/edit` | user_id                                                                                      | HTML（更新モーダル）              | 404エラーページ                        |
 | 更新実行         | フォーム送信    | `POST /admin/users/update`        | フォームデータ                                                                               | リダイレクト → `GET /admin/users` | フォーム再表示（エラーメッセージ付き） |
 | 削除実行         | フォーム送信    | `POST /admin/users/delete`        | user_id                                                                                      | リダイレクト → `GET /admin/users` | エラーメッセージ表示                   |
-| CSVエクスポート  | ボタンクリック  | `POST /admin/users?export=csv`    | 検索条件                                                                                     | CSVダウンロード                   | エラーメッセージ表示                   |
+| CSVエクスポート  | ボタンクリック  | `GET /admin/users?export=csv`    | 検索条件                                                                                     | CSVダウンロード                   | エラーメッセージ表示                   |
 
 ---
 

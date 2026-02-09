@@ -119,7 +119,7 @@
 | 6   | デバイス更新画面     | `/admin/devices/<device_id>/edit`   | GET      | デバイス更新画面表示        | HTML（モーダル）   |
 | 7   | デバイス更新実行     | `/admin/devices/<device_id>/update` | POST     | デバイス更新処理            | リダイレクト (302) |
 | 8   | デバイス削除実行     | `/admin/devices/<device_id>/delete` | POST     | デバイス削除処理            | リダイレクト (302) |
-| 9   | CSVエクスポート      | `/admin/devices?export=csv`         | POST     | デバイス一覧CSVダウンロード | CSV                |
+| 9   | CSVエクスポート      | `/admin/devices?export=csv`         | GET     | デバイス一覧CSVダウンロード | CSV                |
 
 ---
 

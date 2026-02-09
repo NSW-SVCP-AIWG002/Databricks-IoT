@@ -161,6 +161,7 @@
 - INDEX: `organization_id`
 - INDEX: `user_type_id`
 - INDEX: `language_code`
+- UNIQUE: `email_address`
 
 **ビジネスルール:**
 - user_idはAutoIncrementで自動採番（ダミーレコード作成→ID取得→ロールバック方式）
@@ -361,6 +362,7 @@
 - INDEX: `organization_id`
 - INDEX: `device_type_id`
 - UNIQUE: `mac_address`（NULL可）
+- UNIQUE: `device_uuid`
 
 **ビジネスルール:**
 - device_uuidはAzure IoT Hub、AWS IoT Coreで管理されているデバイスIDと同期させる
@@ -750,7 +752,7 @@
 | #   | カラム物理名 | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ------------ | -------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
 | 1   | master_id    | マスタID       | INT         | NOT NULL | ○   | -   | -                 | マスタの一意識別子（主キー）            |
-| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | -   | -   | -                 | アクセス可能なユーザーID（主キー）      |
+| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | ○   | -   | -                 | アクセス可能なユーザーID（主キー）      |
 | 2   | master_name  | マスタ名       | VARCHAR(20) | NOT NULL | -   | -   | -                 | マスタの名称                            |
 | 3   | create_date  | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator      | 作成者         | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID              |
@@ -789,6 +791,7 @@
 CREATE INDEX IX_user_master_organization_id ON user_master(organization_id);
 CREATE INDEX IX_user_master_user_type_id ON user_master(user_type_id);
 CREATE INDEX IX_user_master_language_code ON user_master(language_code);
+CREATE UNIQUE INDEX UX_user_master_email_address ON user_master(email_address);
 
 -- 組織閉方テーブル
 CREATE INDEX IX_organization_closure_subsidiary_id ON organization_closure(subsidiary_organization_id);
@@ -797,6 +800,7 @@ CREATE INDEX IX_organization_closure_subsidiary_id ON organization_closure(subsi
 CREATE INDEX IX_device_master_organization_id ON device_master(organization_id);
 CREATE INDEX IX_device_master_type_id ON device_master(device_type_id);
 CREATE UNIQUE INDEX UX_device_master_mac_address ON device_master(mac_address) WHERE mac_address IS NOT NULL;
+CREATE UNIQUE INDEX UX_device_master_device_uuid ON device_master(device_uuid);
 
 -- アラート設定マスタ
 CREATE INDEX IX_alert_setting_device_id ON alert_setting_master(device_id);
@@ -829,6 +833,8 @@ CREATE INDEX IX_alert_setting_device_level ON alert_setting_master(device_id, al
 
 #### UNIQUE制約
 - `device_master.mac_address`: MACアドレスの重複を防止（NULL許可）
+- `device_master.device_uuid`: デバイスUUIDの重複を防止
+- `user_master.email_address`: メールアドレスの重複を防止
 
 #### CHECK制約
 
