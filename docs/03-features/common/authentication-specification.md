@@ -191,12 +191,12 @@ app/
 | `auth/token_exchange.py`            | IdP JWTをDatabricksトークンに交換、キャッシュ管理                    | 3.4            |
 | `auth/jwt_issuer.py`                | RS256署名によるJWT発行（オンプレミス環境のみ使用）                   | 4.3.2          |
 | `auth/well_known.py`                | `/.well-known/openid-configuration`, `/.well-known/jwks.json` を提供 | 4.3.3          |
-| `auth/exceptions.py`                | 認証関連の例外クラス定義（AuthError, TokenExchangeError等）          | 3.6.2          |
+| `auth/exceptions.py`                | 認証関連の例外クラス定義（AuthError, TokenExchangeError等）          | 3.7.3          |
 | `auth/providers/base.py`            | AuthProvider抽象基底クラス、UserInfo型定義                           | 2.2.1          |
 | `auth/providers/azure_easy_auth.py` | X-MS-*ヘッダーからユーザー情報・JWT取得                              | 4.1            |
 | `auth/providers/aws_cognito.py`     | X-Amzn-Oidc-*ヘッダーからユーザー情報・JWT取得                       | 4.2            |
 | `auth/providers/local_idp.py`       | Flaskセッションからユーザー情報取得、JWT再発行                       | 4.3            |
-| `common/error_handlers.py`          | 認証エラー含む全HTTPエラーハンドラーを一元登録                       | 3.6.3          |
+| `common/error_handlers.py`          | 認証エラー含む全HTTPエラーハンドラーを一元登録                       | 3.7.4          |
 
 #### 2.4.3 補足
 
@@ -686,7 +686,23 @@ def _sync_session(idp_user_info):
 | セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                     |
 | パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ） |
 
-#### 3.7.2 例外クラス定義
+#### 3.7.2 エラー通知（Teams）
+
+エラー発生時、システム保守者が属するTeamsの管理チャネルに対して通知を行います。通知はTeamsチャネルに登録されたワークフロー（Incoming Webhook）を実行することで実現します。
+エラー通知処理の詳細は[共通仕様書](../../common/common-specification.md)のエラー通知の章を参照。
+
+##### 3.7.2.1 通知対象エラー
+
+| エラーコード  | 通知有無 | 優先度 | 説明                                                                                |
+| ------------- | -------- | ------ | ----------------------------------------------------------------------------------- |
+| AUTH_ERR_001  | ✓        | 高     | DB接続失敗（認証関連テーブル操作時）                                                |
+| AUTH_ERR_002  | ✓        | 高     | Token Exchange失敗（Databricks API通信エラー）                                      |
+| AUTH_ERR_003  | ✓        | 高     | メール送信失敗（パスワードリセット）                                                |
+| AUTH_ERR_004  | ✓        | 高     | JWT取得失敗（IdP通信エラー）                                                        |
+| AUTH_WARN_001 | △        | 中     | 認証異常検知（1時間で100件以上のログイン失敗、または5件以上のアカウントロック発生） |
+
+
+#### 3.7.3 例外クラス定義
 
 ```python
 # auth/exceptions.py
@@ -749,7 +765,7 @@ class PasswordResetError(AuthError):
     pass
 ```
 
-#### 3.7.3 Flaskエラーハンドラ
+#### 3.7.4 Flaskエラーハンドラ
 
 ```python
 # common/error_handlers.py
@@ -2121,3 +2137,4 @@ https://{domain}/auth/password-reset/{token}
 | 2026-02-04 | 3.13       | Claude | 例外クラスにERROR_CODE定数を追加: UserNotFoundError/PasswordNotSetError/PasswordAuthError/AccountLockedError/TokenExchangeErrorにERROR_CODE定義、5.1フロー図・5.3実装例でERROR_CODEを参照する形式に修正（静的文字列によるハードコードを防止）                                               |
 | 2026-02-04 | 3.14       | Claude | 5.2パスワードリセット実行画面のトークン取得方法を明確化: GET時はURLパスパラメータ、POST時はフォームhiddenから取得するようフロー図・実装例を修正、GETでフォームにトークンを埋め込む処理を追加                                                                                                |
 | 2026-02-04 | 3.15       | Claude | 5.2パスワードリセットフロー修正: 要求画面に有効トークン存在チェック追加（連続送信防止）、実行画面のトークン無効化→トークン削除に変更、DB設計書からused_dateカラム削除・ビジネスルール更新、5.2フロー図・5.4テーブル定義からused_date関連を削除                                              |
+| 2026-02-09 | 3.16       | Claude | 3.7.2エラー通知（Teams）セクション追加: 認証関連のエラー通知対象を定義（DB接続失敗、Token Exchange失敗、メール送信失敗、JWT取得失敗、認証異常検知）、セクション番号振り直し（旧3.7.2→3.7.3、旧3.7.3→3.7.4）、ファイル責務一覧の参照を更新                                                   |
