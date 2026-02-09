@@ -764,8 +764,8 @@ flowchart TD
     DupResult -->|重複あり| DupError[フォーム再表示<br>このメールアドレスは既に登録されています]
     DupError --> ValidEnd[処理中断]
 
-    DupResult -->|重複なし| CreateUser[レコード作成<br>delete_flag=TRUE<br>databricks_user_id='']
-    CreateUser --> CheckCreate{レコード作成<br>操作結果}
+    DupResult -->|重複なし| CreateUser[OLTP DB.user_master<br>ユーザー登録<br>INSERT INTO<br> user_master<br>delete_flag=TRUE<br>databricks_user_id='']
+    CreateUser --> CheckCreate{OLTP DB<br>操作結果}
 
     CheckCreate -->|失敗| Error500
     CheckCreate -->|成功| CreateDatabricksUser[Databricks User作成<br>POST /api/2.0/preview/scim/v2/Users]
@@ -782,7 +782,7 @@ flowchart TD
 
     InsertUC --> CheckUC{UnityCatalog<br>操作結果}
     CheckUC -->|失敗| RollbackUC[ロールバック<br>UnityCatalog.<br>user_master]
-    CheckUC --> |成功| ActivateUser[ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
+    CheckUC --> |成功| ActivateUser[OLTP DB.user_master<br>ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
 
 　　RollbackUC --> CleenUpDG[Databricksワークスペースグループからユーザーを削除]
 
@@ -1167,12 +1167,12 @@ def create_user():
 
 ##### 表示メッセージ
 
-| メッセージID | 表示内容                                                   | 表示タイミング                            | 表示場所                               |
-| ------------ | ---------------------------------------------------------- | ----------------------------------------- | -------------------------------------- |
-| -            | ユーザーを登録しました                                     | ユーザー登録成功時（Azure/AWS環境）       | ステータスメッセージモーダル（成功）   |
-| -            | ユーザーを登録し、招待メールを送信しました                 | ユーザー登録成功時（オンプレミス環境）    | ステータスメッセージモーダル（成功）   |
-| -            | ユーザーを登録しましたが、招待メール送信に失敗しました     | 招待メール送信失敗時（オンプレミス環境）  | ステータスメッセージモーダル（警告）   |
-| -            | ユーザーの登録に失敗しました                               | API呼び出し失敗時、DB操作失敗時           | ステータスメッセージモーダル（エラー） |
+| メッセージID | 表示内容                                               | 表示タイミング                           | 表示場所                               |
+| ------------ | ------------------------------------------------------ | ---------------------------------------- | -------------------------------------- |
+| -            | ユーザーを登録しました                                 | ユーザー登録成功時（Azure/AWS環境）      | ステータスメッセージモーダル（成功）   |
+| -            | ユーザーを登録し、招待メールを送信しました             | ユーザー登録成功時（オンプレミス環境）   | ステータスメッセージモーダル（成功）   |
+| -            | ユーザーを登録しましたが、招待メール送信に失敗しました | 招待メール送信失敗時（オンプレミス環境） | ステータスメッセージモーダル（警告）   |
+| -            | ユーザーの登録に失敗しました                           | API呼び出し失敗時、DB操作失敗時          | ステータスメッセージモーダル（エラー） |
 
 **注**: オンプレミス環境（`AUTH_TYPE=local`）では、ユーザー登録時に招待メールが送信されます。詳細は[認証仕様書 5.6節](../../common/authentication-specification.md#56-ユーザー新規登録時の認証処理)を参照してください。
 
@@ -2049,17 +2049,17 @@ def export_users_csv(users):
 
 ### 使用テーブル一覧
 
-| No  | テーブル名           | 論理名                       | 操作種別 | ワークフロー                                    | 目的                               | インデックス利用                                 |
-| --- | -------------------- | ---------------------------- | -------- | ----------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| 1   | user_master          | ユーザーマスタ               | SELECT   | 初期表示、検索、参照                            | ユーザー情報の一覧取得             | PRIMARY KEY (user_id)<br>INDEX (organization_id) |
-| 2   | user_master          | ユーザーマスタ               | INSERT   | ユーザー登録                                    | ユーザー情報の新規登録             | -                                                |
-| 3   | user_master          | ユーザーマスタ               | UPDATE   | ユーザー更新、削除                              | ユーザー情報の更新・論理削除       | PRIMARY KEY (user_id)                            |
-| 4   | organization_master  | 組織マスタ                   | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 組織選択肢取得                     | PRIMARY KEY (organization_id)                    |
-| 5   | organization_closure | 組織閉方テーブル             | SELECT   | 全ワークフロー                                  | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
-| 6   | user_type_master     | ユーザー種別マスタ           | SELECT   | 初期表示、登録/更新画面表示、検索条件、一覧表示 | ユーザー種別選択肢取得             | PRIMARY KEY (user_type_id)                       |
-| 7   | region_master        | 地域マスタ                   | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 地域選択肢取得                     | PRIMARY KEY (region_id)                          |
-| 8   | user_password        | ユーザーパスワード           | INSERT   | ユーザー登録（オンプレミス環境のみ）            | パスワード管理レコード作成         | PRIMARY KEY (user_id)                            |
-| 9   | password_reset_token | パスワードリセットトークン   | INSERT   | ユーザー登録（オンプレミス環境のみ）            | 招待トークン発行                   | PRIMARY KEY (token_hash)                         |
+| No  | テーブル名           | 論理名                     | 操作種別 | ワークフロー                                    | 目的                               | インデックス利用                                 |
+| --- | -------------------- | -------------------------- | -------- | ----------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| 1   | user_master          | ユーザーマスタ             | SELECT   | 初期表示、検索、参照                            | ユーザー情報の一覧取得             | PRIMARY KEY (user_id)<br>INDEX (organization_id) |
+| 2   | user_master          | ユーザーマスタ             | INSERT   | ユーザー登録                                    | ユーザー情報の新規登録             | -                                                |
+| 3   | user_master          | ユーザーマスタ             | UPDATE   | ユーザー更新、削除                              | ユーザー情報の更新・論理削除       | PRIMARY KEY (user_id)                            |
+| 4   | organization_master  | 組織マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 組織選択肢取得                     | PRIMARY KEY (organization_id)                    |
+| 5   | organization_closure | 組織閉方テーブル           | SELECT   | 全ワークフロー                                  | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
+| 6   | user_type_master     | ユーザー種別マスタ         | SELECT   | 初期表示、登録/更新画面表示、検索条件、一覧表示 | ユーザー種別選択肢取得             | PRIMARY KEY (user_type_id)                       |
+| 7   | region_master        | 地域マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 地域選択肢取得                     | PRIMARY KEY (region_id)                          |
+| 8   | user_password        | ユーザーパスワード         | INSERT   | ユーザー登録（オンプレミス環境のみ）            | パスワード管理レコード作成         | PRIMARY KEY (user_id)                            |
+| 9   | password_reset_token | パスワードリセットトークン | INSERT   | ユーザー登録（オンプレミス環境のみ）            | 招待トークン発行                   | PRIMARY KEY (token_hash)                         |
 
 **注**: No.8, 9はオンプレミス環境（`AUTH_TYPE=local`）でのみ使用します。Azure/AWS環境ではIdP（Entra ID/Cognito）がユーザー認証を管理するため、これらのテーブルは使用しません。詳細は[認証仕様書](../../common/authentication-specification.md)を参照してください。
 
