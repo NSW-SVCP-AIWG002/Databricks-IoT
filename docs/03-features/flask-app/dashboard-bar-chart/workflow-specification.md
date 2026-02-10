@@ -64,72 +64,14 @@
 
 ---
 
-## 処理フロー全体図
-
-```mermaid
-flowchart TB
-    subgraph Client["クライアント（ブラウザ）"]
-        JSChart[Apache ECharts<br>グラフ描画処理]
-    end
-
-    subgraph Flask["Flask アプリケーション"]
-        direction TB
-
-        subgraph Routes["ルート定義"]
-            RouteAPI["/api/dashboard/bar-chart/data<br>データ取得API"]
-            RouteCSV["/api/dashboard/bar-chart/export<br>CSV出力API"]
-        end
-
-        subgraph Middleware["ミドルウェア"]
-            Auth[認証チェック<br>@login_required]
-            Role[権限チェック<br>@require_role]
-            Validate[バリデーション]
-        end
-
-        subgraph Services["サービス層"]
-            ChartService[チャートサービス<br>データ取得・整形]
-            ExportService[エクスポートサービス<br>CSV生成]
-        end
-    end
-
-    subgraph DataSources["データソース"]
-        subgraph UnityCatalog["Unity Catalog"]
-            Silver[(シルバー層<br>silver_sensor_data)]
-            GoldDaily[(ゴールド層<br>daily_summary)]
-        end
-    end
-
-    JSChart -->|1. API呼び出し| RouteAPI
-    RouteAPI --> Auth
-    Auth --> Role
-    Role --> Validate
-    Validate --> ChartService
-
-    ChartService -->|時単位| Silver
-    ChartService -->|日/週/月単位| GoldDaily
-
-    RouteAPI -->|2. JSONデータ| JSChart
-    JSChart -->|3. グラフ描画| Client
-
-    JSChart -->|CSV出力| RouteCSV
-    RouteCSV --> Auth
-    Auth --> Role
-    Role --> Validate
-    Validate --> ExportService
-    ExportService --> ChartService
-    RouteCSV -->|CSVファイル| JSChart
-```
-
----
-
 ## Flaskルート定義
 
 ### ルート一覧
 
 | メソッド | URL | 関数名 | 説明 |
 | -------- | --- | ------ | ---- |
-| GET | /api/dashboard/bar-chart/data | get_bar_chart_data | グラフデータ取得API |
-| GET | /api/dashboard/bar-chart/export | export_bar_chart_csv | CSV出力API |
+| GET | /api/customer-dashboard/bar-chart/data | get_bar_chart_data | グラフデータ取得API |
+| GET | /api/customer-dashboard/bar-chart/export | export_bar_chart_csv | CSV出力API |
 
 ### グラフデータ取得API
 
@@ -168,7 +110,7 @@ def require_role(*roles):
 # =============================================================================
 # グラフデータ取得API
 # =============================================================================
-@bp.route('/api/dashboard/bar-chart/data', methods=['GET'])
+@bp.route('/api/customer-dashboard/bar-chart/data', methods=['GET'])
 @login_required
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def get_bar_chart_data():
@@ -243,7 +185,7 @@ import io
 # =============================================================================
 # CSV出力API
 # =============================================================================
-@bp.route('/api/dashboard/bar-chart/export', methods=['GET'])
+@bp.route('/api/customer-dashboard/bar-chart/export', methods=['GET'])
 @login_required
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def export_bar_chart_csv():
@@ -345,7 +287,7 @@ flowchart TD
 
     Format --> HasData{データ<br>存在?}
 
-    HasData -->|なし| ReturnEmpty[空データ返却<br>メッセージ付き]
+    HasData -->|なし| ReturnEmpty[空データ返却]
     ReturnEmpty --> End2([終了])
 
     HasData -->|あり| ReturnData[JSONデータ返却]
@@ -954,7 +896,7 @@ def validate_chart_params(params: dict) -> list:
 | 認証エラー | 401 | エラーJSON返却 | なし |
 | 権限エラー | 403 | エラーJSON返却 | WARN |
 | パラメータエラー | 400 | エラーJSON返却 | INFO |
-| データなし | 200 | 空データJSON返却（message付き） | なし |
+| データなし | 200 | 空データJSON返却 | なし |
 | DB接続エラー | 500 | エラーJSON返却 | ERROR |
 | 予期せぬエラー | 500 | エラーJSON返却 | ERROR |
 
@@ -1098,3 +1040,4 @@ def handle_exceptions(f):
 | 2026-02-06 | 1.1 | 集計時間幅を1/2/3/5/10/15分に変更（時単位のみ選択可能） | - |
 | 2026-02-06 | 2.0 | データ取得ワークフローに特化、表示単位別集計仕様を詳細化 | - |
 | 2026-02-09 | 2.1 | 日単位:TODO（新規テーブル）、月単位:全日取得に変更、Apache ECharts使用を明記 | - |
+| 2026-02-10 | 2.2 | 処理フロー全体図のmermaid構文をシンプル化して修正 | - |
