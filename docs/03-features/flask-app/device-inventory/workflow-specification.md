@@ -50,9 +50,9 @@
 | 1 | 台帳一覧表示 | `/admin/device-inventory` | GET | 一覧・検索表示 | HTML | ページング・検索対応 |
 | 2 | 台帳登録画面 | `/admin/device-inventory/create` | GET | 登録モーダル表示 | HTML (partial) | AJAX対応 |
 | 3 | 台帳登録実行 | `/admin/device-inventory/create` | POST | 登録処理 | リダイレクト (302) | 成功時: 一覧へ |
-| 4 | 台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 参照モーダル表示 | HTML (partial) | AJAX対応 |
-| 5 | 台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 | HTML (partial) | AJAX対応 |
-| 6 | 台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 | リダイレクト (302) | 成功時: 一覧へ |
+| 4 | 台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>` | GET | 参照モーダル表示 | HTML (partial) | AJAX対応 |
+| 5 | 台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit` | GET | 更新モーダル表示 | HTML (partial) | AJAX対応 |
+| 6 | 台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST | 更新処理 | リダイレクト (302) | 成功時: 一覧へ |
 | 7 | 台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理 | リダイレクト (302) | 論理削除、複数選択対応 |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 | CSV | 検索条件適用 |
 
@@ -66,10 +66,10 @@
 | 検索ボタン押下 | フォーム送信 | `GET /admin/device-inventory` | 検索条件 | HTML（検索結果） | エラーメッセージ表示 |
 | 台帳登録ボタン押下 | リンククリック | `GET /admin/device-inventory/create` | なし | HTML（登録モーダル） | エラーモーダル表示 |
 | 登録実行 | フォーム送信 | `POST /admin/device-inventory/create` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| 参照ボタン押下 | ボタンクリック | `GET /admin/device-inventory/<device_stock_uuid>` | device_stock_uuid | HTML（参照モーダル） | エラーモーダル表示 |
-| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<device_stock_uuid>/edit` | device_stock_uuid | HTML（更新モーダル） | エラーモーダル表示 |
-| 更新実行 | フォーム送信 | `POST /admin/device-inventory/<device_stock_uuid>/update` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
-| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/delete` | device_stock_uuids（配列） | リダイレクト → 一覧 | エラーメッセージ表示 |
+| 参照ボタン押下 | ボタンクリック | `GET /admin/device-inventory/<device_inventory_uuid>` | device_inventory_uuid | HTML（参照モーダル） | エラーモーダル表示 |
+| 編集ボタン押下 | リンククリック | `GET /admin/device-inventory/<device_inventory_uuid>/edit` | device_inventory_uuid | HTML（更新モーダル） | エラーモーダル表示 |
+| 更新実行 | フォーム送信 | `POST /admin/device-inventory/<device_inventory_uuid>/update` | フォームデータ | リダイレクト → 一覧 | モーダル再表示 |
+| 削除ボタン押下 | フォーム送信 | `POST /admin/device-inventory/delete` | device_inventory_uuids（配列） | リダイレクト → 一覧 | エラーメッセージ表示 |
 | CSVエクスポート押下 | リンククリック | `GET /admin/device-inventory?export=csv` | 検索条件 | CSVファイル | エラーメッセージ表示 |
 
 ---
@@ -102,13 +102,13 @@ flowchart TD
 
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> InitParams[検索条件にデフォルト値を<br>入力]
-    InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM stock_status_master]
+    InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master]
     LoadMaster --> CheckMaster{マスタ取得結果}
 
     CheckMaster -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>SELECT COUNT（*） FROM device_stock_info_master<br>WHERE delete_flag=FALSE]
+    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>SELECT COUNT（*） FROM device_inventory_master<br>WHERE delete_flag=FALSE]
     Count --> CheckCount{件数取得結果}
 
     CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie]
@@ -117,7 +117,7 @@ flowchart TD
 
     CheckCount -->|失敗| Error500
 
-    CheckCount -->|成功| Query[検索結果取得DBクエリ実行<br>SELECT * FROM device_stock_info_master<br>WHERE delete_flag=FALSE<br>LIMIT per_page OFFSET offset]
+    CheckCount -->|成功| Query[検索結果取得DBクエリ実行<br>SELECT * FROM device_inventory_master<br>WHERE delete_flag=FALSE<br>LIMIT per_page OFFSET offset]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500
@@ -125,7 +125,7 @@ flowchart TD
     CheckDB -->|成功| CheckInitial{クエリパラメータに<br>pageがあるか?}
     
     CheckInitial -->|No 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>set_search_conditions_cookie]
-    SaveCookie --> Template[Jinja2テンプレートレンダリング<br>render_template<br>'admin/device_stock_info_master/list.html']
+    SaveCookie --> Template[Jinja2テンプレートレンダリング<br>render_template<br>'admin/device_inventory_master/list.html']
 
     CheckInitial -->|Yes ページング| Template
     Template --> Response[HTMLレスポンス返却]
@@ -136,7 +136,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_name`, `device_type`, `stock_status`, `stock_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
+| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
 
 #### バリデーション
 
@@ -154,9 +154,9 @@ from flask import request, abort
 from decorators.auth import get_current_user, require_role
 from models.role import Role
 
-@device_stock_info_master_bp.route('/admin/device-inventory', methods=['GET'])
+@device_inventory_master_bp.route('/admin/device-inventory', methods=['GET'])
 @require_role(Role.SYSTEM_ADMIN)
-def list_device_stock_info_master():
+def list_device_inventory_master():
     # 認証チェック（リバースプロキシヘッダ）
     current_user = get_current_user()
 ```
@@ -173,8 +173,8 @@ if 'page' in request.args:
     conditions = get_search_conditions_cookie('device_inventory')
     device_name = conditions.get('device_name', '')
     device_type = conditions.get('device_type', 'all')
-    stock_status = conditions.get('stock_status', 'all')
-    stock_location = conditions.get('stock_location', '')
+    inventory_status = conditions.get('inventory_status', 'all')
+    inventory_location = conditions.get('inventory_location', '')
     purchase_date_from = conditions.get('purchase_date_from', None)
     purchase_date_to = conditions.get('purchase_date_to', None)
     page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
@@ -184,8 +184,8 @@ else:
     # 初期表示時: デフォルト値を使用
     device_name = ''
     device_type = 'all'
-    stock_status = 'all'
-    stock_location = ''
+    inventory_status = 'all'
+    inventory_location = ''
     purchase_date_from = None
     purchase_date_to = None
     page = 1
@@ -198,7 +198,7 @@ per_page = 25  # 固定
 **③ 検索条件用マスタデータ取得**
 
 ```python
-from models import device_type_master, stock_status_master
+from models import device_type_master, inventory_status_master
 
 # デバイス種別マスタ取得
 device_types = (
@@ -209,10 +209,10 @@ device_types = (
 )
 
 # 在庫状況マスタ取得
-stock_statuses = (
-    stock_status_master.query
-    .filter(stock_status_master.delete_flag == False)
-    .order_by(stock_status_master.stock_status_id)
+inventory_statuses = (
+    inventory_status_master.query
+    .filter(inventory_status_master.delete_flag == False)
+    .order_by(inventory_status_master.inventory_status_id)
     .all()
 )
 ```
@@ -220,17 +220,17 @@ stock_statuses = (
 **④ データベースクエリ実行**
 
 ```python
-from models import device_stock_info_master, device_master, device_type_master, stock_status_master
+from models import device_inventory_master, device_master, device_type_master, inventory_status_master
 
 query = (
-    device_stock_info_master.query
-    .join(device_master, device_stock_info_master.device_stock_id == device_master.device_stock_id)
+    device_inventory_master.query
+    .join(device_master, device_inventory_master.device_inventory_id == device_master.device_inventory_id)
     .filter(device_master.delete_flag == False)
     .join(device_type_master, device_master.device_type_id == device_type_master.device_type_id)
     .filter(device_type_master.delete_flag == False)
-    .join(stock_status_master, device_stock_info_master.stock_status_id == stock_status_master.stock_status_id)
-    .filter(stock_status_master.delete_flag == False)
-    .filter(device_stock_info_master.delete_flag == False)
+    .join(inventory_status_master, device_inventory_master.inventory_status_id == inventory_status_master.inventory_status_id)
+    .filter(inventory_status_master.delete_flag == False)
+    .filter(device_inventory_master.delete_flag == False)
 )
 
 # データスコープ制限なし（システム保守者は全データにアクセス可能）
@@ -257,7 +257,7 @@ inventories = query.limit(per_page).offset(offset).all()
 **⑤ HTMLレンダリング**
 
 ```python
-return render_template('admin/device_stock_info_master/list.html',
+return render_template('admin/device_inventory_master/list.html',
                       inventories=inventories,
                       total=total,
                       page=page,
@@ -266,12 +266,12 @@ return render_template('admin/device_stock_info_master/list.html',
                       sort_order=sort_order,
                       device_name=device_name,
                       device_type=device_type,
-                      stock_status=stock_status,
-                      stock_location=stock_location,
+                      inventory_status=inventory_status,
+                      inventory_location=inventory_location,
                       purchase_date_from=purchase_date_from,
                       purchase_date_to=purchase_date_to,
                       device_types=device_types,
-                      stock_statuses=stock_statuses)
+                      inventory_statuses=inventory_statuses)
 ```
 
 #### エラーハンドリング
@@ -315,13 +315,13 @@ flowchart TD
 
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
-    Convert --> Count[表示件数取得DBクエリ実行<br>device_stock_info_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN stock_status_master<br>検索条件を適用]
+    Convert --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_stock_info_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN stock_status_master<br>検索条件を適用]
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>検索条件を適用]
     Query --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|失敗| Error500
@@ -336,7 +336,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_name`, `device_type`, `stock_status`, `stock_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
+| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
 
 #### バリデーション
 
@@ -353,17 +353,17 @@ flowchart TD
 **検索クエリ実行:**
 
 ```python
-from models import device_stock_info_master, device_master, device_type_master, stock_status_master
+from models import device_inventory_master, device_master, device_type_master, inventory_status_master
 
 query = (
-    device_stock_info_master.query
-    .join(device_master, device_stock_info_master.device_stock_id == device_master.device_stock_id)
+    device_inventory_master.query
+    .join(device_master, device_inventory_master.device_inventory_id == device_master.device_inventory_id)
     .filter(device_master.delete_flag == False)
     .join(device_type_master, device_master.device_type_id == device_type_master.device_type_id)
     .filter(device_type_master.delete_flag == False)
-    .join(stock_status_master, device_stock_info_master.stock_status_id == stock_status_master.stock_status_id)
-    .filter(stock_status_master.delete_flag == False)
-    .filter(device_stock_info_master.delete_flag == False)
+    .join(inventory_status_master, device_inventory_master.inventory_status_id == inventory_status_master.inventory_status_id)
+    .filter(inventory_status_master.delete_flag == False)
+    .filter(device_inventory_master.delete_flag == False)
 )
 
 # データスコープ制限なし（システム保守者は全データにアクセス可能）
@@ -379,22 +379,22 @@ if device_type and device_type != 'all':
     query = query.filter(device_master.device_type_id == device_type)
 
 # 在庫状況絞り込み
-stock_status = request.args.get('stock_status', 'all')
-if stock_status and stock_status != 'all':
-    query = query.filter(device_stock_info_master.stock_status_id == stock_status)
+inventory_status = request.args.get('inventory_status', 'all')
+if inventory_status and inventory_status != 'all':
+    query = query.filter(device_inventory_master.inventory_status_id == inventory_status)
 
 # 在庫場所検索（部分一致）
-stock_location = request.args.get('stock_location', '')
-if stock_location:
-    query = query.filter(device_stock_info_master.stock_location.like(f'%{stock_location}%'))
+inventory_location = request.args.get('inventory_location', '')
+if inventory_location:
+    query = query.filter(device_inventory_master.inventory_location.like(f'%{inventory_location}%'))
 
 # 購入日範囲フィルタ
 purchase_date_from = request.args.get('purchase_date_from')
 purchase_date_to = request.args.get('purchase_date_to')
 if purchase_date_from:
-    query = query.filter(device_stock_info_master.purchase_date >= purchase_date_from)
+    query = query.filter(device_inventory_master.purchase_date >= purchase_date_from)
 if purchase_date_to:
-    query = query.filter(device_stock_info_master.purchase_date <= purchase_date_to)
+    query = query.filter(device_inventory_master.purchase_date <= purchase_date_to)
 
 # ソート・ページング
 # ...
@@ -505,8 +505,8 @@ flowchart TD
     CloseModal --> End
 
     OpenModal -->|登録ボタン押下| BeginTx[トランザクション開始]
-    BeginTx --> InsertStock[device_stock_info_masterに<br>在庫情報を追加]
-    InsertStock --> InsertDevice[device_masterに<br>デバイス情報を追加]
+    BeginTx --> InsertInventory[device_inventory_masterに<br>在庫情報を追加]
+    InsertInventory --> InsertDevice[device_masterに<br>デバイス情報を追加]
     InsertDevice --> InsertResult{INSERT結果}
 
     InsertResult -->|失敗| Rollback[トランザクションロールバック]
@@ -524,7 +524,7 @@ flowchart TD
 
 **実行タイミング:** 登録ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (4.1)〜(4.12) 全フォーム項目
+**バリデーション対象:** (4.1)〜(4.11) 全フォーム項目
 
 **バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (4) 登録モーダル > バリデーション を参照
 
@@ -533,35 +533,35 @@ flowchart TD
 ```python
 import uuid
 from flask import request, redirect, url_for, flash
-from models import device_stock_info_master, device_master, db
-from forms.device_stock_info_master_form import DeviceStockInfoMasterForm
+from models import device_inventory_master, device_master, db
+from forms.device_inventory_master_form import DeviceInventoryMasterForm
 
-@device_stock_info_master_bp.route('/admin/device-inventory/create', methods=['POST'])
+@device_inventory_master_bp.route('/admin/device-inventory/create', methods=['POST'])
 @require_role(Role.SYSTEM_ADMIN)
-def create_device_stock_info_master():
-    form = DeviceStockInfoMasterForm(request.form)
+def create_device_inventory_master():
+    form = DeviceInventoryMasterForm(request.form)
 
     if not form.validate():
-        return render_template('admin/device_stock_info_master/form.html', form=form)
+        return render_template('admin/device_inventory_master/form.html', form=form)
 
     try:
         # トランザクション開始
-        # device_stock_info_master にINSERT（在庫情報）
-        device_stock = device_stock_info_master(
-            device_stock_uuid=str(uuid.uuid4()),
-            stock_status_id=form.stock_status.data,
+        # device_inventory_master にINSERT（在庫情報）
+        device_inventory = device_inventory_master(
+            device_inventory_uuid=str(uuid.uuid4()),
+            inventory_status_id=form.inventory_status.data,
             purchase_date=form.purchase_date.data,
             # ... 他のフィールド ...
             creator=current_user.user_id,
             modifier=current_user.user_id,
             delete_flag=False
         )
-        db.session.add(device_stock)
+        db.session.add(device_inventory)
         db.session.flush()
 
         # device_master にINSERT（デバイス情報）
         device = device_master(
-            device_stock_id=device_stock.device_stock_id,
+            device_inventory_id=device_inventory.device_inventory_id,
             device_name=form.device_name.data,
             # ... 他のフィールド ...
             creator=current_user.user_id,
@@ -572,12 +572,12 @@ def create_device_stock_info_master():
         db.session.commit()
 
         flash('デバイス台帳を登録しました', 'success')
-        return redirect(url_for('device_stock_info_master.list_device_stock_info_master'))
+        return redirect(url_for('device_inventory_master.list_device_inventory_master'))
 
     except Exception as e:
         db.session.rollback()
         flash('デバイス台帳の登録に失敗しました', 'error')
-        return render_template('admin/device_stock_info_master/form.html', form=form)
+        return render_template('admin/device_inventory_master/form.html', form=form)
 ```
 
 ---
@@ -600,7 +600,7 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| Query[在庫情報UUIDを取得<br>SELECT * FROM<br>device_stock_info_master<br>WHERE device_stock_uuid = :uuid]
+    CheckPerm -->|権限OK| Query[在庫情報UUIDを取得<br>SELECT * FROM<br>device_inventory_master<br>WHERE device_inventory_uuid = :uuid]
     Query --> GetMaster[在庫状況マスタ、<br>デバイスマスタ、<br>デバイス種別マスタを取得]
     GetMaster --> CheckDB{DBクエリ結果}
 
@@ -648,7 +648,7 @@ flowchart TD
     CancelMsg --> End
 
     OpenConfirmModal -->|更新ボタン押下| BeginTx[トランザクション開始]
-    BeginTx --> Update[UPDATE<br>device_stock_info_master<br>SET ... <br>WHERE device_stock_uuid = :uuid]
+    BeginTx --> Update[UPDATE<br>device_inventory_master<br>SET ... <br>WHERE device_inventory_uuid = :uuid]
     Update --> UpdateResult{DBクエリ結果}
 
     UpdateResult -->|0件更新| Error404[404エラーモーダル表示]
@@ -669,10 +669,10 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳更新フォーム表示 | `GET /admin/device-inventory/<device_stock_uuid>/edit` | 現在の設定値を含むフォームを返却。デバイス・在庫状況・デバイス種別をDBから取得 |
-| 台帳更新実行 | `POST /admin/device-inventory/<device_stock_uuid>/update` | フォームデータを受け取り、DB更新 |
+| 台帳更新フォーム表示 | `GET /admin/device-inventory/<device_inventory_uuid>/edit` | 現在の設定値を含むフォームを返却。デバイス・在庫状況・デバイス種別をDBから取得 |
+| 台帳更新実行 | `POST /admin/device-inventory/<device_inventory_uuid>/update` | フォームデータを受け取り、DB更新 |
 
-**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
+**パスパラメータ**: `device_inventory_uuid` - 対象デバイス在庫のUUID
 
 ---
 
@@ -704,7 +704,7 @@ flowchart TD
     CloseModal --> End
 
     OpenModal -->|削除ボタン押下| StartTx[トランザクション開始]
-    StartTx --> Delete[UPDATE<br>device_stock_info_master<br>SET delete_flag = TRUE<br>WHERE device_stock_uuid IN :uuids]
+    StartTx --> Delete[UPDATE<br>device_inventory_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_uuid IN :uuids]
     Delete --> Query{DBクエリ結果}
 
     Query -->|0件削除| Error404[404エラーモーダル表示]
@@ -727,7 +727,7 @@ flowchart TD
 |-------|---------------|------|
 | 台帳削除実行 | `POST /admin/device-inventory/delete` | 論理削除（delete_flag=TRUE） |
 
-**フォームデータ**: `device_stock_uuids` - 削除対象のデバイス在庫UUIDリスト（`request.form.getlist('device_stock_uuids')`で取得）
+**フォームデータ**: `device_inventory_uuids` - 削除対象のデバイス在庫UUIDリスト（`request.form.getlist('device_inventory_uuids')`で取得）
 
 ---
 
@@ -749,7 +749,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_stock_info_master<br>JOIN device_master<br>JOIN stock_status_master<br>JOIN device_type_master<br>WHERE device_stock_uuid = :uuid]
+    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>JOIN device_type_master<br>WHERE device_inventory_uuid = :uuid]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
@@ -764,9 +764,9 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳詳細表示 | `GET /admin/device-inventory/<device_stock_uuid>` | デバイス台帳の詳細情報を返却。デバイス・在庫状況・デバイス種別名をDBから取得 |
+| 台帳詳細表示 | `GET /admin/device-inventory/<device_inventory_uuid>` | デバイス台帳の詳細情報を返却。デバイス・在庫状況・デバイス種別名をDBから取得 |
 
-**パスパラメータ**: `device_stock_uuid` - 対象デバイス在庫のUUID
+**パスパラメータ**: `device_inventory_uuid` - 対象デバイス在庫のUUID
 
 ---
 
@@ -788,7 +788,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_stock_info_master<br>JOIN stock_status_master<br>JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
+    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_inventory_master<br>JOIN inventory_status_master<br>JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
     GetParams --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
@@ -810,11 +810,11 @@ flowchart TD
 ```python
 import pandas as pd
 from datetime import datetime
-from models import device_stock_info_master, device_master, device_type_master, stock_status_master
+from models import device_inventory_master, device_master, device_type_master, inventory_status_master
 
-@device_stock_info_master_bp.route('/admin/device-inventory', methods=['GET'])
+@device_inventory_master_bp.route('/admin/device-inventory', methods=['GET'])
 @require_role(Role.SYSTEM_ADMIN)
-def list_device_stock_info_master():
+def list_device_inventory_master():
     # ... 検索条件適用済みクエリ（各テーブルをJOIN済み、各テーブルのdelete_flag == Falseでフィルタ済み） ...
 
     # CSVエクスポート処理
@@ -826,13 +826,12 @@ def list_device_stock_info_master():
             'モデル情報': d.device.device_model or '',
             'SIMID': d.device.sim_id or '',
             'MACアドレス': d.device.mac_address or '',
-            '在庫状況': d.stock_status.stock_status_name,
+            '在庫状況': d.inventory_status.inventory_status_name,
             '購入日': d.purchase_date.strftime('%Y/%m/%d') if d.purchase_date else '',
             '出荷予定日': d.estimated_ship_date.strftime('%Y/%m/%d') if d.estimated_ship_date else '',
             '出荷日': d.ship_date.strftime('%Y/%m/%d') if d.ship_date else '',
             'メーカー保証終了日': d.manufacturer_warranty_end_date.strftime('%Y/%m/%d') if d.manufacturer_warranty_end_date else '',
-            'ベンダー保証終了日': d.vendor_warranty_end_date.strftime('%Y/%m/%d') if d.vendor_warranty_end_date else '',
-            '在庫場所': d.stock_location or ''
+            '在庫場所': d.inventory_location or ''
         } for d in data])
 
         csv_data = df.to_csv(index=False, encoding='utf-8-sig')
@@ -854,26 +853,26 @@ def list_device_stock_info_master():
 
 | No | テーブル名 | 論理名 | 操作種別 | ワークフロー | 目的 |
 |----|-----------|--------|---------|------------|------|
-| 1 | device_stock_info_master | デバイス在庫情報マスタ | SELECT | 初期表示、検索、参照 | 在庫情報取得 |
-| 2 | device_stock_info_master | デバイス在庫情報マスタ | INSERT | 登録 | 新規在庫情報作成 |
-| 3 | device_stock_info_master | デバイス在庫情報マスタ | UPDATE | 更新、削除 | 在庫情報更新、論理削除 |
+| 1 | device_inventory_master | デバイス在庫情報マスタ | SELECT | 初期表示、検索、参照 | 在庫情報取得 |
+| 2 | device_inventory_master | デバイス在庫情報マスタ | INSERT | 登録 | 新規在庫情報作成 |
+| 3 | device_inventory_master | デバイス在庫情報マスタ | UPDATE | 更新、削除 | 在庫情報更新、論理削除 |
 | 4 | device_master | デバイスマスタ | SELECT | 初期表示、検索、参照 | デバイス情報取得（結合） |
 | 5 | device_master | デバイスマスタ | INSERT | 登録 | 新規デバイス情報作成 |
 | 6 | device_master | デバイスマスタ | UPDATE | 更新、削除 | デバイス情報更新、論理削除 |
 | 7 | device_type_master | デバイス種別マスタ | SELECT | 初期表示、検索、登録、更新 | デバイス種別選択肢取得（結合） |
-| 8 | stock_status_master | 在庫状況マスタ | SELECT | 初期表示、検索、登録、更新 | 在庫状況選択肢取得（結合） |
+| 8 | inventory_status_master | 在庫状況マスタ | SELECT | 初期表示、検索、登録、更新 | 在庫状況選択肢取得（結合） |
 | 9 | users | ユーザー | SELECT | 認証 | 現在ユーザー情報取得 |
 
 ### テーブル結合関係
 
 ```
-device_stock_info_master (dsi)
+device_inventory_master (dsi)
     ├── INNER JOIN device_master (dm)
-    │       ON dsi.device_stock_id = dm.device_stock_id
+    │       ON dsi.device_inventory_id = dm.device_inventory_id
     │       └── INNER JOIN device_type_master (dtm)
     │               ON dm.device_type_id = dtm.device_type_id
-    └── INNER JOIN stock_status_master (ssm)
-            ON dsi.stock_status_id = ssm.stock_status_id
+    └── INNER JOIN inventory_status_master (ssm)
+            ON dsi.inventory_status_id = ssm.inventory_status_id
 ```
 
 ---
@@ -924,13 +923,12 @@ device_stock_info_master (dsi)
 - device_model: 最大100文字、必須
 - sim_id: 最大20文字
 - mac_address: XX:XX:XX:XX:XX:XX形式
-- stock_status: 必須（マスタ値のみ）
-- stock_location: 最大100文字、必須
+- inventory_status: 必須（マスタ値のみ）
+- inventory_location: 最大100文字、必須
 - purchase_date: 必須、日付形式
 - estimated_ship_date: 購入日以降
 - ship_date: 出荷予定日以降
 - manufacturer_warranty_end_date: 必須、購入日以降
-- vendor_warranty_end_date: 必須、購入日以降
 
 **セキュリティ対策:**
 - SQLインジェクション対策: SQLAlchemy ORM使用
@@ -943,7 +941,7 @@ device_stock_info_master (dsi)
 - リクエストID
 - ユーザーID（操作者）
 - 操作種別（登録、更新、削除）
-- 対象リソースID（device_stock_id）
+- 対象リソースID（device_inventory_id）
 - 処理結果（成功/失敗）
 - 在庫状況変更時: 変更前後の値
 

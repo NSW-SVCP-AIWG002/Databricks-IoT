@@ -141,11 +141,6 @@
 │ │ 📅                                                │ │
 │ └───────────────────────────────────────────────────┘ │
 │                                                       │
-│ ベンダー保証終了日 [必須]                              │
-│ ┌───────────────────────────────────────────────────┐ │
-│ │ 📅                                                │ │
-│ └───────────────────────────────────────────────────┘ │
-│                                                       │
 │                                    [登録] [キャンセル] │
 └───────────────────────────────────────────────────────┘
 ```
@@ -206,9 +201,6 @@
 │ メーカー保証終了日                                    │
 │ 2026/01/15 ⚠ 期限間近                                │
 │                                                      │
-│ ベンダー保証終了日                                    │
-│ 2027/01/15                                           │
-│                                                      │
 │ 作成日時                                              │
 │ 2025/01/20 10:30                                     │
 │                                                      │
@@ -266,9 +258,6 @@
 │                                                      │
 │ メーカー保証終了日                                    │
 │ 2026/01/15                                           │
-│                                                      │
-│ ベンダー保証終了日                                    │
-│ 2027/01/15                                           │
 │                                                       │
 │                                    [登録] [キャンセル] │
 └───────────────────────────────────────────────────────┘
@@ -373,7 +362,7 @@
 ||
 | (2.1) | デバイス名 | device_name_search | Text | I/O | - | 100 | - | - | 部分一致検索 |
 | (2.2) | デバイス種別 | device_type | Select | I/O | - | - | すべて | マスタ: device_type_master | ドロップダウン |
-| (2.3) | 在庫状況 | stock_status | Select | I/O | - | - | すべて | マスタ: stock_status_master | ドロップダウン |
+| (2.3) | 在庫状況 | inventory_status | Select | I/O | - | - | すべて | マスタ: inventory_status_master | ドロップダウン |
 | (2.4) | 在庫場所 | storage_location | Text | I/O | - | 100 | - | - | 部分一致検索 |
 | (2.5) | 購入日（開始） | purchase_date_from | Date | I/O | - | - | - | - | 日付ピッカー |
 | (2.6) | 購入日（終了） | purchase_date_to | Date | I/O | - | - | - | - | 日付ピッカー |
@@ -386,10 +375,10 @@
 | (3.3) | デバイス種別 | device_type | Label | O | - | - | - | DB: device_type_master.device_type_name | ソート可 |
 | (3.4) | SIMID | sim_id | Label | O | - | 20 | - | DB: device_master.sim_id | ソート可 |
 | (3.5) | MACアドレス | mac_address | Label | O | - | 17 | - | DB: device_master.mac_address | ソート可 |
-| (3.6) | 在庫状況 | stock_status | Label | O | - | - | - | DB: stock_status_master.stock_status_name | バッジ表示、ソート可 |
-| (3.7) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_stock_info_master.purchase_date | YYYY/MM/DD形式、ソート可 |
-| (3.8) | 保証期限 | warranty_status | Label | O | - | - | - | 計算: メーカーかベンダーで保証終了日の早い方 | 警告アイコン付き、ソート可 |
-| (3.9) | 在庫場所 | stock_location | Label | O | - | 100 | - | DB: device_stock_info_master.stock_location | ソート可 |
+| (3.6) | 在庫状況 | inventory_status | Label | O | - | - | - | DB: inventory_status_master.inventory_status_name | バッジ表示、ソート可 |
+| (3.7) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_inventory_master.purchase_date | YYYY/MM/DD形式、ソート可 |
+| (3.8) | 保証期限 | warranty_status | Label | O | - | - | - | DB: device_inventory_master.manufacturer_warranty_end_date | 警告アイコン付き、ソート可 |
+| (3.9) | 在庫場所 | inventory_location | Label | O | - | 100 | - | DB: device_inventory_master.inventory_location | ソート可 |
 | (3.10) | 参照ボタン | reference_button | Button | I | - | - | - | 固定値:「参照」 | プライマリボタン |
 | (3.11) | 更新ボタン | update_button | Button | I | - | - | - | 固定値:「更新」 | プライマリボタン |
 | (3.12) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号 | 中央揃え |
@@ -399,15 +388,14 @@
 | (4.3) | モデル情報 | model_info | Text | I/O | ○ | 100 | - | - | テキストエリア |
 | (4.4) | SIMID | sim_id | Text | I/O | - | 20 | - | - | テキストエリア |
 | (4.5) | MACアドレス | mac_address | Text | I/O | - | 17 | - | - | XX:XX:XX:XX:XX:XX形式 |
-| (4.6) | 在庫状況 | stock_status | Select | I/O | ○ | - | 在庫中 | マスタ: stock_status_master | ドロップダウン |
-| (4.7) | 在庫場所 | stock_location | Text | I/O | ○ | 100 | - | - | テキストエリア |
+| (4.6) | 在庫状況 | inventory_status | Select | I/O | ○ | - | 在庫中 | マスタ: inventory_status_master | ドロップダウン |
+| (4.7) | 在庫場所 | inventory_location | Text | I/O | ○ | 100 | - | - | テキストエリア |
 | (4.8) | 購入日 | purchase_date | Date | I/O | ○ | - | - | - | 日付ピッカー |
 | (4.9) | 出荷予定日 | estimated_ship_date | Date | I/O | - | - | - | - | 日付ピッカー |
 | (4.10) | 出荷日 | ship_date | Date | I/O | - | - | - | - | 日付ピッカー |
 | (4.11) | メーカー保証終了日 | manufacturer_warranty_end_date | Date | I/O | ○ | - | - | - | 日付ピッカー |
-| (4.12) | ベンダー保証終了日 | vendor_warranty_end_date | Date | I/O | ○ | - | - | - | 日付ピッカー |
-| (4.13) | 登録ボタン | submit_button | Button | I | - | - | - | 固定値: 「登録」 | プライマリボタン |
-| (4.14) | キャンセルボタン | cancel_button | Button | I | - | - | - | 固定値: 「キャンセル」 | セカンダリボタン |
+| (4.12) | 登録ボタン | submit_button | Button | I | - | - | - | 固定値: 「登録」 | プライマリボタン |
+| (4.13) | キャンセルボタン | cancel_button | Button | I | - | - | - | 固定値: 「キャンセル」 | セカンダリボタン |
 ||
 ((5)は(4)と同様の要素)
 ||
@@ -416,33 +404,31 @@
 | (6.3) | モデル情報 | model_info | Label | O | - | - | - | DB: device_master.device_model | - |
 | (6.4) | SIMID | sim_id | Label | O | - | - | - | DB: device_master.sim_id | - |
 | (6.5) | MACアドレス | mac_address | Label | O | - | - | - | DB: device_master.mac_address | - |
-| (6.6) | 在庫状況 | stock_status | Label | O | - | - | - | DB: stock_status_master.stock_status_name | - |
-| (6.7) | 在庫場所 | stock_location | Label | O | - | - | - | DB: device_stock_info_master.stock_location | - |
-| (6.8) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_stock_info_master.purchase_date | - |
-| (6.9) | 出荷予定日 | estimated_ship_date | Label | O | - | - | - | DB: device_stock_info_master.estimated_ship_date | - |
-| (6.10) | 出荷日 | ship_date | Label | O | - | - | - | DB: device_stock_info_master.ship_date | - |
-| (6.11) | メーカー保証終了日 | manufacturer_warranty_end_date | Label | O | - | - | - | DB: device_stock_info_master.manufacturer_warranty_end_date | - |
-| (6.12) | ベンダー保証終了日 | vendor_warranty_end_date | Label | O | - | - | - | DB: device_stock_info_master.vendor_warranty_end_date | - |
-| (6.13) | 作成日時 | create_date | Label | O | - | - | - | DB: device_stock_info_master.create_date | - |
-| (6.14) | 作成者 | creator | Label | O | - | - | - | DB: device_stock_info_master.creator（users.user_nameを表示） | - |
-| (6.15) | 更新日時 | update_date | Label | O | - | - | - | DB: device_stock_info_master.update_date | - |
-| (6.16) | 更新者 | modifier | Label | O | - | - | - | DB: device_stock_info_master.modifier（users.user_nameを表示） | - |
-| (6.17) | 閉じるボタン | close_button | Button | I | - | - | - | 固定値:「閉じる」 | セカンダリボタン |
+| (6.6) | 在庫状況 | inventory_status | Label | O | - | - | - | DB: inventory_status_master.inventory_status_name | - |
+| (6.7) | 在庫場所 | inventory_location | Label | O | - | - | - | DB: device_inventory_master.inventory_location | - |
+| (6.8) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_inventory_master.purchase_date | - |
+| (6.9) | 出荷予定日 | estimated_ship_date | Label | O | - | - | - | DB: device_inventory_master.estimated_ship_date | - |
+| (6.10) | 出荷日 | ship_date | Label | O | - | - | - | DB: device_inventory_master.ship_date | - |
+| (6.11) | メーカー保証終了日 | manufacturer_warranty_end_date | Label | O | - | - | - | DB: device_inventory_master.manufacturer_warranty_end_date | - |
+| (6.12) | 作成日時 | create_date | Label | O | - | - | - | DB: device_inventory_master.create_date | - |
+| (6.13) | 作成者 | creator | Label | O | - | - | - | DB: device_inventory_master.creator（users.user_nameを表示） | - |
+| (6.14) | 更新日時 | update_date | Label | O | - | - | - | DB: device_inventory_master.update_date | - |
+| (6.15) | 更新者 | modifier | Label | O | - | - | - | DB: device_inventory_master.modifier（users.user_nameを表示） | - |
+| (6.16) | 閉じるボタン | close_button | Button | I | - | - | - | 固定値:「閉じる」 | セカンダリボタン |
 ||
 | (7.1) | デバイス名 | device_name | Label | O | - | - | - | DB: device_master.device_name | - |
 | (7.2) | デバイス種別 | device_type | Label | O | - | - | - | DB: device_type_master.device_type_name | - |
 | (7.3) | モデル情報 | model_info | Label | O | - | - | - | DB: device_master.device_model | - |
 | (7.4) | SIMID | sim_id | Label | O | - | - | - | DB: device_master.sim_id | - |
 | (7.5) | MACアドレス | mac_address | Label | O | - | - | - | DB: device_master.mac_address | - |
-| (7.6) | 在庫状況 | stock_status | Label | O | - | - | - | DB: stock_status_master.stock_status_name | - |
-| (7.7) | 在庫場所 | stock_location | Label | O | - | - | - | DB: device_stock_info_master.stock_location | - |
-| (7.8) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_stock_info_master.purchase_date | - |
-| (7.9) | 出荷予定日 | estimated_ship_date | Label | O | - | - | - | DB: device_stock_info_master.estimated_ship_date | - |
-| (7.10) | 出荷日 | ship_date | Label | O | - | - | - | DB: device_stock_info_master.ship_date | - |
-| (7.11) | メーカー保証終了日 | manufacturer_warranty_end_date | Label | O | - | - | - | DB: device_stock_info_master.manufacturer_warranty_end_date | - |
-| (7.12) | ベンダー保証終了日 | vendor_warranty_end_date | Label | O | - | - | - | DB: device_stock_info_master.vendor_warranty_end_date | - |
-| (7.13) | 登録ボタン | register_button | Button | I | - | - | - | 固定値:「登録」 | プライマリボタン |
-| (7.14) | キャンセルボタン | cancel_button | Button | I | - | - | - | 固定値:「キャンセル」 | セカンダリボタン |
+| (7.6) | 在庫状況 | inventory_status | Label | O | - | - | - | DB: inventory_status_master.inventory_status_name | - |
+| (7.7) | 在庫場所 | inventory_location | Label | O | - | - | - | DB: device_inventory_master.inventory_location | - |
+| (7.8) | 購入日 | purchase_date | Label | O | - | - | - | DB: device_inventory_master.purchase_date | - |
+| (7.9) | 出荷予定日 | estimated_ship_date | Label | O | - | - | - | DB: device_inventory_master.estimated_ship_date | - |
+| (7.10) | 出荷日 | ship_date | Label | O | - | - | - | DB: device_inventory_master.ship_date | - |
+| (7.11) | メーカー保証終了日 | manufacturer_warranty_end_date | Label | O | - | - | - | DB: device_inventory_master.manufacturer_warranty_end_date | - |
+| (7.12) | 登録ボタン | register_button | Button | I | - | - | - | 固定値:「登録」 | プライマリボタン |
+| (7.13) | キャンセルボタン | cancel_button | Button | I | - | - | - | 固定値:「キャンセル」 | セカンダリボタン |
 ||
 ((8)は(7)と同様の要素)
 ||
@@ -614,7 +600,7 @@
 - 形式: YYYY/MM/DD
 
 **3.8: 保証期限カラム**
-- 概要: メーカー保証終了日とベンダー保証終了日の早い方を表示
+- 概要: メーカー保証終了日を表示
 - 警告表示:
   - 30日以内: ⚠アイコン + 黄色背景
   - 期限切れ: ⚠アイコン + 赤色テキスト
@@ -703,12 +689,7 @@
 │ │ 📅                                                │ │
 │ └───────────────────────────────────────────────────┘ │
 │                                                       │
-│ (4.12) ベンダー保証終了日 [必須]                       │
-│ ┌───────────────────────────────────────────────────┐ │
-│ │ 📅                                                │ │
-│ └───────────────────────────────────────────────────┘ │
-│                                                       │
-│                  (4.13) [登録]  (4.14) [キャンセル]   │
+│                  (4.12) [登録]  (4.13) [キャンセル]   │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -741,7 +722,7 @@
 **4.6: 在庫状況**
 - 概要: デバイスの在庫状況を選択
 - ラベル: 「在庫状況」
-- 選択肢: stock_status_masterテーブルから取得
+- 選択肢: inventory_status_masterテーブルから取得
 - デフォルト: 在庫中
 
 **4.7: 在庫場所**
@@ -769,17 +750,12 @@
 - ラベル: 「メーカー保証終了日」
 - 入力タイプ: 日付ピッカー（YYYY/MM/DD形式）
 
-**4.12: ベンダー保証終了日**
-- 概要: ベンダー保証が終了する日付を入力
-- ラベル: 「ベンダー保証終了日」
-- 入力タイプ: 日付ピッカー（YYYY/MM/DD形式）
-
-**4.13: 登録ボタン**
+**4.12: 登録ボタン**
 - 概要: 入力内容を確認画面へ進める
 - ラベル: 「登録」
 - スタイル: プライマリボタン
 
-**4.14: キャンセルボタン**
+**4.13: キャンセルボタン**
 - 概要: 入力内容を破棄してモーダルを閉じる
 - ラベル: 「キャンセル」
 - スタイル: セカンダリボタン
@@ -803,12 +779,10 @@
 | 4.10 出荷日 | 出荷予定日以降（出荷予定日が未入力の場合は購入日以降） | 「出荷日は出荷予定日以降を指定してください」（出荷予定日未入力時は「出荷日は購入日以降を指定してください」） |
 | 4.11 メーカー保証終了日 | 必須 | 「メーカー保証終了日を入力してください」 |
 | 4.11 メーカー保証終了日 | 購入日以降 | 「メーカー保証終了日は購入日以降を指定してください」 |
-| 4.12 ベンダー保証終了日 | 必須 | 「ベンダー保証終了日を入力してください」 |
-| 4.12 ベンダー保証終了日 | 購入日以降 | 「ベンダー保証終了日は購入日以降を指定してください」 |
 
 **ボタン配置:**
-- 4.13 登録ボタン: 左側、プライマリボタン、デバイス台帳登録処理を実行
-- 4.14 キャンセルボタン: 右側、セカンダリボタン、モーダルを閉じる
+- 4.12 登録ボタン: 左側、プライマリボタン、デバイス台帳登録処理を実行
+- 4.13 キャンセルボタン: 右側、セカンダリボタン、モーダルを閉じる
 
 ---
 
@@ -854,7 +828,6 @@
 - 出荷予定日
 - 出荷日
 - メーカー保証終了日
-- ベンダー保証終了日
 - 作成日時
 - 作成者
 - 更新日時
@@ -890,7 +863,6 @@
 - 出荷予定日
 - 出荷日
 - メーカー保証終了日
-- ベンダー保証終了日
 
 **注**: すべての項目は読み取り専用
 
@@ -918,7 +890,6 @@
 - 出荷予定日
 - 出荷日
 - メーカー保証終了日
-- ベンダー保証終了日
 
 **注**: すべての項目は読み取り専用
 

@@ -19,8 +19,8 @@
     - [7. 組織閉方テーブル (organization\_closure)](#7-組織閉方テーブル-organization_closure)
     - [8. デバイスマスタ (device\_master)](#8-デバイスマスタ-device_master)
     - [9. デバイス種別マスタ (device\_type\_master)](#9-デバイス種別マスタ-device_type_master)
-    - [10. デバイス在庫情報マスタ (device\_stock\_info\_master)](#10-デバイス在庫情報マスタ-device_stock_info_master)
-    - [11. 在庫状況マスタ (stock\_status\_master)](#11-在庫状況マスタ-stock_status_master)
+    - [10. デバイス在庫情報マスタ (device\_inventory\_master)](#10-デバイス在庫情報マスタ-device_inventory_master)
+    - [11. 在庫状況マスタ (inventory\_status\_master)](#11-在庫状況マスタ-inventory_status_master)
     - [12. アラート設定マスタ (alert\_setting\_master)](#12-アラート設定マスタ-alert_setting_master)
     - [13. 測定項目マスタ (measurement\_item\_master)](#13-測定項目マスタ-measurement_item_master)
     - [14. アラートレベルマスタ (alert\_level\_master)](#14-アラートレベルマスタ-alert_level_master)
@@ -108,8 +108,8 @@
 | 7   | organization_closure     | 組織閉方テーブル        | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
 | 8   | device_master            | デバイスマスタ          | IoTデバイスの情報を管理                                                        |
 | 9   | device_type_master       | デバイス種別マスタ      | デバイスの種別を管理                                                           |
-| 10  | device_stock_info_master | デバイス在庫情報マスタ   | デバイスの在庫・配備状況を管理                                                 |
-| 11  | stock_status_master      | 在庫状況マスタ          | デバイス在庫状況のステータスを管理                                             |
+| 10  | device_inventory_master | デバイス在庫情報マスタ   | デバイスの在庫・配備状況を管理                                                 |
+| 11  | inventory_status_master  | 在庫状況マスタ          | デバイス在庫状況のステータスを管理                                             |
 | 12  | alert_setting_master     | アラート設定マスタ       | アラート検知条件・通知設定を管理                                               |
 | 13  | measurement_item_master  | 測定項目マスタ           | センサーで読み取る、機器に関する測定項目の名前を格納                             |
 | 14  | alert_level_master       | アラートレベルマスタ     | アラートの重要度レベルを管理                                                   |
@@ -338,7 +338,7 @@
 | 3   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）       |
 | 4   | device_name                 | デバイス名             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスの表示名                               |
 | 5   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                       |
-| 6   | device_stock_id             | デバイス在庫ID         | INT          | NOT NULL | -   | -   | -                 | デバイス在庫ID（device_stock_info_master参照） |
+| 6   | device_inventory_id             | デバイス在庫ID         | INT          | NOT NULL | -   | -   | -                 | デバイス在庫ID（device_inventory_master参照） |
 | 6   | sim_id                      | SIMID                  | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのSIM ID                               |
 | 7   | mac_address                 | MACアドレス            | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのMACアドレス                          |
 | 8   | software_version            | ソフトウェアバージョン | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのファームウェアバージョン             |
@@ -353,7 +353,7 @@
 **外部キー:**
 - `organization_id` → `organization_master.organization_id`
 - `device_type_id` → `device_type_master.device_type_id`
-- `device_stock_id` → `device_stock_info_master.device_stock_id`
+- `device_inventory_id` → `device_inventory_master.device_inventory_id`
 
 **インデックス:**
 - PRIMARY KEY: `device_id`
@@ -386,48 +386,47 @@
 
 ---
 
-### 10. デバイス在庫情報マスタ (device_stock_info_master)
+### 10. デバイス在庫情報マスタ (device_inventory_master)
 
 **概要**: デバイスの在庫・配備状況を管理するテーブル
 
 | #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
 | --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
-| 1   | device_stock_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
-| 2   | device_stock_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
-| 3   | stock_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（stock_status_master参照）                         |
+| 1   | device_inventory_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
+| 2   | device_inventory_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | inventory_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）                         |
 | 4   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
 | 5   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
 | 6   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
 | 7   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                          |
-| 8   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | ベンダー保証の終了日                                          |
-| 9   | stock_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
-| 10  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
-| 11  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
-| 12  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
-| 13  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
-| 14  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
+| 8   | inventory_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
+| 9   | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
+| 10  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
+| 11  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
+| 12  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
+| 13  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
 **外部キー:**
-- `stock_status_id` → `stock_status_master.stock_status_id`
+- `inventory_status_id` → `inventory_status_master.inventory_status_id`
 
 **インデックス:**
-- PRIMARY KEY: `device_stock_id`
-- INDEX: `stock_status_id`
+- PRIMARY KEY: `device_inventory_id`
+- INDEX: `inventory_status_id`
 
 **ビジネスルール:**
-- device_stock_idは1デバイスにつき1レコード（1:1関係）
-- stock_status_idで在庫状態を管理
+- device_inventory_idは1デバイスにつき1レコード（1:1関係）
+- inventory_status_idで在庫状態を管理
 
 ---
 
-### 11. 在庫状況マスタ (stock_status_master)
+### 11. 在庫状況マスタ (inventory_status_master)
 
 **概要**: デバイス在庫状況のステータスを管理するマスタテーブル
 
 | #   | カラム物理名      | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ----------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | stock_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
-| 2   | stock_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
+| 1   | inventory_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
+| 2   | inventory_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
 | 3   | create_date       | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator           | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
 | 5   | update_date       | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
@@ -435,16 +434,17 @@
 | 7   | delete_flag       | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
-- PRIMARY KEY: `stock_status_id`
+- PRIMARY KEY: `inventory_status_id`
 
 **初期データ:**
-| stock_status_id | stock_status_name | 説明 |
+| inventory_status_id | inventory_status_name | 説明 |
 | --------------- | ----------------- | ---- |
 | 1               | 在庫中            | 倉庫に保管中 |
-| 2               | 出荷済み          | 顧客へ出荷完了 |
-| 3               | 修理中            | 修理・メンテナンス中 |
-| 4               | 廃棄予定          | 廃棄待ち |
-| 5               | 廃棄済み          | 廃棄完了 |
+| 2               | 出荷予定          | 出荷待ち |
+| 3               | 出荷済み          | 顧客へ出荷完了 |
+| 4               | 修理中            | 修理・メンテナンス中 |
+| 5               | 廃棄予定          | 廃棄待ち |
+| 6               | 廃棄済み          | 廃棄完了 |
 
 ---
 
@@ -808,8 +808,8 @@ CREATE INDEX IX_alert_setting_device_id ON alert_setting_master(device_id);
 CREATE INDEX IX_alert_setting_level ON alert_setting_master(alert_level);
 
 -- デバイス在庫情報マスタ
-CREATE INDEX IX_device_stock_device_id ON device_stock_info_master(device_stock_id);
-CREATE INDEX IX_device_stock_status_id ON device_stock_info_master(stock_status_id);
+CREATE INDEX IX_device_inventory_device_id ON device_inventory_master(device_inventory_id);
+CREATE INDEX IX_device_inventory_status_id ON device_inventory_master(inventory_status_id);
 ```
 
 #### 複合インデックス（検索条件が複数の場合）
@@ -846,7 +846,7 @@ ALTER TABLE alert_setting_master
 ADD CONSTRAINT CK_mail_notification_flag CHECK (mail_notification_flag IN (0, 1));
 
 -- デバイス在庫情報の割当フラグは0または1のみ
-ALTER TABLE device_stock_info_master
+ALTER TABLE device_inventory_master
 ADD CONSTRAINT CK_is_allocated CHECK (is_allocated IN (0, 1));
 
 -- 契約期間の整合性チェック
@@ -854,7 +854,7 @@ ALTER TABLE organization_master
 ADD CONSTRAINT CK_contract_dates CHECK (contract_end_date IS NULL OR contract_end_date >= contract_start_date);
 
 -- 出荷日は割当日以降
-ALTER TABLE device_stock_info_master
+ALTER TABLE device_inventory_master
 ADD CONSTRAINT CK_ship_date CHECK (ship_date IS NULL OR allocated_date IS NULL OR ship_date >= allocated_date);
 ```
 
@@ -904,8 +904,8 @@ ADD CONSTRAINT FK_device_type FOREIGN KEY (device_type_id)
 REFERENCES device_type_master(device_type_id);
 
 ALTER TABLE device_master
-ADD CONSTRAINT FK_device_type FOREIGN KEY (device_stock_id)
-REFERENCES device_stock_info_master(device_stock_id);
+ADD CONSTRAINT FK_device_type FOREIGN KEY (device_inventory_id)
+REFERENCES device_inventory_master(device_inventory_id);
 
 -- アラート設定マスタの外部キー
 ALTER TABLE alert_setting_master
@@ -917,9 +917,9 @@ ADD CONSTRAINT FK_alert_setting_level FOREIGN KEY (alert_level)
 REFERENCES alert_level_master(alert_level_id);
 
 -- デバイス在庫情報マスタの外部キー
-ALTER TABLE device_stock_info_master
-ADD CONSTRAINT FK_device_stock_status FOREIGN KEY (stock_status_id)
-REFERENCES stock_status_master(stock_status_id);
+ALTER TABLE device_inventory_master
+ADD CONSTRAINT FK_device_inventory_status FOREIGN KEY (inventory_status_id)
+REFERENCES inventory_status_master(inventory_status_id);
 ```
 
 ### 3. デフォルト値
