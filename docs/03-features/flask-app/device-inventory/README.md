@@ -66,45 +66,44 @@
 
 ## データモデル
 
-### デバイス在庫情報マスタ (device_stock_info_master)
+### デバイス在庫情報マスタ (device_inventory_master)
 
 **概要**: デバイスの在庫・配備状況を管理するテーブル
 
 | #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
 | --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
-| 1   | device_stock_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
-| 2   | device_stock_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
-| 3   | stock_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（stock_status_master参照）                         |
+| 1   | device_inventory_id                | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
+| 2   | device_inventory_uuid              | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | inventory_status_id                | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）                         |
 | 4   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
 | 5   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
 | 6   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
 | 7   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                          |
-| 8   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | ベンダー保証の終了日                                          |
-| 9   | stock_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
-| 10  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
-| 11  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
-| 12  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
-| 13  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
-| 14  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
+| 8   | inventory_location                 | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
+| 9  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
+| 10  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
+| 11  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
+| 12  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
+| 13  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
 **外部キー:**
-- `stock_status_id` → `stock_status_master.stock_status_id`
+- `inventory_status_id` → `inventory_status_master.inventory_status_id`
 
 **ビジネスルール:**
-- device_stock_idは1デバイスにつき1レコード（1:1関係）
-- stock_status_idで在庫状態を管理
-- デバイス情報（device_id, device_name等）はdevice_masterテーブルからdevice_stock_idで参照
+- device_inventory_idは1デバイスにつき1レコード（1:1関係）
+- inventory_status_idで在庫状態を管理
+- デバイス情報（device_id, device_name等）はdevice_masterテーブルからdevice_inventory_idで参照
 
 ---
 
-### 在庫状況マスタ (stock_status_master)
+### 在庫状況マスタ (inventory_status_master)
 
 **概要**: デバイス在庫状況のステータスを管理するマスタテーブル
 
 | #   | カラム物理名      | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ----------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | stock_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
-| 2   | stock_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
+| 1   | inventory_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
+| 2   | inventory_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
 | 3   | create_date       | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator           | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
 | 5   | update_date       | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
@@ -112,13 +111,14 @@
 | 7   | delete_flag       | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **初期データ:**
-| stock_status_id | stock_status_name | 説明 |
+| inventory_status_id | inventory_status_name | 説明 |
 | --------------- | ----------------- | ---- |
 | 1               | 在庫中            | 倉庫に保管中 |
-| 2               | 出荷済み          | 顧客へ出荷完了 |
-| 3               | 修理中            | 修理・メンテナンス中 |
-| 4               | 廃棄予定          | 廃棄待ち |
-| 5               | 廃棄済み          | 廃棄完了 |
+| 2               | 出荷予定          | 出荷待ち |
+| 3               | 出荷済み          | 顧客へ出荷完了 |
+| 4               | 修理中            | 修理・メンテナンス中 |
+| 5               | 廃棄予定          | 廃棄待ち |
+| 6               | 廃棄済み          | 廃棄完了 |
 
 ---
 
@@ -129,9 +129,9 @@
 | 1 | デバイス台帳一覧表示 | `/admin/device-inventory` | GET | 一覧・検索表示 |
 | 2 | デバイス台帳登録画面 | `/admin/device-inventory/create` | GET | 登録モーダル表示 |
 | 3 | デバイス台帳登録実行 | `/admin/device-inventory/create` | POST | 登録処理 |
-| 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<device_stock_uuid>` | GET | 詳細モーダル表示 |
-| 5 | デバイス台帳更新画面 | `/admin/device-inventory/<device_stock_uuid>/edit` | GET | 更新モーダル表示 |
-| 6 | デバイス台帳更新実行 | `/admin/device-inventory/<device_stock_uuid>/update` | POST | 更新処理 |
+| 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>` | GET | 詳細モーダル表示 |
+| 5 | デバイス台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit` | GET | 更新モーダル表示 |
+| 6 | デバイス台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST | 更新処理 |
 | 7 | デバイス台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理（論理削除、複数選択対応） |
 | 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 |
 
@@ -171,7 +171,7 @@
 
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード等
 - [UI共通仕様書](../../common/ui-common-specification.md) - 共通UI仕様
-- [アプリケーションDB仕様書](../../common/app-database-specification.md) - テーブル定義（device_stock_info_master）
+- [アプリケーションDB仕様書](../../common/app-database-specification.md) - テーブル定義（device_inventory_master）
 
 ### 要件定義
 
