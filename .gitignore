@@ -7,17 +7,14 @@
 # docsフォルダ内のすべてを許可
 !/docs/**
 
-# .gitignore自体を許可
+# .gitignore自体を除外
 .gitignore
 
-docs/03-features/ldp-pipeline/gold_layer/review-comments.md
+# flask-appディレクトリすべて除外
+/workspaces/Databricks-IoT/docs/03-features/flask-app
 
-docs/03-features/ldp-pipeline/silver-layer/review-comments.md
+# silver-layer内の内容は全て許可
+!/workspaces/Databricks-IoT/docs/03-features/ldp-pipeline/silver-layer/**
 
-docs/AIレビューコメント/review-comments-silver.md
-
-docs/AIレビューコメント/review-comments‐gold.md
-
-docs/03-features/flask-app/conversational-ai-chat
-
-docs/03-features/flask-app/device-inventory
+# common内のDB設計書は全て許可
+!/workspaces/Databricks-IoT/docs/03-features/common/**
