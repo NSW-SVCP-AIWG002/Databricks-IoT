@@ -1,0 +1,34 @@
+{
+	"name": "Databricks-IoT Python Flask + MySQL",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/workspaces/Databricks-IoT",
+
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		}
+	},
+
+	"forwardPorts": [5000, 3306],
+
+	"postCreateCommand": "pip install -r requirements.txt && npm install -g @anthropic-ai/claude-code",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.debugpy",
+				"cstrap.flask-snippets",
+				"wholroyd.jinja",
+				"mtxr.sqltools",
+				"mtxr.sqltools-driver-mysql",
+				"bierner.markdown-mermaid"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/bin/python"
+			}
+		}
+	}
+}
