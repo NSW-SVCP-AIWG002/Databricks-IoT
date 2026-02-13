@@ -61,6 +61,7 @@
 | DBG-003 | 期間選択 | 日時ピッカーによる表示期間の指定 |
 | DBG-004 | 集計間隔選択 | データの集計間隔を選択（時単位のみ） |
 | DBG-005 | CSV出力 | 表示データをCSVファイルとしてダウンロード |
+| DBG-006 | ガジェット登録 | 棒グラフガジェットの新規登録 |
 
 ---
 
@@ -72,6 +73,8 @@
 | -------- | --- | ------ | ---- |
 | GET | /api/customer-dashboard/bar-chart/data | get_bar_chart_data | グラフデータ取得API |
 | GET | /api/customer-dashboard/bar-chart/export | export_bar_chart_csv | CSV出力API |
+| POST | /api/customer-dashboard/bar-chart/register | register_bar_chart | ガジェット登録API |
+| GET | /api/customer-dashboard/bar-chart/aggregation-methods | get_aggregation_methods | 集約方法一覧取得API |
 
 ### グラフデータ取得API
 
@@ -252,6 +255,210 @@ def export_bar_chart_csv():
         logger.error(f'CSV export error: {e}')
         return jsonify({'status': 'error', 'message': 'CSV出力に失敗しました'}), 500
 ```
+
+### ガジェット登録API
+
+```python
+# =============================================================================
+# ガジェット登録API
+# =============================================================================
+@bp.route('/api/customer-dashboard/bar-chart/register', methods=['POST'])
+@login_required
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
+def register_bar_chart():
+    """
+    棒グラフガジェットを登録
+
+    リクエストボディ:
+    - title: ガジェットタイトル（必須）
+    - device_mode: 表示デバイス選択（'specified' or 'tree_linked'）（必須）
+    - device_id: デバイスID（device_mode='specified'の場合必須）
+    - group_id: グループID（必須）
+    - aggregation_method_id: 集約方法ID（必須）
+    - item: 表示項目（必須、1つのみ）
+    - min_value: Y軸最小値（任意）
+    - max_value: Y軸最大値（任意）
+    - gadget_size: 部品サイズ（必須）
+
+    レスポンス:
+    - 成功時: {"status": "success", "gadget_id": "..."}
+    - エラー時: {"status": "error", "message": "..."}
+    """
+    data = request.get_json()
+
+    # バリデーション
+    errors = validate_register_params(data)
+    if errors:
+        return jsonify({'status': 'error', 'message': errors[0]}), 400
+
+    try:
+        # ガジェット登録
+        # TODO: 登録先DBにガジェット情報を保存
+        gadget = BarChartGadget(
+            title=data['title'],
+            device_mode=data['device_mode'],
+            device_id=data.get('device_id'),
+            group_id=data['group_id'],
+            aggregation_method_id=data['aggregation_method_id'],
+            item=data['item'],
+            min_value=data.get('min_value'),
+            max_value=data.get('max_value'),
+            gadget_size=data['gadget_size'],
+            created_by=g.current_user.id
+        )
+        db.session.add(gadget)
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'gadget_id': gadget.id
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Gadget registration error: {e}')
+        return jsonify({'status': 'error', 'message': '登録に失敗しました'}), 500
+
+
+def validate_register_params(data: dict) -> list:
+    """
+    登録パラメータをバリデーション
+    """
+    errors = []
+
+    # title
+    if not data.get('title'):
+        errors.append('タイトルは必須です')
+    elif len(data['title']) > 50:
+        errors.append('タイトルは50文字以内で入力してください')
+
+    # device_mode
+    if data.get('device_mode') not in ['specified', 'tree_linked']:
+        errors.append('表示デバイス選択が不正です')
+
+    # device_id (指定デバイスモード時のみ必須)
+    if data.get('device_mode') == 'specified':
+        if not data.get('device_id'):
+            errors.append('デバイスIDは必須です')
+        elif not UUID_PATTERN.match(data['device_id']):
+            errors.append('デバイスIDの形式が不正です')
+
+    # group_id
+    if not data.get('group_id'):
+        errors.append('グループIDは必須です')
+
+    # aggregation_method_id
+    if not data.get('aggregation_method_id'):
+        errors.append('集約方法は必須です')
+    elif data['aggregation_method_id'] not in range(1, 9):
+        errors.append('集約方法が不正です')
+
+    # item（1つのみ）
+    if not data.get('item'):
+        errors.append('表示項目は必須です')
+    elif data['item'] not in ALLOWED_ITEMS:
+        errors.append(f'不正な項目です: {data["item"]}')
+
+    # min_value / max_value（任意、両方入力時は大小チェック）
+    min_val = data.get('min_value')
+    max_val = data.get('max_value')
+
+    if min_val is not None:
+        try:
+            min_val = float(min_val)
+        except (ValueError, TypeError):
+            errors.append('最小値は数値で入力してください')
+            min_val = None
+
+    if max_val is not None:
+        try:
+            max_val = float(max_val)
+        except (ValueError, TypeError):
+            errors.append('最大値は数値で入力してください')
+            max_val = None
+
+    if min_val is not None and max_val is not None:
+        if min_val >= max_val:
+            errors.append('最小値は最大値より小さい値を入力してください')
+
+    # gadget_size
+    if not data.get('gadget_size'):
+        errors.append('部品サイズは必須です')
+    # TODO: gadget_sizeの許可値チェック
+
+    return errors
+```
+
+### 集約方法一覧取得API
+
+```python
+# =============================================================================
+# 集約方法一覧取得API
+# =============================================================================
+@bp.route('/api/customer-dashboard/bar-chart/aggregation-methods', methods=['GET'])
+@login_required
+def get_aggregation_methods():
+    """
+    集約方法一覧を取得
+
+    レスポンス:
+    - 成功時: {"status": "success", "data": [...]}
+    """
+    try:
+        # gold_summary_method_masterから有効な集約方法を取得
+        methods = get_active_aggregation_methods()
+
+        return jsonify({
+            'status': 'success',
+            'data': methods
+        })
+
+    except Exception as e:
+        logger.error(f'Aggregation methods fetch error: {e}')
+        return jsonify({'status': 'error', 'message': '集約方法の取得に失敗しました'}), 500
+
+
+def get_active_aggregation_methods() -> list:
+    """
+    有効な集約方法一覧を取得
+
+    Returns:
+        list: 集約方法リスト
+    """
+    query = """
+    SELECT
+        summary_method_id,
+        summary_method_code,
+        summary_method_name
+    FROM iot_catalog.gold.gold_summary_method_master
+    WHERE delete_flag = FALSE
+    ORDER BY summary_method_id
+    """
+
+    result = spark.sql(query).collect()
+
+    return [
+        {
+            'id': row.summary_method_id,
+            'code': row.summary_method_code,
+            'name': row.summary_method_name
+        }
+        for row in result
+    ]
+```
+
+**集約方法マスタ（gold_summary_method_master）:**
+
+| summary_method_id | summary_method_code | summary_method_name | 計算ロジック |
+| ----------------- | ------------------- | ------------------- | ------------ |
+| 1 | AVG | 平均値 | `AVG(sensor_value)` |
+| 2 | MAX | 最大値 | `MAX(sensor_value)` |
+| 3 | MIN | 最小値 | `MIN(sensor_value)` |
+| 4 | P25 | 第1四分位数 | `PERCENTILE_APPROX(sensor_value, 0.25)` |
+| 5 | MEDIAN | 中央値 | `PERCENTILE_APPROX(sensor_value, 0.5)` |
+| 6 | P75 | 第3四分位数 | `PERCENTILE_APPROX(sensor_value, 0.75)` |
+| 7 | STDDEV | 標準偏差 | `STDDEV(sensor_value)` |
+| 8 | P95 | 上側5％境界値 | `PERCENTILE_APPROX(sensor_value, 0.95)` |
 
 ---
 
@@ -756,9 +963,85 @@ def generate_csv(data: dict) -> str:
 
 ---
 
+## ガジェット登録ワークフロー
+
+### 処理フロー図
+
+```mermaid
+flowchart TD
+    A[登録リクエスト受信] --> B{認証チェック}
+    B -->|NG| C[401エラー]
+    B -->|OK| D{権限チェック}
+    D -->|NG| E[403エラー]
+    D -->|OK| F{バリデーション}
+    F -->|NG| G[400エラー]
+    F -->|OK| H{デバイスモード}
+    H -->|指定デバイス| I[デバイス存在チェック]
+    H -->|ツリー連動| J[組織権限チェック]
+    I --> K{デバイス存在?}
+    K -->|なし| L[400エラー]
+    K -->|あり| M[データスコープチェック]
+    J --> M
+    M --> N{アクセス権限?}
+    N -->|なし| O[403エラー]
+    N -->|あり| P[集約方法マスタ検証]
+    P --> Q{有効な集約方法?}
+    Q -->|なし| R[400エラー]
+    Q -->|あり| S[最小値/最大値検証]
+    S --> T{min < max?}
+    T -->|NG| U[400エラー]
+    T -->|OK or 未入力| V[ガジェット登録]
+    V --> W{登録結果}
+    W -->|失敗| X[500エラー]
+    W -->|成功| Y[201 Created返却]
+```
+
+### 登録処理の流れ
+
+1. **認証・権限チェック**: ログインユーザーの認証状態とロールを確認
+2. **バリデーション**: 必須項目、文字数、形式をチェック
+3. **デバイスモード分岐**:
+   - 指定デバイス: デバイスの存在確認とデータスコープチェック
+   - ツリー連動: 組織権限チェック
+4. **集約方法検証**: gold_summary_method_masterで有効性を確認
+5. **最小値/最大値検証**: 両方入力時は最小値 < 最大値をチェック
+6. **ガジェット登録**: **TODO** 登録先DBにガジェット情報を保存
+
+### 円グラフとの主な違い
+
+| 項目 | 円グラフ | 棒グラフ |
+|------|----------|----------|
+| センサー選択 | items（リスト、1-5個） | item（単一値、1つのみ） |
+| 最小値/最大値 | なし | あり（任意入力） |
+| 部品サイズ | なし | あり（必須） |
+
+---
+
+## 集約方法一覧取得ワークフロー
+
+### 処理フロー図
+
+```mermaid
+flowchart TD
+    A[リクエスト受信] --> B{認証チェック}
+    B -->|NG| C[401エラー]
+    B -->|OK| D[集約方法マスタ取得]
+    D --> E[delete_flag=FALSEでフィルタ]
+    E --> F[summary_method_idでソート]
+    F --> G[JSONレスポンス返却]
+```
+
+### 取得処理の流れ
+
+1. **認証チェック**: ログイン状態を確認（権限チェックは不要）
+2. **マスタ取得**: gold_summary_method_masterから有効な集約方法を取得
+3. **レスポンス**: ID、コード、名称のリストを返却
+
+---
+
 ## バリデーション仕様
 
-### リクエストパラメータ定義
+### リクエストパラメータ定義（データ取得API）
 
 | パラメータ | 型 | 必須 | 説明 | 例 |
 | ---------- | -- | ---- | ---- | -- |
@@ -768,6 +1051,20 @@ def generate_csv(data: dict) -> str:
 | item | string | ○ | 表示項目 | "communication_power_time" |
 | method_id | integer | ○ | 集計方法ID | 1 |
 | base_datetime | string | ○ | 基準日時（ISO 8601） | "2026-02-05T15:32:42+09:00" |
+
+### リクエストパラメータ定義（ガジェット登録API）
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| title | string | ○ | ガジェットタイトル（1-50文字） |
+| device_mode | string | ○ | 表示デバイス選択（'specified' / 'tree_linked'） |
+| device_id | string | △ | デバイスID（device_mode='specified'時必須） |
+| group_id | string | ○ | グループID |
+| aggregation_method_id | integer | ○ | 集約方法ID（1-8） |
+| item | string | ○ | 表示項目（1つのみ） |
+| min_value | number | - | Y軸最小値（任意） |
+| max_value | number | - | Y軸最大値（任意） |
+| gadget_size | string | ○ | 部品サイズ（TODO: 選択肢2つ） |
 
 ### バリデーション実装
 
@@ -1041,3 +1338,5 @@ def handle_exceptions(f):
 | 2026-02-06 | 2.0 | データ取得ワークフローに特化、表示単位別集計仕様を詳細化 | - |
 | 2026-02-09 | 2.1 | 日単位:TODO（新規テーブル）、月単位:全日取得に変更、Apache ECharts使用を明記 | - |
 | 2026-02-10 | 2.2 | 処理フロー全体図のmermaid構文をシンプル化して修正 | - |
+| 2026-02-13 | 2.3 | ガジェット登録API、集約方法一覧取得API追加 | - |
+| 2026-02-13 | 2.4 | ガジェット登録ワークフロー（mermaidフロー図）追加 | - |
