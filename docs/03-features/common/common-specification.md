@@ -50,7 +50,7 @@
    - 12.2 [API識別子（UUID）](#api識別子uuid)
 13. [設定ファイル管理項目](#設定ファイル管理項目)
    - 13.1 [概要](#概要-1)
-   - 13.2 [統合設定ファイル全体構造](#統合設定ファイル全体構造)
+   - 13.2 [設定ファイル全体構造](#設定ファイル全体構造)
 14. [関連ドキュメント](#関連ドキュメント)
 
 ---
@@ -1048,80 +1048,62 @@ db.session.commit()
 
 ### 概要
 
-データベースのマスタテーブルではなく、**設定ファイル（YAML）で管理する項目**を定義します。
+データベースのマスタテーブルではなく、**設定ファイル（config.py）で管理する項目**を定義します。
 
 **設定ファイル管理の利点:**
-- デプロイ不要でアプリケーション再起動のみで設定変更可能
+- Pythonコードとして直接参照でき、型安全性が高い
 - バージョン管理が容易
 - 環境ごとの設定差分管理が簡単
 - データベースマイグレーション不要
+- 外部ライブラリ（PyYAML等）への依存が不要
 
 **設定ファイル格納場所:**
 ```
 config/
-└── application_settings.yaml  # アプリケーション設定（全項目統合）
+└── config.py  # アプリケーション設定（全項目統合）
 ```
 
-### 統合設定ファイル全体構造
+### 設定ファイル全体構造
 
-`config/application_settings.yaml` には、以下の全設定項目を統合して管理します。
+`config/config.py` には、以下の全設定項目を統合して管理します。
 
-```yaml
+```python
 # アラート比較演算子
-alert_operators:
-  - operator_id: gt
-    operator_symbol: ">"
-  - operator_id: lt
-    operator_symbol: "<"
-  - operator_id: gte
-    operator_symbol: ">="
-  - operator_id: lte
-    operator_symbol: "<="
-  - operator_id: eq
-    operator_symbol: "=="
+ALERT_OPERATORS = [
+    {"operator_id": "gt", "operator_symbol": ">"},
+    {"operator_id": "lt", "operator_symbol": "<"},
+    {"operator_id": "gte", "operator_symbol": ">="},
+    {"operator_id": "lte", "operator_symbol": "<="},
+    {"operator_id": "eq", "operator_symbol": "=="},
+]
 
 # 判定時間（分）
-judgment_times: [1, 5, 10, 15, 30, 60]
+JUDGMENT_TIMES = [1, 5, 10, 15, 30, 60]
 
 # ソート順序
-sort_orders:
-  - sort_order_id: asc
-    sort_order_name: 昇順
-
-  - sort_order_id: desc
-    sort_order_name: 降順
+SORT_ORDERS = [
+    {"sort_order_id": "asc", "sort_order_name": "昇順"},
+    {"sort_order_id": "desc", "sort_order_name": "降順"},
+]
 
 # ページネーション設定
-pagination:
-  default_items_per_page: 25
+PAGINATION = {
+    "default_items_per_page": 25,
+}
 
 # マスタデフォルト値
-master_defaults:
-  user_status:
-    active: 1
-    locked: 0
+MASTER_DEFAULTS = {
+    "user_status": {
+        "active": 1,
+        "locked": 0,
+    },
+}
 ```
 
 **Flaskでの読み込み実装例:**
 
 ```python
-import yaml
-from pathlib import Path
-
-def load_application_settings():
-    """
-    application_settings.yamlを読み込む共通関数
-
-    Returns:
-        dict: アプリケーション設定の辞書
-    """
-    config_path = Path(__file__).parent / 'config' / 'application_settings.yaml'
-
-    with open(config_path, 'r', encoding='utf-8') as f:
-        settings = yaml.safe_load(f)
-
-    return settings
-
+from config.config import ALERT_OPERATORS, JUDGMENT_TIMES, SORT_ORDERS, PAGINATION, MASTER_DEFAULTS
 ```
 
 ---
