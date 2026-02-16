@@ -173,7 +173,7 @@ flowchart TD
 リバースプロキシヘッダから認証情報を取得し、権限を確認します。
 
 **処理内容:**
-- ヘッダ `X-Databricks-User-Id` からユーザーIDを取得
+- ヘッダ `X-Forwarded-User` からユーザーIDを取得
 - データベースから現在ユーザー情報を取得（ユーザー種別、組織ID）
 - 組織に応じてデータスコープを決定
 
@@ -191,7 +191,7 @@ from functools import wraps
 def require_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        user_id = request.headers.get('X-Databricks-User-Id')
+        user_id = request.headers.get('X-Forwarded-User')
         if not user_id:
             abort(401)
 
@@ -573,7 +573,7 @@ WHERE
   AND CASE WHEN :alert_status_id IS NULL THEN TRUE ELSE asm.alert_status_id = :alert_status_id END
 ORDER BY
   {sort_by} {order},
-  ah.alert_history_id DESC -- 第二ソートキー
+  ah.alert_history_id {order} -- 第二ソートキー
 LIMIT :item_per_page OFFSET (:page -1) * :item_per_page
 ```
 
@@ -717,7 +717,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 ### 認証・認可実装
 
 **認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Databricks-User-Id`）
+- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
 
 **認可ロジック:**
 
