@@ -178,7 +178,8 @@ def get_circle_chart_data():
 
     リクエストパラメータ:
     - gadget_id: ガジェットID（必須）
-    - organization_id: 組織ID（ツリー連動モード時は必須）
+    - device_id: デバイスID（ツリー連動モード時は必須）
+    - base_datetime: 基準日時 ISO 8601形式（必須）
 
     レスポンス:
     - 成功時: {"status": "success", "data": {...}}
@@ -187,7 +188,8 @@ def get_circle_chart_data():
     # パラメータ取得
     params = {
         'gadget_id': request.args.get('gadget_id'),
-        'organization_id': request.args.get('organization_id')  # ツリー連動モード時のみ使用
+        'device_id': request.args.get('device_id'),  # ツリー連動モード時のみ使用
+        'base_datetime': request.args.get('base_datetime')
     }
 
     # バリデーション
@@ -200,27 +202,23 @@ def get_circle_chart_data():
     if not gadget:
         return jsonify({'status': 'error', 'message': 'ガジェットが見つかりません'}), 404
 
-    # デバイス取得（指定デバイス or ツリー連動）
+    # デバイスID取得（指定デバイス or ツリー連動）
     if gadget['device_mode'] == 'specified':
-        # 指定デバイスモード: 単一デバイスのデータを集計
-        device_ids = [gadget['device_id']]
+        # 指定デバイスモード: ガジェット登録時に固定されたデバイス
+        device_id = gadget['device_id']
     else:
-        # ツリー連動モード: 組織配下の全デバイスのデータを集計
-        organization_id = params['organization_id']
-        if not organization_id:
-            return jsonify({'status': 'error', 'message': 'organization_idは必須です'}), 400
-
-        # TODO: 共通仕様 - 組織配下のデバイス一覧を取得
-        device_ids = get_devices_by_organization(organization_id)
-        if not device_ids:
-            return jsonify({'status': 'error', 'message': '対象デバイスが見つかりません'}), 404
+        # ツリー連動モード: ツリー上で選択されたデバイス
+        device_id = params['device_id']
+        if not device_id:
+            return jsonify({'status': 'error', 'message': 'device_idは必須です'}), 400
 
     # データ取得（ガジェットに設定された集約方法を使用）
     try:
         data = get_chart_data(
-            device_ids=device_ids,
+            device_id=device_id,
             items=gadget['items'],
-            aggregation_method_id=gadget['aggregation_method_id']
+            aggregation_method_id=gadget['aggregation_method_id'],
+            base_datetime=datetime.fromisoformat(params['base_datetime'])
         )
 
         if not data['values']:
@@ -435,10 +433,10 @@ flowchart TD
     H --> I{ガジェット存在?}
     I -->|なし| J[404エラー]
     I -->|あり| K{デバイスモード}
-    K -->|指定デバイス| L[単一デバイスID取得]
-    K -->|ツリー連動| M[組織配下の全デバイスID取得]
-    M --> N{デバイス存在?}
-    N -->|なし| O[404エラー]
+    K -->|指定デバイス| L[ガジェット登録時のデバイスID取得]
+    K -->|ツリー連動| M[リクエストからデバイスID取得]
+    M --> N{device_id指定あり?}
+    N -->|なし| O[400エラー]
     N -->|あり| P[集約方法マスタ取得]
     L --> P
     P --> Q[設定された集約方法でシルバー層データを集約]
@@ -447,38 +445,40 @@ flowchart TD
     R -->|あり| T[JSONレスポンス返却]
 ```
 
-**集計対象の違い:**
-- **指定デバイス**: 登録時に指定した単一デバイスのデータを集計
-- **ツリー連動**: 画面で選択された組織配下の全デバイスのデータを集計
+**デバイス指定方法の違い:**
+- **指定デバイス**: ガジェット登録時に固定されたデバイスのデータを表示
+- **ツリー連動**: ツリー上で選択されたデバイスのデータを表示（動的に変更可能）
 
 ### データ取得実装
 
 ```python
-def get_chart_data(device_ids: list, items: list, aggregation_method_id: int) -> dict:
+def get_chart_data(device_id: str, items: list, aggregation_method_id: int, base_datetime: datetime) -> dict:
     """
     円グラフ用データを取得
 
     Args:
-        device_ids: デバイスIDリスト（単一または複数）
+        device_id: デバイスID
         items: 表示項目リスト
         aggregation_method_id: 集約方法ID
+        base_datetime: 基準日時
 
     Returns:
         dict: グラフデータ
     """
-    # データスコープチェック（全デバイスに対して）
-    for device_id in device_ids:
-        device = get_device_info(device_id)
-        if device and not check_data_scope(g.current_user, device):
-            raise PermissionError('アクセス権限がありません')
+    # データスコープチェック
+    device = get_device_info(device_id)
+    if not device:
+        raise ValueError('デバイスが見つかりません')
+    if not check_data_scope(g.current_user, device):
+        raise PermissionError('アクセス権限がありません')
 
     # 集約方法情報取得
     aggregation_method = get_aggregation_method(aggregation_method_id)
     if not aggregation_method:
         raise ValueError('集約方法が見つかりません')
 
-    # シルバー層から集約データ取得（複数デバイス対応）
-    aggregated_data = query_silver_aggregated(device_ids, items, aggregation_method['code'])
+    # シルバー層から集約データ取得
+    aggregated_data = query_silver_aggregated(device_id, items, aggregation_method['code'], base_datetime)
 
     # レスポンス構築
     labels = []
@@ -492,7 +492,7 @@ def get_chart_data(device_ids: list, items: list, aggregation_method_id: int) ->
     return {
         'labels': labels,
         'values': values,
-        'device_count': len(device_ids),
+        'device_name': device['device_name'],
         'aggregation_method': aggregation_method['name']
     }
 ```
@@ -512,21 +512,21 @@ AGGREGATION_FUNCTIONS = {
     'P95': 'PERCENTILE_APPROX({column}, 0.95)'
 }
 
-def query_silver_aggregated(device_ids: list, items: list, method_code: str) -> dict:
+def query_silver_aggregated(device_id: str, items: list, method_code: str, base_datetime: datetime) -> dict:
     """
-    シルバー層から集約データを取得（複数デバイス対応）
+    シルバー層から集約データを取得
 
     Args:
-        device_ids: デバイスIDリスト（単一または複数）
+        device_id: デバイスID
         items: 取得する項目リスト
         method_code: 集約方法コード（AVG, MAX, MIN, etc.）
+        base_datetime: 基準日時
 
     Returns:
         dict: 項目名と集約値の辞書
 
     Note:
-        - 指定デバイスモード: 単一デバイスのデータを集約
-        - ツリー連動モード: 組織配下の全デバイスのデータを集約
+        - 基準日時から過去1時間分のデータを集約
     """
     # 集約関数を構築
     agg_func = AGGREGATION_FUNCTIONS.get(method_code, 'AVG')
@@ -541,14 +541,15 @@ def query_silver_aggregated(device_ids: list, items: list, method_code: str) -> 
 
     columns_sql = ', '.join(select_columns)
 
-    # デバイスIDリストをIN句用に変換
-    device_ids_str = ', '.join([f"'{d}'" for d in device_ids])
+    # 基準日時から過去1時間分のデータを取得
+    start_datetime = base_datetime - timedelta(hours=1)
 
     query = f"""
     SELECT {columns_sql}
     FROM iot_catalog.silver.silver_sensor_data
-    WHERE device_uuid IN ({device_ids_str})
-      AND received_at >= DATE_SUB(CURRENT_TIMESTAMP(), 1)
+    WHERE device_uuid = '{device_id}'
+      AND received_at >= '{start_datetime.isoformat()}'
+      AND received_at <= '{base_datetime.isoformat()}'
     """
 
     result = spark.sql(query).first()
@@ -557,23 +558,6 @@ def query_silver_aggregated(device_ids: list, items: list, method_code: str) -> 
         return {}
 
     return {item: result[item] for item in items if result[item] is not None}
-
-
-def get_devices_by_organization(organization_id: str) -> list:
-    """
-    組織配下のデバイスID一覧を取得
-
-    Args:
-        organization_id: 組織ID
-
-    Returns:
-        list: デバイスIDリスト
-
-    TODO: 共通仕様 - 組織ツリー（organization_closure）を使用して
-          指定組織および配下組織に紐づくデバイス一覧を取得
-    """
-    # TODO: 共通仕様として実装
-    pass
 
 
 def get_aggregation_method(method_id: int) -> dict:
@@ -708,12 +692,14 @@ flowchart TD
 | パラメータ | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
 | gadget_id | string | ○ | ガジェットID |
-| organization_id | string | △ | 組織ID（ツリー連動モード時必須） |
+| device_id | string | △ | デバイスID（ツリー連動モード時必須） |
+| base_datetime | string | ○ | 基準日時（ISO 8601形式） |
 
 **備考:**
 - 表示項目（items）、集約方法（aggregation_method_id）はガジェット登録時に設定された値を使用
-- **指定デバイスモード**: 登録時に指定した単一デバイスのデータを集計
-- **ツリー連動モード**: リクエストで指定した組織配下の全デバイスのデータを集計
+- **指定デバイスモード**: ガジェット登録時に固定されたデバイスのデータを表示
+- **ツリー連動モード**: リクエストで指定したデバイス（ツリー上で選択）のデータを表示
+- **基準日時**: 指定した日時から過去1時間分のデータを集約
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
@@ -779,10 +765,19 @@ def validate_chart_params(params: dict) -> list:
     if not params.get('gadget_id'):
         errors.append('gadget_idは必須です')
 
-    # organization_id（ツリー連動モード時のみ必須、API側でチェック）
+    # device_id（ツリー連動モード時のみ必須、API側でチェック）
     # 形式チェックのみ実施
-    if params.get('organization_id') and not UUID_PATTERN.match(params['organization_id']):
-        errors.append('organization_idの形式が不正です')
+    if params.get('device_id') and not UUID_PATTERN.match(params['device_id']):
+        errors.append('device_idの形式が不正です')
+
+    # base_datetime（必須）
+    if not params.get('base_datetime'):
+        errors.append('base_datetimeは必須です')
+    else:
+        try:
+            datetime.fromisoformat(params['base_datetime'])
+        except ValueError:
+            errors.append('base_datetimeの形式が不正です')
 
     return errors
 ```
@@ -906,3 +901,5 @@ def internal_error(error):
 | 2026-02-13 | 1.2 | mermaidワークフロー図追加（登録フロー、集約方法取得フロー） |
 | 2026-02-13 | 1.3 | データ取得APIをガジェットID指定方式に変更（登録済み集約方法を使用） |
 | 2026-02-13 | 1.4 | ツリー連動モード時の複数デバイス集計対応追加 |
+| 2026-02-13 | 1.5 | データ取得APIにbase_datetimeパラメータ追加（日時ピッカー対応） |
+| 2026-02-13 | 1.6 | ツリー連動モード仕様訂正（単一デバイス指定に変更、organization_id→device_id） |
