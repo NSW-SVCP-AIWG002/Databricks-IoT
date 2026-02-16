@@ -977,7 +977,7 @@ flowchart TD
     F -->|NG| G[400エラー]
     F -->|OK| H{デバイスモード}
     H -->|指定デバイス| I[デバイス存在チェック]
-    H -->|ツリー連動| J[組織権限チェック]
+    H -->|ツリー連動| J[device_id未設定として登録]
     I --> K{デバイス存在?}
     K -->|なし| L[400エラー]
     K -->|あり| M[データスコープチェック]
@@ -1002,7 +1002,7 @@ flowchart TD
 2. **バリデーション**: 必須項目、文字数、形式をチェック
 3. **デバイスモード分岐**:
    - 指定デバイス: デバイスの存在確認とデータスコープチェック
-   - ツリー連動: 組織権限チェック
+   - ツリー連動: device_id未設定として登録（表示時にツリー上で選択したデバイスのデータを取得）
 4. **集約方法検証**: gold_summary_method_masterで有効性を確認
 5. **最小値/最大値検証**: 両方入力時は最小値 < 最大値をチェック
 6. **ガジェット登録**: **TODO** 登録先DBにガジェット情報を保存
@@ -1081,17 +1081,28 @@ VALID_INTERVALS = {
 }
 
 VALID_ITEMS = [
-    'external_temp', 'set_temp_freezer_1', 'set_temp_freezer_2',
-    'internal_temp_freezer_1', 'internal_temp_freezer_2',
-    'compressor_rpm', 'fan_motor_rpm',
-    'heater_output_1', 'heater_output_2',
-    'suction_temp_freezer_1', 'suction_temp_freezer_2',
-    'discharge_temp_freezer_1', 'discharge_temp_freezer_2',
-    'defrost_temp_freezer_1', 'defrost_temp_freezer_2',
-    'set_temp_refrigerator', 'internal_temp_refrigerator',
-    'suction_temp_refrigerator', 'discharge_temp_refrigerator',
-    'defrost_temp_refrigerator',
-    'communication_power_time', 'battery_voltage'
+    'external_temp',                      # 外気温度
+    'set_temp_freezer_1',                 # 第1冷凍 設定温度
+    'internal_sensor_temp_freezer_1',     # 第1冷凍 庫内センサー温度
+    'internal_temp_freezer_1',            # 第1冷凍 庫内温度
+    'df_temp_freezer_1',                  # 第1冷凍 DF温度
+    'condensing_temp_freezer_1',          # 第1冷凍 凝縮温度
+    'adjusted_internal_temp_freezer_1',   # 第1冷凍 微調整後庫内温度
+    'set_temp_freezer_2',                 # 第2冷凍 設定温度
+    'internal_sensor_temp_freezer_2',     # 第2冷凍 庫内センサー温度
+    'internal_temp_freezer_2',            # 第2冷凍 庫内温度
+    'df_temp_freezer_2',                  # 第2冷凍 DF温度
+    'condensing_temp_freezer_2',          # 第2冷凍 凝縮温度
+    'adjusted_internal_temp_freezer_2',   # 第2冷凍 微調整後庫内温度
+    'compressor_freezer_1',               # 第1冷凍 圧縮機
+    'compressor_freezer_2',               # 第2冷凍 圧縮機
+    'fan_motor_1',                        # 第1ファンモータ回転数
+    'fan_motor_2',                        # 第2ファンモータ回転数
+    'fan_motor_3',                        # 第3ファンモータ回転数
+    'fan_motor_4',                        # 第4ファンモータ回転数
+    'fan_motor_5',                        # 第5ファンモータ回転数
+    'defrost_heater_output_1',            # 防露ヒータ出力(1)
+    'defrost_heater_output_2'             # 防露ヒータ出力(2)
 ]
 
 VALID_METHOD_IDS = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -1165,9 +1176,9 @@ def validate_chart_params(params: dict) -> list:
 | 表示単位 | 集計間隔 | 分換算 | 選択可否 | 表示本数 |
 | -------- | -------- | ------ | -------- | -------- |
 | hour | 1min, 2min, 3min, 5min, 10min, 15min | 1〜15分 | 選択可能 | 可変 |
-| day | 2時間 | 120分 | 固定（非表示） | 12本 |
+| day | 1時間 | 60分 | 固定（非表示） | 24本 |
 | week | 1日 | 1440分 | 固定（非表示） | 7本 |
-| month | 2日 | 2880分 | 固定（非表示） | 14〜16本 |
+| month | 1日 | 1440分 | 固定（非表示） | 28〜31本 |
 
 **集計方法（method_id）:**
 
