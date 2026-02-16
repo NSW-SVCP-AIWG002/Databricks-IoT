@@ -382,9 +382,11 @@ def validate_register_params(data: dict) -> list:
             errors.append('最小値は最大値より小さい値を入力してください')
 
     # gadget_size
+    VALID_GADGET_SIZES = ['2x2', '2x4']
     if not data.get('gadget_size'):
         errors.append('部品サイズは必須です')
-    # TODO: gadget_sizeの許可値チェック
+    elif data['gadget_size'] not in VALID_GADGET_SIZES:
+        errors.append('部品サイズが不正です')
 
     return errors
 ```
@@ -1064,7 +1066,7 @@ flowchart TD
 | item | string | ○ | 表示項目（1つのみ） |
 | min_value | number | - | Y軸最小値（任意） |
 | max_value | number | - | Y軸最大値（任意） |
-| gadget_size | string | ○ | 部品サイズ（TODO: 選択肢2つ） |
+| gadget_size | string | ○ | 部品サイズ（'2x2' / '2x4'） |
 
 ### バリデーション実装
 
