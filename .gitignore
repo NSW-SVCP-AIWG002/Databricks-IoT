@@ -29,6 +29,8 @@
 
 # 依存関係・設定ファイル
 !/requirements.txt
+!/wsgi.py
+!/pytest.ini
 !/Dockerfile
 
 # 環境変数テンプレート（実際の.envは除外）
