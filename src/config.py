@@ -9,8 +9,8 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
     # Flask Server Configuration
-    FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
-    FLASK_PORT = int(os.getenv("FLASK_PORT", 8080))
+    APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
+    APP_PORT = int(os.getenv("APP_PORT", 5000))
 
     # MySQL Configuration
     MYSQL_HOST = os.getenv("MYSQL_HOST", "db")
@@ -36,8 +36,16 @@ class ProductionConfig(Config):
     DEBUG = False
 
 
+class TestingConfig(Config):
+    """Testing configuration."""
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
+    "testing": TestingConfig,
     "default": DevelopmentConfig
 }
