@@ -108,20 +108,21 @@ flowchart TD
     CheckMaster -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>SELECT COUNT（*） FROM device_inventory_master<br>WHERE delete_flag=FALSE]
-    Count --> CheckCount{件数取得結果}
+    CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
 
     CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
     OverridePage --> LoadMaster
 
-    CheckCount -->|失敗| Error500
+    CheckCount --> CheckCountResult{件数取得結果}
 
-    CheckCount -->|成功| Query[検索結果取得DBクエリ実行<br>SELECT * FROM device_inventory_master<br>WHERE delete_flag=FALSE<br>LIMIT per_page OFFSET offset]
+    CheckCountResult -->|失敗| Error500
+
+    CheckCountResult -->|成功| Query[検索結果取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>LIMIT per_page OFFSET offset]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500
-    
+
     CheckDB -->|成功| CheckInitial{クエリパラメータに<br>pageがあるか?}
     
     CheckInitial -->|No 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>set_search_conditions_cookie]
@@ -178,8 +179,8 @@ if 'page' in request.args:
     purchase_date_from = conditions.get('purchase_date_from', None)
     purchase_date_to = conditions.get('purchase_date_to', None)
     page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
-    sort_column = conditions.get('sort_column', '')
-    sort_order = conditions.get('sort_order', '')
+    sort_column = conditions.get('sort_column', 'device_inventory_id')
+    sort_order = conditions.get('sort_order', 'desc')
 else:
     # 初期表示時: デフォルト値を使用
     device_name = ''
@@ -189,8 +190,8 @@ else:
     purchase_date_from = None
     purchase_date_to = None
     page = 1
-    sort_column = ''
-    sort_order = ''
+    sort_column = 'device_inventory_id'
+    sort_order = 'desc'
 
 per_page = 25  # 固定
 ```
@@ -237,14 +238,14 @@ query = (
 
 # ソート
 if sort_column:
-    # sort_orderが未選択の場合は昇順をデフォルトとする
-    order_direction = sort_order if sort_order else 'asc'
+    # sort_orderが未選択の場合は降順をデフォルトとする
+    order_direction = sort_order if sort_order else 'desc'
     query = query.order_by(
-        getattr(device_master, sort_column).asc() if order_direction == 'asc'
-        else getattr(device_master, sort_column).desc()
+        getattr(device_master, sort_column).desc() if order_direction == 'desc'
+        else getattr(device_master, sort_column).asc()
     )
 else:
-    query = query.order_by(device_master.device_name.asc())
+    query = query.order_by(device_master.device_inventory_id.desc())
 
 # 件数取得
 total = query.count()
@@ -280,7 +281,7 @@ return render_template('admin/device_inventory_master/list.html',
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
 | 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 500 | データベースエラー | 110エラーモーダル表示 | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -315,13 +316,13 @@ flowchart TD
 
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
-    Convert --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>検索条件を適用]
+    Convert --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>検索条件を適用]
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Query --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|失敗| Error500
@@ -411,7 +412,7 @@ if purchase_date_to:
 ソート条件を変更して `GET /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_id&sort_order=desc&page=1
+GET /admin/device-inventory?device_name=...&sort_column=device_inventory_id&sort_order=desc&page=1
 ```
 
 ---
@@ -435,7 +436,7 @@ GET /admin/device-inventory?device_name=...&sort_column=device_id&sort_order=des
 ページ番号を変更して `GET /admin/device-inventory` へリダイレクト。検索条件とソート条件は保持。
 
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_id&sort_order=asc&page=3
+GET /admin/device-inventory?device_name=...&sort_column=device_inventory_id&sort_order=desc&page=3
 ```
 
 ---
@@ -458,7 +459,7 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| LoadMaster[デバイス種別マスタ、<br>在庫状況マスタを取得]
+    CheckPerm -->|権限OK| LoadMaster[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
     LoadMaster --> QueryDB{DBクエリ結果}
 
     QueryDB -->|失敗| Error500[500エラーモーダル表示]
@@ -477,7 +478,7 @@ flowchart TD
 
 #### 登録実行
 
-**トリガー:** (7.13) 登録モーダルの登録ボタンクリック
+**トリガー:** (7.14) 登録確認モーダルの登録ボタンクリック
 
 #### 処理フロー（登録実行）
 
@@ -524,14 +525,20 @@ flowchart TD
 
 **実行タイミング:** 登録ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (4.1)〜(4.11) 全フォーム項目
+**バリデーション対象:** (4.1)〜(4.13) 全フォーム項目
 
 **バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (4) 登録モーダル > バリデーション を参照
 
 #### 処理詳細（サーバーサイド）
 
+**登録処理の概要:**
+ユースケース仕様書に従い、デバイス購入直後の登録時に以下を同時に行う:
+1. device_inventory_master（台帳マスタ）にレコード登録
+2. device_master（デバイスマスタ）にレコード登録
+
 ```python
 import uuid
+import secrets
 from flask import request, redirect, url_for, flash
 from models import device_inventory_master, device_master, db
 from forms.device_inventory_master_form import DeviceInventoryMasterForm
@@ -546,12 +553,17 @@ def create_device_inventory_master():
 
     try:
         # トランザクション開始
-        # device_inventory_master にINSERT（在庫情報）
+        # 1. device_inventory_master にINSERT（台帳情報）
         device_inventory = device_inventory_master(
-            device_inventory_uuid=str(uuid.uuid4()),
-            inventory_status_id=form.inventory_status.data,
+            device_inventory_uuid=str(uuid.uuid4()),  # ユニーク制約
+            inventory_status_id=form.inventory_status_id,
+            device_model=form.device_model.data,  # オリジナル値を保持
+            mac_address=form.mac_address.data,  # オリジナル値を保持
             purchase_date=form.purchase_date.data,
-            # ... 他のフィールド ...
+            estimated_ship_date=form.estimated_ship_date.data,
+            ship_date=form.ship_date.data,
+            manufacturer_warranty_end_date=form.manufacturer_warranty_end_date.data,
+            inventory_location=form.inventory_location.data,
             creator=current_user.user_id,
             modifier=current_user.user_id,
             delete_flag=False
@@ -559,11 +571,19 @@ def create_device_inventory_master():
         db.session.add(device_inventory)
         db.session.flush()
 
-        # device_master にINSERT（デバイス情報）
+        # 2. device_master にINSERT（デバイス情報）
         device = device_master(
-            device_inventory_id=device_inventory.device_inventory_id,
+            device_uuid=secrets.token_hex(64),  # 128文字のランダム文字列（16進数）、ユニーク制約
             device_name=form.device_name.data,
-            # ... 他のフィールド ...
+            device_type_id=form.device_type.data,
+            device_model=form.device_model.data,
+            device_inventory_id=device_inventory.device_inventory_id,
+            sim_id=form.sim_id.data,
+            mac_address=form.mac_address.data,
+            organization_id=form.organization_id.data,  # 組織ID（ドロップダウンから選択）
+            software_version=form.software_version.data,
+            device_location=form.device_location.data,
+            certificate_expiration_date=form.certificate_expiration_date.data,
             creator=current_user.user_id,
             modifier=current_user.user_id,
             delete_flag=False
@@ -600,9 +620,8 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| Query[在庫情報UUIDを取得<br>SELECT * FROM<br>device_inventory_master<br>WHERE device_inventory_uuid = :uuid]
-    Query --> GetMaster[在庫状況マスタ、<br>デバイスマスタ、<br>デバイス種別マスタを取得]
-    GetMaster --> CheckDB{DBクエリ結果}
+    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
+    Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
     Error404 --> End
@@ -620,7 +639,7 @@ flowchart TD
 
 #### 更新実行
 
-**トリガー:** (8) 更新モーダルの更新ボタンクリック
+**トリガー:** (8.14) 更新確認モーダルの更新ボタンクリック
 
 #### 処理フロー（更新実行）
 
@@ -648,8 +667,9 @@ flowchart TD
     CancelMsg --> End
 
     OpenConfirmModal -->|更新ボタン押下| BeginTx[トランザクション開始]
-    BeginTx --> Update[UPDATE<br>device_inventory_master<br>SET ... <br>WHERE device_inventory_uuid = :uuid]
-    Update --> UpdateResult{DBクエリ結果}
+    BeginTx --> InsertInventory[device_inventory_masterに<br>在庫情報を追加]
+    InsertInventory --> InsertDevice[device_masterに<br>デバイス情報を追加]
+    InsertDevice --> UpdateResult{DBクエリ結果}
 
     UpdateResult -->|0件更新| Error404[404エラーモーダル表示]
     Error404 --> End
@@ -673,6 +693,77 @@ flowchart TD
 | 台帳更新実行 | `POST /admin/device-inventory/<device_inventory_uuid>/update` | フォームデータを受け取り、DB更新 |
 
 **パスパラメータ**: `device_inventory_uuid` - 対象デバイス在庫のUUID
+
+#### 処理詳細（サーバーサイド）
+
+**更新処理の概要:**
+ユースケース仕様書に従い、台帳マスタとデバイスマスタを同時に更新する:
+1. device_inventory_master（台帳マスタ）の更新（在庫状況、在庫場所、出荷予定日、出荷日）
+2. device_master（デバイスマスタ）の更新（デバイス名、種別、SIMID、ソフトウェアバージョン、設置場所）
+
+**注意:** モデル情報、MACアドレス、購入日、メーカー保証終了日はオリジナル値を保持するため更新しない
+
+```python
+from flask import request, redirect, url_for, flash
+from models import device_inventory_master, device_master, db
+from forms.device_inventory_master_form import DeviceInventoryMasterUpdateForm
+
+@device_inventory_master_bp.route('/admin/device-inventory/<device_inventory_uuid>/update', methods=['POST'])
+@require_role(Role.SYSTEM_ADMIN)
+def update_device_inventory_master(device_inventory_uuid):
+    # 対象レコード取得
+    inventory = device_inventory_master.query.filter_by(
+        device_inventory_uuid=device_inventory_uuid,
+        delete_flag=False
+    ).first_or_404()
+
+    device = device_master.query.filter_by(
+        device_inventory_id=inventory.device_inventory_id,
+        delete_flag=False
+    ).first_or_404()
+
+    form = DeviceInventoryMasterUpdateForm(request.form)
+
+    if not form.validate():
+        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory)
+
+    try:
+        # 1. device_inventory_master の更新（台帳情報）
+        # ※ device_model, mac_address, purchase_date, manufacturer_warranty_end_date は更新しない
+        inventory.inventory_status_id = form.inventory_status.data
+        inventory.inventory_location = form.inventory_location.data
+        inventory.estimated_ship_date = form.estimated_ship_date.data
+        inventory.ship_date = form.ship_date.data
+        inventory.modifier = current_user.user_id
+
+        # 2. device_master の更新（デバイス情報）
+        device.device_name = form.device_name.data
+        device.device_type_id = form.device_type.data
+        device.organization_id = form.organization_id.data
+        device.sim_id = form.sim_id.data
+        device.software_version = form.software_version.data
+        device.device_location = form.device_location.data
+        device.certificate_expiration_date = form.certificate_expiration_date.data
+        device.modifier = current_user.user_id
+
+        db.session.commit()
+
+        flash('デバイス台帳を更新しました', 'success')
+        return redirect(url_for('device_inventory_master.list_device_inventory_master'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash('デバイス台帳の更新に失敗しました', 'error')
+        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory)
+```
+
+**更新時の読み取り専用項目（更新しない）:**
+| 項目 | 理由 |
+|------|------|
+| device_model | オリジナル値を履歴として保持 |
+| mac_address | オリジナル値を履歴として保持 |
+| purchase_date | 購入日は変更不可 |
+| manufacturer_warranty_end_date | 保証期限は変更不可 |
 
 ---
 
@@ -704,8 +795,9 @@ flowchart TD
     CloseModal --> End
 
     OpenModal -->|削除ボタン押下| StartTx[トランザクション開始]
-    StartTx --> Delete[UPDATE<br>device_inventory_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_uuid IN :uuids]
-    Delete --> Query{DBクエリ結果}
+    StartTx --> DeleteInventory[UPDATE<br>device_inventory_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_uuid IN :uuids]
+    DeleteInventory --> DeleteDevice[UPDATE<br>device_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_id IN<br>対象のdevice_inventory_id]
+    DeleteDevice --> Query{DBクエリ結果}
 
     Query -->|0件削除| Error404[404エラーモーダル表示]
     Error404 --> End
@@ -733,7 +825,7 @@ flowchart TD
 
 ### デバイス台帳参照
 
-**トリガー:** (3.2) デバイス名リンククリック または (3.10) 参照ボタンクリック
+**トリガー:** (3.10) 参照ボタンクリック
 
 #### 処理フロー
 
@@ -749,7 +841,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>JOIN device_type_master<br>WHERE device_inventory_uuid = :uuid]
+    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>JOIN device_type_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
@@ -917,23 +1009,102 @@ device_inventory_master (dsi)
 
 ### 入力検証
 
-**検証項目:**
-- device_name: 最大100文字、必須
-- device_type: 必須（マスタ値のみ）
-- device_model: 最大100文字、必須
-- sim_id: 最大20文字
-- mac_address: XX:XX:XX:XX:XX:XX形式
-- inventory_status: 必須（マスタ値のみ）
-- inventory_location: 最大100文字、必須
-- purchase_date: 必須、日付形式
-- estimated_ship_date: 購入日以降
-- ship_date: 出荷予定日以降
-- manufacturer_warranty_end_date: 必須、購入日以降
+**■ 登録時の検証項目:**
+
+| 項目 | 検証ルール | 備考 |
+|------|-----------|------|
+| device_inventory_uuid | UUID形式、ユニーク制約（DB側） | 台帳マスタ、自動生成 |
+| device_uuid | 128文字、ユニーク制約（DB側） | デバイスマスタ、自動生成 |
+| device_name | 必須、最大100文字 | デバイスマスタ |
+| device_type | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ |
+| organization_id | 必須（組織マスタにあるレコードのみ） | デバイスマスタ |
+| sim_id | 最大20文字 | デバイスマスタ |
+| software_version | 最大100文字 | デバイスマスタ |
+| device_location | 最大100文字 | デバイスマスタ |
+| certificate_expiration_date | 日付形式 | デバイスマスタ |
+| device_model | 必須、最大100文字 | 台帳マスタ |
+| mac_address | 必須、XX:XX:XX:XX:XX:XX形式 | 台帳マスタ |
+| inventory_location | 必須、最大100文字 | 台帳マスタ |
+| purchase_date | 必須、日付形式 | 台帳マスタ |
+| manufacturer_warranty_end_date | 必須、購入日以降 | 台帳マスタ |
+| estimated_ship_date | 購入日以降 | 台帳マスタ |
+| ship_date | 購入日以降 | 台帳マスタ |
+
+**■ 更新時の検証項目:**
+
+| 項目 | 検証ルール | 備考 |
+|------|-----------|------|
+| device_name | 必須、最大100文字 | デバイスマスタ |
+| device_type | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ |
+| organization_id | 必須（組織マスタにあるレコードのみ） | デバイスマスタ |
+| sim_id | 最大20文字 | デバイスマスタ |
+| software_version | 最大100文字 | デバイスマスタ |
+| device_location | 最大100文字 | デバイスマスタ |
+| certificate_expiration_date | 日付形式 | デバイスマスタ |
+| inventory_status | 必須（在庫状況マスタにあるレコードのみ） | 台帳マスタ |
+| inventory_location | 必須、最大100文字 | 台帳マスタ |
+| estimated_ship_date | 購入日以降 | 台帳マスタ |
+| ship_date | 購入日以降 | 台帳マスタ |
 
 **セキュリティ対策:**
 - SQLインジェクション対策: SQLAlchemy ORM使用
 - XSS対策: Jinja2自動エスケープ
 - CSRF対策: Flask-WTF CSRF保護
+
+**■ device_uuidバリデーション実装例:**
+
+device_uuidは接続するクラウドサービスによりバリデーション方法が異なる。環境変数`AUTH_TYPE`に基づき、適切なバリデータを取得する。
+
+```python
+# validators/device_uuid_validator.py
+import os
+import re
+
+def get_device_uuid_validator():
+    """クラウドプロバイダーに応じたdevice_uuidバリデータを返す"""
+    auth_type = os.getenv('AUTH_TYPE', 'azure')
+
+    validators = {
+        'azure': {
+            'max_length': 128,
+            'pattern': r'^[A-Za-z0-9\-\.%_\*\?\!\(\)\,\:\=\@\$\']+$',
+            'description': 'ASCII 7ビット英数字、(- . % _ * ? ! ( ) , : = @ $ \')使用可'
+        },
+        'aws': {
+            'max_length': 128,
+            'pattern': r'^[a-zA-Z0-9:_-]+$',
+            'description': '[a-zA-Z0-9:_-]使用可'
+        },
+    }
+
+    # localはazureと同じバリデーションを使用
+    validators['local'] = validators['azure']
+
+    validator = validators.get(auth_type)
+    if not validator:
+        raise ValueError(f"Unknown AUTH_TYPE: {auth_type}")
+
+    return validator
+
+
+def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
+    """device_uuidのバリデーションを実行"""
+    validator = get_device_uuid_validator()
+
+    if len(device_uuid) > validator['max_length']:
+        return False, f"device_uuidは{validator['max_length']}文字以内で入力してください"
+
+    if not re.match(validator['pattern'], device_uuid):
+        return False, f"device_uuidの形式が不正です（{validator['description']}）"
+
+    return True, ""
+```
+
+| AUTH_TYPE | バリデーションルール |
+|-----------|-------------------|
+| azure | 最大128文字、ASCII 7ビット英数字、`(- . % _ * ? ! ( ) , : = @ $ ')`使用可 |
+| aws | 最大128文字、`[a-zA-Z0-9:_-]`使用可 |
+| local | azureと同じバリデーションを使用 |
 
 ### ログ出力ルール
 
