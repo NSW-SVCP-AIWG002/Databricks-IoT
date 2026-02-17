@@ -84,7 +84,7 @@
 | 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
 | 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
 | 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template()` with error modal   |
+| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')`   |
 
 **注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
 
@@ -100,9 +100,9 @@
 | PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
 | RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
 | INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーメッセージモーダル表示                         |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーメッセージモーダル表示                         |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーメッセージモーダル表示                         |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ表示（errors/500.html）                  |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーページ表示（errors/500.html）                  |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ表示（errors/500.html）                  |
 
 **Flask実装例:**
 
@@ -132,9 +132,8 @@ try:
 except Exception as e:
     db.session.rollback()
     logger.error(f"Database error: {e}")
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'データベースエラーが発生しました'}), 500
+    # エラーページを表示
+    return render_template('errors/500.html'), 500
 ```
 
 ---
@@ -151,8 +150,8 @@ except Exception as e:
 | 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
 | 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
 | リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 

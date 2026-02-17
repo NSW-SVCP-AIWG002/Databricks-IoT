@@ -836,7 +836,9 @@ FROM
     INNER JOIN organization_closure oc
         ON u.organization_id = oc.parent_organization_id
     INNER JOIN device_master d
-        ON oc.subsidiary_organization_id = d.organization_id;
+        ON oc.subsidiary_organization_id = d.organization_id
+WHERE
+    u.delete_flag = FALSE;
 ```
 
 **カラム一覧:**
@@ -926,6 +928,7 @@ def list_devices():
 - このVIEWは、ユーザーの所属組織とその配下の全組織に紐づくデバイスを返す
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除されたデバイス（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたユーザー（`u.delete_flag = TRUE`）はVIEW側で除外される
 - ユーザーが存在しない組織に所属している場合、結果は0件となる
 
 ---
@@ -1382,7 +1385,9 @@ FROM
     INNER JOIN device_master d
         ON oc.subsidiary_organization_id = d.organization_id
     INNER JOIN alert_setting_master a
-        ON d.device_id = a.device_id;
+        ON d.device_id = a.device_id
+WHERE
+    d.delete_flag = FALSE;
 ```
 
 **カラム一覧:**
@@ -1479,6 +1484,7 @@ def list_alert_settings():
 - alert_setting_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
 - 論理削除されたアラート設定（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたデバイス（`d.delete_flag = TRUE`）はVIEW側で除外される
 
 ---
 
@@ -1524,7 +1530,10 @@ FROM
     INNER JOIN alert_setting_master a
         ON d.device_id = a.device_id
     INNER JOIN alert_history ah
-        ON a.alert_id = ah.alert_id;
+        ON a.alert_id = ah.alert_id
+WHERE
+    d.delete_flag = FALSE
+    AND a.delete_flag = FALSE;
 ```
 
 **カラム一覧:**
@@ -1618,6 +1627,7 @@ def list_alert_history():
 - alert_historyは組織IDを持たないため、alert_setting_master → device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
 - 論理削除されたアラート履歴（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたデバイス（`d.delete_flag = TRUE`）およびアラート設定（`a.delete_flag = TRUE`）はVIEW側で除外される
 
 ---
 
