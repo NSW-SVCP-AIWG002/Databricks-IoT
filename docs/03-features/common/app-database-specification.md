@@ -629,7 +629,7 @@
 | #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                      |
 | --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------- |
 | 1   | mail_history_id   | メール送信履歴ID     | INT          | NOT NULL | ○   | -   | -                 | メール送信履歴の一意識別子                |
-| 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(32)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
+| 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(36)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
 | 3   | mail_type         | メール種別ID         | INT          | NOT NULL | -   | ○   | -                 | メール種別ID（mail_type_master参照）      |
 | 4   | sender_email      | 送信元メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 送信元のメールアドレス                    |
 | 5   | recipients        | 送信先メールアドレス | JSON         | NOT NULL | -   | -   | -                 | 送信先のメールアドレス（JSON形式）        |
@@ -1670,7 +1670,7 @@ FROM
 | user_name            | ユーザー名               | VARCHAR(20)  | ログインユーザーの名前                          |
 | user_organization_id | ユーザー組織ID           | INT          | ログインユーザーの所属組織ID                    |
 | mail_history_id      | メール送信履歴ID         | INT          | メール送信履歴の一意識別子                      |
-| mail_history_uuid    | メール送信履歴UUID       | VARCHAR(32)  | UUID（外部公開用一意識別子）                    |
+| mail_history_uuid    | メール送信履歴UUID       | VARCHAR(36)  | UUID（外部公開用一意識別子）                    |
 | mail_type            | メール種別ID             | INT          | メール種別ID                                    |
 | sender_email         | 送信元メールアドレス     | VARCHAR(254) | 送信元のメールアドレス                          |
 | recipients           | 送信先メールアドレス     | JSON         | 送信先のメールアドレス（JSON形式）              |
