@@ -1,5 +1,7 @@
 # デバイス台帳管理 - ワークフロー仕様書
 
+> **注記**: 本仕様書では、簡単のため「デバイス在庫情報マスタ」を「台帳マスタ」と記載する。
+
 ## 📑 目次
 
 - [概要](#概要)
@@ -137,7 +139,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
+| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
 
 #### バリデーション
 
@@ -162,16 +164,21 @@ def list_device_inventory_master():
     current_user = get_current_user()
 ```
 
-**② クエリパラメータ取得**
+**② クエリパラメータ取得とCookie処理**
 
 ```python
-from common.cookie_utils import get_search_conditions_cookie
+from common.cookie_utils import (
+    get_search_conditions_cookie,
+    set_search_conditions_cookie,
+    clear_search_conditions_cookie
+)
 
 # ページングの場合（pageパラメータあり）: Cookieから検索条件を取得し、pageのみ上書き
-# 初期表示の場合（pageパラメータなし）: デフォルト値を使用
+# 初期表示の場合（pageパラメータなし）: Cookieをクリアしてデフォルト値を使用
 if 'page' in request.args:
     # ページング時: Cookieから検索条件を取得（共通関数使用）
     conditions = get_search_conditions_cookie('device_inventory')
+    device_uuid = conditions.get('device_uuid', '')
     device_name = conditions.get('device_name', '')
     device_type = conditions.get('device_type', 'all')
     inventory_status = conditions.get('inventory_status', 'all')
@@ -182,7 +189,11 @@ if 'page' in request.args:
     sort_column = conditions.get('sort_column', 'device_inventory_id')
     sort_order = conditions.get('sort_order', 'desc')
 else:
-    # 初期表示時: デフォルト値を使用
+    # 初期表示時: Cookie検索条件をクリア
+    clear_search_conditions_cookie('device_inventory')
+
+    # デフォルト値を使用
+    device_uuid = ''
     device_name = ''
     device_type = 'all'
     inventory_status = 'all'
@@ -236,6 +247,10 @@ query = (
 
 # データスコープ制限なし（システム保守者は全データにアクセス可能）
 
+# デバイスUUID検索（部分一致）
+if device_uuid:
+    query = query.filter(device_master.device_uuid.like(f'%{device_uuid}%'))
+
 # ソート
 if sort_column:
     # sort_orderが未選択の場合は降順をデフォルトとする
@@ -255,9 +270,25 @@ offset = (page - 1) * per_page
 inventories = query.limit(per_page).offset(offset).all()
 ```
 
-**⑤ HTMLレンダリング**
+**⑤ HTMLレンダリング（Cookie保存）**
 
 ```python
+# 初期表示時: レンダリング直前にCookieに検索条件を格納
+if 'page' not in request.args:
+    search_conditions = {
+        'device_uuid': device_uuid,
+        'device_name': device_name,
+        'device_type': device_type,
+        'inventory_status': inventory_status,
+        'inventory_location': inventory_location,
+        'purchase_date_from': purchase_date_from,
+        'purchase_date_to': purchase_date_to,
+        'sort_column': sort_column,
+        'sort_order': sort_order,
+        'page': page
+    }
+    set_search_conditions_cookie('device_inventory', search_conditions)
+
 return render_template('admin/device_inventory_master/list.html',
                       inventories=inventories,
                       total=total,
@@ -265,6 +296,7 @@ return render_template('admin/device_inventory_master/list.html',
                       per_page=per_page,
                       sort_column=sort_column,
                       sort_order=sort_order,
+                      device_uuid=device_uuid,
                       device_name=device_name,
                       device_type=device_type,
                       inventory_status=inventory_status,
@@ -289,7 +321,7 @@ return render_template('admin/device_inventory_master/list.html',
 
 ### 検索・絞り込み
 
-**トリガー:** (2.9) 検索ボタンクリック（フォーム送信）
+**トリガー:** (2.10) 検索ボタンクリック（フォーム送信）
 
 **前提条件:**
 - 検索条件が入力されている（空でも可）
@@ -337,13 +369,13 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
+| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
 
 #### バリデーション
 
 **実行タイミング:** 検索ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (2.1) デバイス名、(2.4) 在庫場所、(2.5)〜(2.6) 購入日範囲
+**バリデーション対象:** (2.1) デバイスUUID、(2.2) デバイス名、(2.5) 在庫場所、(2.6)〜(2.7) 購入日範囲
 
 **バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (2) 検索フォーム > バリデーション を参照
 
@@ -351,7 +383,28 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
-**検索クエリ実行:**
+**① Cookie検索条件クリアと検索条件取得**
+
+```python
+from common.cookie_utils import clear_search_conditions_cookie, set_search_conditions_cookie
+
+# Cookie検索条件をクリア（検索実行時）
+clear_search_conditions_cookie('device_inventory')
+
+# 検索条件取得
+device_uuid = request.args.get('device_uuid', '')
+device_name = request.args.get('device_name', '')
+device_type = request.args.get('device_type', 'all')
+inventory_status = request.args.get('inventory_status', 'all')
+inventory_location = request.args.get('inventory_location', '')
+purchase_date_from = request.args.get('purchase_date_from')
+purchase_date_to = request.args.get('purchase_date_to')
+sort_column = request.args.get('sort_column', 'device_inventory_id')
+sort_order = request.args.get('sort_order', 'desc')
+page = 1  # 検索時はページを1にリセット
+```
+
+**② 検索クエリ実行**
 
 ```python
 from models import device_inventory_master, device_master, device_type_master, inventory_status_master
@@ -369,29 +422,27 @@ query = (
 
 # データスコープ制限なし（システム保守者は全データにアクセス可能）
 
+# デバイスUUID検索（部分一致）
+if device_uuid:
+    query = query.filter(device_master.device_uuid.like(f'%{device_uuid}%'))
+
 # デバイス名検索（部分一致）
-device_name = request.args.get('device_name', '')
 if device_name:
     query = query.filter(device_master.device_name.like(f'%{device_name}%'))
 
 # デバイス種別絞り込み
-device_type = request.args.get('device_type', 'all')
 if device_type and device_type != 'all':
     query = query.filter(device_master.device_type_id == device_type)
 
 # 在庫状況絞り込み
-inventory_status = request.args.get('inventory_status', 'all')
 if inventory_status and inventory_status != 'all':
     query = query.filter(device_inventory_master.inventory_status_id == inventory_status)
 
 # 在庫場所検索（部分一致）
-inventory_location = request.args.get('inventory_location', '')
 if inventory_location:
     query = query.filter(device_inventory_master.inventory_location.like(f'%{inventory_location}%'))
 
 # 購入日範囲フィルタ
-purchase_date_from = request.args.get('purchase_date_from')
-purchase_date_to = request.args.get('purchase_date_to')
 if purchase_date_from:
     query = query.filter(device_inventory_master.purchase_date >= purchase_date_from)
 if purchase_date_to:
@@ -401,11 +452,33 @@ if purchase_date_to:
 # ...
 ```
 
+**③ Cookie保存とレンダリング**
+
+```python
+# レンダリング前にCookieに検索条件を格納
+search_conditions = {
+    'device_uuid': device_uuid,
+    'device_name': device_name,
+    'device_type': device_type,
+    'inventory_status': inventory_status,
+    'inventory_location': inventory_location,
+    'purchase_date_from': purchase_date_from,
+    'purchase_date_to': purchase_date_to,
+    'sort_column': sort_column,
+    'sort_order': sort_order,
+    'page': page
+}
+set_search_conditions_cookie('device_inventory', search_conditions)
+
+# テンプレートレンダリング
+# ...
+```
+
 ---
 
 ### ソート
 
-**トリガー:** (2.7) ソート項目、(2.8) ソート順の選択後、(2.9) 検索ボタンクリック
+**トリガー:** (2.8) ソート項目、(2.9) ソート順の選択後、(2.10) 検索ボタンクリック
 
 #### 処理フロー
 
@@ -478,7 +551,7 @@ flowchart TD
 
 #### 登録実行
 
-**トリガー:** (7.14) 登録確認モーダルの登録ボタンクリック
+**トリガー:** (7.17) 登録確認モーダルの登録ボタンクリック
 
 #### 処理フロー（登録実行）
 
@@ -525,7 +598,7 @@ flowchart TD
 
 **実行タイミング:** 登録ボタンクリック直後（サーバーサイド）
 
-**バリデーション対象:** (4.1)〜(4.13) 全フォーム項目
+**バリデーション対象:** (4.1)〜(4.16) 全フォーム項目
 
 **バリデーションルール:** [UI仕様書](./ui-specification.md) の要素詳細 (4) 登録モーダル > バリデーション を参照
 
@@ -535,6 +608,15 @@ flowchart TD
 ユースケース仕様書に従い、デバイス購入直後の登録時に以下を同時に行う:
 1. device_inventory_master（台帳マスタ）にレコード登録
 2. device_master（デバイスマスタ）にレコード登録
+
+**データ格納形式:**
+- MACアドレス: コロン込み（XX:XX:XX:XX:XX:XX形式、17文字）でそのまま格納
+  - フォーム入力値を変換せずに格納
+  - device_inventory_master.mac_address および device_master.mac_address に同じ値を格納
+
+**注意:** フロー図では、バリデーションOK後に登録確認モーダル（ADM-017）を表示し、
+そこで登録ボタンが押されたらDB登録処理を実行する流れになっています。
+以下の実装例では、確認モーダル表示とDB登録処理を含めた全体の流れを示しています。
 
 ```python
 import uuid
@@ -548,8 +630,14 @@ from forms.device_inventory_master_form import DeviceInventoryMasterForm
 def create_device_inventory_master():
     form = DeviceInventoryMasterForm(request.form)
 
+    # サーバーサイドバリデーション
     if not form.validate():
-        return render_template('admin/device_inventory_master/form.html', form=form)
+        # バリデーションエラー時: 登録モーダル再表示
+        return render_template('admin/device_inventory_master/form.html', form=form), 422
+
+    # バリデーションOK: 登録確認モーダル（ADM-017）を表示
+    # フロントエンド側で確認モーダルを開き、ユーザーが登録ボタンを押したら
+    # 以下のDB登録処理を実行
 
     try:
         # トランザクション開始
@@ -573,7 +661,7 @@ def create_device_inventory_master():
 
         # 2. device_master にINSERT（デバイス情報）
         device = device_master(
-            device_uuid=secrets.token_hex(64),  # 128文字のランダム文字列（16進数）、ユニーク制約
+            device_uuid=form.device_uuid.data,  # ユニーク制約
             device_name=form.device_name.data,
             device_type_id=form.device_type.data,
             device_model=form.device_model.data,
@@ -591,13 +679,17 @@ def create_device_inventory_master():
         db.session.add(device)
         db.session.commit()
 
+        # トランザクションコミット成功後: 登録完了モーダル（ADM-020）を表示
+        # ユーザーがOKボタンを押したら一覧画面へリダイレクト
         flash('デバイス台帳を登録しました', 'success')
         return redirect(url_for('device_inventory_master.list_device_inventory_master'))
 
     except Exception as e:
+        # トランザクションロールバック
         db.session.rollback()
+        # 500エラーモーダル表示
         flash('デバイス台帳の登録に失敗しました', 'error')
-        return render_template('admin/device_inventory_master/form.html', form=form)
+        return render_template('admin/device_inventory_master/form.html', form=form), 500
 ```
 
 ---
@@ -639,7 +731,7 @@ flowchart TD
 
 #### 更新実行
 
-**トリガー:** (8.14) 更新確認モーダルの更新ボタンクリック
+**トリガー:** (8) 更新確認モーダルの更新ボタンクリック
 
 #### 処理フロー（更新実行）
 
@@ -701,7 +793,14 @@ flowchart TD
 1. device_inventory_master（台帳マスタ）の更新（在庫状況、在庫場所、出荷予定日、出荷日）
 2. device_master（デバイスマスタ）の更新（デバイス名、種別、SIMID、ソフトウェアバージョン、設置場所）
 
-**注意:** モデル情報、MACアドレス、購入日、メーカー保証終了日はオリジナル値を保持するため更新しない
+**データ格納形式:**
+- MACアドレス: コロン込み（XX:XX:XX:XX:XX:XX形式、17文字）でそのまま格納
+  - フォーム入力値を変換せずに格納
+  - device_inventory_master.mac_address および device_master.mac_address に同じ値を格納
+
+**注意:** フロー図では、バリデーションOK後に更新確認モーダル（ADM-018）を表示し、
+そこで更新ボタンが押されたらDB更新処理を実行する流れになっています。
+以下の実装例では、確認モーダル表示とDB更新処理を含めた全体の流れを示しています。
 
 ```python
 from flask import request, redirect, url_for, flash
@@ -724,19 +823,29 @@ def update_device_inventory_master(device_inventory_uuid):
 
     form = DeviceInventoryMasterUpdateForm(request.form)
 
+    # サーバーサイドバリデーション
     if not form.validate():
-        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory)
+        # バリデーションエラー時: 更新モーダル再表示
+        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory), 422
+
+    # バリデーションOK: 更新確認モーダル（ADM-018）を表示
+    # フロントエンド側で確認モーダルを開き、ユーザーが更新ボタンを押したら
+    # 以下のDB更新処理を実行
 
     try:
         # 1. device_inventory_master の更新（台帳情報）
-        # ※ device_model, mac_address, purchase_date, manufacturer_warranty_end_date は更新しない
+        inventory.device_model = form.device_model.data
+        inventory.mac_address = form.mac_address.data
         inventory.inventory_status_id = form.inventory_status.data
         inventory.inventory_location = form.inventory_location.data
+        inventory.purchase_date = form.purchase_date.data
+        inventory.manufacturer_warranty_end_date = form.manufacturer_warranty_end_date.data
         inventory.estimated_ship_date = form.estimated_ship_date.data
         inventory.ship_date = form.ship_date.data
         inventory.modifier = current_user.user_id
 
         # 2. device_master の更新（デバイス情報）
+        device.device_uuid = form.device_uuid.data
         device.device_name = form.device_name.data
         device.device_type_id = form.device_type.data
         device.organization_id = form.organization_id.data
@@ -744,26 +853,24 @@ def update_device_inventory_master(device_inventory_uuid):
         device.software_version = form.software_version.data
         device.device_location = form.device_location.data
         device.certificate_expiration_date = form.certificate_expiration_date.data
+        device.device_model = form.device_model.data
+        device.mac_address = form.mac_address.data
         device.modifier = current_user.user_id
 
         db.session.commit()
 
+        # トランザクションコミット成功後: 更新完了モーダル（ADM-021）を表示
+        # ユーザーがOKボタンを押したら一覧画面へリダイレクト
         flash('デバイス台帳を更新しました', 'success')
         return redirect(url_for('device_inventory_master.list_device_inventory_master'))
 
     except Exception as e:
+        # トランザクションロールバック
         db.session.rollback()
+        # 500エラーモーダル表示
         flash('デバイス台帳の更新に失敗しました', 'error')
-        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory)
+        return render_template('admin/device_inventory_master/edit.html', form=form, inventory=inventory), 500
 ```
-
-**更新時の読み取り専用項目（更新しない）:**
-| 項目 | 理由 |
-|------|------|
-| device_model | オリジナル値を履歴として保持 |
-| mac_address | オリジナル値を履歴として保持 |
-| purchase_date | 購入日は変更不可 |
-| manufacturer_warranty_end_date | 保証期限は変更不可 |
 
 ---
 
@@ -821,6 +928,76 @@ flowchart TD
 
 **フォームデータ**: `device_inventory_uuids` - 削除対象のデバイス在庫UUIDリスト（`request.form.getlist('device_inventory_uuids')`で取得）
 
+#### 処理詳細（サーバーサイド）
+
+**削除処理の概要:**
+選択された複数のデバイス台帳を論理削除する:
+1. device_inventory_master（台帳マスタ）のdelete_flagをTRUEに更新
+2. device_master（デバイスマスタ）のdelete_flagをTRUEに更新
+
+**注意:** フロー図では、削除ボタン押下後に削除確認モーダル（ADM-019）を表示し、
+そこで削除ボタンが押されたらDB削除処理を実行する流れになっています。
+
+```python
+from flask import request, redirect, url_for, flash
+from models import device_inventory_master, device_master, db
+
+@device_inventory_master_bp.route('/admin/device-inventory/delete', methods=['POST'])
+@require_role(Role.SYSTEM_ADMIN)
+def delete_device_inventory_master():
+    # 削除対象のUUIDリストを取得
+    device_inventory_uuids = request.form.getlist('device_inventory_uuids')
+
+    if not device_inventory_uuids:
+        flash('削除対象が選択されていません', 'error')
+        return redirect(url_for('device_inventory_master.list_device_inventory_master'))
+
+    # 削除確認モーダル（ADM-019）表示
+    # フロントエンド側で確認モーダルを開き、ユーザーが削除ボタンを押したら
+    # 以下のDB削除処理を実行
+
+    try:
+        # トランザクション開始
+        # 対象の台帳マスタを取得
+        inventories = device_inventory_master.query.filter(
+            device_inventory_master.device_inventory_uuid.in_(device_inventory_uuids),
+            device_inventory_master.delete_flag == False
+        ).all()
+
+        if not inventories:
+            flash('削除対象が見つかりませんでした', 'error')
+            return redirect(url_for('device_inventory_master.list_device_inventory_master')), 404
+
+        # 1. device_inventory_master の論理削除
+        for inventory in inventories:
+            inventory.delete_flag = True
+            inventory.modifier = current_user.user_id
+
+            # 2. device_master の論理削除
+            devices = device_master.query.filter_by(
+                device_inventory_id=inventory.device_inventory_id,
+                delete_flag=False
+            ).all()
+
+            for device in devices:
+                device.delete_flag = True
+                device.modifier = current_user.user_id
+
+        db.session.commit()
+
+        # トランザクションコミット成功後: 削除完了モーダル（ADM-022）を表示
+        # ユーザーがOKボタンを押したら一覧画面へリダイレクト
+        flash('デバイス台帳を削除しました', 'success')
+        return redirect(url_for('device_inventory_master.list_device_inventory_master'))
+
+    except Exception as e:
+        # トランザクションロールバック
+        db.session.rollback()
+        # 500エラーモーダル表示
+        flash('デバイス台帳の削除に失敗しました', 'error')
+        return redirect(url_for('device_inventory_master.list_device_inventory_master')), 500
+```
+
 ---
 
 ### デバイス台帳参照
@@ -841,7 +1018,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>JOIN device_type_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid]
+    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
@@ -953,18 +1130,26 @@ def list_device_inventory_master():
 | 6 | device_master | デバイスマスタ | UPDATE | 更新、削除 | デバイス情報更新、論理削除 |
 | 7 | device_type_master | デバイス種別マスタ | SELECT | 初期表示、検索、登録、更新 | デバイス種別選択肢取得（結合） |
 | 8 | inventory_status_master | 在庫状況マスタ | SELECT | 初期表示、検索、登録、更新 | 在庫状況選択肢取得（結合） |
-| 9 | users | ユーザー | SELECT | 認証 | 現在ユーザー情報取得 |
+| 9 | user_master | ユーザーマスタ | SELECT | 認証 | 現在ユーザー情報取得 |
+| 10 | organization_master | 組織マスタ | SELECT | 登録、更新 | 組織選択肢取得(結合) |
+| 11 | organization_closure | 組織閉包テーブル | SELECT | 登録、更新 | 組織選択肢取得(結合) |
 
 ### テーブル結合関係
 
 ```
-device_inventory_master (dsi)
+device_inventory_master (dim)
     ├── INNER JOIN device_master (dm)
-    │       ON dsi.device_inventory_id = dm.device_inventory_id
+    │       ON dim.device_inventory_id = dm.device_inventory_id
     │       └── INNER JOIN device_type_master (dtm)
     │               ON dm.device_type_id = dtm.device_type_id
-    └── INNER JOIN inventory_status_master (ssm)
-            ON dsi.inventory_status_id = ssm.inventory_status_id
+    │       └── INNER JOIN organization_master (om)
+    │               ON dm.organization_id = om.organization_id
+    │               └── INNER JOIN organization_closure (oc)
+    │                       ON om.organization_id = oc.parent_organization_id
+    │                       └── INNER JOIN organization_master (om2)
+    │                               ON oc.subsidiary_organization_id = om2.organization_id
+    └── INNER JOIN inventory_status_master (ism)
+            ON dim.inventory_status_id = ism.inventory_status_id
 ```
 
 ---
@@ -1009,12 +1194,10 @@ device_inventory_master (dsi)
 
 ### 入力検証
 
-**■ 登録時の検証項目:**
-
 | 項目 | 検証ルール | 備考 |
 |------|-----------|------|
 | device_inventory_uuid | UUID形式、ユニーク制約（DB側） | 台帳マスタ、自動生成 |
-| device_uuid | 128文字、ユニーク制約（DB側） | デバイスマスタ、自動生成 |
+| device_uuid | 必須、最大128文字、ユニーク制約（DB側） | デバイスマスタ |
 | device_name | 必須、最大100文字 | デバイスマスタ |
 | device_type | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ |
 | organization_id | 必須（組織マスタにあるレコードのみ） | デバイスマスタ |
@@ -1030,21 +1213,9 @@ device_inventory_master (dsi)
 | estimated_ship_date | 購入日以降 | 台帳マスタ |
 | ship_date | 購入日以降 | 台帳マスタ |
 
-**■ 更新時の検証項目:**
-
-| 項目 | 検証ルール | 備考 |
-|------|-----------|------|
-| device_name | 必須、最大100文字 | デバイスマスタ |
-| device_type | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ |
-| organization_id | 必須（組織マスタにあるレコードのみ） | デバイスマスタ |
-| sim_id | 最大20文字 | デバイスマスタ |
-| software_version | 最大100文字 | デバイスマスタ |
-| device_location | 最大100文字 | デバイスマスタ |
-| certificate_expiration_date | 日付形式 | デバイスマスタ |
-| inventory_status | 必須（在庫状況マスタにあるレコードのみ） | 台帳マスタ |
-| inventory_location | 必須、最大100文字 | 台帳マスタ |
-| estimated_ship_date | 購入日以降 | 台帳マスタ |
-| ship_date | 購入日以降 | 台帳マスタ |
+**ユニーク制約違反時の処理:**
+- `device_inventory_uuid`、`device_uuid` のユニーク制約違反（IntegrityError）が発生した場合は、データベースエラー（500エラー）として処理する
+- 登録処理でユニーク制約違反が発生した場合、トランザクションをロールバックし、500エラーモーダルを表示する
 
 **セキュリティ対策:**
 - SQLインジェクション対策: SQLAlchemy ORM使用
