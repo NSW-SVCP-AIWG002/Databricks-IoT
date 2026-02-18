@@ -3,76 +3,193 @@
 ## 📑 目次
 
 - [📋 概要](#-概要)
-- [📚 テストレベル別の詳細ガイド](#-テストレベル別の詳細ガイド)
-- [🛠️ テスト実行コマンド一覧](#️-テスト実行コマンド一覧)
 - [📋 テスト実装の基本原則](#-テスト実装の基本原則)
+- [🧪 単体テスト（Unit Test）ルール](#-単体テストunit-testルール)
+- [🔗 結合テスト（Integration Test）ルール](#-結合テストintegration-testルール)
+- [🌐 E2E テスト（End-to-End Test）ルール](#-e2e-テストend-to-end-testルール)
+- [🛠️ テスト実行コマンド一覧](#️-テスト実行コマンド一覧)
 - [📂 テストコードの実装方針とファイル配置ルール](#-テストコードの実装方針とファイル配置ルール)
 
 ---
 
 ## 📋 概要
 
-このドキュメントでは、バックエンド（Flask）とフロントエンド（Flask + Jinja2）におけるテスト実装の具体的なコード例、実行コマンド、ファイル配置ルールを提供します。
+このドキュメントでは、Flask + Jinja2 アプリケーションにおけるテスト実装のルール、実行コマンド、ファイル配置ルールを提供します。
 
 プロジェクトでは以下の 3 つのテストレベルを実施します：
 
-- **単体テスト（Unit Test）**: Service 層、Model 層、Utility 関数の最小単位のテスト
-- **結合テスト（Integration Test）**: API 結合テスト、複数モジュール間の連携テスト
-- **E2E テスト（End-to-End Test）**: ユーザーの操作フローを再現した画面・機能の統合テスト
+| テストレベル | ツール                      | 対象                            | 実行方式       |
+| ------------ | --------------------------- | ------------------------------- | -------------- |
+| 単体テスト   | pytest + unittest.mock      | Service層、Model層、Utility関数 | 自動（pytest） |
+| 結合テスト   | pytest + Flask test_client  | APIエンドポイント、DB連携       | 自動（pytest） |
+| E2Eテスト    | 手動 / Playwright（必要時） | ユーザー業務フロー（CUJ）       | 手動基本       |
 
-各テストレベルの詳細な運用ルールや実装指針については、次のセクション「テストレベル別の詳細ガイド」を参照してください。
+これらのテストは`03-features`配下の設計書をベースにテストケースを作成して実施します。
 
 ---
 
-## 📚 テストレベル別の詳細ガイド
+## 📋 テスト実装の基本原則
 
-各テストレベルには、より詳細な運用ルールと実装指針が別ドキュメントで定義されています。
+### 1. テストの独立性
 
-### 🧪 単体テスト（Unit Test）
+- 各テストは他のテストに依存せず、独立して実行できるように設計する
+- テストの実行順序に依存しない
+- `setup_method()` / `teardown_method()`、または pytest フィクスチャでセットアップ・クリーンアップを行う
+- グローバル変数の共有を避ける
 
-**概要**: Repository 層、UseCase 層、UI コンポーネント層の最小単位をテスト。外部依存をモック化し、ビジネスロジックのみを検証します。
+### 2. AAA パターン（Arrange-Act-Assert）
 
-**詳細ドキュメント**: **[単体テスト実装ルール](./unit-testing-rule.md)**
+- **Arrange（準備）**: テストに必要なデータやモックをセットアップ
+- **Act（実行）**: テスト対象の関数やメソッドを実行
+- **Assert（検証）**: 期待される結果を検証
 
-**主な対象**:
+### 3. テストの可読性
 
-- Repository 層の CRUD 操作、検索、フィルタリング
-- UseCase 層のビジネスロジック、バリデーション
-- UI コンポーネントのレンダリング、ユーザーインタラクション
+- テスト名は「何をテストしているか」を明確に示す
+- docstring を使用して日本語のテスト説明を記述
+- エラーメッセージは具体的で理解しやすいものにする
 
-### 🔗 結合テスト（Integration Test）
+### 4. モック・スタブの適切な使用
 
-**概要**: 複数のモジュールやレイヤーが連携して動作することを検証。API 結合テストでは、実際の HTTP リクエストを送信し、データベースを含む全レイヤーの動作を確認します。
+- 外部依存（データベース、外部 API 等）は適切にモック化する
+- `unittest.mock.Mock`、`unittest.mock.patch` を使用
+- pytest の `monkeypatch` フィクスチャも活用可能
+- 過度なモック化は避け、単体テストと結合テストのバランスを考慮する
 
-**詳細ドキュメント**: **[結合テスト実装ルール](./integration-testing-rule.md)**
+### 5. エラーハンドリングのテスト
 
-**主な対象**:
+- 正常系だけでなく、異常系のテストも必ず実装する
+- 境界値やエッジケースのテストを含める
+- `pytest.raises()` を使用して例外を検証する
+
+### 6. テストデータの管理
+
+- テストデータはファクトリ関数やフィクスチャを使って生成する
+- ハードコードされた値ではなく、意味のある変数名を使用する
+- テストデータの再利用性を高める
+
+### 7. テストのクリーンアップ
+
+- 各テストの前後で適切にセットアップ・クリーンアップを行う
+- リソース（データベース接続、ファイルハンドル等）は適切に解放する
+
+---
+
+## 🧪 単体テスト（Unit Test）ルール
+
+### 概要
+
+Service層、Model層、Utility関数の最小単位をテスト。外部依存をモック化し、ビジネスロジックのみを検証します。
+
+### テスト対象
+
+- **Service層**: ビジネスロジック、バリデーション、CRUD操作のロジック
+- **Model層**: データモデルの検証、プロパティの正当性、データ変換処理
+- **Utility関数**: ヘルパー関数、データフォーマット処理、計算ロジック
+
+### カバレッジ目標
+
+- **最低目標**: 70%以上
+- **推奨目標**: 80%以上
+- Line Coverage、Branch Coverage、Function Coverage を測定
+- カバレッジは品質の指標の一つであり、100%を目指すことよりも意味のあるテストを書くことを優先
+
+### チェックリスト
+
+- [ ] 正常系のテストがある
+- [ ] 異常系のテストがある
+- [ ] 境界値のテストがある
+- [ ] エッジケースのテストがある
+- [ ] テストが独立している
+- [ ] AAA パターンに従っている
+- [ ] テスト名が明確である（docstring で日本語説明）
+- [ ] モックが適切に使用されている
+- [ ] テストデータが適切に管理されている
+- [ ] 実行速度が十分に速い（数秒以内）
+
+---
+
+## 🔗 結合テスト（Integration Test）ルール
+
+### 概要
+
+複数のモジュールやレイヤーが連携して動作することを検証。Flask test_client を使用して実際の HTTP リクエストを送信し、データベースを含む全レイヤーの動作を確認します。
+
+### テスト対象
 
 - API エンドポイントの HTTP リクエスト/レスポンス
 - 認証・認可フロー
-- データベースとの連携
-- フロントエンド ↔ バックエンドの API 連携
+- データベースとの連携（CRUD操作）
+- トランザクション処理
+- エラーハンドリング
 
-### 🌐 E2E テスト（End-to-End Test）
+### テスト環境の分離
 
-**概要**: Playwright を使用して、実際のブラウザでユーザーの操作フローを再現。クリティカルユーザージャーニー（CUJ）を中心に、重要な業務フローの完走性を保証します。
+- テスト専用のデータベースを使用する
+- テスト用の設定ファイル・環境変数でテスト環境を識別する
+- 本番データに影響を与えないようにする
 
-**詳細ドキュメント**: **[E2E テスト運用ルール](./e2e-testing-rule.md)**
+### データのクリーンアップ
 
-**主な対象**:
+- テストの前後でデータを初期化・クリーンアップする
+- トランザクションを使用してロールバックする
+- テスト終了後にテストデータを確実に削除する
 
-- ログイン → タスク操作 → ログアウトの一連フロー
-- 契約管理の検索・絞り込み・詳細参照・登録
-- 管理者向けマネジメント業務の成功パス
+### カバレッジ目標
+
+- **統合ポイントカバレッジ**: 最低90%、推奨95%
+- 全公開 API エンドポイント 100%カバー
+- 認証・認可フローは 100%カバー
+
+### チェックリスト
+
+- [ ] API エンドポイントのテストがある
+- [ ] 認証・認可のテストがある
+- [ ] データフローのテストがある（リクエスト → 処理 → レスポンス → DB保存）
+- [ ] エラーハンドリングのテストがある
+- [ ] トランザクションのテストがある（該当する場合）
+- [ ] データベースとの連携が正しく動作する
+- [ ] テスト環境が適切に設定されている
+- [ ] データのクリーンアップが実装されている
+- [ ] HTTP ステータスコードが正しく返される
+- [ ] レスポンスボディの内容が期待通りである
+- [ ] テストが独立している（他のテストに依存しない）
+
+---
+
+## 🌐 E2E テスト（End-to-End Test）ルール
+
+### 概要
+
+原則手動で実施し、場合に応じて Playwright で自動化します。クリティカルユーザージャーニー（CUJ）を中心に、重要な業務フローの完走性を保証します。
+
+### テスト方針
+
+- **手動テストが基本**: ブラウザで実際の操作フローを手動で確認する
+- **自動化は必要時**: 回帰テストの効率化等で必要な場合に Playwright を導入する
+- **CUJ に集中**: 「顧客が達成したい成果」に焦点を当てる
+- **細かな検証は他レベルで担保**: バリデーション詳細や境界値検証は単体テスト・結合テストで担保する
+
+### テスト対象
+
+- 一連の各種業務フロー（ログイン、検索、登録、更新、削除等）
 - クロスブラウザ/レスポンシブ対応の確認
 
-**重要**: E2E テストは「顧客が達成したい成果」に焦点を当て、細かなバリデーションや境界値検証は単体テスト・結合テストで担保します。
+### CUJ の考え方
+
+- ユーザーが業務上必須の操作を完遂できることを担保する
+- 新たな E2E テストを追加する場合は、既存 CUJ と重複しないか確認してから実施する
+
+### チェックリスト
+
+- [ ] クリティカルパスのテストがある
+- [ ] エラー発生時の業務継続性テストがある
+- [ ] 既存 CUJ と重複していないか確認した
+- [ ] 細かな検証は単体テスト・結合テストへ委ねている
 
 ---
 
 ## 🛠️ テスト実行コマンド一覧
-
-### Flask アプリケーション
 
 ```bash
 # 全てのテストを実行
@@ -85,21 +202,21 @@ pytest --cov=app --cov-report=html
 ptw
 
 # 特定のテストファイルのみ実行
-pytest tests/device_service_test.py
+pytest tests/unit/test_device_service.py
 
 # 特定のテストクラスのみ実行
-pytest tests/device_service.py_test::TestDeviceService
+pytest tests/unit/test_device_service.py::TestDeviceService
 
 # 特定のテストメソッドのみ実行
-pytest tests/device_service_test.py::TestDeviceService::create_device_test
-
-# 結合テストのみ実行（マーカー使用）
-pytest -m integration
+pytest tests/unit/test_device_service.py::TestDeviceService::test_create_device
 
 # 単体テストのみ実行（マーカー使用）
 pytest -m unit
 
-# E2Eテストを実行（Playwright使用）
+# 結合テストのみ実行（マーカー使用）
+pytest -m integration
+
+# E2Eテストを実行（Playwright使用時）
 pytest tests/e2e/
 
 # 詳細な出力で実行
@@ -111,113 +228,57 @@ open htmlcov/index.html
 
 ---
 
-## 📋 テスト実装の基本原則
-
-### 1. テストの独立性
-
-- 各テストは他のテストに依存せず、独立して実行できるように設計する
-- テストの実行順序に依存しない
-- `@BeforeEach`/`@AfterEach`（JUnit）または`beforeEach`/`afterEach`（Jest）を使ってセットアップ・クリーンアップを行う
-- グローバル変数の共有を避ける
-
-### 2. AAA パターン（Arrange-Act-Assert）
-
-- **Arrange（準備）**: テストに必要なデータやモックをセットアップ
-- **Act（実行）**: テスト対象の関数やメソッドを実行
-- **Assert（検証）**: 期待される結果を検証
-
-### 3. テストの可読性
-
-- テスト名は「何をテストしているか」を明確に示す
-- `@DisplayName`（JUnit）を使用して日本語のテスト名を記述
-- エラーメッセージは具体的で理解しやすいものにする
-
-### 4. モック・スタブの適切な使用
-
-- 外部依存（データベース、外部 API 等）は適切にモック化する
-- Mockito の`@Mock`、`@InjectMocks`を使用（Spring Boot）
-- MSW を使用して API をモック化（Next.js）
-- 過度なモック化は避け、単体テストと結合テストのバランスを考慮する
-
-### 5. エラーハンドリングのテスト
-
-- 正常系だけでなく、異常系のテストも必ず実装する
-- 境界値やエッジケースのテストを含める
-- `assertThatThrownBy`（AssertJ）または`expect().toThrow()`（Jest）を使用
-
-### 6. テストデータの管理
-
-- テストデータはファクトリ関数やビルダーパターンを使って生成する
-- `@DataJpaTest`でテスト用のデータベースを使用（Spring Boot）
-- MSW でテスト用の API レスポンスを定義（Next.js）
-
-### 7. 非同期処理の扱い
-
-- `async/await`を適切に使用する（Next.js）
-- `waitFor`を使用して非同期処理の完了を待つ（React Testing Library）
-- タイムアウトやレースコンディションに注意する
-
-### 8. テストのクリーンアップ
-
-- 各テストの前後で適切にセットアップ・クリーンアップを行う
-- データベースのトランザクションを使用してロールバック（Spring Boot）
-- リソース（データベース接続、ファイルハンドル等）は適切に解放する
-
----
-
 ## 📂 テストコードの実装方針とファイル配置ルール
 
-### テスト項目書とテストコードの関係
+### テスト観点とテストコードの関係
 
-#### テスト項目書（`docs/06-testing/`配下の spec.md）の役割
+#### テスト観点表（`docs/05-testing/`配下の perspectives.md）の役割
 
-- **機能単位でテスト項目を管理**する仕様書
-- **目的**: テストカバレッジの把握、レビュー、進捗管理
-- **例**: `docs/06-testing/unit-test/user-management-spec.md` には ビジネスロジック、ドメインルール、UI コンポーネント単位の全テスト項目を記載
+- **テストレベルごとに汎用的な観点を定義**するチェックリスト
+- **目的**: テストカバレッジの把握、観点の漏れ防止
+- **例**: `docs/05-testing/unit-test/unit-test-perspectives.md` にはバリデーション、CRUD操作、エラーハンドリング等の観点を記載
 
-#### 実際のテストコード実装の方針
+#### テストコード実装の方針
 
-テスト項目書は**機能単位**でまとめられていますが、実際のテストコード実装では以下のように**適切な粒度で分割**してください。
+テスト観点表から該当する機能の観点を選択し、**テストコードを直接実装**してください。テストコード内に対応する観点番号をdocstring/コメントで記載し、トレーサビリティを確保します。
 
 ---
 
-### Flask アプリケーション テストコードのファイル配置
+### ファイル配置
 
 #### 単体テスト（Unit Test）
 
-**配置ルール**: Service/Model/Utility 単位でファイル分割
+**配置ルール**: 責務単位でファイル分割
 
-**配置場所**: 実装コードと同じディレクトリ
-
-```
-app/services/
-├── device_service.py
-└── device_service_test.py            # Service層の単体テスト
-
-app/models/
-├── device.py
-└── device_test.py                    # Model層の単体テスト
+**配置場所**: `tests/unit/` ディレクトリ
 
 ```
+tests/unit/
+└── device/
+    ├── test_device_service.py            # Service層の単体テスト
+    └── test_device_model.py              # Model層の単体テスト
+```
 
-**命名規則**:  `<実装ファイル名>_test.py`
+**命名規則**: `test_<実装ファイル名>.py`
 
 #### 結合テスト（Integration Test）
 
-**配置ルール**: エンドポイント単位または Blueprint 単位でファイル分割
+**配置ルール**: Blueprint 単位でファイル分割
 
 **配置場所**: `tests/integration/` ディレクトリ
 
 ```
 tests/integration/
-├──_device_api_test.py               # デバイス管理API結合テスト
-├── user_api_test.py                 # ユーザー管理API結合テスト
-└── alert_api_test.py                # アラート管理API結合テスト
+├── test_device_routes.py               # デバイス管理API結合テスト
+├── test_user_routes.py                 # ユーザー管理API結合テスト
+└── test_alert_routes.py                # アラート管理API結合テスト
 ```
 
-**命名規則**: `<機能名>_api_test.py`
+**命名規則**: `test_<機能名>_routes.py`
 
 #### E2E テスト
+
+- ※ 手動テストの場合は参照不要
 
 **配置ルール**: ユーザージャーニー（CUJ）単位でファイル分割
 
@@ -234,44 +295,61 @@ tests/e2e/
 
 ---
 
-### テスト項目書とコードのマッピング方法
+### テスト観点とコードのマッピング方法
 
-各テストコードには、対応するテスト項目書の項目番号をコメントで記載することを推奨します。
+各テストコードには、対応するテスト観点表のセクション番号をdocstring/コメントに記載してください。
 
 #### 単体テストの例
 
 ```python
 # tests/unit/test_device_service.py
-# 対応: docs/06-testing/unit-test/device-management-spec.md の「Service層」
+# 観点: unit-test-perspectives.md > 1.1 入力チェック, 2.1 正常系処理
 
-def test_create_device():
-    """B-U-001: デバイス作成が正常に動作すること"""
-    # テスト実装
-    service = DeviceService()
-    result = service.create_device(device_data)
-    assert result.success is True
+@pytest.mark.unit
+class TestDeviceServiceValidation:
+    """デバイスサービス - 入力バリデーション
+    観点: 1.1.1 必須チェック, 1.1.2 最大文字列長チェック
+    """
+
+    def test_required_field_empty(self):
+        """1.1.1: 必須項目が空文字の場合、ValidationErrorがスローされる"""
+        # Arrange
+        data = {"device_id": "", "device_name": "Test Device"}
+
+        # Act & Assert
+        with pytest.raises(ValidationError):
+            self.service.create_device(data)
 ```
 
-#### E2E テストの例
+#### 結合テストの例
 
 ```python
-# tests/e2e/test_device_management_flow.py
-# 対応: docs/06-testing/e2e-test/device-management-spec.md の「1. デバイス管理フロー」
+# tests/integration/test_device_routes.py
+# 観点: integration-test-perspectives.md > 4.3 登録（Create）テスト
 
-def test_device_search_flow(page):
-    """F-E-001: 検索ボタンクリックで検索が実行されること"""
-    # テスト実装
-    page.goto("https://workspace-url/apps/app-name/admin/devices")
-    page.fill("#search-input", "device-001")
-    page.click("#search-button")
-    assert page.locator(".device-row").count() > 0
+@pytest.mark.integration
+class TestDeviceRoutesCreate:
+    """デバイス管理API - 登録テスト
+    観点: 4.3 登録（Create）テスト
+    """
+
+    def test_create_device_success(self):
+        """4.3.1: 正常登録 - 登録成功、DBにレコード追加、一覧リダイレクト"""
+        # Arrange
+        data = {"device_id": "DEV-001", "device_name": "Test Device"}
+
+        # Act
+        response = self.client.post("/devices", data=data, follow_redirects=False)
+
+        # Assert
+        assert response.status_code == 302
 ```
 
 ---
 
 ### テストファイル配置の原則
 
-1. **単体テスト**: `tests/unit/` または実装コードと同じディレクトリに配置
+1. **単体テスト**: `tests/unit/` ディレクトリに配置
 2. **結合テスト**: `tests/integration/` ディレクトリに配置
 3. **E2E テスト**: `tests/e2e/` ディレクトリに集約
 4. **命名の一貫性**: プロジェクト全体で `test_` プレフィックスを使用
