@@ -32,6 +32,11 @@
     - [20. アラート履歴 (alert\_history)](#20-アラート履歴-alert_history)
     - [21. アラートステータスマスタ (alert\_status\_master)](#21-アラートステータスマスタ-alert_status_master)
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
+    - [23. ダッシュボードマスタ (dashboard\_master)](#23-ダッシュボードマスタ-dashboard_master)
+    - [24. ダッシュボードグループマスタ (dashboard\_group\_master)](#24-ダッシュボードグループマスタ-dashboard_group_master)
+    - [25. ダッシュボードガジェットマスタ (dashboard\_gadget\_master)](#25-ダッシュボードガジェットマスタ-dashboard_gadget_master)
+    - [26. ガジェット種別マスタ (gadget\_type\_master)](#26-ガジェット種別マスタ-gadget_type_master)
+    - [27. ダッシュボードユーザー設定 (dashboard\_user\_setting)](#27-ダッシュボードユーザー設定-dashboard_user_setting)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -97,30 +102,35 @@
 
 ## テーブル一覧
 
-| #   | テーブル物理名           | テーブル論理名           | 説明                                                                           |
-| --- | ------------------------ | ------------------------ | ------------------------------------------------------------------------------ |
-| 1   | user_master              | ユーザーマスタ           | システム利用ユーザーの情報を管理                                               |
-| 2   | user_type_master         | ユーザー種別マスタ       | ユーザーの種別（権限）を管理                                                   |
-| 3   | language_master          | 言語マスタ               | システム表示言語を管理                                                         |
-| 4   | organization_master      | 組織マスタ               | 組織（顧客、販社等）の情報を管理                                               |
-| 5   | organization_type_master | 組織種別マスタ           | 組織の種別を管理                                                               |
-| 6   | contract_status_master   | 契約状態マスタ           | 組織の契約状態を管理                                                           |
-| 7   | organization_closure     | 組織閉方テーブル         | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
-| 8   | device_master            | デバイスマスタ           | IoTデバイスの情報を管理                                                        |
-| 9   | device_type_master       | デバイス種別マスタ       | デバイスの種別を管理                                                           |
-| 10  | device_stock_info_master | デバイス在庫情報マスタ   | デバイスの在庫・配備状況を管理                                                 |
-| 11  | stock_status_master      | 在庫状況マスタ           | デバイス在庫状況のステータスを管理                                             |
-| 12  | alert_setting_master     | アラート設定マスタ       | アラート検知条件・通知設定を管理                                               |
-| 13  | measurement_item_master  | 測定項目マスタ           | センサーで読み取る、機器に関する測定項目の名前を格納                           |
-| 14  | alert_level_master       | アラートレベルマスタ     | アラートの重要度レベルを管理                                                   |
-| 15  | sort_item_master         | ソート項目マスタ         | 一覧画面のソート項目を管理                                                     |
-| 16  | device_status_data       | デバイスステータス       | デバイスの接続状態を保持                                                       |
-| 17  | region_master            | 地域マスタ               | 地域情報を管理                                                                 |
-| 18  | mail_history             | メール送信履歴           | システムから送信されたメールの履歴を管理                                       |
-| 19  | mail_type_master         | メール種別マスタ         | メールの種別を管理                                                             |
-| 20  | alert_history            | アラート履歴             | アラート履歴を管理                                                             |
-| 21  | alert_status_master      | アラートステータスマスタ | アラートのステータスを管理                                                     |
-| 22  | master_list              | マスタ一覧               | CSVインポート・エクスポートするマスタを管理                                    |
+| #   | テーブル物理名           | テーブル論理名                  | 説明                                                                           |
+| --- | ------------------------ | ----------------------------- | ------------------------------------------------------------------------------ |
+| 1   | user_master              | ユーザーマスタ                 | システム利用ユーザーの情報を管理                                               |
+| 2   | user_type_master         | ユーザー種別マスタ             | ユーザーの種別（権限）を管理                                                   |
+| 3   | language_master          | 言語マスタ                    | システム表示言語を管理                                                         |
+| 4   | organization_master      | 組織マスタ                    | 組織（顧客、販社等）の情報を管理                                               |
+| 5   | organization_type_master | 組織種別マスタ                | 組織の種別を管理                                                               |
+| 6   | contract_status_master   | 契約状態マスタ                | 組織の契約状態を管理                                                           |
+| 7   | organization_closure     | 組織閉方テーブル              | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
+| 8   | device_master            | デバイスマスタ                | IoTデバイスの情報を管理                                                        |
+| 9   | device_type_master       | デバイス種別マスタ            | デバイスの種別を管理                                                           |
+| 10  | device_stock_info_master | デバイス在庫情報マスタ         | デバイスの在庫・配備状況を管理                                                 |
+| 11  | stock_status_master      | 在庫状況マスタ                | デバイス在庫状況のステータスを管理                                             |
+| 12  | alert_setting_master     | アラート設定マスタ            | アラート検知条件・通知設定を管理                                               |
+| 13  | measurement_item_master  | 測定項目マスタ                | センサーで読み取る、機器に関する測定項目の名前を格納                           |
+| 14  | alert_level_master       | アラートレベルマスタ          | アラートの重要度レベルを管理                                                   |
+| 15  | sort_item_master         | ソート項目マスタ              | 一覧画面のソート項目を管理                                                     |
+| 16  | device_status_data       | デバイスステータス            | デバイスの接続状態を保持                                                       |
+| 17  | region_master            | 地域マスタ                   | 地域情報を管理                                                                 |
+| 18  | mail_history             | メール送信履歴               | システムから送信されたメールの履歴を管理                                       |
+| 19  | mail_type_master         | メール種別マスタ             | メールの種別を管理                                                             |
+| 20  | alert_history            | アラート履歴                 | アラート履歴を管理                                                             |
+| 21  | alert_status_master      | アラートステータスマスタ      | アラートのステータスを管理                                                     |
+| 22  | master_list              | マスタ一覧                   | CSVインポート・エクスポートするマスタを管理                                    |
+| 23  | dashboard_master         | ダッシュボードマスタ          | ダッシュボードを管理                                                         |
+| 24  | dashboard_group_master   | ダッシュボードグループマスタ   | ダッシュボードグループを管理                                                  |
+| 25  | dashboard_gadget_master  | ダッシュボードガジェットマスタ | ガジェットを管理                                                             |
+| 26  | gadget_type_master       | ガジェット種別マスタ          | ガジェット種別を管理                                                         |
+| 27  | dashboard_user_setting   | ダッシュボードユーザー設定     | ダッシュボードのユーザー固有設定を管理                                        |
 
 
 ---
@@ -775,6 +785,155 @@
 | 3         | 組織             | 組織マスタ             |
 | 4         | アラート設定     | アラート設定マスタ     |
 | 5         | デバイス在庫情報 | デバイス在庫情報マスタ |
+
+---
+
+### 23. ダッシュボードマスタ (dashboard_master)
+
+**概要**: 顧客作成ダッシュボードで作成されたダッシュボードを管理するマスタテーブル
+
+| #   | カラム物理名     | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                             |
+| --- | --------------- | ----------------- | ----------- | -------- | --- | --- | ----------------- | ----------------------------------------------- |
+| 1   | dashboard_id    | ダッシュボードID   | INT         | NOT NULL | ○   | -   | -                 | ダッシュボードの一意識別子（主キー、AutoIncrement） |
+| 2   | dashboard_uuid  | ダッシュボードUUID | VARCHAR(36) | NOT NULL | -   | -   | -                 | ダッシュボードのUUID（URLパラメータ用）            |
+| 3   | dashboard_name  | ダッシュボード名   | VARCHAR(50) | NOT NULL | -   | -   | -                 | ダッシュボード名                                  |
+| 4   | organization_id | 組織ID            | INT         | NOT NULL | -   | ○   | -                 | 組織の一意識別子（外部キー）                       |
+| 5   | create_date     | 作成日時          | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                  |
+| 6   | creator         | 作成者            | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
+| 7   | update_date     | 更新日時          | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
+| 8   | modifier        | 更新者            | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
+| 9   | delete_flag     | 削除フラグ        | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
+
+**外部キー:**
+- `organization_id` → `organization_master.organization_id`
+
+**インデックス:**
+- PRIMARY KEY: `dashboard_id`
+
+**ビジネスルール:**
+- ダッシュボードは組織に紐づく
+
+---
+
+### 24. ダッシュボードグループマスタ (dashboard_group_master)
+
+**概要**: 顧客作成ダッシュボードで作成されたダッシュボードグループを管理するマスタテーブル
+
+| #   | カラム物理名          | カラム論理名              | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                     |
+| --- | -------------------- | ------------------------ | ----------- | -------- | --- | --- | ----------------- | ------------------------------------------------------- |
+| 1   | dashboard_group_id   | ダッシュボードグループID   | INT         | NOT NULL | ○   | -   | -                 | ダッシュボードグループの一意識別子（主キー、AutoIncrement） |
+| 2   | dashboard_group_uuid | ダッシュボードグループUUID | VARCHAR(36) | NOT NULL | -   | -   | -                 | ダッシュボードグループのUUID（URLパラメータ用）            |
+| 3   | dashboard_group_name | ダッシュボードグループ名   | VARCHAR(50) | NOT NULL | -   | -   | -                 | ダッシュボードグループ名                                  |
+| 4   | dashboard_id         | ダッシュボードID          | INT         | NOT NULL | -   | ○   | -                 | ダッシュボードの一意識別子（外部キー）                      |
+| 5   | display_order        | 表示順序                 | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                             |
+| 6   | create_date          | 作成日時                 | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                          |
+| 7   | creator              | 作成者                   | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                                 |
+| 8   | update_date          | 更新日時                 | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                       |
+| 9   | modifier             | 更新者                   | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                                 |
+| 10  | delete_flag          | 削除フラグ               | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                     |
+
+**外部キー:**
+- `dashboard_id` → `dashboard_master.dashboard_id`
+
+**インデックス:**
+- PRIMARY KEY: `dashboard_group_id`
+
+**ビジネスルール:**
+- ダッシュボードグループはダッシュボードに紐づく
+
+---
+
+### 25. ダッシュボードガジェットマスタ (dashboard_gadget_master)
+
+**概要**: 顧客作成ダッシュボードで作成されたガジェットを管理するマスタテーブル
+
+| #   | カラム物理名        | カラム論理名            | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                         |
+| --- | ------------------ | ---------------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------- |
+| 1   | gadget_id          | ガジェットID            | INT         | NOT NULL | ○   | -   | -                 | ガジェットの一意識別子（主キー、AutoIncrement）                                |
+| 2   | gadget_uuid        | ガジェットUUID          | VARCHAR(36) | NOT NULL | -   | -   | -                 | ガジェットのUUID（URLパラメータ用）                                            |
+| 3   | gadget_name        | ガジェット名            | VARCHAR(20) | NOT NULL | -   | -   | -                 | ガジェット名                                                                  |
+| 4   | dashboard_group_id | ダッシュボードグループID | INT         | NOT NULL | -   | ○   | -                 | ダッシュボードグループの一意識別子（外部キー）                                   |
+| 5   | gadget_type_id     | ガジェット種別ID        | INT         | NOT NULL | -   | ○   | -                 | ガジェット種別の一意識別子（外部キー）                                           |
+| 6   | chart_config       | チャート設定            | JSON        | NOT NULL | -   | -   | -                 | 抽象化されたアプリケーション設定（EChartsオプションへの変換はレンダリング時に実行） |
+| 7   | data_source_config | データソース設定        | JSON        | NOT NULL | -   | -   | -                 | ガジェットが参照するデータの種別・表示設定（デフォルト設定）                       |
+| 8   | position_x         | X座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
+| 9   | position_y         | Y座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
+| 10  | gadget_size        | ガジェットサイズ        | INT         | NOT NULL | -   | -   | -                 | 0: 2x2（480×480px）、1: 2×4（960×480px）                                      |
+| 11  | display_order      | 表示順序               | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                                                  |
+| 12  | create_date        | 作成日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                               |
+| 13  | creator            | 作成者                 | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                                                      |
+| 14  | update_date        | 更新日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                                            |
+| 15  | modifier           | 更新者                 | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                                                      |
+| 16  | delete_flag        | 削除フラグ             | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                          |
+
+**外部キー:**
+- `dashboard_group_id` → `dashboard_group_master.dashboard_group_id`
+- `gadget_type_id` → `gadget_type_master.gadget_type_id`
+
+**インデックス:**
+- PRIMARY KEY: `gadget_id`
+
+**ビジネスルール:**
+- ガジェットはダッシュボードグループに紐づく
+
+---
+
+### 26. ガジェット種別マスタ (gadget_type_master)
+
+**概要**: ガジェット種別を管理するマスタテーブル
+
+| #   | カラム物理名        | カラム論理名          | データ型      | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
+| --- | ------------------ | -------------------- | ------------- | -------- | --- | --- | ----------------- | ----------------------------------------------- |
+| 1   | gadget_type_id     | ガジェット種別ID      | INT           | NOT NULL | ○   | ○   | -                 | ガジェット種別の一意識別子（主キー、AutoIncrement） |
+| 2   | gadget_type_name   | ガジェット種別名      | VARCHAR(20)   | NOT NULL | -   | -   | -                 | ガジェット種別名                                  |
+| 3   | data_source_type   | データソース種別      | INT           | NOT NULL | -   | -   | -                 | 0: 組織、1: デバイス                              |
+| 4   | gadget_image_path  | ガジェットイメージパス | VARCHAR(100) | NOT NULL | -   | -   | -                 | 画像パス（例: static\images\xxxxx.png）            |
+| 5   | gadget_description | ガジェット説明        | VARCHAR(500) | NOT NULL | -   | -   | -                 | ガジェットの説明文                                  |
+| 6   | create_date        | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
+| 7   | creator            | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                          |
+| 8   | update_date        | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
+| 9   | modifier           | 更新者               | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                          |
+| 10  | delete_flag        | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE              |
+
+**外部キー:**
+- `gadget_type_id` → `dashboard_gadget_master.gadget_type_id`
+
+**インデックス:**
+- PRIMARY KEY: `gadget_type_id`
+
+**ビジネスルール:**
+- Webアプリケーションの管理画面上で操作不可のマスタ
+
+---
+
+### 27. ダッシュボードユーザー設定 (dashboard_user_setting)
+
+**概要**: ユーザー毎のダッシュボード設定（選択中ダッシュボードやガジェットの日時設定など）を管理するテーブル
+
+| #   | カラム物理名              | カラム論理名          | データ型 | NULL     | PK  | FK  | デフォルト値      | 説明                                              |
+| --- | ------------------------ | -------------------- | ------- | -------- | --- | --- | ----------------- | ----------------------------------------------- |
+| 1   | user_id                  | ユーザーID            | INT     | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）            |
+| 2   | selected_dashboard_id    | 選択中ダッシュボードID | INT     | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                |
+| 3   | selected_organization_id | 選択中組織ID          | INT     | NOT NULL | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合は0を登録    |
+| 4   | selected_device_id       | 選択中デバイスID      | INT     | NOT NULL | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合は0を登録 |
+| 5   | gadget_datetime          | ガジェット日時        | JSON    | NOT NULL | -   | -   | -                 | ガジェット毎の日時設定                             |
+| 6   | create_date              | 作成日時             | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                  |
+| 7   | creator                  | 作成者               | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
+| 8   | update_date              | 更新日時             | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
+| 9   | modifier                 | 更新者               | INT      | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
+| 10  | delete_flag              | 削除フラグ           | BOOLEAN  | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
+
+**外部キー:**
+- `user_id` → `user_master.user_id`
+- `selected_dashboard_id` → `dashboard_master.dashboard_id`
+- `selected_organization_id` → `organization_master.organization_id`
+- `selected_device_id` → `device_master.device_id`
+
+**インデックス:**
+- PRIMARY KEY: `user_id`
+
+**ビジネスルール:**
+- ダッシュボード設定はユーザーに紐づく
 
 ---
 
