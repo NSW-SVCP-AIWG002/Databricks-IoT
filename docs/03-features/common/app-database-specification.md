@@ -393,29 +393,33 @@
 
 | #   | カラム物理名                   | カラム論理名       | データ型     | NULL      | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ------------------------------ | ------------------ | ------------ | --------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | device_inventory_id                | デバイス在庫ID     | INT          | NOT NULL  | ○   | -   | -                 | デバイス在庫ID                          |
-| 2   | inventory_status_id                | 在庫状況ID         | INT          | NOT NULL  | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）   |
-| 3   | purchase_date                  | 購入日             | DATETIME     | NOT NULL  | -   | -   | -                 | デバイス購入日                          |
-| 4   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷予定日                      |
-| 5   | ship_date                      | 出荷日             | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷日                          |
-| 6   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL  | -   | -   | -                 | メーカー保証の終了日                    |
-| 7   | vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | NOT NULL  | -   | -   | -                 | ベンダー保証の終了日                    |
-| 8   | inventory_location                 | 在庫場所           | VARCHAR(100) | NOT  NULL | -   | -   | -                 | 現在の在庫保管場所                      |
-| 9   | create_date                    | 作成日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 10  | creator                        | 作成者             | INT          | NOT NULL  | -   | -   | -                 | レコード作成者のユーザID                |
-| 11  | update_date                    | 更新日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
-| 12  | modifier                       | 更新者             | INT          | NOT NULL  | -   | -   | -                 | レコード更新者のユーザID                |
-| 13  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL  | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| 1   | device_inventory_id            | デバイス在庫ID     | INT          | NOT NULL  | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID                          |
+| 2   | device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL  | -   | -   | -                 | デバイス在庫UUID（ユニーク制約、自動生成） |
+| 3   | inventory_status_id            | 在庫状況ID         | INT          | NOT NULL  | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照） |
+| 4   | device_model                   | モデル情報         | VARCHAR(100) | NOT NULL  | -   | -   | -                 | デバイスのモデル情報                    |
+| 5   | mac_address                    | MACアドレス        | VARCHAR(17)  | NOT NULL  | -   | -   | -                 | MACアドレス（XX:XX:XX:XX:XX:XX形式）    |
+| 6   | purchase_date                  | 購入日             | DATETIME     | NOT NULL  | -   | -   | -                 | デバイス購入日                          |
+| 7   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷予定日                      |
+| 8   | ship_date                      | 出荷日             | DATETIME     | NULL      | -   | -   | -                 | デバイス出荷日                          |
+| 9   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL  | -   | -   | -                 | メーカー保証の終了日                    |
+| 10  | inventory_location             | 在庫場所           | VARCHAR(100) | NOT NULL  | -   | -   | -                 | 現在の在庫保管場所                      |
+| 11  | create_date                    | 作成日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| 12  | creator                        | 作成者             | INT          | NOT NULL  | -   | -   | -                 | レコード作成者のユーザID                |
+| 13  | update_date                    | 更新日時           | DATETIME     | NOT NULL  | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
+| 14  | modifier                       | 更新者             | INT          | NOT NULL  | -   | -   | -                 | レコード更新者のユーザID                |
+| 15  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL  | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **外部キー:**
 - `inventory_status_id` → `inventory_status_master.inventory_status_id`
 
 **インデックス:**
 - PRIMARY KEY: `device_inventory_id`
+- UNIQUE INDEX: `device_inventory_uuid`
 - INDEX: `inventory_status_id`
 
 **ビジネスルール:**
 - device_inventory_idは1デバイスにつき1レコード（1:1関係）
+- device_inventory_uuidはUUID形式で自動生成され、ユニーク制約を持つ
 - inventory_status_idで在庫状態を管理
 
 ---

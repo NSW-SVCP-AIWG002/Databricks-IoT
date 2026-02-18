@@ -1,5 +1,7 @@
 # デバイス台帳管理 (FR-004-5)
 
+> **注記**: 本仕様書では、簡単のため「デバイス在庫情報マスタ」を「台帳マスタ」と記載する。
+
 ## 📑 目次
 
 - [概要](#概要)
@@ -76,7 +78,7 @@
 | 2   | device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
 | 3   | inventory_status_id            | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）                     |
 | 4   | device_model                   | モデル情報         | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番（オリジナル値を履歴として保持）      |
-| 5   | mac_address                    | MACアドレス        | VARCHAR(17)  | NOT NULL | -   | -   | -                 | ネットワークインターフェースの物理アドレス（オリジナル値を履歴として保持） |
+| 5   | mac_address                    | MACアドレス        | VARCHAR(17)  | NOT NULL | -   | -   | -                 | ネットワークインターフェースの物理アドレス。コロン区切り形式（AA:BB:CC:DD:EE:FF）で格納（オリジナル値を履歴として保持） |
 | 6   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
 | 7   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
 | 8   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
@@ -133,13 +135,13 @@
 | #   | カラム物理名                | カラム論理名           | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                            |
 | --- | --------------------------- | ---------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------------- |
 | 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイスの一意識別子（主キー、自動採番）        |
-| 2   | device_uuid                 | デバイスUUID           | VARCHAR(128) | NOT NULL | -   | -   | -                 | クラウドサービスで管理されるデバイスID（※1）   |
+| 2   | device_uuid                 | デバイスUUID           | VARCHAR(128) | NOT NULL | -   | -   | -                 | クラウドに登録されるデバイスID（※1）128ビットの値でなくてもよいのでUUIDとも限らない |
 | 3   | device_name                 | デバイス名             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスの表示名                                |
 | 4   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）        |
 | 5   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                       |
 | 6   | device_inventory_id         | デバイス在庫ID         | INT          | NULL     | -   | ○   | -                 | デバイス在庫ID（device_inventory_master参照）   |
-| 7   | sim_id                      | SIMID                  | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのSIM ID                                |
-| 8   | mac_address                 | MACアドレス            | VARCHAR(17)  | NULL     | -   | -   | -                 | デバイスのMACアドレス                         |
+| 7   | sim_id                      | SIMID                  | VARCHAR(20) | NULL     | -   | -   | -                 | デバイスのSIM ID                                |
+| 8   | mac_address                 | MACアドレス            | VARCHAR(17)  | NULL     | -   | -   | -                 | デバイスのMACアドレス。コロン区切り形式（AA:BB:CC:DD:EE:FF）で格納 |
 | 9   | organization_id             | 組織ID                 | INT          | NULL     | -   | ○   | -                 | 所属組織ID（organization_master参照）           |
 | 10  | software_version            | ソフトウェアバージョン | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのファームウェアバージョン              |
 | 11  | device_location             | 設置場所               | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスの設置場所                              |
