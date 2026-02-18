@@ -1,11 +1,54 @@
 # すべてのファイルとディレクトリを除外
 /*
 
-# docsフォルダのみ許可
+# ドキュメント
 !/docs/
-
-# docsフォルダ内のすべてを許可
 !/docs/**
+!/README.md
+!/LICENSE
+!/NOTICE
+!/CLAUDE.md
 
-# .gitignore自体を許可
+# 開発環境設定
+!/.devcontainer/
+!/.devcontainer/**
+!/.vscode/
+!/.vscode/**
+
+# アプリケーションコード（srcフォルダで開発）
+!/src/
+!/src/**
+
+# DB初期化スクリプト
+!/init/
+!/init/**
+
+# テストコード
+!/tests/
+!/tests/**
+
+# 依存関係・設定ファイル
+!/requirements.txt
+!/wsgi.py
+!/pytest.ini
+!/Dockerfile
+
+# 環境変数テンプレート（実際の.envは除外）
+!/.env.example
+
+# エディタ設定
+!/.editorconfig
+
+# Git設定
 !.gitignore
+
+# 機密情報・Databricks関連は除外
+.env
+*.key
+*.pem
+.databricks/
+databricks.yml
+credentials/
+
+# データファイルは除外
+users.json
