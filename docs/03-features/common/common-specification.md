@@ -324,6 +324,9 @@ SORT_ORDER = [{sort_order_id: -1, sort_order_name:""},
             ]
 sort_item = [{sort_item_id: NNN, sort_item_name: SSS }, ...] # sort_item_masterを検索した結果を格納した辞書配列
 ```
+
+> **注:** `SORT_ORDER` は設定ファイルでの管理対象外です。実装時は共通関数内で固定値として定義してください。
+
 検索実行時、画面から受け取ったsort_item_idは検索クエリのパラメータとして、sort_order_idは検索関数内でASCまたはDESCに置換して検索クエリに渡されます。
 
 **sort_order_idを置換する過程の実装例**
@@ -1079,12 +1082,6 @@ ALERT_OPERATORS = [
 # 判定時間（分）
 JUDGMENT_TIMES = [1, 5, 10, 15, 30, 60]
 
-# ソート順序
-SORT_ORDERS = [
-    {"sort_order_id": "asc", "sort_order_name": "昇順"},
-    {"sort_order_id": "desc", "sort_order_name": "降順"},
-]
-
 # ページネーション設定
 PAGINATION = {
     "default_items_per_page": 25,
@@ -1102,7 +1099,7 @@ MASTER_DEFAULTS = {
 **Flaskでの読み込み実装例:**
 
 ```python
-from config.config import ALERT_OPERATORS, JUDGMENT_TIMES, SORT_ORDERS, PAGINATION, MASTER_DEFAULTS
+from config.config import ALERT_OPERATORS, JUDGMENT_TIMES, PAGINATION, MASTER_DEFAULTS
 ```
 
 ---
