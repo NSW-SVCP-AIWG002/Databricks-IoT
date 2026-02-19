@@ -194,9 +194,10 @@ src/
 │   ├── exceptions.py              # 共通例外クラス定義
 │   └── error_handlers.py          # 全エラーハンドラー登録（400/403/404→モーダル、500→エラーページ）
 │
-├── db/                            # データベース接続
+├── databricks/                    # Databricks外部接続口（Unity Catalog・SCIM API）
 │   ├── __init__.py
-│   └── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.databricks_token使用）
+│   ├── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.databricks_token使用）
+│   └── scim_client.py             # Databricks SCIM API クライアント（ユーザー・グループ管理）
 │
 ├── models/                        # SQLAlchemy ORMモデル（テーブル定義）
 │   ├── __init__.py
