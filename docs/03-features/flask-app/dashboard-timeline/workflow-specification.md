@@ -3,40 +3,70 @@
 ## 📑 目次
 
 - [概要](#概要)
+  - [このドキュメントの役割](#このドキュメントの役割)
+  - [対象機能](#対象機能)
+  - [処理フロー概要](#処理フロー概要)
 - [Flaskルート定義](#flaskルート定義)
+  - [ルート一覧](#ルート一覧)
+  - [グラフデータ取得API](#グラフデータ取得api)
+  - [CSVエクスポートAPI](#csvエクスポートapi)
+  - [ガジェット登録API](#ガジェット登録api)
 - [データ取得ワークフロー](#データ取得ワークフロー)
-- [CSVエクスポートワークフロー](#CSVエクスポートワークフロー)
+  - [処理フロー図](#処理フロー図)
+  - [APIエンドポイント](#apiエンドポイント)
+  - [データ取得実装](#データ取得実装)
+  - [Silver層クエリ](#silver層クエリ)
+- [CSVエクスポートワークフロー](#csvエクスポートワークフロー)
+  - [処理フロー図](#処理フロー図-1)
+  - [CSVエクスポート仕様](#csvエクスポート仕様)
+  - [CSVエクスポート処理](#csvエクスポート処理)
 - [ガジェット登録ワークフロー](#ガジェット登録ワークフロー)
+  - [処理フロー図](#処理フロー図-2)
+  - [APIエンドポイント](#apiエンドポイント-1)
+  - [登録処理の流れ](#登録処理の流れ)
 - [バリデーション仕様](#バリデーション仕様)
+  - [リクエストパラメータ定義（データ取得API）](#リクエストパラメータ定義データ取得api)
+  - [リクエストパラメータ定義（ガジェット登録API）](#リクエストパラメータ定義ガジェット登録api)
+  - [バリデーション実装](#バリデーション実装)
+  - [許可値一覧](#許可値一覧)
 - [エラーハンドリング](#エラーハンドリング)
+  - [エラー分類](#エラー分類)
+  - [エラーハンドリング実装](#エラーハンドリング実装)
 - [セキュリティ設計](#セキュリティ設計)
+  - [入力検証](#入力検証)
+  - [データアクセス制御](#データアクセス制御)
 - [パフォーマンス設計](#パフォーマンス設計)
+  - [性能目標](#性能目標)
+  - [最適化方針](#最適化方針)
 - [テスト仕様](#テスト仕様)
+  - [単体テスト](#単体テスト)
+  - [統合テスト](#統合テスト)
 - [関連ドキュメント](#関連ドキュメント)
-- [更新履歴](#更新履歴)
+- [変更履歴](#変更履歴)
 
 ---
 
 ## 概要
 
-このドキュメントは、ダッシュボード時系列グラフ機能のワークフローを定義する。
+このドキュメントは、ダッシュボード時系列グラフ機能のワークフロー、エラーハンドリングの詳細を記載します。
 
-**このドキュメントの役割:**
-- ✅ データ取得API処理フロー（Silver層からの生データ取得）
-- ✅ CSVエクスポート処理フロー
-- ✅ ガジェット登録処理フロー
-- ✅ バリデーション・エラーハンドリング
+### このドキュメントの役割
 
-**対象機能:**
+- データ取得APIの処理フロー（Silver層からの生データ取得）
+- CSVエクスポート処理フロー
+- ガジェット登録処理フロー
+- バリデーション・エラーハンドリング
 
-| 機能ID | 機能名 | 説明 |
-|--------|--------|------|
+**注:** UI要素の詳細やバリデーションルールは [UI仕様書](./ui-specification.md) を参照してください。
+
+### 対象機能
+
+| 機能ID | 機能名 | 処理内容 |
+| ------ | ------ | -------- |
 | DTL-001 | 時系列グラフ表示 | 指定期間のセンサーデータを折れ線グラフで表示 |
 | DTL-002 | 期間選択 | 開始・終了日時を指定してデータ範囲を変更 |
 | DTL-003 | CSVエクスポート | 表示中のデータをCSVファイルとしてダウンロード |
 | DTL-004 | ガジェット登録 | 時系列グラフをダッシュボードに登録 |
-
-**注:** UI要素の詳細やバリデーションルールは [UI仕様書](./ui-specification.md) を参照してください。
 
 ### 処理フロー概要
 
@@ -89,11 +119,11 @@ flowchart TD
 
 ### ルート一覧
 
-| No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
-|----|---------|---------------|---------|------|---------------|------|
-| 1 | データ取得 | `/api/dashboard/timeline/data` | GET | 時系列データ取得 | JSON | Silver層から生データ取得 |
-| 2 | CSVエクスポート | `/api/dashboard/timeline/csv` | GET | CSVエクスポート | CSVファイル | UTF-8 BOM付き |
-| 3 | ガジェット登録 | `/api/dashboard/timeline/gadgets` | POST | ガジェット登録 | JSON | 201 Created |
+| メソッド | URL | 関数名 | 説明 |
+| -------- | --- | ------ | ---- |
+| GET | `/api/dashboard/timeline/data` | get_timeline_data | 時系列データ取得API |
+| GET | `/api/dashboard/timeline/csv` | export_timeline_csv | CSVエクスポートAPI |
+| POST | `/api/dashboard/timeline/gadgets` | register_timeline_gadget | ガジェット登録API |
 
 ---
 
@@ -216,10 +246,15 @@ def register_timeline_gadget():
     if errors:
         return jsonify({'success': False, 'error': {'code': 'VALIDATION_ERROR', 'message': errors[0], 'details': errors}}), 400
 
-    # デバイスモードが指定デバイスの場合、データスコープチェック
+    # デバイスモード分岐・スコープチェック
     if params.get('device_mode') == 'specified':
+        # デバイス存在チェック
+        if not device_exists(params.get('device_id')):
+            return jsonify({'success': False, 'error': {'code': 'DEVICE_NOT_FOUND', 'message': 'デバイスが見つかりません'}}), 400
+        # データスコープチェック（デバイスが組織配下か確認）
         if not check_device_scope(params.get('device_id'), current_user):
             return jsonify({'success': False, 'error': {'code': 'FORBIDDEN', 'message': 'アクセス権限がありません'}}), 403
+    # ツリー連動: device_id未設定として登録（表示時にツリー選択デバイスのスコープチェックを実施）
 
     # ガジェット登録
     try:
@@ -314,13 +349,13 @@ SENSOR_ITEMS = {
     'external_temp': {'label': '共通外気温度', 'unit': '℃'},
     'set_temp_freezer_1': {'label': '第1冷凍設定温度', 'unit': '℃'},
     'internal_sensor_temp_freezer_1': {'label': '第1冷凍庫内センサー温度', 'unit': '℃'},
-    'internal_temp_freezer_1': {'label': '第1冷凍表示温度', 'unit': '℃'},
+    'internal_temp_freezer_1': {'label': '第1冷凍 庫内温度', 'unit': '℃'},
     'df_temp_freezer_1': {'label': '第1冷凍DF温度', 'unit': '℃'},
     'condensing_temp_freezer_1': {'label': '第1冷凍凝縮温度', 'unit': '℃'},
     'adjusted_internal_temp_freezer_1': {'label': '第1冷凍微調整後庫内温度', 'unit': '℃'},
     'set_temp_freezer_2': {'label': '第2冷凍設定温度', 'unit': '℃'},
     'internal_sensor_temp_freezer_2': {'label': '第2冷凍庫内センサー温度', 'unit': '℃'},
-    'internal_temp_freezer_2': {'label': '第2冷凍表示温度', 'unit': '℃'},
+    'internal_temp_freezer_2': {'label': '第2冷凍 庫内温度', 'unit': '℃'},
     'df_temp_freezer_2': {'label': '第2冷凍DF温度', 'unit': '℃'},
     'condensing_temp_freezer_2': {'label': '第2冷凍凝縮温度', 'unit': '℃'},
     'adjusted_internal_temp_freezer_2': {'label': '第2冷凍微調整後庫内温度', 'unit': '℃'},
@@ -518,14 +553,22 @@ flowchart TD
     D -->|NG| E[403エラー]
     D -->|OK| F{バリデーション}
     F -->|NG| G[400エラー]
-    F -->|OK| H{デバイスモード判定}
-    H -->|指定デバイス| I{デバイススコープチェック}
-    I -->|NG| J[403エラー]
-    I -->|OK| K[ガジェット登録]
-    H -->|ツリー連動| K
-    K --> L{登録結果}
-    L -->|失敗| M[500エラー]
-    L -->|成功| N[201 Created返却]
+    F -->|OK| H{デバイスモード}
+    H -->|指定デバイス| I[デバイス存在チェック]
+    H -->|ツリー連動| J[device_id未設定として登録]
+    I --> K{デバイス存在?}
+    K -->|なし| L[400エラー]
+    K -->|あり| M[データスコープチェック]
+    M --> N{アクセス権限?}
+    N -->|なし| O[403エラー]
+    N -->|あり| P[最小値/最大値検証]
+    J --> P
+    P --> Q{min < max?}
+    Q -->|NG| R[400エラー]
+    Q -->|OK or 未入力| S[ガジェット登録]
+    S --> T{登録結果}
+    T -->|失敗| U[500エラー]
+    T -->|成功| V[201 Created返却]
 ```
 
 ### APIエンドポイント
@@ -536,7 +579,7 @@ flowchart TD
 
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| gadget_name | string | ○ | ガジェット名（最大50文字） |
+| gadget_name | string | ○ | ガジェット名（最大20文字） |
 | device_mode | string | ○ | デバイスモード（'specified' / 'tree_linked'） |
 | device_id | string | ※ | デバイスID（※ device_mode='specified' の場合必須） |
 | left_item | string | ○ | 左Y軸のセンサー項目カラム名 |
@@ -586,8 +629,10 @@ flowchart TD
 
 1. **認証・権限チェック**: ログインユーザーの認証状態とロールを確認
 2. **バリデーション**: 必須項目、文字数、形式、許可値をチェック
-3. **デバイスモード分岐**: 指定デバイスの場合はデバイスのスコープチェック
-4. **最小値/最大値整合チェック**: min < max の検証（設定されている場合）
+3. **デバイスモード分岐**:
+   - 指定デバイス: デバイスの存在確認（404→400エラー）とデータスコープチェック（403エラー）
+   - ツリー連動: device_id未設定として登録（スコープチェックは表示時にツリー選択デバイスに対して実施）
+4. **最小値/最大値検証**: 両方入力時は最小値 < 最大値をチェック
 5. **ガジェット登録**: **TODO** 登録先DBにガジェット情報を保存
 
 ### 棒グラフ・円グラフとの主な違い
@@ -617,7 +662,7 @@ flowchart TD
 
 | パラメータ | 型 | 必須 | バリデーション |
 |-----------|-----|------|--------------|
-| gadget_name | string | ○ | 1-50文字 |
+| gadget_name | string | ○ | 1-20文字 |
 | device_mode | string | ○ | 'specified' / 'tree_linked' |
 | device_id | string | ※ | device_mode='specified' の場合必須 |
 | left_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
@@ -721,8 +766,8 @@ def validate_register_params(params: dict) -> list:
     # ガジェット名
     if not params.get('gadget_name'):
         errors.append('ガジェット名は必須です')
-    elif len(params['gadget_name']) > 50:
-        errors.append('ガジェット名は50文字以内で入力してください')
+    elif len(params['gadget_name']) > 20:
+        errors.append('ガジェット名は20文字以内で入力してください')
 
     # デバイスモード
     device_mode = params.get('device_mode')
@@ -810,13 +855,14 @@ def validate_register_params(params: dict) -> list:
 
 ### エラー分類
 
-| HTTPステータス | エラー種別 | 説明 |
-|---------------|-----------|------|
-| 400 | Bad Request | バリデーションエラー、パラメータ不正 |
-| 401 | Unauthorized | 認証エラー（未ログイン、セッション切れ） |
-| 403 | Forbidden | 権限エラー（データスコープ外アクセス） |
-| 404 | Not Found | リソース未検出（デバイス、ガジェット） |
-| 500 | Internal Server Error | サーバー内部エラー |
+| エラー種別 | HTTPステータス | 対応 | ログ出力 |
+| ---------- | -------------- | ---- | -------- |
+| 認証エラー | 401 | エラーJSON返却 | なし |
+| 権限エラー | 403 | エラーJSON返却 | WARN |
+| パラメータエラー | 400 | エラーJSON返却 | INFO |
+| リソース未検出 | 404 | エラーJSON返却 | なし |
+| DB接続エラー | 500 | エラーJSON返却 | ERROR |
+| 予期せぬエラー | 500 | エラーJSON返却 | ERROR |
 
 ### エラーレスポンス形式
 
@@ -854,10 +900,19 @@ def validate_register_params(params: dict) -> list:
 ### エラーハンドリング実装
 
 ```python
+import logging
 from flask import jsonify
+from functools import wraps
 
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# エラーハンドラー
+# =============================================================================
 @timeline_bp.errorhandler(400)
 def bad_request(error):
+    """400 Bad Request"""
     return jsonify({
         'success': False,
         'error': {'code': 'VALIDATION_ERROR', 'message': str(error)}
@@ -866,6 +921,7 @@ def bad_request(error):
 
 @timeline_bp.errorhandler(401)
 def unauthorized(error):
+    """401 Unauthorized"""
     return jsonify({
         'success': False,
         'error': {'code': 'UNAUTHORIZED', 'message': '認証が必要です'}
@@ -874,6 +930,8 @@ def unauthorized(error):
 
 @timeline_bp.errorhandler(403)
 def forbidden(error):
+    """403 Forbidden"""
+    logger.warning(f'Access denied: user={current_user.user_id}, path={request.path}')
     return jsonify({
         'success': False,
         'error': {'code': 'FORBIDDEN', 'message': 'アクセス権限がありません'}
@@ -882,6 +940,7 @@ def forbidden(error):
 
 @timeline_bp.errorhandler(404)
 def not_found(error):
+    """404 Not Found"""
     return jsonify({
         'success': False,
         'error': {'code': 'NOT_FOUND', 'message': 'リソースが見つかりません'}
@@ -890,10 +949,36 @@ def not_found(error):
 
 @timeline_bp.errorhandler(500)
 def internal_error(error):
+    """500 Internal Server Error"""
+    logger.error(f'Internal error: {error}', exc_info=True)
     return jsonify({
         'success': False,
         'error': {'code': 'INTERNAL_ERROR', 'message': 'サーバーエラーが発生しました'}
     }), 500
+
+
+# =============================================================================
+# 共通例外処理デコレータ
+# =============================================================================
+def handle_exceptions(f):
+    """API用例外処理デコレータ"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValidationError as e:
+            logger.info(f'Validation error: {e}')
+            return jsonify({'success': False, 'error': {'code': 'VALIDATION_ERROR', 'message': str(e)}}), 400
+        except PermissionError as e:
+            logger.warning(f'Permission error: {e}')
+            return jsonify({'success': False, 'error': {'code': 'FORBIDDEN', 'message': 'アクセス権限がありません'}}), 403
+        except DatabaseError as e:
+            logger.error(f'Database error: {e}', exc_info=True)
+            return jsonify({'success': False, 'error': {'code': 'INTERNAL_ERROR', 'message': 'データベースエラーが発生しました'}}), 500
+        except Exception as e:
+            logger.error(f'Unexpected error: {e}', exc_info=True)
+            return jsonify({'success': False, 'error': {'code': 'INTERNAL_ERROR', 'message': 'サーバーエラーが発生しました'}}), 500
+    return decorated_function
 ```
 
 ---
@@ -963,26 +1048,17 @@ def internal_error(error):
 
 ## 関連ドキュメント
 
-### 画面仕様
-- [機能概要 README](./README.md) - 機能概要、データモデル
-- [UI仕様書](./ui-specification.md) - UI要素の詳細、バリデーションルール定義
-
-### アーキテクチャ設計
-- [バックエンド設計](../../../01-architecture/backend.md) - Flask/LDP設計、Blueprint構成
-- [データベース設計](../../../01-architecture/database.md) - テーブル定義、インデックス設計
-
-### データベース仕様
+- [UI仕様書](./ui-specification.md) - 画面要素・レイアウト仕様
+- [README.md](./README.md) - 機能概要
 - [シルバー層仕様](../../common/unity-catalog-database-specification.md) - silver_sensor_dataテーブル定義
 - [OLTP DB仕様](../../common/app-database-specification.md) - デバイスマスタ等
-
-### 共通仕様
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード
 - [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
 
-## 更新履歴
+## 変更履歴
 
-| 日付 | バージョン | 更新内容 |
-|------|------------|----------|
-| 2026-02-17 | 1.0 | 初版作成 |
+| 日付 | 版数 | 変更内容 | 担当者 |
+| ---- | ---- | -------- | ------ |
+| 2026-02-17 | 1.0 | 初版作成 | - |
