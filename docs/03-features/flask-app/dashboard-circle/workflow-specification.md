@@ -74,17 +74,15 @@ flowchart TB
 
     subgraph DataSources
         Silver[(シルバー層)]
-        Master[(集約方法マスタ)]
     end
 
     JSChart -->|1. データリクエスト| RouteAPI
     RouteAPI --> Auth
     Auth --> ChartService
-    ChartService -->|2. 集約方法取得| Master
-    ChartService -->|3. 集約データ取得| Silver
+    ChartService -->|2. 最新データ取得| Silver
     Silver -->|データ| ChartService
     ChartService -->|JSON| RouteAPI
-    RouteAPI -->|4. レスポンス| JSChart
+    RouteAPI -->|3. レスポンス| JSChart
 ```
 
 ### ガジェット登録フロー
@@ -136,12 +134,11 @@ flowchart TB
 
 ```python
 from flask import Blueprint, jsonify, request, g
-from datetime import datetime
 from functools import wraps
-import pytz
+import logging
 
 bp = Blueprint('dashboard_circle_chart', __name__)
-JST = pytz.timezone('Asia/Tokyo')
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # デコレータ定義
@@ -174,12 +171,11 @@ def require_role(*roles):
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def get_circle_chart_data():
     """
-    円グラフ用データを取得
+    円グラフ用データを取得（シルバー層から最新値を取得）
 
     リクエストパラメータ:
     - gadget_id: ガジェットID（必須）
     - device_id: デバイスID（ツリー連動モード時は必須）
-    - base_datetime: 基準日時 ISO 8601形式（必須）
 
     レスポンス:
     - 成功時: {"status": "success", "data": {...}}
@@ -189,7 +185,6 @@ def get_circle_chart_data():
     params = {
         'gadget_id': request.args.get('gadget_id'),
         'device_id': request.args.get('device_id'),  # ツリー連動モード時のみ使用
-        'base_datetime': request.args.get('base_datetime')
     }
 
     # バリデーション
@@ -212,13 +207,11 @@ def get_circle_chart_data():
         if not device_id:
             return jsonify({'status': 'error', 'message': 'device_idは必須です'}), 400
 
-    # データ取得（ガジェットに設定された集約方法を使用）
+    # シルバー層から最新データ取得
     try:
         data = get_chart_data(
             device_id=device_id,
-            items=gadget['items'],
-            aggregation_method_id=gadget['aggregation_method_id'],
-            base_datetime=datetime.fromisoformat(params['base_datetime'])
+            items=gadget['items']
         )
 
         if not data['values']:
@@ -437,12 +430,11 @@ flowchart TD
     K -->|ツリー連動| M[リクエストからデバイスID取得]
     M --> N{device_id指定あり?}
     N -->|なし| O[400エラー]
-    N -->|あり| P[集約方法マスタ取得]
+    N -->|あり| P[シルバー層から最新レコード取得]
     L --> P
-    P --> Q[設定された集約方法でシルバー層データを集約]
-    Q --> R{データ存在?}
-    R -->|なし| S[空データ返却]
-    R -->|あり| T[JSONレスポンス返却]
+    P --> Q{データ存在?}
+    Q -->|なし| R[空データ返却]
+    Q -->|あり| S[JSONレスポンス返却]
 ```
 
 **デバイス指定方法の違い:**
@@ -452,15 +444,13 @@ flowchart TD
 ### データ取得実装
 
 ```python
-def get_chart_data(device_id: str, items: list, aggregation_method_id: int, base_datetime: datetime) -> dict:
+def get_chart_data(device_id: str, items: list) -> dict:
     """
-    円グラフ用データを取得
+    円グラフ用データを取得（シルバー層から最新値を取得）
 
     Args:
         device_id: デバイスID
         items: 表示項目リスト
-        aggregation_method_id: 集約方法ID
-        base_datetime: 基準日時
 
     Returns:
         dict: グラフデータ
@@ -472,84 +462,50 @@ def get_chart_data(device_id: str, items: list, aggregation_method_id: int, base
     if not check_data_scope(g.current_user, device):
         raise PermissionError('アクセス権限がありません')
 
-    # 集約方法情報取得
-    aggregation_method = get_aggregation_method(aggregation_method_id)
-    if not aggregation_method:
-        raise ValueError('集約方法が見つかりません')
-
-    # シルバー層から集約データ取得
-    aggregated_data = query_silver_aggregated(device_id, items, aggregation_method['code'], base_datetime)
+    # シルバー層から最新データ取得
+    latest_data = query_silver_latest(device_id, items)
 
     # レスポンス構築
     labels = []
     values = []
     for item in items:
         item_info = SENSOR_ITEMS.get(item)
-        if item_info and item in aggregated_data:
+        if item_info and item in latest_data:
             labels.append(item_info['label'])
-            values.append(aggregated_data[item])
+            values.append(latest_data[item])
 
     return {
         'labels': labels,
         'values': values,
-        'device_name': device['device_name'],
-        'aggregation_method': aggregation_method['name']
+        'device_name': device['device_name']
     }
 ```
 
 ### シルバー層クエリ
 
 ```python
-# 集約方法コードと計算ロジックのマッピング
-AGGREGATION_FUNCTIONS = {
-    'AVG': 'AVG',
-    'MAX': 'MAX',
-    'MIN': 'MIN',
-    'P25': 'PERCENTILE_APPROX({column}, 0.25)',
-    'MEDIAN': 'PERCENTILE_APPROX({column}, 0.5)',
-    'P75': 'PERCENTILE_APPROX({column}, 0.75)',
-    'STDDEV': 'STDDEV',
-    'P95': 'PERCENTILE_APPROX({column}, 0.95)'
-}
-
-def query_silver_aggregated(device_id: str, items: list, method_code: str, base_datetime: datetime) -> dict:
+def query_silver_latest(device_id: str, items: list) -> dict:
     """
-    シルバー層から集約データを取得
+    シルバー層から最新レコードのデータを取得
 
     Args:
         device_id: デバイスID
         items: 取得する項目リスト
-        method_code: 集約方法コード（AVG, MAX, MIN, etc.）
-        base_datetime: 基準日時
 
     Returns:
-        dict: 項目名と集約値の辞書
+        dict: 項目名と最新値の辞書
 
     Note:
-        - 基準日時から過去1時間分のデータを集約
+        - received_at の降順で最新の1件を取得
     """
-    # 集約関数を構築
-    agg_func = AGGREGATION_FUNCTIONS.get(method_code, 'AVG')
-
-    # 項目ごとの集約式を構築
-    select_columns = []
-    for item in items:
-        if 'PERCENTILE' in agg_func:
-            select_columns.append(f"{agg_func.format(column=item)} AS {item}")
-        else:
-            select_columns.append(f"{agg_func}({item}) AS {item}")
-
-    columns_sql = ', '.join(select_columns)
-
-    # 基準日時から過去1時間分のデータを取得
-    start_datetime = base_datetime - timedelta(hours=1)
+    columns_sql = ', '.join(items)
 
     query = f"""
     SELECT {columns_sql}
     FROM iot_catalog.silver.silver_sensor_data
     WHERE device_uuid = '{device_id}'
-      AND received_at >= '{start_datetime.isoformat()}'
-      AND received_at <= '{base_datetime.isoformat()}'
+    ORDER BY received_at DESC
+    LIMIT 1
     """
 
     result = spark.sql(query).first()
@@ -558,38 +514,6 @@ def query_silver_aggregated(device_id: str, items: list, method_code: str, base_
         return {}
 
     return {item: result[item] for item in items if result[item] is not None}
-
-
-def get_aggregation_method(method_id: int) -> dict:
-    """
-    集約方法情報を取得
-
-    Args:
-        method_id: 集約方法ID
-
-    Returns:
-        dict: 集約方法情報 {id, code, name}
-    """
-    query = """
-    SELECT
-        summary_method_id,
-        summary_method_code,
-        summary_method_name
-    FROM iot_catalog.gold.gold_summary_method_master
-    WHERE summary_method_id = :method_id
-      AND delete_flag = FALSE
-    """
-
-    result = spark.sql(query, {'method_id': method_id}).first()
-
-    if not result:
-        return None
-
-    return {
-        'id': result.summary_method_id,
-        'code': result.summary_method_code,
-        'name': result.summary_method_name
-    }
 
 
 def get_gadget_info(gadget_id: str) -> dict:
@@ -693,13 +617,12 @@ flowchart TD
 | ---------- | -- | ---- | ---- |
 | gadget_id | string | ○ | ガジェットID |
 | device_id | string | △ | デバイスID（ツリー連動モード時必須） |
-| base_datetime | string | ○ | 基準日時（ISO 8601形式） |
 
 **備考:**
-- 表示項目（items）、集約方法（aggregation_method_id）はガジェット登録時に設定された値を使用
+- 表示項目（items）はガジェット登録時に設定された値を使用
 - **指定デバイスモード**: ガジェット登録時に固定されたデバイスのデータを表示
 - **ツリー連動モード**: リクエストで指定したデバイス（ツリー上で選択）のデータを表示
-- **基準日時**: 指定した日時から過去1時間分のデータを集約
+- **データ取得**: シルバー層から対象デバイスの最新レコードを取得（日時指定不要）
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
@@ -769,15 +692,6 @@ def validate_chart_params(params: dict) -> list:
     # 形式チェックのみ実施
     if params.get('device_id') and not UUID_PATTERN.match(params['device_id']):
         errors.append('device_idの形式が不正です')
-
-    # base_datetime（必須）
-    if not params.get('base_datetime'):
-        errors.append('base_datetimeは必須です')
-    else:
-        try:
-            datetime.fromisoformat(params['base_datetime'])
-        except ValueError:
-            errors.append('base_datetimeの形式が不正です')
 
     return errors
 ```
@@ -903,3 +817,4 @@ def internal_error(error):
 | 2026-02-13 | 1.4 | ツリー連動モード時の複数デバイス集計対応追加 |
 | 2026-02-13 | 1.5 | データ取得APIにbase_datetimeパラメータ追加（日時ピッカー対応） |
 | 2026-02-13 | 1.6 | ツリー連動モード仕様訂正（単一デバイス指定に変更、organization_id→device_id） |
+| 2026-02-20 | 1.7 | 日時ピッカー削除、シルバー層から最新値を自動取得する仕様に変更（base_datetime廃止、集約処理廃止） |
