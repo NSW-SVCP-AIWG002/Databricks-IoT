@@ -60,7 +60,7 @@
 | DBG-002 | 表示単位切替 | 時/日/週/月単位での表示切替 |
 | DBG-003 | 期間選択 | 日時ピッカーによる表示期間の指定 |
 | DBG-004 | 集計間隔選択 | データの集計間隔を選択（時単位のみ） |
-| DBG-005 | CSV出力 | 表示データをCSVファイルとしてダウンロード |
+| DBG-005 | CSVエクスポート | 表示データをCSVファイルとしてダウンロード |
 | DBG-006 | ガジェット登録 | 棒グラフガジェットの新規登録 |
 
 ---
@@ -126,7 +126,7 @@ def get_bar_chart_data():
     - interval: 集計間隔（時単位のみ必須）
     - item: 表示項目（必須）
     - method_id: 集計方法ID（必須）
-    - base_datetime: 基準日時 ISO 8601形式（必須）
+    - base_datetime: 基準日時（必須）
 
     レスポンス:
     - 成功時: {"status": "success", "data": {...}}
@@ -329,8 +329,8 @@ def validate_register_params(data: dict) -> list:
     # title
     if not data.get('title'):
         errors.append('タイトルは必須です')
-    elif len(data['title']) > 50:
-        errors.append('タイトルは50文字以内で入力してください')
+    elif len(data['title']) > 20:
+        errors.append('タイトルは20文字以内で入力してください')
 
     # device_mode
     if data.get('device_mode') not in ['specified', 'tree_linked']:
@@ -1044,13 +1044,13 @@ flowchart TD
 | interval | string | △ | 集計間隔（時単位のみ必須） | "10min" |
 | item | string | ○ | 表示項目 | "communication_power_time" |
 | method_id | integer | ○ | 集計方法ID | 1 |
-| base_datetime | string | ○ | 基準日時（ISO 8601） | "2026-02-05T15:32:42+09:00" |
+| base_datetime | string | ○ | 基準日時（YYYY/MM/DD HH:mm:ss形式） | "2026-02-05 15:32:42" |
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
 | パラメータ | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| title | string | ○ | ガジェットタイトル（1-50文字） |
+| title | string | ○ | ガジェットタイトル（1-20文字） |
 | device_mode | string | ○ | 表示デバイス選択（'specified' / 'tree_linked'） |
 | device_id | string | △ | デバイスID（device_mode='specified'時必須） |
 | group_id | string | ○ | グループID |
