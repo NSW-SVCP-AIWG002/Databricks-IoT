@@ -171,7 +171,6 @@
 |------|------|
 | ファイル名形式 | `timeline_{device_uuid}_{yyyyMMddHHmmss}.csv` |
 | 文字コード | UTF-8（BOM付き） |
-| データなし時 | ボタン非活性（disabled） |
 
 **CSV列構成:**
 
