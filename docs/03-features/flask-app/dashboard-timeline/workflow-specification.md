@@ -132,8 +132,10 @@ flowchart TD
 ```python
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+import logging
 
 timeline_bp = Blueprint('dashboard_timeline', __name__)
+logger = logging.getLogger(__name__)
 
 
 @timeline_bp.route('/api/dashboard/timeline/data', methods=['GET'])
@@ -181,7 +183,10 @@ def get_timeline_data():
 ```python
 import csv
 import io
+import logging
 from flask import Response
+
+logger = logging.getLogger(__name__)
 
 @timeline_bp.route('/api/dashboard/timeline/csv', methods=['GET'])
 @require_login
@@ -205,18 +210,22 @@ def export_timeline_csv():
         return jsonify({'success': False, 'error': {'code': 'FORBIDDEN', 'message': 'アクセス権限がありません'}}), 403
 
     # データ取得
-    chart_data = get_chart_data(
-        device_id=device_id,
-        left_item=left_item,
-        right_item=right_item,
-        start_datetime=datetime.fromisoformat(start_datetime),
-        end_datetime=datetime.fromisoformat(end_datetime)
-    )
+    try:
+        chart_data = get_chart_data(
+            device_id=device_id,
+            left_item=left_item,
+            right_item=right_item,
+            start_datetime=datetime.fromisoformat(start_datetime),
+            end_datetime=datetime.fromisoformat(end_datetime)
+        )
+    except Exception as e:
+        logger.error(f"CSVエクスポート用データ取得失敗: {e}")
+        return jsonify({'success': False, 'error': {'code': 'INTERNAL_ERROR', 'message': 'データの取得に失敗しました'}}), 500
 
     # CSV生成
     csv_content = generate_timeline_csv(chart_data, left_item, right_item)
 
-    # ファイル名生成
+    # ファイル名生成（get_device_uuid: デバイスマスタからデバイスUUIDを取得するユーティリティ関数）
     device_uuid = get_device_uuid(device_id)
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     filename = f'timeline_{device_uuid}_{timestamp}.csv'
@@ -233,6 +242,10 @@ def export_timeline_csv():
 ### ガジェット登録API
 
 ```python
+import logging
+
+logger = logging.getLogger(__name__)
+
 @timeline_bp.route('/api/dashboard/timeline/gadgets', methods=['POST'])
 @require_login
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
@@ -492,7 +505,7 @@ flowchart TD
 | 3 | {左Y軸項目のラベル} | 左Y軸に選択されたセンサー値 |
 | 4 | {右Y軸項目のラベル} | 右Y軸に選択されたセンサー値 |
 
-### CSVエクスポート処理（参考）
+### CSVエクスポート処理
 
 ```python
 import csv
@@ -655,8 +668,8 @@ flowchart TD
 | device_id | string | ○ | 空文字不可 |
 | left_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
 | right_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
-| start_datetime | string | ○ | - |
-| end_datetime | string | ○ | start_datetime より後 |
+| start_datetime | string | ○ | 日時文字列（例: `2026-02-17 08:00:00`）、`datetime.fromisoformat()` でパース可能な形式 |
+| end_datetime | string | ○ | 日時文字列、start_datetime より後、差分が24時間以内 |
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
@@ -667,10 +680,10 @@ flowchart TD
 | device_id | string | ※ | device_mode='specified' の場合必須 |
 | left_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
 | right_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
-| left_min | number | - | 数値形式、left_max より小さいこと |
-| left_max | number | - | 数値形式、left_min より大きいこと |
-| right_min | number | - | 数値形式、right_max より小さいこと |
-| right_max | number | - | 数値形式、right_min より大きいこと |
+| left_min | number | - | 数値形式。left_max と両方入力時のみ left_min < left_max を検証（片側のみも可） |
+| left_max | number | - | 数値形式。left_min と両方入力時のみ left_min < left_max を検証（片側のみも可） |
+| right_min | number | - | 数値形式。right_max と両方入力時のみ right_min < right_max を検証（片側のみも可） |
+| right_max | number | - | 数値形式。right_min と両方入力時のみ right_min < right_max を検証（片側のみも可） |
 | group_id | string | ○ | 空文字不可 |
 | gadget_size | string | ○ | '2x2' / '2x4' |
 
@@ -873,10 +886,8 @@ def validate_register_params(params: dict) -> list:
     "code": "VALIDATION_ERROR",
     "message": "左Y軸の表示項目が不正です",
     "details": [
-      {
-        "field": "left_item",
-        "message": "左Y軸の表示項目が不正です"
-      }
+      "左Y軸の表示項目が不正です",
+      "右Y軸の表示項目は必須です"
     ]
   }
 }
@@ -893,8 +904,9 @@ def validate_register_params(params: dict) -> list:
 | INVALID_MIN_MAX | 最小値/最大値不正 | 400 |
 | UNAUTHORIZED | 認証エラー | 401 |
 | FORBIDDEN | アクセス権限なし | 403 |
-| DEVICE_NOT_FOUND | デバイス未検出 | 404 |
-| GADGET_NOT_FOUND | ガジェット未検出 | 404 |
+| DEVICE_NOT_FOUND | デバイス未検出（APIハンドラーから直接返却） | 404 |
+| GADGET_NOT_FOUND | ガジェット未検出（APIハンドラーから直接返却） | 404 |
+| NOT_FOUND | リソース未検出（汎用404エラーハンドラーから返却） | 404 |
 | INTERNAL_ERROR | サーバーエラー | 500 |
 
 ### エラーハンドリング実装
@@ -931,7 +943,8 @@ def unauthorized(error):
 @timeline_bp.errorhandler(403)
 def forbidden(error):
     """403 Forbidden"""
-    logger.warning(f'Access denied: user={current_user.user_id}, path={request.path}')
+    user_id = getattr(current_user, 'user_id', 'unknown') if current_user else 'unknown'
+    logger.warning(f'Access denied: user={user_id}, path={request.path}')
     return jsonify({
         'success': False,
         'error': {'code': 'FORBIDDEN', 'message': 'アクセス権限がありません'}
@@ -1032,8 +1045,10 @@ def handle_exceptions(f):
 | 3 | 24時間を超える日時範囲でリクエスト | 400エラー、DATETIME_RANGE_EXCEEDED |
 | 4 | 権限外デバイスへのアクセス | 403エラー、FORBIDDEN |
 | 5 | CSVエクスポート（正常系） | UTF-8 BOM付きCSV、4列出力 |
-| 6 | ガジェット登録（正常系） | 201 Created、gadget_type="timeline" |
+| 6 | ガジェット登録（正常系・指定デバイス） | 201 Created、gadget_type="timeline" |
 | 7 | 最小値 ≥ 最大値で登録 | 400エラー、INVALID_MIN_MAX |
+| 8 | 指定デバイスモードで存在しないデバイスIDを指定して登録 | 400エラー、DEVICE_NOT_FOUND |
+| 9 | ツリー連動モードでのガジェット登録（正常系） | 201 Created、device_id未設定で登録される |
 
 ### 統合テスト
 
@@ -1042,7 +1057,7 @@ def handle_exceptions(f):
 | 1 | データ取得 → ECharts描画 | 折れ線グラフが正常に描画される |
 | 2 | ガジェット登録 → ダッシュボード表示 | 登録したガジェットが表示される |
 | 3 | Row Access Policy適用確認 | 組織外デバイスのデータが表示されない |
-| 4 | 最小値/最大値設定 → 描画除外確認 | 範囲外データがグラフに描画されない |
+| 4 | 最小値/最大値設定 → Y軸範囲確認 | EChartsのY軸表示範囲が指定値（min/max）に設定される |
 
 ---
 
