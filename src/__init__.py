@@ -17,4 +17,8 @@ def create_app():
 
     db.init_app(app)
 
+    # Blueprint登録
+    from src.views.industry_dashboard import industry_dashboard_bp
+    app.register_blueprint(industry_dashboard_bp)
+
     return app
