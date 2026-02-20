@@ -825,7 +825,7 @@
 | 2   | dashboard_group_uuid | ダッシュボードグループUUID | VARCHAR(36) | NOT NULL | -   | -   | -                 | ダッシュボードグループのUUID（URLパラメータ用）            |
 | 3   | dashboard_group_name | ダッシュボードグループ名   | VARCHAR(50) | NOT NULL | -   | -   | -                 | ダッシュボードグループ名                                  |
 | 4   | dashboard_id         | ダッシュボードID          | INT         | NOT NULL | -   | ○   | -                 | ダッシュボードの一意識別子（外部キー）                      |
-| 5   | display_order        | 表示順序                 | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                             |
+| 5   | display_order        | 表示順                   | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                             |
 | 6   | create_date          | 作成日時                 | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                          |
 | 7   | creator              | 作成者                   | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                                 |
 | 8   | update_date          | 更新日時                 | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                       |
@@ -859,7 +859,7 @@
 | 8   | position_x         | X座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
 | 9   | position_y         | Y座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
 | 10  | gadget_size        | ガジェットサイズ        | INT         | NOT NULL | -   | -   | -                 | 0: 2x2（480×480px）、1: 2×4（960×480px）                                      |
-| 11  | display_order      | 表示順序               | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                                                  |
+| 11  | display_order      | 表示順                 | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                                                  |
 | 12  | create_date        | 作成日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                               |
 | 13  | creator            | 作成者                 | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                                                      |
 | 14  | update_date        | 更新日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                                            |
@@ -889,11 +889,12 @@
 | 3   | data_source_type   | データソース種別      | INT           | NOT NULL | -   | -   | -                 | 0: 組織、1: デバイス                              |
 | 4   | gadget_image_path  | ガジェットイメージパス | VARCHAR(100) | NOT NULL | -   | -   | -                 | 画像パス（例: static\images\xxxxx.png）            |
 | 5   | gadget_description | ガジェット説明        | VARCHAR(500) | NOT NULL | -   | -   | -                 | ガジェットの説明文                                  |
-| 6   | create_date        | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
-| 7   | creator            | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                          |
-| 8   | update_date        | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
-| 9   | modifier           | 更新者               | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                          |
-| 10  | delete_flag        | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE              |
+| 6   | display_order      | 表示順               | INT         | NOT NULL | -   | -   | -                 | ガジェット種別の表示順                               |
+| 7   | create_date        | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
+| 8   | creator            | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                          |
+| 9   | update_date        | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
+| 10  | modifier           | 更新者               | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                          |
+| 11  | delete_flag        | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE              |
 
 **外部キー:**
 - `gadget_type_id` → `dashboard_gadget_master.gadget_type_id`
@@ -908,26 +909,25 @@
 
 ### 27. ダッシュボードユーザー設定 (dashboard_user_setting)
 
-**概要**: ユーザー毎のダッシュボード設定（選択中ダッシュボードやガジェットの日時設定など）を管理するテーブル
+**概要**: ユーザー毎のダッシュボード設定（選択中ダッシュボードや組織など）を管理するテーブル
 
-| #   | カラム物理名              | カラム論理名          | データ型 | NULL     | PK  | FK  | デフォルト値      | 説明                                              |
-| --- | ------------------------ | -------------------- | ------- | -------- | --- | --- | ----------------- | ----------------------------------------------- |
-| 1   | user_id                  | ユーザーID            | INT     | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）            |
-| 2   | selected_dashboard_id    | 選択中ダッシュボードID | INT     | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                |
-| 3   | selected_organization_id | 選択中組織ID          | INT     | NOT NULL | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合は0を登録    |
-| 4   | selected_device_id       | 選択中デバイスID      | INT     | NOT NULL | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合は0を登録 |
-| 5   | gadget_datetime          | ガジェット日時        | JSON    | NOT NULL | -   | -   | -                 | ガジェット毎の日時設定                             |
-| 6   | create_date              | 作成日時             | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                  |
-| 7   | creator                  | 作成者               | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
-| 8   | update_date              | 更新日時             | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
-| 9   | modifier                 | 更新者               | INT      | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
-| 10  | delete_flag              | 削除フラグ           | BOOLEAN  | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
+| #   | カラム物理名     | カラム論理名    | データ型 | NULL     | PK  | FK  | デフォルト値      | 説明                                              |
+| --- | --------------- | -------------- | ------- | -------- | --- | --- | ----------------- | ----------------------------------------------- |
+| 1   | user_id         | ユーザーID      | INT     | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）            |
+| 2   | dashboard_id    | ダッシュボードID | INT     | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                |
+| 3   | organization_id | 組織ID          | INT     | NOT NULL | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合は0を登録    |
+| 4   | device_id       | デバイスID      | INT     | NOT NULL | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合は0を登録 |
+| 5   | create_date     | 作成日時        | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                  |
+| 6   | creator         | 作成者          | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
+| 7   | update_date     | 更新日時        | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
+| 8   | modifier        | 更新者          | INT      | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
+| 9   | delete_flag     | 削除フラグ      | BOOLEAN  | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
 
 **外部キー:**
 - `user_id` → `user_master.user_id`
-- `selected_dashboard_id` → `dashboard_master.dashboard_id`
-- `selected_organization_id` → `organization_master.organization_id`
-- `selected_device_id` → `device_master.device_id`
+- `dashboard_id` → `dashboard_master.dashboard_id`
+- `organization_id` → `organization_master.organization_id`
+- `device_id` → `device_master.device_id`
 
 **インデックス:**
 - PRIMARY KEY: `user_id`
