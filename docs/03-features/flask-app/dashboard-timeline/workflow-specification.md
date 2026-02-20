@@ -5,7 +5,7 @@
 - [概要](#概要)
 - [Flaskルート定義](#flaskルート定義)
 - [データ取得ワークフロー](#データ取得ワークフロー)
-- [CSV出力ワークフロー](#csv出力ワークフロー)
+- [CSVエクスポートワークフロー](#CSVエクスポートワークフロー)
 - [ガジェット登録ワークフロー](#ガジェット登録ワークフロー)
 - [バリデーション仕様](#バリデーション仕様)
 - [エラーハンドリング](#エラーハンドリング)
@@ -23,7 +23,7 @@
 
 **このドキュメントの役割:**
 - ✅ データ取得API処理フロー（Silver層からの生データ取得）
-- ✅ CSV出力処理フロー
+- ✅ CSVエクスポート処理フロー
 - ✅ ガジェット登録処理フロー
 - ✅ バリデーション・エラーハンドリング
 
@@ -33,7 +33,7 @@
 |--------|--------|------|
 | DTL-001 | 時系列グラフ表示 | 指定期間のセンサーデータを折れ線グラフで表示 |
 | DTL-002 | 期間選択 | 開始・終了日時を指定してデータ範囲を変更 |
-| DTL-003 | CSV出力 | 表示中のデータをCSVファイルとしてダウンロード |
+| DTL-003 | CSVエクスポート | 表示中のデータをCSVファイルとしてダウンロード |
 | DTL-004 | ガジェット登録 | 時系列グラフをダッシュボードに登録 |
 
 **注:** UI要素の詳細やバリデーションルールは [UI仕様書](./ui-specification.md) を参照してください。
@@ -42,23 +42,45 @@
 
 ```mermaid
 flowchart TD
-    subgraph メイン画面
-        A[デバイス選択/ツリー連動] --> B[日時範囲指定]
-        B --> C[データ取得API呼び出し]
-        C --> D[ECharts折れ線グラフ描画]
-        D --> E{CSV出力?}
-        E -->|Yes| F[CSV出力処理]
-        E -->|No| G[表示継続]
+    subgraph main["メイン画面"]
+        Start1(["デバイス選択/ツリー連動"]) --> Auth1[認証・権限チェック]
+        Auth1 --> CheckAuth1{認証・権限OK?}
+        CheckAuth1 -->|NG| ErrAuth1[401/403エラーページ表示]
+        CheckAuth1 -->|OK| DateRange[日時範囲指定]
+        DateRange --> CallAPI["データ取得API呼び出し<br>GET /api/dashboard/timeline/data"]
+        CallAPI --> CheckVal1{バリデーション/<br>スコープOK?}
+        CheckVal1 -->|NG| ErrVal1[400/403エラー表示]
+        CheckVal1 -->|OK| FetchData[Silver層からデータ取得]
+        FetchData --> DrawChart[ECharts折れ線グラフ描画]
+        DrawChart --> ExportCheck{CSVエクスポート?}
+        ExportCheck -->|Yes| CSVExport["CSVエクスポート処理<br>GET /api/dashboard/timeline/csv"]
+        ExportCheck -->|No| Continue[表示継続]
+        ErrAuth1 --> End1([処理完了])
+        ErrVal1 --> End1
+        CSVExport --> End1
+        Continue --> End1
     end
 
-    subgraph 登録画面
-        H[登録画面表示] --> I[ガジェット名入力]
-        I --> J[左Y軸/右Y軸センサー選択]
-        J --> K[最小値/最大値設定]
-        K --> L[グループ/部品サイズ選択]
-        L --> M[登録ボタン押下]
-        M --> N[ガジェット登録API]
+    subgraph register["登録画面"]
+        Start2([登録画面表示]) --> Auth2[認証・権限チェック]
+        Auth2 --> CheckAuth2{認証・権限OK?}
+        CheckAuth2 -->|NG| ErrAuth2[401/403エラーページ表示]
+        CheckAuth2 -->|OK| InputForm["ガジェット名/センサー項目/<br>軸設定/グループ/サイズ入力"]
+        InputForm --> Submit[登録ボタン押下]
+        Submit --> CallRegAPI["ガジェット登録API呼び出し<br>POST /api/dashboard/timeline/gadgets"]
+        CallRegAPI --> CheckVal2{バリデーション/<br>スコープOK?}
+        CheckVal2 -->|NG| ErrVal2[400/403エラー表示]
+        CheckVal2 -->|OK| RegisterGadget[ガジェット登録処理]
+        RegisterGadget --> RegResult{登録結果}
+        RegResult -->|失敗| Err500[500エラー表示]
+        RegResult -->|成功| Success[201 Created返却]
+        ErrAuth2 --> End2([処理完了])
+        ErrVal2 --> End2
+        Err500 --> End2
+        Success --> End2
     end
+
+    End1 ~~~ Start2
 ```
 
 ---
@@ -70,7 +92,7 @@ flowchart TD
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
 | 1 | データ取得 | `/api/dashboard/timeline/data` | GET | 時系列データ取得 | JSON | Silver層から生データ取得 |
-| 2 | CSV出力 | `/api/dashboard/timeline/csv` | GET | CSV出力 | CSVファイル | UTF-8 BOM付き |
+| 2 | CSVエクスポート | `/api/dashboard/timeline/csv` | GET | CSVエクスポート | CSVファイル | UTF-8 BOM付き |
 | 3 | ガジェット登録 | `/api/dashboard/timeline/gadgets` | POST | ガジェット登録 | JSON | 201 Created |
 
 ---
@@ -124,7 +146,7 @@ def get_timeline_data():
 
 ---
 
-### CSV出力API
+### CSVエクスポートAPI
 
 ```python
 import csv
@@ -135,7 +157,7 @@ from flask import Response
 @require_login
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def export_timeline_csv():
-    """時系列データをCSV出力"""
+    """時系列データをCSVエクスポート"""
 
     # パラメータ取得・バリデーション
     device_id = request.args.get('device_id')
@@ -249,8 +271,8 @@ flowchart TD
 | device_id | string | ○ | デバイスID |
 | left_item | string | ○ | 左Y軸のセンサー項目カラム名 |
 | right_item | string | ○ | 右Y軸のセンサー項目カラム名 |
-| start_datetime | string | ○ | 開始日時（ISO 8601形式） |
-| end_datetime | string | ○ | 終了日時（ISO 8601形式） |
+| start_datetime | string | ○ | 開始日時 |
+| end_datetime | string | ○ | 終了日時 |
 
 ### レスポンス
 
@@ -402,13 +424,13 @@ def fetch_silver_data(device_id: str, left_item: str, right_item: str,
 
 ---
 
-## CSV出力ワークフロー
+## CSVエクスポートワークフロー
 
 ### 処理フロー図
 
 ```mermaid
 flowchart TD
-    A[CSV出力ボタン押下] --> B{データ存在チェック}
+    A[CSVエクスポートボタン押下] --> B{データ存在チェック}
     B -->|なし| C[エラーメッセージ表示]
     B -->|あり| D{バリデーション}
     D -->|NG| E[400エラー]
@@ -419,7 +441,7 @@ flowchart TD
     I --> J[ダウンロード開始]
 ```
 
-### CSV出力仕様
+### CSVエクスポート仕様
 
 **ファイル名形式:**
 `timeline_{device_uuid}_{yyyyMMddHHmmss}.csv`
@@ -435,7 +457,7 @@ flowchart TD
 | 3 | {左Y軸項目のラベル} | 左Y軸に選択されたセンサー値 |
 | 4 | {右Y軸項目のラベル} | 右Y軸に選択されたセンサー値 |
 
-### CSV出力処理（参考）
+### CSVエクスポート処理（参考）
 
 ```python
 import csv
@@ -588,8 +610,8 @@ flowchart TD
 | device_id | string | ○ | 空文字不可 |
 | left_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
 | right_item | string | ○ | SENSOR_ITEMS のキーに含まれること |
-| start_datetime | string | ○ | ISO 8601形式 |
-| end_datetime | string | ○ | ISO 8601形式、start_datetime より後 |
+| start_datetime | string | ○ | - |
+| end_datetime | string | ○ | start_datetime より後 |
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
@@ -636,8 +658,8 @@ def validate_chart_params(device_id: str, left_item: str, right_item: str,
         device_id: デバイスID
         left_item: 左Y軸カラム名
         right_item: 右Y軸カラム名
-        start_datetime: 開始日時（ISO 8601形式）
-        end_datetime: 終了日時（ISO 8601形式）
+        start_datetime: 開始日時
+        end_datetime: 終了日時
 
     Returns:
         エラーメッセージのリスト（空リストは正常）
@@ -781,7 +803,6 @@ def validate_register_params(params: dict) -> list:
 | 制約 | 値 | 説明 |
 |------|-----|------|
 | 最大範囲 | 24時間 | 開始〜終了の差分 |
-| 形式 | ISO 8601 | YYYY-MM-DDTHH:mm:ss+09:00 |
 
 ---
 
@@ -886,7 +907,7 @@ def internal_error(error):
 | センサー項目名 | ホワイトリスト方式（`VALID_ITEMS` リストで照合） |
 | SQLパラメータ | パラメータバインディング（`:device_id`, `:start_datetime` 等） |
 | カラム名の動的挿入 | ホワイトリスト照合後にのみSQLに展開（SQLインジェクション防止） |
-| 日時パラメータ | ISO 8601形式チェック + `datetime.fromisoformat()` でのパース |
+| 日時パラメータ | `datetime.fromisoformat()` でのパース |
 
 ### データアクセス制御
 
@@ -903,7 +924,7 @@ def internal_error(error):
 | 指標 | 目標値 |
 |------|--------|
 | API応答時間 | 500ms以内（データ取得API） |
-| CSV出力時間 | 5秒以内 |
+| CSVエクスポート時間 | 5秒以内 |
 | 最大同時接続 | 100接続 |
 
 ### 最適化方針
@@ -925,7 +946,7 @@ def internal_error(error):
 | 2 | 不正なセンサー項目名でリクエスト | 400エラー、INVALID_SENSOR_ITEM |
 | 3 | 24時間を超える日時範囲でリクエスト | 400エラー、DATETIME_RANGE_EXCEEDED |
 | 4 | 権限外デバイスへのアクセス | 403エラー、FORBIDDEN |
-| 5 | CSV出力（正常系） | UTF-8 BOM付きCSV、4列出力 |
+| 5 | CSVエクスポート（正常系） | UTF-8 BOM付きCSV、4列出力 |
 | 6 | ガジェット登録（正常系） | 201 Created、gadget_type="timeline" |
 | 7 | 最小値 ≥ 最大値で登録 | 400エラー、INVALID_MIN_MAX |
 
