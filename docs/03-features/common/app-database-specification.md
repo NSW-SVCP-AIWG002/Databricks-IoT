@@ -32,6 +32,8 @@
     - [20. アラート履歴 (alert\_history)](#20-アラート履歴-alert_history)
     - [21. アラートステータスマスタ (alert\_status\_master)](#21-アラートステータスマスタ-alert_status_master)
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
+    - [23. メール通知キュー（email\_notification\_queue）](#23-メール通知キューemail_notification_queue)
+    - [24. アラート異常状態（alert\_abnomal\_state）](#24-アラート異常状態alert_abnomal_state)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -581,13 +583,13 @@
 
 **概要**: デバイスの接続状態を保持するテーブル
 
-| #   | カラム物理名 | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
-| --- | ------------ | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | device_id    | デバイスID   | VARCHAR(100) | NOT NULL | ○   | -   | -                 | デバイス固有のID                        |
-| 2   | status       | ステータス   | INT          | NOT NULL | -   | 0   | -                 | 0：未接続　1：接続済み                  |
-| 3   | delete_flag  | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
-| 4   | create_date  | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 5   | update_date  | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
+| #   | カラム物理名       | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
+| --- | ------------------ | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
+| 1   | device_id          | デバイスID   | VARCHAR(100) | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
+| 2   | last_received_time | 最終受信時刻 | TIMESTAMP    | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 |
+| 3   | delete_flag        | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
+| 4   | create_date        | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
+| 5   | update_date        | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
 
 **外部キー:**
 - `device_id` → `device_master.device_id`
@@ -775,6 +777,94 @@
 | 3         | 組織             | 組織マスタ             |
 | 4         | アラート設定     | アラート設定マスタ     |
 | 5         | デバイス在庫情報 | デバイス在庫情報マスタ |
+
+---
+
+### 23. メール通知キュー（email_notification_queue）
+
+**概要**: メール送信の待機列を保持するテーブル
+
+| #   | カラム物理名      | カラム論理名         | データ型      | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
+| --- | ----------------- | -------------------- | ------------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
+| 1   | queue_id          | キューID             | BIGINT        | NOT NULL | 〇  | -   | -                 | キューレコードの一意識別子（自動採番）                       |
+| 2   | device_id         | デバイスID           | INT           | NOT NULL | -   | 〇  | -                 | アラート発生元デバイスID                                     |
+| 3   | organization_id   | 組織ID               | INT           | NOT NULL | -   | 〇  | -                 | デバイス所属組織ID                                           |
+| 4   | alert_id          | アラートID           | INT           | NOT NULL | -   | 〇  | -                 | 発生したアラートの設定ID                                     |
+| 5   | recipient_email   | 送信先メールアドレス | VARCHAR(2000) | NOT NULL | -   | -   | -                 | 通知送信先のメールアドレス。複数ある場合、カンマ区切りで結合 |
+| 6   | subject           | 件名                 | VARCHAR(500)  | NOT NULL | -   | -   | -                 | メール件名                                                   |
+| 7   | body              | 本文                 | VARCHAR(2000) | NOT NULL | -   | -   | -                 | メール本文（HTML形式可）                                     |
+| 8   | alert_detail_json | アラート詳細JSON     | JSON          | NOT NULL | -   | -   | -                 | アラート詳細情報（測定項目、値、閾値等）                     |
+| 9   | status            | ステータス           | VARCHAR(20)   | NOT NULL | -   | -   | -                 | PENDING/PROCESSING/SENT/FAILED                               |
+| 10  | retry_count       | リトライ回数         | INT           | NOT NULL | -   | -   | -                 | 送信リトライ回数（初期値0、最大3）                           |
+| 11  | error_message     | エラーメッセージ     | JSON          | NULL     | -   | -   | -                 | 送信失敗時のエラー内容                                       |
+| 12  | event_timestamp   | イベント発生日時     | TIMESTAMP     | NOT NULL | -   | -   | -                 | アラートが発生した日時                                       |
+| 13  | queued_time       | キュー登録日時       | TIMESTAMP     | NOT NULL | -   | -   | -                 | キューに登録された日時                                       |
+| 14  | processed_time    | 処理完了日時         | TIMESTAMP     | NULL     | -   | -   | -                 | メール送信処理が完了した日時                                 |
+| 15  | create_time       | 作成日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
+| 16  | update_time       | 更新日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                             |
+
+**外部キー:**
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+- `alert_id` → `alert_setting_master.alert_id`
+
+**インデックス:**
+- PRIMARY KEY: `queue_id`
+
+**ステータス遷移**:
+
+| ステータス | 説明                                 |
+| ---------- | ------------------------------------ |
+| PENDING    | 送信待ち（初期状態）                 |
+| PROCESSING | 送信処理中（バッチジョブが処理開始） |
+| SENT       | 送信完了                             |
+| FAILED     | 送信失敗（最大リトライ回数超過）     |
+
+**ビジネスルール:**
+- LDPストリーミング処理でアラート検出時にPENDINGステータスでINSERT
+- バッチジョブがPENDINGレコードを取得しPROCESSINGに更新後、メール送信
+- 送信成功時はSENT、失敗時はretry_count増加、retry_countが3を超えた場合はFAILEDステータスに更新
+- 30日経過したSENT/FAILEDレコードは定期削除ジョブで削除
+
+---
+
+### 24. アラート異常状態（alert_abnomal_state）
+
+**概要**: デバイス×アラート設定ごとの異常継続状態を管理するテーブル。アラート設定マスタの判定時間（judgment_time）を超えて異常値が継続した場合にアラートを発報するための状態管理に使用する。
+
+| #   | カラム物理名        | カラム論理名     | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                           |
+| --- | ------------------- | ---------------- | --------- | -------- | --- | --- | ----------------- | ---------------------------------------------- |
+| 1   | device_id           | デバイスID       | INT       | NOT NULL | 〇  | 〇  | -                 | 対象デバイスID                                 |
+| 2   | alert_id            | アラートID       | INT       | NOT NULL | 〇  | 〇  | -                 | アラート設定ID（alert_setting_master参照）     |
+| 3   | abnormal_start_time | 異常開始時刻     | TIMESTAMP | NULL     | -   | -   | -                 | 異常が開始した時刻（正常時はNULL）             |
+| 4   | last_event_time     | 最終イベント時刻 | TIMESTAMP | NOT NULL | -   | -   | -                 | 最後に評価したセンサーデータのイベント時刻     |
+| 5   | last_sensor_value   | 最終センサー値   | DOUBLE    | NULL     | -   | -   | -                 | 最後に評価したセンサー値                       |
+| 6   | alert_fired_time    | アラート発報時刻 | TIMESTAMP | NULL     | -   | -   | -                 | アラートを発報した時刻（未発報時はNULL）       |
+| 7   | alert_history_id    | アラート履歴ID   | INT       | NULL     | -   | 〇  | -                 | アラート履歴ID（復旧時更新用、未発報時はNULL） |
+| 8   | create_time         | 作成日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
+| 9   | update_time         | 更新日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                               |
+
+**外部キー:**
+- `device_id` → `device_master.device_id`
+- `alert_id` → `alert_setting_master.alert_id`
+
+**状態遷移**:
+
+| 状態         | abnormal_start_time | alert_fired_time | 説明                           |
+| ------------ | ------------------- | ---------------- | ------------------------------ |
+| 正常         | NULL                | NULL             | 閾値内、異常なし               |
+| 異常開始     | 異常開始時刻        | NULL             | 閾値超過開始、判定時間未経過   |
+| アラート発報 | 異常開始時刻        | アラート発報時刻 | 判定時間経過、アラート発報済み |
+| 復旧         | NULL                | NULL             | 正常値に復旧、状態リセット     |
+
+**ビジネスルール**:
+- デバイスID×アラートIDの組み合わせで一意にレコードを管理
+- 閾値超過時に異常状態でなければ、異常開始時刻を記録
+- 異常継続時間が判定時間（judgment_time）を超過した時点でアラートを発報
+- アラート発報時にOLTP DBのアラート履歴にレコードを登録し、そのalert_history_idを保持
+- 一度アラートを発報したら、復旧するまで再発報しない（abnormal_start_time IS NOT NULL AND alert_fired_time IS NOT NULL）
+- 正常値に復旧したら、alert_history_idを使用してOLTP DBのアラート履歴に復旧日時を更新
+- 復旧処理完了後、全ての状態をリセット（alert_history_id含む）
 
 ---
 

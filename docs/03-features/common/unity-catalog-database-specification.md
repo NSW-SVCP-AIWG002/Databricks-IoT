@@ -20,8 +20,6 @@
     - [ブロンズ層](#ブロンズ層-1)
     - [シルバー層テーブル](#シルバー層テーブル)
       - [1. センサーデータ (silver\_sensor\_data)](#1-センサーデータ-silver_sensor_data)
-      - [2. メール送信キュー (silver\_email\_notification\_queue)](#2-メール送信キュー-silver_email_notification_queue)
-      - [3. アラート異常状態 (silver\_alert\_abnormal\_state)](#3-アラート異常状態-silver_alert_abnormal_state)
     - [ゴールド層テーブル](#ゴールド層テーブル)
       - [1. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#1-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
       - [2. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#2-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
@@ -120,9 +118,7 @@ iot_catalog/                                        # Unity Catalogカタログ
 ├── bronze/                                         # 生データが格納されるADLS内のディレクトリ
 │   └── YYYYMMDD/                                   # 生データは日付ごとに投入される
 ├── silver/                                         # シルバー層スキーマ
-│   ├── silver_sensor_data                          # JSON形式にパースしたセンサーデータ
-│   ├── silver_email_notification_queue                    # メール送信キューテーブル
-│   └── silver_alert_abnormal_state                        # アラート異常状態テーブル
+│   └── silver_sensor_data                          # JSON形式にパースしたセンサーデータ
 ├── gold/                                           # ゴールド層スキーマ
 │   ├── gold_sensor_data_daily_summary              # センサーデータ日次サマリ
 │   ├── gold_sensor_data_monthly_summary            # センサーデータ月次サマリ
@@ -147,11 +143,11 @@ iot_catalog/                                        # Unity Catalogカタログ
 
 ### シルバー層
 
-| #   | テーブル物理名                  | テーブル論理名   | 説明                                         |
-| --- | ------------------------------- | ---------------- | -------------------------------------------- |
-| 1   | silver_sensor_data              | センサーデータ   | 構造化済みセンサーデータ                     |
-| 2   | silver_email_notification_queue | メール送信キュー | アラート発生時のメール送信待ちキューテーブル |
-| 3   | silver_alert_abnormal_state     | アラート異常状態 | デバイス×アラート設定ごとの異常継続状態管理  |
+| #   | テーブル物理名     | テーブル論理名 | 説明                     |
+| --- | ------------------ | -------------- | ------------------------ |
+| 1   | silver_sensor_data | センサーデータ | 構造化済みセンサーデータ |
+
+**注記**: メール送信キュー（email_notification_queue）とアラート異常状態（alert_abnormal_state）は、OLTPレスポンス要件のためOLTP DB（MySQL）に配置されています。詳細はアプリケーションデータベース設計書を参照してください。
 
 ### ゴールド層
 
@@ -268,157 +264,6 @@ TBLPROPERTIES (
 
 **ビジネスルール**:
 - device_id、organization_idはOLTPのdevice_masterから取得
-
----
-
-#### 2. メール送信キュー (silver_email_notification_queue)
-
-**概要**: アラート発生時にメール送信をキューイングするテーブル。Databricks Workflowのバッチジョブにより定期的に処理される。
-
-| #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | 説明                                     |
-| --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ---------------------------------------- |
-| 1   | queue_id          | キューID             | BIGINT       | NOT NULL | 〇  |     | キューレコードの一意識別子（自動採番）   |
-| 2   | device_id         | デバイスID           | INT          | NOT NULL |     |     | アラート発生元デバイスID                 |
-| 3   | organization_id   | 組織ID               | INT          | NOT NULL |     |     | デバイス所属組織ID                       |
-| 4   | alert_id          | アラートID           | INT          | NOT NULL |     |     | 発生したアラートの設定ID                 |
-| 5   | recipient_email   | 送信先メールアドレス | VARCHAR(255) | NOT NULL |     |     | 通知送信先のメールアドレス               |
-| 6   | subject           | 件名                 | VARCHAR(500) | NOT NULL |     |     | メール件名                               |
-| 7   | body              | 本文                 | STRING       | NOT NULL |     |     | メール本文（HTML形式可）                 |
-| 8   | alert_detail_json | アラート詳細JSON     | VARIANT      | NOT NULL |     |     | アラート詳細情報（測定項目、値、閾値等） |
-| 9   | status            | ステータス           | VARCHAR(20)  | NOT NULL |     |     | PENDING/PROCESSING/SENT/FAILED           |
-| 10  | retry_count       | リトライ回数         | INT          | NOT NULL |     |     | 送信リトライ回数（初期値0、最大3）       |
-| 11  | error_message     | エラーメッセージ     | STRING       | NULL     |     |     | 送信失敗時のエラー内容                   |
-| 12  | event_timestamp   | イベント発生日時     | TIMESTAMP    | NOT NULL |     |     | アラートが発生した日時                   |
-| 13  | queued_time       | キュー登録日時       | TIMESTAMP    | NOT NULL |     |     | キューに登録された日時                   |
-| 14  | processed_time    | 処理完了日時         | TIMESTAMP    | NULL     |     |     | メール送信処理が完了した日時             |
-| 15  | create_time       | 作成日時             | TIMESTAMP    | NOT NULL |     |     | レコード作成日時                         |
-| 16  | update_time       | 更新日時             | TIMESTAMP    | NOT NULL |     |     | レコード更新日時                         |
-
-**クラスタリングキー**: `status`, `queued_time`
-
-**テーブルプロパティ**:
-```sql
-CREATE TABLE IF NOT EXISTS iot_catalog.silver.silver_email_notification_queue (
-    queue_id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
-    device_id INT NOT NULL,
-    organization_id INT NOT NULL,
-    alert_id INT NOT NULL,
-    alert_name VARCHAR(255) NOT NULL,
-    alert_level_id INT NOT NULL,
-    recipient_email VARCHAR(255) NOT NULL,
-    subject VARCHAR(500) NOT NULL,
-    body STRING NOT NULL,
-    alert_detail_json VARIANT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    retry_count INT NOT NULL DEFAULT 0,
-    error_message STRING NULL,
-    event_timestamp TIMESTAMP NOT NULL,
-    queued_time TIMESTAMP NOT NULL,
-    processed_time TIMESTAMP NULL,
-    create_time TIMESTAMP NOT NULL,
-    update_time TIMESTAMP NOT NULL
-)
-USING DELTA
-CLUSTER BY (status, queued_time)
-TBLPROPERTIES (
-    'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact' = 'true',
-    'delta.logRetentionDuration' = 'interval 7 days',
-    'delta.deletedFileRetentionDuration' = 'interval 7 days',
-    'delta.tuneFileSizesForRewrites' = 'true'
-);
-```
-
-**ステータス遷移**:
-
-| ステータス | 説明                                 |
-| ---------- | ------------------------------------ |
-| PENDING    | 送信待ち（初期状態）                 |
-| PROCESSING | 送信処理中（バッチジョブが処理開始） |
-| SENT       | 送信完了                             |
-| FAILED     | 送信失敗（最大リトライ回数超過）     |
-
-**バッチ処理仕様**:
-
-| 項目             | 値                              | 説明                                    |
-| ---------------- | ------------------------------- | --------------------------------------- |
-| 実行間隔         | 1分                             | Databricks Workflowで定期実行           |
-| 最大リトライ回数 | 3回                             | retry_countが3を超えたらFAILEDに遷移    |
-| リトライ間隔     | 指数バックオフ（1秒、2秒、4秒） | リトライ時の待機時間                    |
-| 処理単位         | 100件/バッチ                    | 1回の実行で処理する最大キュー数         |
-| データ保持期間   | 30日                            | SENT/FAILEDステータスのレコード保持期間 |
-
-**ビジネスルール**:
-- LDPストリーミング処理でアラート検出時にPENDINGステータスでINSERT
-- バッチジョブがPENDINGレコードを取得しPROCESSINGに更新後、メール送信
-- 送信成功時はSENT、失敗時はretry_count増加、retry_countが3を超えた場合はFAILEDステータスに更新
-- 30日経過したSENT/FAILEDレコードは定期削除ジョブで削除
-
----
-
-#### 3. アラート異常状態 (silver_alert_abnormal_state)
-
-**概要**: デバイス×アラート設定ごとの異常継続状態を管理するテーブル。アラート設定マスタの判定時間（judgment_time）を超えて異常値が継続した場合にアラートを発砲するための状態管理に使用する。
-
-| #   | カラム物理名        | カラム論理名     | データ型  | NULL     | PK  | FK  | 説明                                                    |
-| --- | ------------------- | ---------------- | --------- | -------- | --- | --- | ------------------------------------------------------- |
-| 1   | device_id           | デバイスID       | INT       | NOT NULL | 〇  |     | 対象デバイスID                                          |
-| 2   | alert_id            | アラートID       | INT       | NOT NULL | 〇  |     | アラート設定ID（alert_setting_master参照）              |
-| 3   | is_abnormal         | 異常状態フラグ   | BOOLEAN   | NOT NULL |     |     | 現在異常状態か（TRUE:異常、FALSE:正常）                 |
-| 4   | abnormal_start_time | 異常開始時刻     | TIMESTAMP | NULL     |     |     | 異常が開始した時刻（正常時はNULL）                      |
-| 5   | last_event_time     | 最終イベント時刻 | TIMESTAMP | NOT NULL |     |     | 最後に評価したセンサーデータのイベント時刻              |
-| 6   | last_sensor_value   | 最終センサー値   | DOUBLE    | NULL     |     |     | 最後に評価したセンサー値                                |
-| 7   | alert_fired         | アラート発砲済   | BOOLEAN   | NOT NULL |     |     | 今回の異常期間でアラートを発砲済みか                    |
-| 8   | alert_fired_time    | アラート発砲時刻 | TIMESTAMP | NULL     |     |     | アラートを発砲した時刻（未発砲時はNULL）                |
-| 9   | alert_history_id    | アラート履歴ID   | INT       | NULL     |     |     | OLTP DBのアラート履歴ID（復旧時更新用、未発砲時はNULL） |
-| 10  | create_time         | 作成日時         | TIMESTAMP | NOT NULL |     |     | レコード作成日時                                        |
-| 11  | update_time         | 更新日時         | TIMESTAMP | NOT NULL |     |     | レコード更新日時                                        |
-
-**クラスタリングキー**: `device_id`, `alert_id`
-
-**テーブルプロパティ**:
-```sql
-CREATE TABLE IF NOT EXISTS iot_catalog.silver.silver_alert_abnormal_state (
-    device_id INT NOT NULL,
-    alert_id INT NOT NULL,
-    is_abnormal BOOLEAN NOT NULL DEFAULT FALSE,
-    abnormal_start_time TIMESTAMP NULL,
-    last_event_time TIMESTAMP NOT NULL,
-    last_sensor_value DOUBLE NULL,
-    alert_fired BOOLEAN NOT NULL DEFAULT FALSE,
-    alert_fired_time TIMESTAMP NULL,
-    alert_history_id INT NULL,
-    create_time TIMESTAMP NOT NULL,
-    update_time TIMESTAMP NOT NULL
-)
-USING DELTA
-CLUSTER BY (device_id, alert_id)
-TBLPROPERTIES (
-    'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact' = 'true',
-    'delta.logRetentionDuration' = 'interval 7 days',
-    'delta.deletedFileRetentionDuration' = 'interval 7 days',
-    'delta.tuneFileSizesForRewrites' = 'true'
-);
-```
-
-**状態遷移**:
-
-| 状態         | is_abnormal | abnormal_start_time | alert_fired | 説明                           |
-| ------------ | ----------- | ------------------- | ----------- | ------------------------------ |
-| 正常         | FALSE       | NULL                | FALSE       | 閾値内、異常なし               |
-| 異常開始     | TRUE        | 異常開始時刻        | FALSE       | 閾値超過開始、判定時間未経過   |
-| アラート発砲 | TRUE        | 異常開始時刻        | TRUE        | 判定時間経過、アラート発砲済み |
-| 復旧         | FALSE       | NULL                | FALSE       | 正常値に復旧、状態リセット     |
-
-**ビジネスルール**:
-- デバイスID×アラートIDの組み合わせで一意にレコードを管理
-- 閾値超過時に異常状態でなければ、異常開始時刻を記録
-- 異常継続時間が判定時間（judgment_time）を超過した時点でアラートを発砲
-- アラート発砲時にOLTP DBのアラート履歴にレコードを登録し、そのalert_history_idを保持
-- 一度アラートを発砲したら、復旧するまで再発砲しない（alert_fired=TRUE）
-- 正常値に復旧したら、alert_history_idを使用してOLTP DBのアラート履歴に復旧日時を更新
-- 復旧処理完了後、全ての状態をリセット（alert_history_id含む）
 
 ---
 
@@ -777,14 +622,12 @@ VACUUM iot_catalog.silver.silver_sensor_data;
 
 ## クラスター設計
 
-| テーブル                         | クラスタリングキー                   | 目的                                |
-| -------------------------------- | ------------------------------------ | ----------------------------------- |
-| silver_sensor_data               | `DATE(event_timestamp)`, `device_id` | 時系列クエリの最適化                |
-| silver_email_notification_queue  | `status`, `queued_time`              | ステータス別キュー取得の最適化      |
-| silver_alert_abnormal_state      | `device_id`, `alert_id`              | デバイス×アラート別状態取得の最適化 |
-| gold_sensor_data_daily_summary   | `collection_date`, `device_id`       | 集計単位でのアクセス最適化          |
-| gold_sensor_data_monthly_summary | `collection_year_month`, `device_id` | 集計単位でのアクセス最適化          |
-| gold_sensor_data_yearly_summary  | `collection_year`, `device_id`       | 集計単位でのアクセス最適化          |
+| テーブル                         | クラスタリングキー                   | 目的                       |
+| -------------------------------- | ------------------------------------ | -------------------------- |
+| silver_sensor_data               | `DATE(event_timestamp)`, `device_id` | 時系列クエリの最適化       |
+| gold_sensor_data_daily_summary   | `collection_date`, `device_id`       | 集計単位でのアクセス最適化 |
+| gold_sensor_data_monthly_summary | `collection_year_month`, `device_id` | 集計単位でのアクセス最適化 |
+| gold_sensor_data_yearly_summary  | `collection_year`, `device_id`       | 集計単位でのアクセス最適化 |
 
 ---
 
@@ -837,12 +680,13 @@ Unity CatalogはOLTP DB（MySQL互換）と連携して動作します。
 
 ---
 
-| 版数 | 日付       | 更新者       | 更新内容                                         |
-| ---- | ---------- | ------------ | ------------------------------------------------ |
-| 1.0  | 2026-01-13 | Kei Sugiyama | 初版作成                                         |
-| 1.1  | 2026-01-14 | Kei Sugiyama | Row Access Policy追加、型変更対応                |
-| 1.2  | 2026-01-16 | Kei Sugiyama | レビュー指摘事項反映                             |
-| 1.3  | 2026-01-22 | Kei Sugiyama | メール送信キューテーブル追加                     |
-| 1.4  | 2026-01-23 | Kei Sugiyama | アラート異常状態テーブル追加（継続時間判定対応） |
+| 版数 | 日付       | 更新者       | 更新内容                                                                 |
+| ---- | ---------- | ------------ | ------------------------------------------------------------------------ |
+| 1.0  | 2026-01-13 | Kei Sugiyama | 初版作成                                                                 |
+| 1.1  | 2026-01-14 | Kei Sugiyama | Row Access Policy追加、型変更対応                                        |
+| 1.2  | 2026-01-16 | Kei Sugiyama | レビュー指摘事項反映                                                     |
+| 1.3  | 2026-01-22 | Kei Sugiyama | メール送信キューテーブル追加                                             |
+| 1.4  | 2026-01-23 | Kei Sugiyama | アラート異常状態テーブル追加（継続時間判定対応）                         |
+| 1.5  | 2026-02-02 | Kei Sugiyama | 異常状態テーブル・メール送信キューをOLTP DBに移設（シルバー層から削除）  |
 
 **このデータベース設計書は、実装前に必ずレビューを受けてください。**
