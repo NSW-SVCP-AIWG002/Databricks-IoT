@@ -1,20 +1,54 @@
 # すべてのファイルとディレクトリを除外
 /*
 
-# docsフォルダのみ許可
+# ドキュメント
 !/docs/
-
-# docsフォルダ内のすべてを許可
 !/docs/**
+!/README.md
+!/LICENSE
+!/NOTICE
+!/CLAUDE.md
 
-# .gitignore自体を除外
-.gitignore
+# 開発環境設定
+!/.devcontainer/
+!/.devcontainer/**
+!/.vscode/
+!/.vscode/**
 
-# flask-appディレクトリすべて除外
-/workspaces/Databricks-IoT/docs/03-features/flask-app
+# アプリケーションコード（srcフォルダで開発）
+!/src/
+!/src/**
 
-# silver-layer内の内容は全て許可
-!/workspaces/Databricks-IoT/docs/03-features/ldp-pipeline/silver-layer/**
+# DB初期化スクリプト
+!/init/
+!/init/**
 
-# common内のDB設計書は全て許可
-!/workspaces/Databricks-IoT/docs/03-features/common/**
+# テストコード
+!/tests/
+!/tests/**
+
+# 依存関係・設定ファイル
+!/requirements.txt
+!/wsgi.py
+!/pytest.ini
+!/Dockerfile
+
+# 環境変数テンプレート（実際の.envは除外）
+!/.env.example
+
+# エディタ設定
+!/.editorconfig
+
+# Git設定
+!.gitignore
+
+# 機密情報・Databricks関連は除外
+.env
+*.key
+*.pem
+.databricks/
+databricks.yml
+credentials/
+
+# データファイルは除外
+users.json
