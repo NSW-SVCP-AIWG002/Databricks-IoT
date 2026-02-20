@@ -170,6 +170,319 @@ except Exception as e:
 
 **注:** ログ出力の詳細は[ログ出力ポリシー](#ログ出力ポリシー)セクションを参照してください。
 
+### エラー通知（Teams）
+
+エラー発生時、システム保守者が属するTeamsの管理チャネルに対して通知を行います。通知はTeamsチャネルに登録されたワークフロー（Incoming Webhook）を実行することで実現します。
+エラー通知対象のエラー内容は各機能の設計書を参照。
+
+#### 通知フロー
+
+```mermaid
+flowchart TD
+    Error([エラー発生]) --> CheckType{通知対象<br>エラーか}
+    CheckType -->|対象外| LogOnly[ログ出力のみ]
+    LogOnly --> End([処理続行])
+
+    CheckType -->|対象| BuildPayload[通知メッセージ<br>ペイロード作成]
+    BuildPayload --> CallWebhook[Teams Webhook<br>呼び出し]
+    CallWebhook --> CheckResult{送信結果}
+
+    CheckResult -->|成功| LogSuccess[通知成功ログ出力]
+    LogSuccess --> End([処理続行])
+
+    CheckResult -->|失敗| RetryCount{リトライ<br>回数確認}
+    RetryCount -->|3回以上| LogFailure[通知失敗ログ出力<br>※処理は続行]
+    RetryCount -->|3回未満| Wait[5秒待機]
+    Wait --> CallWebhook
+    LogFailure --> End([処理続行])
+```
+
+#### 通知メッセージ仕様
+
+| 項目           | 内容                                  |
+| -------------- | ------------------------------------- |
+| 宛先           | システム保守者用Teams管理チャネル     |
+| 通知方式       | Teamsワークフロー（Incoming Webhook） |
+| メッセージ形式 | Adaptive Card（JSON）                 |
+
+**通知内容:**
+
+| 項目         | 説明                            | 例                                |
+| ------------ | ------------------------------- | --------------------------------- |
+| タイトル     | アラート種別と優先度            | [高] シルバー層パイプラインエラー |
+| エラーコード | 発生したエラーのコード          | SILVER_ERR_001                    |
+| エラー内容   | エラーメッセージ                | OLTP DBへの接続に失敗しました     |
+| 発生日時     | エラー発生のタイムスタンプ      | 2026-01-29 10:15:42 JST           |
+| パイプライン | 対象パイプライン名              | silver_sensor_data_pipeline       |
+| バッチID     | foreachBatchのバッチID          | 12345                             |
+| 詳細情報     | スタックトレース（先頭500文字） | -                                 |
+| 対処リンク   | 運用手順書へのリンク            | -                                 |
+
+#### Webhook設定
+
+**環境変数:**
+
+| 変数名                    | 説明                              | 設定場所                |
+| ------------------------- | --------------------------------- | ----------------------- |
+| TEAMS_WEBHOOK_URL         | TeamsワークフローのWebhook URL    | Databricks Secret Scope |
+| TEAMS_WEBHOOK_TIMEOUT_SEC | Webhook呼び出しタイムアウト（秒） | パイプライン設定        |
+| TEAMS_WEBHOOK_RETRY_COUNT | リトライ回数                      | パイプライン設定        |
+
+**Secret Scope設定:**
+
+```python
+# Databricks Secret Scopeからwebhook URLを取得
+webhook_url = dbutils.secrets.get(scope="iot-pipeline-secrets", key="teams-webhook-url")
+```
+
+#### 通知実装例（Python）
+
+```python
+import requests
+import json
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class TeamsNotifier:
+    """Teams通知クラス"""
+
+    def __init__(self, webhook_url: str, timeout: int = 30, retry_count: int = 3):
+        self.webhook_url = webhook_url
+        self.timeout = timeout
+        self.retry_count = retry_count
+
+    def send_error_notification(
+        self,
+        error_code: str,
+        error_message: str,
+        pipeline_name: str,
+        batch_id: int = None,
+        stack_trace: str = None
+    ) -> bool:
+        """
+        エラー通知をTeamsに送信
+
+        Args:
+            error_code: エラーコード（例: SILVER_ERR_001）
+            error_message: エラーメッセージ
+            pipeline_name: パイプライン名
+            batch_id: foreachBatchのバッチID（オプション）
+            stack_trace: スタックトレース（オプション）
+
+        Returns:
+            bool: 送信成功時True
+        """
+        payload = self._build_adaptive_card(
+            error_code=error_code,
+            error_message=error_message,
+            pipeline_name=pipeline_name,
+            batch_id=batch_id,
+            stack_trace=stack_trace
+        )
+
+        for attempt in range(self.retry_count):
+            try:
+                response = requests.post(
+                    self.webhook_url,
+                    json=payload,
+                    timeout=self.timeout,
+                    headers={"Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    logger.info(f"Teams通知送信成功: {error_code}")
+                    return True
+                else:
+                    logger.warning(
+                        f"Teams通知送信失敗 (試行 {attempt + 1}/{self.retry_count}): "
+                        f"status={response.status_code}"
+                    )
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    f"Teams通知送信エラー (試行 {attempt + 1}/{self.retry_count}): {str(e)}"
+                )
+
+            if attempt < self.retry_count - 1:
+                import time
+                time.sleep(5)  # 5秒待機してリトライ
+
+        logger.error(f"Teams通知送信失敗（リトライ上限）: {error_code}")
+        return False
+
+    def _build_adaptive_card(
+        self,
+        error_code: str,
+        error_message: str,
+        pipeline_name: str,
+        batch_id: int = None,
+        stack_trace: str = None
+    ) -> dict:
+        """Adaptive Cardペイロードを構築"""
+
+        priority = "高" if error_code.startswith("SILVER_ERR") else "中"
+        priority_color = "attention" if priority == "高" else "warning"
+
+        facts = [
+            {"title": "エラーコード", "value": error_code},
+            {"title": "エラー内容", "value": error_message},
+            {"title": "発生日時", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S JST")},
+            {"title": "パイプライン", "value": pipeline_name}
+        ]
+
+        if batch_id is not None:
+            facts.append({"title": "バッチID", "value": str(batch_id)})
+
+        card = {
+            "type": "message",
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                        "type": "AdaptiveCard",
+                        "version": "1.4",
+                        "body": [
+                            {
+                                "type": "TextBlock",
+                                "size": "Large",
+                                "weight": "Bolder",
+                                "text": f"[{priority}] シルバー層パイプラインエラー",
+                                "color": priority_color
+                            },
+                            {
+                                "type": "FactSet",
+                                "facts": facts
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        # スタックトレースがある場合は追加（先頭500文字）
+        if stack_trace:
+            card["attachments"][0]["content"]["body"].append({
+                "type": "TextBlock",
+                "text": f"**詳細情報:**\n```\n{stack_trace[:500]}\n```",
+                "wrap": True,
+                "size": "Small"
+            })
+
+        return card
+
+
+# グローバルインスタンス（パイプライン起動時に初期化）
+_notifier = None
+
+def get_teams_notifier() -> TeamsNotifier:
+    """TeamsNotifierのシングルトンインスタンスを取得"""
+    global _notifier
+    if _notifier is None:
+        webhook_url = dbutils.secrets.get(scope="iot-pipeline-secrets", key="teams-webhook-url")
+        _notifier = TeamsNotifier(webhook_url)
+    return _notifier
+
+
+def notify_error(error_code: str, error_message: str, batch_id: int = None, stack_trace: str = None):
+    """エラー通知のヘルパー関数"""
+    notifier = get_teams_notifier()
+    notifier.send_error_notification(
+        error_code=error_code,
+        error_message=error_message,
+        pipeline_name="silver_sensor_data_pipeline",
+        batch_id=batch_id,
+        stack_trace=stack_trace
+    )
+```
+
+#### 組み込み例
+
+```python
+import traceback
+
+def process_sensor_batch(batch_df, batch_id):
+    """
+    foreachBatchで呼び出されるメイン処理関数（Teams通知付き）
+    """
+    try:
+        # JSONパース処理
+        parsed_df = parse_sensor_data(batch_df)
+
+        # アラート判定処理
+        with_alerts = evaluate_alerts(parsed_df)
+
+        # Delta Lake書込み
+        write_to_delta_lake(with_alerts)
+
+        # OLTP DB更新
+        update_oltp_db(with_alerts, batch_id)
+
+        # メール送信キュー登録
+        enqueue_email_notifications(with_alerts, batch_id)
+
+        logger.info(f"バッチ処理完了: batch_id={batch_id}, records={batch_df.count()}")
+
+    except pymysql.Error as e:
+        # OLTP接続エラー
+        error_msg = f"OLTP DBへの接続に失敗しました: {str(e)}"
+        logger.error(f"SILVER_ERR_001: {error_msg}")
+        notify_error(
+            error_code="SILVER_ERR_001",
+            error_message=error_msg,
+            batch_id=batch_id,
+            stack_trace=traceback.format_exc()
+        )
+        # 処理は続行（Delta Lake書込みはロールバックしない）
+
+    except Exception as e:
+        # その他のエラー
+        error_msg = f"センサーデータの処理中にエラーが発生しました: {str(e)}"
+        logger.error(f"SILVER_ERR_003: {error_msg}")
+        notify_error(
+            error_code="SILVER_ERR_003",
+            error_message=error_msg,
+            batch_id=batch_id,
+            stack_trace=traceback.format_exc()
+        )
+        raise  # Delta Lake書込みエラーは再スロー
+
+
+def update_oltp_db(df, batch_id):
+    """OLTP DB更新処理（リトライ付き）"""
+    max_retries = 3
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            with get_mysql_connection() as conn:
+                update_device_status(conn, df)
+                insert_alert_history(conn, df)
+                conn.commit()
+            return  # 成功
+
+        except pymysql.Error as e:
+            last_error = e
+            if not is_retryable_error(e):
+                break  # リトライ不可能なエラー
+
+            if attempt < max_retries - 1:
+                wait_time = OLTP_RETRY_INTERVALS[attempt]
+                logger.warning(f"OLTP更新リトライ ({attempt + 1}/{max_retries}): {wait_time}秒待機")
+                time.sleep(wait_time)
+
+    # リトライ上限到達
+    error_msg = f"OLTP DBへの接続に失敗しました（{max_retries}回リトライ後）: {str(last_error)}"
+    logger.error(f"SILVER_ERR_001: {error_msg}")
+    notify_error(
+        error_code="SILVER_ERR_001",
+        error_message=error_msg,
+        batch_id=batch_id,
+        stack_trace=traceback.format_exc()
+    )
+```
+
 ---
 
 ## 認証・認可
