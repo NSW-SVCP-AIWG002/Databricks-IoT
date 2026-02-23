@@ -201,7 +201,7 @@ def get_belt_chart_data():
     - interval: 集計間隔（時単位のみ必須）
     - items: 表示項目リスト（カンマ区切り、1-5個）（必須）
     - method_id: 集計方法ID（必須）
-    - base_datetime: 基準日時 ISO 8601形式（必須）
+    - base_datetime: 基準日時（YYYY/MM/DD HH:mm:ss）（必須）
 
     レスポンス:
     - 成功時: {"status": "success", "data": {...}}
@@ -1108,7 +1108,7 @@ flowchart TD
 | interval | string | △ | 集計間隔（時単位のみ必須） | "10min" |
 | items | string | ○ | 表示項目（カンマ区切り、1-5個） | "external_temp,set_temp_freezer_1" |
 | method_id | integer | ○ | 集計方法ID | 1 |
-| base_datetime | string | ○ | 基準日時（ISO 8601） | "2026-02-05T15:32:42+09:00" |
+| base_datetime | string | ○ | 基準日時（YYYY/MM/DD HH:mm:ss） | "2026/02/05 15:32:42" |
 
 ### リクエストパラメータ定義（ガジェット登録API）
 
@@ -1410,3 +1410,4 @@ def handle_exceptions(f):
 | 日付 | 版数 | 変更内容 | 担当者 |
 | ---- | ---- | -------- | ------ |
 | 2026-02-16 | 1.0 | 初版作成 | - |
+| 2026-02-23 | 1.1 | ISO 8601形式の文言をYYYY/MM/DD HH:mm:ssに変更 | - |
