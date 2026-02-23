@@ -70,8 +70,8 @@ flowchart TD
 | パラメータ | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
 | device_id | string | ○ | デバイスID |
-| start_datetime | string | ○ | 開始日時（ISO 8601形式） |
-| end_datetime | string | ○ | 終了日時（ISO 8601形式） |
+| start_datetime | string | ○ | 開始日時（YYYY/MM/DD HH:mm:ss） |
+| end_datetime | string | ○ | 終了日時（YYYY/MM/DD HH:mm:ss） |
 
 ### レスポンス
 
@@ -402,8 +402,8 @@ def validate_datetime_range(start_datetime: str, end_datetime: str) -> list:
     日時範囲のバリデーション
 
     Args:
-        start_datetime: 開始日時（ISO 8601形式）
-        end_datetime: 終了日時（ISO 8601形式）
+        start_datetime: 開始日時（YYYY/MM/DD HH:mm:ss）
+        end_datetime: 終了日時（YYYY/MM/DD HH:mm:ss）
 
     Returns:
         エラーメッセージのリスト（空リストは正常）
@@ -479,7 +479,6 @@ def validate_gadget_params(params: dict) -> list:
 | 制約 | 値 | 説明 |
 |------|-----|------|
 | 最大範囲 | 24時間 | 開始〜終了の差分 |
-| 形式 | ISO 8601 | YYYY-MM-DDTHH:mm:ss+09:00 |
 
 ---
 
@@ -533,3 +532,4 @@ def validate_gadget_params(params: dict) -> list:
 | 日付 | バージョン | 更新内容 |
 |------|------------|----------|
 | 2026-02-16 | 1.0 | 初版作成 |
+| 2026-02-20 | 1.1 | ISO 8601形式の文言をYYYY/MM/DD HH:mm:ssに変更、日時範囲の形式行を削除 |
