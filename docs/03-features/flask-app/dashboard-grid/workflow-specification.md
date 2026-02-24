@@ -4,7 +4,7 @@
 
 - [概要](#概要)
 - [データ取得ワークフロー](#データ取得ワークフロー)
-- [CSV出力ワークフロー](#csv出力ワークフロー)
+- [CSVエクスポートワークフロー](#csv出力ワークフロー)
 - [ガジェット登録ワークフロー](#ガジェット登録ワークフロー)
 - [バリデーション](#バリデーション)
 - [エラーハンドリング](#エラーハンドリング)
@@ -23,8 +23,8 @@ flowchart TD
         A[ツリーでデバイス選択] --> B[日時範囲指定]
         B --> C[データ取得API呼び出し]
         C --> D[テーブル表示]
-        D --> E{CSV出力?}
-        E -->|Yes| F[CSV出力処理]
+        D --> E{CSVエクスポート?}
+        E -->|Yes| F[CSVエクスポート処理]
         E -->|No| G[表示継続]
     end
 
@@ -182,19 +182,19 @@ def get_table_data(device_id: str, start_datetime: datetime, end_datetime: datet
 
 ---
 
-## CSV出力ワークフロー
+## CSVエクスポートワークフロー
 
 ### 処理フロー図
 
 ```mermaid
 flowchart TD
-    A[CSV出力ボタン押下] --> B{データ存在チェック}
+    A[CSVエクスポートボタン押下] --> B{データ存在チェック}
     B -->|なし| C[エラーメッセージ表示]
     B -->|あり| D[CSVファイル生成]
     D --> E[ダウンロード開始]
 ```
 
-### CSV出力仕様
+### CSVエクスポート仕様
 
 **ファイル名形式:**
 `table_{device_uuid}_{yyyyMMddHHmmss}.csv`
@@ -230,7 +230,7 @@ flowchart TD
 | 23 | defrost_heater_output_1 | 防露ヒータ出力(1) |
 | 24 | defrost_heater_output_2 | 防露ヒータ出力(2) |
 
-### CSV出力処理（参考）
+### CSVエクスポート処理（参考）
 
 ```python
 import csv
@@ -333,7 +333,7 @@ flowchart TD
 |-----------|-----|------|------|
 | gadget_name | string | ○ | ガジェット名（最大50文字） |
 | group_id | string | ○ | グループID |
-| gadget_size | string | ○ | 部品サイズ（'2x2' / '3x2'） |
+| gadget_size | string | ○ | 部品サイズ（'2x2' / '2x4'） |
 
 ### リクエスト例
 
@@ -391,7 +391,7 @@ from datetime import datetime, timedelta
 # =============================================================================
 MAX_RANGE_HOURS = 24  # 最大取得範囲（時間）
 
-VALID_GADGET_SIZES = ['2x2', '3x2']
+VALID_GADGET_SIZES = ['2x2', '2x4']
 
 
 # =============================================================================
@@ -472,7 +472,7 @@ def validate_gadget_params(params: dict) -> list:
 | 値 | ラベル | 説明 |
 |----|--------|------|
 | 2x2 | 2x2 | 標準サイズ |
-| 3x2 | 3x2 | 横長サイズ |
+| 2x4 | 2x4 | 横長サイズ |
 
 **日時範囲:**
 
@@ -533,3 +533,4 @@ def validate_gadget_params(params: dict) -> list:
 |------|------------|----------|
 | 2026-02-16 | 1.0 | 初版作成 |
 | 2026-02-20 | 1.1 | ISO 8601形式の文言をYYYY/MM/DD HH:mm:ssに変更、日時範囲の形式行を削除 |
+| 2026-02-24 | 1.2 | CSV出力→CSVエクスポート、横長サイズ3x2→2x4に修正 |
