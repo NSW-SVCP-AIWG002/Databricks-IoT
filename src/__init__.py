@@ -17,6 +17,13 @@ def create_app():
 
     db.init_app(app)
 
+    from flask_wtf.csrf import CSRFProtect
+    CSRFProtect(app)
+
+    # 認証ミドルウェア登録
+    from src.auth.middleware import authenticate_request
+    app.before_request(authenticate_request)
+
     # Blueprint登録
     from src.views.industry_dashboard import industry_dashboard_bp
     app.register_blueprint(industry_dashboard_bp)
