@@ -11,7 +11,7 @@
 - [Flaskルート定義](#flaskルート定義)
   - [ルート一覧](#ルート一覧)
   - [グラフデータ取得API](#グラフデータ取得api)
-  - [CSV出力API](#csv出力api)
+  - [CSVエクスポートAPI](#csv出力api)
   - [ガジェット登録API](#ガジェット登録api)
   - [集約方法一覧取得API](#集約方法一覧取得api)
 - [データ取得ワークフロー](#データ取得ワークフロー)
@@ -22,9 +22,9 @@
   - [ゴールド層クエリ（日単位）](#ゴールド層クエリ日単位)
   - [ゴールド層クエリ（週単位）](#ゴールド層クエリ週単位)
   - [ゴールド層クエリ（月単位）](#ゴールド層クエリ月単位)
-- [CSV出力ワークフロー](#csv出力ワークフロー)
+- [CSVエクスポートワークフロー](#csv出力ワークフロー)
   - [処理フロー図](#処理フロー図-1)
-  - [CSV出力実装](#csv出力実装)
+  - [CSVエクスポート実装](#csv出力実装)
 - [ガジェット登録ワークフロー](#ガジェット登録ワークフロー)
   - [処理フロー図](#処理フロー図-2)
   - [登録処理の流れ](#登録処理の流れ)
@@ -49,13 +49,13 @@
 
 ## 概要
 
-このドキュメントは、ダッシュボード帯グラフ（積み上げ棒グラフ）機能のデータ取得ワークフロー、CSV出力、ガジェット登録、エラーハンドリングの詳細を記載します。
+このドキュメントは、ダッシュボード帯グラフ（積み上げ棒グラフ）機能のデータ取得ワークフロー、CSVエクスポート、ガジェット登録、エラーハンドリングの詳細を記載します。
 
 ### このドキュメントの役割
 
 - データ取得APIの処理フロー
 - シルバー層・ゴールド層からのデータ取得ロジック（複数項目対応）
-- CSV出力機能の処理フロー
+- CSVエクスポート機能の処理フロー
 - ガジェット登録機能の処理フロー
 - バリデーション・エラーハンドリング
 
@@ -67,7 +67,7 @@
 | DBLG-002 | 表示単位切替 | 時/日/週/月単位での表示切替 |
 | DBLG-003 | 期間選択 | 日時ピッカーによる表示期間の指定 |
 | DBLG-004 | 集計間隔選択 | データの集計間隔を選択 |
-| DBLG-005 | CSV出力 | 表示データのCSVダウンロード |
+| DBLG-005 | CSVエクスポート | 表示データのCSVダウンロード |
 | DBLG-006 | ガジェット登録 | 帯グラフガジェットの新規登録 |
 
 ---
@@ -147,7 +147,7 @@ flowchart TB
 | メソッド | URL | 関数名 | 説明 |
 | -------- | --- | ------ | ---- |
 | GET | /api/customer-dashboard/belt-chart/data | get_belt_chart_data | グラフデータ取得API |
-| GET | /api/customer-dashboard/belt-chart/csv | export_belt_chart_csv | CSV出力API |
+| GET | /api/customer-dashboard/belt-chart/csv | export_belt_chart_csv | CSVエクスポートAPI |
 | POST | /api/customer-dashboard/belt-chart/register | register_belt_chart | ガジェット登録API |
 | GET | /api/customer-dashboard/belt-chart/aggregation-methods | get_aggregation_methods | 集約方法一覧取得API |
 
@@ -250,18 +250,18 @@ def get_belt_chart_data():
         return jsonify({'status': 'error', 'message': 'データの取得に失敗しました'}), 500
 ```
 
-### CSV出力API
+### CSVエクスポートAPI
 
 ```python
 # =============================================================================
-# CSV出力API
+# CSVエクスポートAPI
 # =============================================================================
 @bp.route('/api/customer-dashboard/belt-chart/csv', methods=['GET'])
 @login_required
 @require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def export_belt_chart_csv():
     """
-    帯グラフのデータをCSV出力
+    帯グラフのデータをCSVエクスポート
 
     リクエストパラメータ: データ取得APIと同一
 
@@ -306,7 +306,7 @@ def export_belt_chart_csv():
 
     except Exception as e:
         logger.error(f'CSV export error: {e}')
-        return jsonify({'status': 'error', 'message': 'CSV出力に失敗しました'}), 500
+        return jsonify({'status': 'error', 'message': 'CSVエクスポートに失敗しました'}), 500
 ```
 
 ### ガジェット登録API
@@ -970,7 +970,7 @@ def fetch_gold_monthly_data(
 
 ---
 
-## CSV出力ワークフロー
+## CSVエクスポートワークフロー
 
 ### 処理フロー図
 
@@ -991,7 +991,7 @@ flowchart TD
     Download --> End2([終了])
 ```
 
-### CSV出力実装
+### CSVエクスポート実装
 
 ```python
 # =============================================================================
@@ -1356,14 +1356,14 @@ def handle_exceptions(f):
 | 項目 | 目標値 |
 | ---- | ------ |
 | APIレスポンス | 500ms以内 |
-| CSV出力 | 5秒以内（10万件まで） |
+| CSVエクスポート | 5秒以内（10万件まで） |
 
 ### 最適化方針
 
 | 項目 | 方針 |
 | ---- | ---- |
 | クエリ最適化 | クラスタリングキー（device_id, collection_date）活用 |
-| データ件数制限 | グラフ表示は最大100件、CSV出力は最大10万件 |
+| データ件数制限 | グラフ表示は最大100件、CSVエクスポートは最大10万件 |
 | マスタキャッシュ | センサー項目、集計方法マスタをアプリケーションキャッシュ |
 | 接続プーリング | Databricks SQL Connectorのコネクションプール使用 |
 | 複数項目の一括取得 | 可能な限り1クエリで複数項目を同時取得 |
@@ -1388,7 +1388,7 @@ def handle_exceptions(f):
 | テスト項目 | 内容 |
 | ---------- | ---- |
 | データ取得API | 各表示単位・集計間隔・複数項目でのデータ取得 |
-| CSV出力 | ファイルダウンロード・内容確認（複数項目列の検証） |
+| CSVエクスポート | ファイルダウンロード・内容確認（複数項目列の検証） |
 | エラーハンドリング | 各エラーパターンでの動作確認 |
 | 月末処理 | 2月（28/29日）、30日の月、31日の月 |
 | 項目数境界テスト | 1項目/5項目の積み上げ表示 |
@@ -1411,3 +1411,4 @@ def handle_exceptions(f):
 | ---- | ---- | -------- | ------ |
 | 2026-02-16 | 1.0 | 初版作成 | - |
 | 2026-02-23 | 1.1 | ISO 8601形式の文言をYYYY/MM/DD HH:mm:ssに変更 | - |
+| 2026-02-24 | 1.2 | CSV出力をCSVエクスポートに名称変更 | - |
