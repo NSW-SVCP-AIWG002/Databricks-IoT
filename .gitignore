@@ -52,3 +52,4 @@ credentials/
 
 # データファイルは除外
 users.json
+docs/03-features/flask-app/conversational-ai-chat/design-review.md

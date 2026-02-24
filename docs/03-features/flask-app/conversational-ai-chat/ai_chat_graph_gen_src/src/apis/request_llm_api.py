@@ -12,6 +12,7 @@ from conf.prompt import GENERAL_LLM_PROMPT, LLMAPI_prompt, ADVANCE_DATA_ANALYSIS
 from conf.logging_config import log_message
 from src.utils.llm import post_chat
 from src.utils.dataframe import get_df_schema_info
+from src.utils.sandbox import validate_generated_code, execute_with_timeout, CodeExecutionTimeoutError
 
 def clean_code(code: str) -> str:
     """
@@ -72,25 +73,27 @@ def advance_data_analysis(user_question, schema_info, df_json, messages):
             # 4. コードの実行と出力のキャプチャ
             generated_code = result.get("message", "") 
 
-            # local_vars = {"df": df, "pd": pd, "np": np, "json": json}
-            exec_namespace = globals().copy()
-            exec_namespace["df"] = df
+            code_to_exec = clean_code(generated_code)
+            # L1: コード静的解析
+            is_safe, violation = validate_generated_code(code_to_exec)
+            if not is_safe:
+                raise ValueError(f"安全でないコードが検出されました: {violation}")
+            # L2: 制限付き実行名前空間
+            exec_namespace = {
+                "df": df, "pd": pd, "np": np,
+                "print": print, "__builtins__": {}
+            }
             # stdoutをキャプチャするためのStringIOオブジェクト
             captured_output = StringIO()
-            
+
             # 元のstdoutを保存
             original_stdout = sys.stdout
-            
+
             try:
                 # stdoutをStringIOにリダイレクト
                 sys.stdout = captured_output
-                
-                
-                # コード実行
-                # exec(clean_code(generated_code), {}, local_vars)
-                exec(clean_code(generated_code), exec_namespace)
-
-                
+                # L3: タイムアウト付き実行
+                execute_with_timeout(code_to_exec, exec_namespace, 30)
             finally:
                 # 必ず元のstdoutに戻す
                 sys.stdout = original_stdout
