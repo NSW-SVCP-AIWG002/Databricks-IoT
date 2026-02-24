@@ -7,6 +7,7 @@ load_dotenv()
 class Config:
     """Base configuration."""
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
+    AUTH_TYPE = os.getenv("AUTH_TYPE")  # 必須設定: 'azure' / 'aws' / 'local'
 
     # Flask Server Configuration
     APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
