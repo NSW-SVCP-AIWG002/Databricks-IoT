@@ -1,7 +1,7 @@
-﻿# A5:ER FORMAT:21
+﻿# A5:ER FORMAT:19
 # A5:ER ENCODING:UTF8
 # A5:ER Mk-1 Copyright © 2007 m.matsubara
-# A5:SQL Mk-2 Version 2.21.0 Copyright © 1997 - 2026 m.matsubara
+# A5:SQL Mk-2 Version 2.20.4 Copyright © 1997 - 2025 m.matsubara
 #  https://a5m2.mmatsubara.com
 
 [Manager]
@@ -9,9 +9,12 @@ ProjectName=DatabricksIoT_デバイス管理
 Author=
 MaxEntityRowShow=1000
 ReadOnlyRecommend=0
+Page=Main
 PageInfo="Main",7,"B3Landscape",$FFFFFF
 LogicalView=1
 DecodeDomain=0
+ViewModePageIndividually=1
+ViewMode=7
 ViewFormat=0
 UseNondependenceDashLine=0
 FontName=メイリオ
@@ -34,7 +37,6 @@ SqlSeparator=0
 UpperCaseKeyword=0
 ShowTag=1
 ShowCommonAttributes=0
-ShowDisableAttributes=0
 BugFixEntityWidth=1
 
 [Entity]
@@ -44,8 +46,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=2700
-Top=850
+Left=2200
+Top=1000
 Field="デバイスID","device_id","INT","NOT NULL",0,"","システム内でUNIQUEのデバイスID",$000028FF,""
 Field="デバイスUUID","device_uuid","VARCHAR(128)","NOT NULL",,"","Azure IoT Hub, AWS IoT Coreに登録されたデバイスID、クライアントID",$FFFFFFFF,""
 Field="デバイス名","device_name","VARCHAR(100)","NOT NULL",,"","画面に表示するデバイスの名称",$FFFFFFFF,""
@@ -67,7 +69,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133024
-Position="Main",2200,1000
+Position="MAIN",2200,1000
 ZOrder=1
 
 [Entity]
@@ -77,8 +79,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=1100
-Top=50
+Left=1000
+Top=100
 Field="ユーザーID","user_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="DatabricksユーザーID","databricks_user_id","VARCHAR(36)","NOT NULL",,"","",$FFFFFFFF,""
 Field="ユーザー名","user_name","VARCHAR(20)","NOT NULL",,"","",$FFFFFFFF,""
@@ -100,7 +102,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132939
-Position="Main",1000,100
+Position="MAIN",1000,100
 ZOrder=3
 
 [Entity]
@@ -110,8 +112,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4150
-Top=1000
+Left=3350
+Top=1050
 Field="デバイス種別ID","device_type_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="デバイス種別名","device_type_name","VARCHAR(100)","NOT NULL",,"","",$FFFFFFFF,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"","",$FFFFFFFF,""
@@ -123,7 +125,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133226
-Position="Main",3350,1050
+Position="MAIN",3350,1050
 ZOrder=4
 
 [Entity]
@@ -146,7 +148,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132711
-Position="Main",50,100
+Position="MAIN",50,100
 ZOrder=7
 
 [Entity]
@@ -157,7 +159,7 @@ TableInnerOption=
 TableOption=
 Page=MAIN
 Left=50
-Top=1350
+Top=1300
 Field="アラートID","alert_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="アラートUUID","alert_uuid","VARCHAR(36)","NOT NULL",,"UUID自動生成","",$FFFFFFFF,""
 Field="アラート名","alert_name","VARCHAR(100)","NOT NULL",,"","",$FFFFFFFF,""
@@ -181,7 +183,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260127151919
-Position="Main",50,1300
+Position="MAIN",50,1300
 ZOrder=8
 
 [Entity]
@@ -213,7 +215,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133041
-Position="Main",2200,100
+Position="MAIN",2200,100
 ZOrder=10
 
 [Entity]
@@ -223,7 +225,7 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4250
+Left=3350
 Top=100
 Field="親組織ID","parent_organization_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="子組織ID","subsidiary_organization_id","INT","NOT NULL",1,"","",$000000FF,""
@@ -232,7 +234,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260106131014
-Position="Main",3350,100
+Position="MAIN",3350,100
 ZOrder=11
 
 [Entity]
@@ -257,7 +259,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132808
-Position="Main",50,450
+Position="MAIN",50,450
 ZOrder=13
 
 [Entity]
@@ -267,7 +269,7 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4150
+Left=3350
 Top=300
 Field="組織種別ID","organization_type_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="組織種別名","organization_type_name","VARCHAR(50)","NOT NULL",,"","",$FFFFFFFF,""
@@ -280,7 +282,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133140
-Position="Main",3350,300
+Position="MAIN",3350,300
 ZOrder=14
 
 [Entity]
@@ -290,7 +292,7 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4150
+Left=3350
 Top=650
 Field="契約状態ID","contract_status_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="契約状態名","contract_status_name","VARCHAR(20)","NOT NULL",,"","",$FFFFFFFF,""
@@ -303,7 +305,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133206
-Position="Main",3350,650
+Position="MAIN",3350,650
 ZOrder=15
 
 [Entity]
@@ -314,7 +316,7 @@ TableInnerOption=
 TableOption=
 Page=MAIN
 Left=50
-Top=2250
+Top=2150
 Field="アラートレベルID","alert_level_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="アラートレベル名","alert_level_name","VARCHAR(100)","NOT NULL",,"","",$FFFFFFFF,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"CURRENT_TIMESTAMP","",$FFFFFFFF,""
@@ -326,7 +328,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260121151439
-Position="Main",50,2150
+Position="MAIN",50,2150
 ZOrder=16
 
 [Relation]
@@ -506,8 +508,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=2900
-Top=1700
+Left=3000
+Top=1900
 Field="デバイス在庫ID","device_stock_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="在庫状況ID","stock_status_id","INT","NOT NULL",,"","キッティング済、出荷準備中など",$00FF4100,""
 Field="購入日","purchase_date","DATETIME","NOT NULL",,"","",$FFFFFFFF,""
@@ -525,7 +527,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133103
-Position="Main",3000,1900
+Position="MAIN",3000,1900
 ZOrder=31
 
 [Entity]
@@ -535,8 +537,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4200
-Top=1650
+Left=3350
+Top=1450
 Field="在庫状況ID","stock_status_id","INT","NOT NULL",0,"","",$000000FF,"AUTO_INCREMENT"
 Field="在庫状況名","stock_status_name","VARCHAR(100)","NOT NULL",,"","",$FFFFFFFF,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"","",$FFFFFFFF,""
@@ -548,7 +550,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116133241
-Position="Main",3350,1450
+Position="MAIN",3350,1450
 ZOrder=33
 
 [Relation]
@@ -623,8 +625,8 @@ Comment=一覧のソート項目を管理するマスタテーブル\nkei.sugiya
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4200
-Top=2950
+Left=100
+Top=3200
 Field="画面ID","view_id","INT","NOT NULL",0,"","画面(機能)固有のID",$000000FF,""
 Field="ソート項目ID","sort_item_id","INT","NOT NULL",1,"","ソート項目固有のID",$000000FF,""
 Field="ソート項目名","sort_item_name","VARCHAR(100)","NOT NULL",,"","ソート項目の内容",$FFFFFFFF,""
@@ -636,7 +638,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20251223143216
-Position="Main",50,2550
+Position="MAIN",100,3200
 ZOrder=42
 
 [Entity]
@@ -646,8 +648,8 @@ Comment=デバイスのステータス（接続状態など）\nkei.sugiyama
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=4150
-Top=1350
+Left=2250
+Top=1800
 Field="デバイスID","device_id","INT","NOT NULL",0,"","",$0079009A,""
 Field="ステータス","status","INT","NOT NULL",,"0","0 : 未接続　1 : 接続済み",$FFFFFFFF,""
 Field="削除フラグ","delete_flag","BOOLEAN","NOT NULL",,"FALSE","論理削除時：TRUE　その他の場合：FALSE",$FFFFFFFF,""
@@ -657,7 +659,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20251223132335
-Position="Main",2200,1850,741,201
+Position="MAIN",2250,1800,741,201
 ZOrder=43
 
 [Relation]
@@ -669,7 +671,7 @@ Fields1=device_id
 Fields2=device_id
 Cardinarity1=
 Cardinarity2=
-Position="MAIN",0,4045,5955,5030,R,R,""
+Position="MAIN",0,4045,5955,5057,R,R,""
 Dependence=1
 Caption=
 PName=
@@ -677,7 +679,7 @@ ModifiedDateTime=20251216113452
 LineMode=0
 Bar1=404
 Bar2=596
-Bar3=503
+Bar3=506
 TermPos1=R
 TermPos2=R
 ZOrder=44
@@ -725,7 +727,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116132836
-Position="Main",50,900
+Position="MAIN",50,900
 ZOrder=47
 
 [Relation]
@@ -756,8 +758,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=1700
-Top=1050
+Left=2000
+Top=2200
 Field="メール送信履歴ID","mail_history_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="メール送信履歴UUID","mail_history_uuid","VARCHAR(36)","NOT NULL",,"","",$FFFFFFFF,""
 Field="関連ユーザID","user_id","INT","NOT NULL",,"","",$FFFFFFFF,""
@@ -775,9 +777,9 @@ Field="更新者","modifier","INT","NOT NULL",,"","",$FFFFFFFF,""
 Field="削除フラグ","delete_flag","BOOLEAN","NOT NULL",,"","",$FFFFFFFF,""
 EffectMode=None
 Color=$000000
-BkColor=$00F5FF
-ModifiedDateTime=20260121140805
-Position="Main",2000,2200
+BkColor=$FFFFFF
+ModifiedDateTime=20260220103738
+Position="MAIN",2000,2200
 ZOrder=53
 
 [Entity]
@@ -934,8 +936,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=1650
-Top=2050
+Left=950
+Top=2200
 Field="アラート履歴ID","alert_history_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="アラート履歴UUID","alert_history_uuid","VARCHAR(36)","NOT NULL",,"","",$00000000,""
 Field="アラートID","alert_id","INT","NOT NULL",,"","",$00FF0000,""
@@ -952,7 +954,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260202104034
-Position="MAIN",1650,2050
+Position="MAIN",950,2200
 ZOrder=91
 
 [Relation]
@@ -983,8 +985,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=1350
-Top=2750
+Left=1250
+Top=2850
 Field="アラートステータスID","alert_status_id","INT","NOT NULL",0,"","",$000000FF,""
 Field="アラートステータス名","alert_status_name","VARCHAR(10)","NOT NULL",,"","",$00000000,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"","",$FFFFFFFF,""
@@ -996,7 +998,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260116162857
-Position="MAIN",1350,2750
+Position="MAIN",1250,2850
 ZOrder=68
 
 [Relation]
@@ -1072,8 +1074,8 @@ Comment=
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=0
-Top=2750
+Left=-50
+Top=2600
 Field="測定項目ID","measurement_item_id","INT","NOT NULL",0,"AUTO_INCREMENT","",$000000FF,""
 Field="測定項目名","measurement_item_name","VARCHAR(50)","NOT NULL",,"","センサーで読み取る、機器に関する測定項目の名前",$FFFFFFFF,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"CURRENT_TIMESTAMP","",$FFFFFFFF,""
@@ -1085,7 +1087,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260120141306
-Position="MAIN",0,2750,857,270
+Position="MAIN",-50,2600,857,270
 ZOrder=73
 
 [Relation]
@@ -1136,9 +1138,9 @@ LName=メール通知キュー
 Comment=メール送信待機列の格納テーブル。マスタではない。\n2026/02/02 ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
-Left=2750
-Top=2500
+Page=MAIN
+Left=2950
+Top=2850
 Field="キューID","queue_id","BIGINT","NOT NULL",0,"","キューレコードの一意識別子（自動採番）",$000000FF,""
 Field="デバイスID","device_id","INT","NOT NULL",,"","アラート発生元デバイスID",$00FF4100,""
 Field="組織ID","organization_id","INT","NOT NULL",,"","デバイス所属組織ID",$00FF4100,""
@@ -1159,7 +1161,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260202111556
-Position="Main",2750,2500,937,624
+Position="MAIN",2950,2850,937,624
 ZOrder=78
 
 [Relation]
@@ -1231,7 +1233,7 @@ LName=アラート異常状態
 Comment=デバイス×アラート設定ごとの異常継続状態を管理するテーブル。\nアラート設定マスタの判定時間（judgment_time）を超えて異常値が継続した場合にアラートを発報するための状態管理に使用する。\n2026/02/02 ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=4100
 Top=2500
 Field="デバイスID","device_id","INT","NOT NULL",0,"","対象デバイスID",$0079009A,""
@@ -1247,7 +1249,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260202112302
-Position="Main",4100,2500,868,370
+Position="MAIN",4100,2500,868,370
 ZOrder=82
 
 [Relation]

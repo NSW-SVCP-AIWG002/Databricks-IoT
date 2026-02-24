@@ -18,6 +18,7 @@ from conf.settings import endpoint
 from conf.logging_config import log_message
 from conf.prompt import graph_prompt
 from src.utils.llm import post_chat
+from src.utils.sandbox import validate_generated_code, execute_with_timeout, CodeExecutionTimeoutError
 
 # エージェントがグラフ描画するコードを生成する関数
 def plot_code_node(prompt, sql_query, df):
@@ -61,12 +62,20 @@ def create_plot(prompt, sql_query, df):
             plot_code = result["plot_code"]
             message = result["explain"]
             if "fig" in plot_code:
-                # local_vars = {"df": df, "go": go, "px": px, "pd": pd, "np": np}
-                exec_namespace = globals().copy()
-                exec_namespace["df"] = df
                 plot_code_clean = clean_code(plot_code)
+                # L1: コード静的解析
+                is_safe, violation = validate_generated_code(plot_code_clean)
+                if not is_safe:
+                    raise ValueError(f"安全でないコードが検出されました: {violation}")
+                # L2: 制限付き実行名前空間
+                exec_namespace = {
+                    "df": df, "go": go, "px": px,
+                    "pd": pd, "np": np, "print": print,
+                    "__builtins__": {}
+                }
                 start_exec = time.time()
-                exec(clean_code(plot_code), exec_namespace)
+                # L3: タイムアウト付き実行
+                execute_with_timeout(plot_code_clean, exec_namespace, 30)
                 end_exec = time.time()
                 log_message(f"生成コード実行時間: {end_exec - start_exec}秒")
                 fig = exec_namespace.get("fig")
