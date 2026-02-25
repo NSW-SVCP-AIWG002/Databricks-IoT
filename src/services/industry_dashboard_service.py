@@ -188,7 +188,7 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
         )
         .join(Organization, (Device.organization_id == Organization.organization_id)
               & (Organization.delete_flag == False))  # noqa: E712
-        .join(DeviceStatusData, Device.device_status_id == DeviceStatusData.device_status_id,
+        .join(DeviceStatusData, Device.device_id == DeviceStatusData.device_id,
               isouter=True)
         .filter(
             Device.delete_flag == False,  # noqa: E712
