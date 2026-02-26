@@ -18,8 +18,9 @@
    - 6.2 [リクエスト前後（自動）](#62-リクエスト前後自動)
    - 6.3 [認証イベント](#63-認証イベント)
    - 6.4 [外部API Connectorパターン](#64-外部api-connectorパターン)
-   - 6.5 [MySQL（SQLAlchemyイベントリスナー）](#65-mysqlsqlalchemyイベントリスナー)
-   - 6.6 [エラーハンドリング（400系・500系）](#66-エラーハンドリング400系500系)
+   - 6.5 [Token Exchangeパターン](#65-token-exchangeパターン)
+   - 6.6 [MySQL（SQLAlchemyイベントリスナー）](#66-mysqlsqlalchemyイベントリスナー)
+   - 6.7 [エラーハンドリング（400系・500系）](#67-エラーハンドリング400系500系)
 7. [業務イベント別フィールド規則](#7-業務イベント別フィールド規則)
 8. [未決定事項](#8-未決定事項)
 
@@ -228,7 +229,8 @@ logger.warning("認証失敗", extra={"raw_email": "unknown@external.com"})
 | リクエスト | 開始 | `before_request` フック | INFO |
 | リクエスト | 終了（processingTime 含む） | `after_request` フック | INFO |
 | 認証 | IdP 認証成功 | `authenticate_request()` | INFO |
-| 外部API | 呼び出し前後・失敗（SCIM / Unity Catalog 等） | Connector クラス内 | INFO / ERROR |
+| 外部API（Connector） | 呼び出し前後・失敗（SCIM / Unity Catalog 等） | Connector クラス内 | INFO / ERROR |
+| 外部API（Token Exchange） | 呼び出し前後・失敗 | `auth/token_exchange.py` | INFO / ERROR |
 | MySQL | 書き込み（INSERT / UPDATE / DELETE） | `src/__init__.py`（SQLAlchemy イベント） | INFO |
 | MySQL | SELECT | `src/__init__.py`（SQLAlchemy イベント） | DEBUG |
 | エラー | 500 系例外 | `error_handlers.py` | ERROR |
@@ -335,7 +337,40 @@ def delete_user(self, user_id):
 
 > **注意**: `failure_reason` の抽出方法は API のレスポンス構造によって異なる。各 Connector で適切に実装すること（例: SCIM は `message` フィールド、Unity Catalog は独自構造）。
 
-### 6.5 MySQL（SQLAlchemyイベントリスナー）
+### 6.5 Token Exchangeパターン
+
+Token Exchange は Connector クラスの `_request()` 抽象化を持たないため、`exchange_token()` メソッド内で直接ログを出力する。フィールド構造は Connector パターンと同じ（`service`, `operation`, `duration_ms` 等）。
+
+```python
+# auth/token_exchange.py
+def exchange_token(self, idp_jwt: str) -> dict:
+    logger.info("外部API呼び出し開始", extra={
+        "service": "databricks_token_exchange",
+        "operation": "Token Exchange",
+    })
+    start = time.time()
+    response = requests.post(self.token_endpoint, data=payload)
+    duration_ms = int((time.time() - start) * 1000)
+
+    if response.status_code != 200:
+        logger.error("外部API失敗", exc_info=False, extra={
+            "service": "databricks_token_exchange",
+            "operation": "Token Exchange",
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+            "failure_reason": response.text[:200],
+        })
+        raise TokenExchangeError(f"Token Exchange failed: {response.text}")
+
+    logger.info("外部API完了", extra={
+        "service": "databricks_token_exchange",
+        "operation": "Token Exchange",
+        "duration_ms": duration_ms,
+    })
+    ...
+```
+
+### 6.6 MySQL（SQLAlchemyイベントリスナー）
 
 Service 層での手動ログ出力は行わない。`create_app()` 内で SQLAlchemy イベントリスナーを登録し、全 SQL 実行を自動でログ出力する。
 
@@ -371,7 +406,7 @@ def create_user(email, ...):
     # ← SQLAlchemy イベントリスナーが INSERT ログを自動出力するため手動出力不要
 ```
 
-### 6.6 エラーハンドリング（400系・500系）
+### 6.7 エラーハンドリング（400系・500系）
 
 `error_handlers.py` がすべての HTTP エラーを一元的にログ出力する。
 
@@ -410,6 +445,7 @@ def handle_4xx(e):
 | 外部API呼び出し | `service`, `operation`, `duration_ms` | `extra={"service": "databricks_scim", "operation": "ユーザー作成", "duration_ms": 95}` |
 | 外部API失敗 | 上記 + `status`, `failure_reason` | `extra={..., "status": 400, "failure_reason": "user already exists"}` ※ API ごとに抽出方法が異なる |
 | DB操作（MySQL） | `query`, `duration_ms` | SQLAlchemy イベントリスナーが自動付与 |
+| 400系エラー | `httpStatus` | `extra={"httpStatus": e.code}` |
 | 500エラー | 例外クラス名・スタックトレース（自動） | `exc_info=True` で自動付与。任意で `extra={"error_type": type(e).__name__}` |
 
 ---
@@ -419,4 +455,3 @@ def handle_4xx(e):
 | 項目 | 状況 |
 |---|---|
 | JSON フォーマッターの実装ライブラリ（`python-json-logger` 等） | 要検討 |
-| 400系エラーのフィールド規則（status 以外に何を出すか） | 400系ハンドリング設計確定後に7章へ追記 |
