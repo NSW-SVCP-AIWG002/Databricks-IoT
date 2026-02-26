@@ -31,7 +31,7 @@
 インフラストラクチャ設計
 - Databricks Platform構成（Premium ライセンス）
 - Azure IoT Services構成（IoT Hubs、Event Hubs、Event Hubs Capture）
-- 認証基盤（Entra ID、Databricksワークスペース、アクセス元IP制限）
+- 認証基盤（共通モジュール化: Azure/AWS/オンプレミス対応、OAuth トークン フェデレーション、アクセス元IP制限）
 - ネットワーク構成（Private Link、Azure DNS）
 - コンピューティングプレーン構成（サーバレス/クラシック）
 - Unity Catalog設計（ADLS連携）
@@ -73,8 +73,8 @@
 - データ整合性の保証
 
 ### 4. **セキュリティとガバナンス**
-- Entra ID + Databricks User認証（シングルサインオン）
-- アクセス元IP制限（Databricksワークスペース、Databricks Apps）
+- 認証共通モジュール（Azure/AWS/オンプレミス対応）+ OAuth トークン フェデレーション
+- アクセス元IP制限（Databricksワークスペース、Azure App Service）
 - Private Linkによるセキュア通信（Event Hub/ADLS/MySQL/Databricks UI API）
 - Unity Catalogによるアクセス制御
 - データ暗号化（100%）
@@ -121,11 +121,11 @@
 
 アーキテクチャの変更は、必ず`decisions/`ディレクトリにADRとして記録してください。
 
-| 日付 | バージョン | 編集者 | 変更内容 |
-|------|------------|--------|----------|
-| 2025-11-14 | 1.0 | Claude | 初版作成（Databricks IoTシステム用にアーキテクチャドキュメント構成を整備） |
-| 2025-11-20 | 1.1 | Claude | インフラネットワーク構成反映: Entra ID認証基盤、Private Link、Event Hubs Capture、ADLS、コンピューティングプレーン構成、踏み台VMを追加 |
-| 2025-11-26 | 1.2 | Claude | Azure環境統合の明確化: overview.mdの(TODO)を削除、システム構成図の表記を「Azure統合環境（Azure IoT + Databricks Platform）」に変更 |
+| 日付       | バージョン | 編集者 | 変更内容                                                                                                                               |
+| ---------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-14 | 1.0        | Claude | 初版作成（Databricks IoTシステム用にアーキテクチャドキュメント構成を整備）                                                             |
+| 2025-11-20 | 1.1        | Claude | インフラネットワーク構成反映: Entra ID認証基盤、Private Link、Event Hubs Capture、ADLS、コンピューティングプレーン構成、踏み台VMを追加 |
+| 2025-11-26 | 1.2        | Claude | Azure環境統合の明確化: overview.mdの(TODO)を削除、システム構成図の表記を「Azure統合環境（Azure IoT + Databricks Platform）」に変更     |
 
 ## 📚 参考資料
 
@@ -134,7 +134,6 @@
 - [Unity Catalog Documentation](https://docs.databricks.com/data-governance/unity-catalog/index.html)
 - [Delta Lake Documentation](https://docs.delta.io/)
 - [Databricks SQL Connector for Python](https://docs.databricks.com/dev-tools/python-sql-connector.html)
-- [Databricks Apps](https://docs.databricks.com/en/dev-tools/databricks-apps/index.html)
 
 ### Azure IoT関連
 - [Azure IoT Hubs Documentation](https://learn.microsoft.com/azure/iot-hub/)
