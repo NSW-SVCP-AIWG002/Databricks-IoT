@@ -2,9 +2,9 @@ import os
 
 from flask import g, request, session, abort, render_template, current_app
 
-from auth.services import find_user_by_email
-from auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
-from common.logger import get_logger
+from iot_app.auth.services import find_user_by_email
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -74,7 +74,7 @@ def authenticate_request():
         g.databricks_token = dev_token
     else:
         try:
-            from auth.token_exchange import TokenExchanger
+            from iot_app.auth.token_exchange import TokenExchanger
             token_exchanger = TokenExchanger()
             g.databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
         except JWTRetrievalError:

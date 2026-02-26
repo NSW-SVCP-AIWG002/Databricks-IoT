@@ -11,8 +11,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 from flask import session
 
-from auth.token_exchange import TokenExchanger
-from auth.exceptions import TokenExchangeError, JWTRetrievalError
+from iot_app.auth.token_exchange import TokenExchanger
+from iot_app.auth.exceptions import TokenExchangeError, JWTRetrievalError
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ class TestTokenExchangerEnsureValidToken:
     def test_jwt_retrieval_error_raises_jwt_retrieval_error(self, exchanger, app):
         """1.3.6: JWT 取得に失敗した場合（認証基盤の異常）、JWTRetrievalError が発生する"""
         # Arrange
-        from auth.exceptions import UnauthorizedError
+        from iot_app.auth.exceptions import UnauthorizedError
 
         mock_provider = MagicMock()
         mock_provider.get_jwt_for_token_exchange.side_effect = UnauthorizedError("JWT not found")

@@ -4,8 +4,8 @@ import time
 import requests
 from flask import session
 
-from auth.exceptions import TokenExchangeError, JWTRetrievalError, UnauthorizedError
-from common.logger import get_logger
+from iot_app.auth.exceptions import TokenExchangeError, JWTRetrievalError, UnauthorizedError
+from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
 

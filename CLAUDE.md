@@ -173,148 +173,153 @@ except IntegrityError:
 
 ```
 src/
-├── __init__.py                    # Flaskアプリケーションファクトリ（create_app）
-├── config.py                      # 環境設定（Flask, MySQL, Databricks接続情報）
-│
-├── auth/                          # 認証モジュール
-│   ├── __init__.py
-│   ├── factory.py                 # AuthProvider生成（現状Azure固定、将来の拡張点）
-│   ├── middleware.py              # before_request認証フック（認証除外パス判定、セッション同期、トークン確保）
-│   ├── routes.py                  # /auth/logout 等の認証関連ルート
-│   ├── services.py                # 認証関連データアクセス（ユーザー情報取得・セッション管理）
-│   ├── token_exchange.py          # IdP JWT → Databricksアクセストークン交換
-│   ├── exceptions.py              # 認証例外クラス定義（AuthError, TokenExchangeError等）
-│   └── providers/
-│       ├── __init__.py
-│       ├── base.py                # AuthProvider抽象基底クラス、UserInfo型定義
-│       └── azure_easy_auth.py     # Azure Easy Auth実装（X-MS-*ヘッダーからユーザー情報・JWT取得）
-│
-├── common/                        # 共通モジュール
-│   ├── __init__.py
-│   ├── exceptions.py              # 共通例外クラス定義
-│   └── error_handlers.py          # 全エラーハンドラー登録（400/403/404→モーダル、500→エラーページ）
-│
-├── db/                            # データベース接続
-│   ├── __init__.py
-│   └── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.databricks_token使用）
-│
-├── models/                        # SQLAlchemy ORMモデル（テーブル定義）
-│   ├── __init__.py
-│   ├── device.py                  # device_master, device_type_master
-│   ├── user.py                    # user_master, user_type_master
-│   ├── organization.py            # organization_master, organization_type_master, organization_closure
-│   ├── alert.py                   # alert_setting_master, alert_level_master, alert_history, alert_status_master
-│   ├── notification.py            # mail_history, mail_type_master
-│   ├── device_stock.py            # device_stock_info_master, stock_status_master
-│   ├── contract.py                # contract_status_master
-│   ├── region.py                  # region_master
-│   ├── language.py                # language_master
-│   ├── measurement.py             # measurement_item_master
-│   ├── sort_item.py               # sort_item_master
-│   └── device_status.py           # device_status_data
-│
-├── forms/                         # Flask-WTFフォーム定義（入力バリデーション・CSRF保護）
-│   ├── __init__.py
-│   ├── device.py                  # デバイス登録・更新フォーム
-│   ├── user.py                    # ユーザー登録・更新フォーム
-│   ├── organization.py            # 組織登録・更新フォーム
-│   ├── alert_setting.py           # アラート設定登録・更新フォーム
-│   ├── device_stock.py            # デバイス台帳登録・更新フォーム
-│   ├── mail_setting.py            # メール通知設定フォーム
-│   └── transfer.py                # CSVインポートフォーム
-│
-├── services/                      # ビジネスロジック（CRUD処理本体、トランザクション管理）
-│   ├── __init__.py
-│   ├── device_service.py          # デバイスCRUD
-│   ├── user_service.py            # ユーザーCRUD
-│   ├── organization_service.py    # 組織CRUD（organization_closure連携含む）
-│   ├── alert_setting_service.py   # アラート設定CRUD
-│   ├── device_stock_service.py    # デバイス台帳CRUD
-│   ├── mail_setting_service.py    # メール通知設定CRUD
-│   ├── alert_history_service.py   # アラート履歴参照
-│   ├── mail_history_service.py    # メール通知履歴参照
-│   ├── dashboard_service.py       # ダッシュボードデータ取得（Unity Catalog経由）
-│   └── csv_service.py             # CSVインポート・エクスポート共通処理
-│
-├── views/                         # Blueprint定義（ルーティング・リクエスト/レスポンス制御）
-│   ├── __init__.py
-│   ├── admin/                     # 管理機能 Blueprint（ADM-001〜016）
-│   │   ├── __init__.py            # Blueprint登録
-│   │   ├── devices.py             # /admin/devices/* デバイス管理ルーティング
-│   │   ├── users.py               # /admin/users/* ユーザー管理ルーティング
-│   │   ├── organizations.py       # /admin/organizations/* 組織管理ルーティング
-│   │   └── device_inventory.py    # /admin/device-inventory/* デバイス台帳ルーティング
-│   ├── alert/                     # アラート機能 Blueprint（ALT-001〜006）
-│   │   ├── __init__.py
-│   │   ├── alert_settings.py      # /alert/alert-settings/* アラート設定ルーティング
-│   │   └── alert_history.py       # /alert/alert-history/* アラート履歴ルーティング
-│   ├── notice/                    # 通知機能 Blueprint（NTC-001〜006）
-│   │   ├── __init__.py
-│   │   ├── mail_settings.py       # /notice/mail-settings/* メール通知設定ルーティング
-│   │   └── mail_history.py        # /notice/mail-history/* メール通知履歴ルーティング
-│   ├── dashboard/                 # ダッシュボード Blueprint（DSH-001）
-│   │   ├── __init__.py
-│   │   └── views.py               # /, /dashboard ダッシュボード表示ルーティング
-│   ├── account/                   # アカウント Blueprint（ACC-001〜002）
-│   │   ├── __init__.py
-│   │   └── views.py               # /account/* 言語設定・ユーザ情報参照ルーティング
-│   └── transfer/                  # インポート Blueprint（TRF-001）
-│       ├── __init__.py
-│       └── views.py               # /transfer/* CSVインポートルーティング
-│
-├── decorators/                    # カスタムデコレータ
-│   ├── __init__.py
-│   └── auth.py                    # @require_role 等の権限チェックデコレータ
-│
-├── templates/                     # Jinja2テンプレート
-│   ├── base.html                  # 共通レイアウト（ヘッダー、サイドバー、フッター）
-│   ├── components/                # 再利用可能なマクロ
-│   │   ├── pagination.html        # ページネーションマクロ
-│   │   ├── modal.html             # モーダルマクロ（メッセージ・確認・フォーム）
-│   │   ├── form_fields.html       # フォーム部品マクロ
-│   │   ├── table.html             # テーブルマクロ
-│   │   └── search.html            # 検索フォームマクロ
-│   ├── errors/
-│   │   └── 500.html               # 500エラーページ
-│   ├── admin/
-│   │   ├── devices/               # デバイス管理テンプレート（list, form, detail）
-│   │   ├── users/                 # ユーザー管理テンプレート
-│   │   ├── organizations/         # 組織管理テンプレート
-│   │   └── device_inventory/      # デバイス台帳テンプレート
-│   ├── alert/
-│   │   ├── alert_settings/        # アラート設定テンプレート
-│   │   └── alert_history/         # アラート履歴テンプレート
-│   ├── notice/
-│   │   ├── mail_settings/         # メール通知設定テンプレート
-│   │   └── mail_history/          # メール通知履歴テンプレート
-│   ├── dashboard/                 # ダッシュボードテンプレート
-│   ├── account/                   # アカウントテンプレート
-│   └── transfer/                  # CSVインポートテンプレート
-│
-└── static/                        # 静的ファイル
-    ├── css/
-    │   ├── variables.css          # CSS変数定義（カラー、スペーシング、フォント）
-    │   ├── reset.css              # CSSリセット
-    │   ├── base.css               # 基本スタイル
-    │   ├── main.css               # メインスタイルシート（全CSSをインポート）
-    │   └── components/            # BEMコンポーネント別CSS
-    │       ├── button.css
-    │       ├── alert.css
-    │       ├── form.css
-    │       ├── table.css
-    │       ├── pagination.css
-    │       ├── modal.css
-    │       ├── sort.css
-    │       └── spinner.css
-    ├── images/                    # アイコン等の画像
-    └── js/
-        ├── main.js                # グローバルJS（検索条件のsessionStorage保持等）
-        └── components/            # コンポーネント別JS
-            ├── modal.js           # Modalクラス
-            ├── validation.js      # FormValidatorクラス
-            ├── toast.js           # Toastクラス
-            ├── sort.js            # TableSortクラス（部分ソート＝クライアント側）
-            └── pagination.js      # Paginationクラス（UI描画・ページ遷移リクエスト発行）
+├── __init__.py                    # 空ファイル（srcはコンテナディレクトリ）
+└── iot_app/                       # アプリケーションパッケージ（トップレベル）
+    ├── __init__.py                # Flaskアプリケーションファクトリ（create_app）、db = SQLAlchemy()
+    ├── config.py                  # 環境設定（Flask, MySQL, Databricks接続情報）
+    │
+    ├── auth/                      # 認証モジュール
+    │   ├── __init__.py
+    │   ├── factory.py             # AuthProvider生成（現状Azure固定、将来の拡張点）
+    │   ├── middleware.py          # before_request認証フック（認証除外パス判定、セッション同期、トークン確保）
+    │   ├── routes.py              # /auth/logout 等の認証関連ルート
+    │   ├── services.py            # 認証関連データアクセス（ユーザー情報取得・セッション管理）
+    │   ├── token_exchange.py      # IdP JWT → Databricksアクセストークン交換
+    │   ├── exceptions.py          # 認証例外クラス定義（AuthError, TokenExchangeError等）
+    │   └── providers/
+    │       ├── __init__.py
+    │       ├── base.py            # AuthProvider抽象基底クラス、UserInfo型定義
+    │       ├── azure_easy_auth.py # Azure Easy Auth実装（X-MS-*ヘッダーからユーザー情報・JWT取得）
+    │       └── dev.py             # ローカル開発用（DEV_AUTH_EMAIL / DEV_DATABRICKS_TOKEN使用）
+    │
+    ├── common/                    # 共通モジュール
+    │   ├── __init__.py
+    │   ├── exceptions.py          # 共通例外クラス定義
+    │   ├── error_handlers.py      # 全エラーハンドラー登録（400/403/404→モーダル、500→エラーページ）
+    │   └── logger.py              # AppLoggerAdapter（自動コンテキスト付与・マスキング）
+    │
+    ├── db/                        # データベース接続
+    │   ├── __init__.py
+    │   └── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.databricks_token使用）
+    │
+    ├── models/                    # SQLAlchemy ORMモデル（テーブル定義）
+    │   ├── __init__.py
+    │   ├── device.py              # device_master, device_type_master
+    │   ├── user.py                # user_master, user_type_master
+    │   ├── organization.py        # organization_master, organization_type_master, organization_closure
+    │   ├── alert.py               # alert_setting_master, alert_level_master, alert_history, alert_status_master
+    │   ├── notification.py        # mail_history, mail_type_master
+    │   ├── device_stock.py        # device_stock_info_master, stock_status_master
+    │   ├── contract.py            # contract_status_master
+    │   ├── region.py              # region_master
+    │   ├── language.py            # language_master
+    │   ├── measurement.py         # measurement_item_master
+    │   ├── sort_item.py           # sort_item_master
+    │   └── device_status.py       # device_status_data
+    │
+    ├── forms/                     # Flask-WTFフォーム定義（入力バリデーション・CSRF保護）
+    │   ├── __init__.py
+    │   ├── device.py              # デバイス登録・更新フォーム
+    │   ├── user.py                # ユーザー登録・更新フォーム
+    │   ├── organization.py        # 組織登録・更新フォーム
+    │   ├── alert_setting.py       # アラート設定登録・更新フォーム
+    │   ├── device_stock.py        # デバイス台帳登録・更新フォーム
+    │   ├── mail_setting.py        # メール通知設定フォーム
+    │   └── transfer.py            # CSVインポートフォーム
+    │
+    ├── services/                  # ビジネスロジック（CRUD処理本体、トランザクション管理）
+    │   ├── __init__.py
+    │   ├── device_service.py      # デバイスCRUD
+    │   ├── user_service.py        # ユーザーCRUD
+    │   ├── organization_service.py # 組織CRUD（organization_closure連携含む）
+    │   ├── alert_setting_service.py # アラート設定CRUD
+    │   ├── device_stock_service.py  # デバイス台帳CRUD
+    │   ├── mail_setting_service.py  # メール通知設定CRUD
+    │   ├── alert_history_service.py # アラート履歴参照
+    │   ├── mail_history_service.py  # メール通知履歴参照
+    │   ├── dashboard_service.py   # ダッシュボードデータ取得（Unity Catalog経由）
+    │   └── csv_service.py         # CSVインポート・エクスポート共通処理
+    │
+    ├── views/                     # Blueprint定義（ルーティング・リクエスト/レスポンス制御）
+    │   ├── __init__.py
+    │   ├── admin/                 # 管理機能 Blueprint（ADM-001〜016）
+    │   │   ├── __init__.py        # Blueprint登録
+    │   │   ├── devices.py         # /admin/devices/* デバイス管理ルーティング
+    │   │   ├── users.py           # /admin/users/* ユーザー管理ルーティング
+    │   │   ├── organizations.py   # /admin/organizations/* 組織管理ルーティング
+    │   │   └── device_inventory.py # /admin/device-inventory/* デバイス台帳ルーティング
+    │   ├── alert/                 # アラート機能 Blueprint（ALT-001〜006）
+    │   │   ├── __init__.py
+    │   │   ├── alert_settings.py  # /alert/alert-settings/* アラート設定ルーティング
+    │   │   └── alert_history.py   # /alert/alert-history/* アラート履歴ルーティング
+    │   ├── notice/                # 通知機能 Blueprint（NTC-001〜006）
+    │   │   ├── __init__.py
+    │   │   ├── mail_settings.py   # /notice/mail-settings/* メール通知設定ルーティング
+    │   │   └── mail_history.py    # /notice/mail-history/* メール通知履歴ルーティング
+    │   ├── dashboard/             # ダッシュボード Blueprint（DSH-001）
+    │   │   ├── __init__.py
+    │   │   └── views.py           # /, /dashboard ダッシュボード表示ルーティング
+    │   ├── account/               # アカウント Blueprint（ACC-001〜002）
+    │   │   ├── __init__.py
+    │   │   └── views.py           # /account/* 言語設定・ユーザ情報参照ルーティング
+    │   └── transfer/              # インポート Blueprint（TRF-001）
+    │       ├── __init__.py
+    │       └── views.py           # /transfer/* CSVインポートルーティング
+    │
+    ├── decorators/                # カスタムデコレータ
+    │   ├── __init__.py
+    │   └── auth.py                # @require_role 等の権限チェックデコレータ
+    │
+    ├── templates/                 # Jinja2テンプレート
+    │   ├── base.html              # 共通レイアウト（ヘッダー、サイドバー、フッター）
+    │   ├── components/            # 再利用可能なマクロ
+    │   │   ├── pagination.html    # ページネーションマクロ
+    │   │   ├── modal.html         # モーダルマクロ（メッセージ・確認・フォーム）
+    │   │   ├── form_fields.html   # フォーム部品マクロ
+    │   │   ├── table.html         # テーブルマクロ
+    │   │   └── search.html        # 検索フォームマクロ
+    │   ├── errors/
+    │   │   ├── 403.html           # 403エラーページ（DB未登録ユーザー）
+    │   │   └── 500.html           # 500エラーページ
+    │   ├── admin/
+    │   │   ├── devices/           # デバイス管理テンプレート（list, form, detail）
+    │   │   ├── users/             # ユーザー管理テンプレート
+    │   │   ├── organizations/     # 組織管理テンプレート
+    │   │   └── device_inventory/  # デバイス台帳テンプレート
+    │   ├── alert/
+    │   │   ├── alert_settings/    # アラート設定テンプレート
+    │   │   └── alert_history/     # アラート履歴テンプレート
+    │   ├── notice/
+    │   │   ├── mail_settings/     # メール通知設定テンプレート
+    │   │   └── mail_history/      # メール通知履歴テンプレート
+    │   ├── dashboard/             # ダッシュボードテンプレート
+    │   ├── account/               # アカウントテンプレート
+    │   └── transfer/              # CSVインポートテンプレート
+    │
+    └── static/                    # 静的ファイル
+        ├── css/
+        │   ├── variables.css      # CSS変数定義（カラー、スペーシング、フォント）
+        │   ├── reset.css          # CSSリセット
+        │   ├── base.css           # 基本スタイル
+        │   ├── main.css           # メインスタイルシート（全CSSをインポート）
+        │   └── components/        # BEMコンポーネント別CSS
+        │       ├── button.css
+        │       ├── alert.css
+        │       ├── form.css
+        │       ├── table.css
+        │       ├── pagination.css
+        │       ├── modal.css
+        │       ├── sort.css
+        │       └── spinner.css
+        ├── images/                # アイコン等の画像
+        └── js/
+            ├── main.js            # グローバルJS（検索条件のsessionStorage保持等）
+            └── components/        # コンポーネント別JS
+                ├── modal.js       # Modalクラス
+                ├── validation.js  # FormValidatorクラス
+                ├── toast.js       # Toastクラス
+                ├── sort.js        # TableSortクラス（部分ソート＝クライアント側）
+                └── pagination.js  # Paginationクラス（UI描画・ページ遷移リクエスト発行）
 ```
 
 ---

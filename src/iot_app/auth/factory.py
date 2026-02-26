@@ -1,7 +1,7 @@
 from flask import current_app
 
-from auth.providers.azure_easy_auth import AzureEasyAuthProvider
-from auth.providers.dev import DevAuthProvider
+from iot_app.auth.providers.azure_easy_auth import AzureEasyAuthProvider
+from iot_app.auth.providers.dev import DevAuthProvider
 
 
 def get_auth_provider():
