@@ -109,12 +109,12 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラーページ表示]
 
-    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1<br>sort_id=4, order=desc<br>sent_at_start=現在日時から7日前の00:00<br>sent_at_end=現在日時の23:59]
+    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1, sort_id=4, order=desc<br>sent_at_start=7日前 00:00<br>sent_at_end=当日 23:59]
     Init --> SetParams[Cookieに検索条件を格納]
-    SetParams --> Query[DBクエリ実行<br>SELECT * FROM mail_history<br>WHERE organization_id=現在の組織ID<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
-    Query --> CheckDB{DBクエリ<br>結果}
+    SetParams --> Query[DBクエリ実行<br>SELECT FROM mail_history<br>WHERE organization_id=現在の組織ID<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
+    Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template('mail-history/list.html'<br>mail_histories=histories, total=total, page=1)]
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
     Template --> Response[HTMLレスポンス返却]
 
     CheckDB -->|失敗| Error500[500エラーページ表示]
@@ -371,10 +371,10 @@ flowchart TD
     ValidError --> ValidEnd([処理中断])
 
     ValidCheck -->|OK| PutParams[Cookieに検索条件を格納<br>mail_types, keyword<br>sent_at_start, sent_at_end<br>page=1, sort_id=4, order=desc]
-    PutParams --> Query[DBクエリ実行<br>SELECT * FROM mail_history<br>WHERE organization_id=現在の組織ID<br>AND mail_type IN (mail_types)<br>AND (subject LIKE '%keyword%' OR body LIKE '%keyword%')<br>AND sent_at BETWEEN sent_at_start AND sent_at_end<br>ORDER BY sent_at DESC, mail_history_id ASC<br>LIMIT 25 OFFSET 0]
-    Query --> CheckDB{DBクエリ<br>結果}
+    PutParams --> Query[DBクエリ実行<br>SELECT FROM mail_history<br>WHERE organization_id=現在の組織ID<br>AND mail_type IN mail_types<br>AND sent_at BETWEEN sent_at_start AND sent_at_end<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
+    Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template('mail-history/list.html'<br>mail_histories=histories, ...)]
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
     Template --> Response[HTMLレスポンス返却]
 
     CheckDB -->|失敗| Error500[500エラーページ表示]
@@ -681,6 +681,26 @@ Cookieに検索条件を保持する
 
 #### 処理フロー
 
+```mermaid
+flowchart TD
+    Start([ソートヘッダークリック]) --> GetParams[クエリパラメータ取得<br>sort_id, order]
+    GetParams --> GetCookie[Cookieから検索条件を取得]
+    GetCookie --> ValidSort{sort_idが有効?}
+    ValidSort -->|無効| DefaultSort[デフォルト値を使用<br>sort_id=4, order=desc]
+    ValidSort -->|有効| ValidOrder{orderが有効?}
+    ValidOrder -->|不正| FixOrder[order=desc に修正]
+    ValidOrder -->|正常| UpdateCookie[Cookieにソート条件を保存<br>sort_id, order, page=1]
+    DefaultSort --> UpdateCookie
+    FixOrder --> UpdateCookie
+    UpdateCookie --> Query[DBクエリ実行<br>Cookieの検索条件と新ソート条件で検索]
+    Query --> CheckDB{DBクエリ結果}
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
+    Template --> Response[HTMLレスポンス返却]
+    CheckDB -->|失敗| Error500[500エラーページ表示]
+    Response --> End([処理完了])
+    Error500 --> End
+```
+
 ソート処理は、Cookieに保存された検索条件を保持したまま、ソート条件を変更して検索処理を実行します。
 
 **リクエスト例:**
@@ -761,6 +781,19 @@ def mail_history_list():
 
 #### 処理フロー
 
+```mermaid
+flowchart TD
+    Start([ページ番号ボタンクリック]) --> GetParams[クエリパラメータ取得<br>page]
+    GetParams --> GetCookie[Cookieから検索条件・ソート条件を取得]
+    GetCookie --> Query[DBクエリ実行<br>Cookieの検索条件とソート条件とページ番号で検索]
+    Query --> CheckDB{DBクエリ結果}
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
+    Template --> Response[HTMLレスポンス返却]
+    CheckDB -->|失敗| Error500[500エラーページ表示]
+    Response --> End([処理完了])
+    Error500 --> End
+```
+
 ページング処理は、Cookieに保存された検索条件とソート条件を保持したまま、ページ番号を変更して検索処理を実行します。
 
 **リクエスト例:**
@@ -836,7 +869,7 @@ flowchart TD
     Query --> CheckDB{データ取得<br>結果}
 
     CheckDB -->|見つからない| Error404[404エラー<br>データが見つかりません]
-    CheckDB -->|成功| Template[Jinja2パーシャルテンプレートレンダリング<br>render_template('mail-history/detail_modal.html'<br>mail_history=history)]
+    CheckDB -->|成功| Template[Jinja2パーシャルテンプレートレンダリング<br>render_template<br>mail-history/detail_modal.html]
     Template --> Response[HTMLレスポンス返却<br>モーダル内部のHTMLのみ]
     Response --> Modal[モーダルを開く]
 
