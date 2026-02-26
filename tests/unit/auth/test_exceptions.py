@@ -13,7 +13,7 @@ auth/exceptions.py の単体テスト
 """
 import pytest
 
-from auth.exceptions import (
+from iot_app.auth.exceptions import (
     AuthError,
     UnauthorizedError,
     ForbiddenError,

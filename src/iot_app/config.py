@@ -41,6 +41,7 @@ class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     DEBUG = True
+    AUTH_TYPE = 'dev'
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 
 

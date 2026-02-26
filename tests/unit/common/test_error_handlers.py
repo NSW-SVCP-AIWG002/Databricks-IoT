@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from werkzeug.exceptions import Unauthorized, NotFound
 
-from common.error_handlers import handle_500, handle_401, handle_4xx
+from iot_app.common.error_handlers import handle_500, handle_401, handle_4xx
 
 
 # ---------------------------------------------------------------------------
@@ -34,8 +34,8 @@ class TestHandle500:
         error = Exception("some internal error")
 
         with app.test_request_context("/"):
-            with patch("common.error_handlers.logger") as mock_logger:
-                with patch("common.error_handlers.render_template", return_value=""):
+            with patch("iot_app.common.error_handlers.logger") as mock_logger:
+                with patch("iot_app.common.error_handlers.render_template", return_value=""):
                     handle_500(error)
 
                     mock_logger.error.assert_called_once()
@@ -60,9 +60,9 @@ class TestHandle401:
 
         with app.test_request_context("/"):
             g.failed_email = "unknown@external.com"
-            with patch("common.error_handlers.logger") as mock_logger:
-                with patch("common.error_handlers.redirect", return_value=""):
-                    with patch("common.error_handlers.url_for", return_value="/auth/login"):
+            with patch("iot_app.common.error_handlers.logger") as mock_logger:
+                with patch("iot_app.common.error_handlers.redirect", return_value=""):
+                    with patch("iot_app.common.error_handlers.url_for", return_value="/auth/login"):
                         handle_401(error)
 
                         mock_logger.warning.assert_called_once()
@@ -74,9 +74,9 @@ class TestHandle401:
         error = Unauthorized()
 
         with app.test_request_context("/"):
-            with patch("common.error_handlers.logger") as mock_logger:
-                with patch("common.error_handlers.redirect", return_value=""):
-                    with patch("common.error_handlers.url_for", return_value="/auth/login"):
+            with patch("iot_app.common.error_handlers.logger") as mock_logger:
+                with patch("iot_app.common.error_handlers.redirect", return_value=""):
+                    with patch("iot_app.common.error_handlers.url_for", return_value="/auth/login"):
                         handle_401(error)
 
                         mock_logger.warning.assert_called_once()
@@ -87,9 +87,9 @@ class TestHandle401:
         error = Unauthorized()
 
         with app.test_request_context("/"):
-            with patch("common.error_handlers.logger"):
-                with patch("common.error_handlers.redirect") as mock_redirect:
-                    with patch("common.error_handlers.url_for", return_value="/auth/login"):
+            with patch("iot_app.common.error_handlers.logger"):
+                with patch("iot_app.common.error_handlers.redirect") as mock_redirect:
+                    with patch("iot_app.common.error_handlers.url_for", return_value="/auth/login"):
                         flask_session["email"] = "existing@example.com"
                         handle_401(error)
 
@@ -112,7 +112,7 @@ class TestHandle4xx:
         error = NotFound()
 
         with app.test_request_context("/"):
-            with patch("common.error_handlers.logger") as mock_logger:
+            with patch("iot_app.common.error_handlers.logger") as mock_logger:
                 handle_4xx(error)
 
                 mock_logger.warning.assert_called_once()

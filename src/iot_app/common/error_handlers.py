@@ -1,6 +1,6 @@
 from flask import g, session, redirect, url_for, render_template
 
-from common.logger import get_logger
+from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,4 +1,4 @@
-from src import db
+from iot_app import db
 
 
 class User(db.Model):

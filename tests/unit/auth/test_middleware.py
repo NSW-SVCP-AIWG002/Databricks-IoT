@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 from flask import session
 from werkzeug.exceptions import InternalServerError, Unauthorized
 
-from auth.middleware import is_excluded_path, _sync_session, authenticate_request
-from auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.middleware import is_excluded_path, _sync_session, authenticate_request
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ class TestAuthenticateRequest:
         mock_provider = self._make_mock_provider()
 
         with app.test_request_context("/static/css/main.css"):
-            with patch("auth.middleware.auth_provider", mock_provider):
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 result = authenticate_request()
 
         assert result is None
@@ -162,7 +162,7 @@ class TestAuthenticateRequest:
         mock_provider.get_user_info.side_effect = UnauthorizedError("not authenticated")
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 session["email"] = "existing@example.com"
 
                 with pytest.raises(Unauthorized):
@@ -177,10 +177,10 @@ class TestAuthenticateRequest:
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("auth.middleware.render_template",
+                    with patch("iot_app.auth.middleware.render_template",
                                return_value="<html>403</html>") as mock_render:
                         session["email"] = "existing@example.com"
 
@@ -203,10 +203,10 @@ class TestAuthenticateRequest:
         mock_exchanger.ensure_valid_token.return_value = "valid-databricks-token"
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         result = authenticate_request()
 
@@ -226,10 +226,10 @@ class TestAuthenticateRequest:
         mock_exchanger.ensure_valid_token.return_value = "valid-databricks-token"
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         authenticate_request()
                         assert g.databricks_token == "valid-databricks-token"
@@ -247,10 +247,10 @@ class TestAuthenticateRequest:
         mock_exchanger.ensure_valid_token.return_value = "valid-token"
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         authenticate_request()
 
@@ -271,8 +271,8 @@ class TestAuthenticateRequest:
 
         with app.test_request_context("/dashboard"):
             app.config['AUTH_TYPE'] = 'dev'
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
                     authenticate_request()
                     assert g.databricks_token == "dev-token-xyz"
@@ -287,8 +287,8 @@ class TestAuthenticateRequest:
 
         with app.test_request_context("/dashboard"):
             app.config['AUTH_TYPE'] = 'dev'
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
                     with pytest.raises(InternalServerError):
                         authenticate_request()
@@ -303,10 +303,10 @@ class TestAuthenticateRequest:
         mock_exchanger.ensure_valid_token.side_effect = JWTRetrievalError("JWT not found")
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         with pytest.raises(InternalServerError):
                             authenticate_request()
@@ -321,10 +321,10 @@ class TestAuthenticateRequest:
         mock_exchanger.ensure_valid_token.side_effect = TokenExchangeError("exchange failed")
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         with pytest.raises(InternalServerError):
                             authenticate_request()
@@ -365,10 +365,10 @@ class TestAuthenticateRequestLogging:
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("auth.middleware.render_template",
+                    with patch("iot_app.auth.middleware.render_template",
                                return_value="<html>403</html>"):
                         with caplog.at_level(logging.WARNING):
                             authenticate_request()
@@ -392,10 +392,10 @@ class TestAuthenticateRequestLogging:
         mock_exchanger.ensure_valid_token.return_value = "valid-token"
 
         with app.test_request_context("/dashboard"):
-            with patch("auth.middleware.auth_provider", mock_provider):
-                with patch("auth.middleware.find_user_by_email",
+            with patch("iot_app.auth.middleware.auth_provider", mock_provider):
+                with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
-                    with patch("auth.token_exchange.TokenExchanger",
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         with caplog.at_level(logging.INFO):
                             authenticate_request()

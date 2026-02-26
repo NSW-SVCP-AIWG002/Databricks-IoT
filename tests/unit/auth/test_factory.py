@@ -10,9 +10,9 @@ get_auth_provider() の単体テスト
 """
 import pytest
 
-from auth.factory import get_auth_provider
-from auth.providers.azure_easy_auth import AzureEasyAuthProvider
-from auth.providers.dev import DevAuthProvider
+from iot_app.auth.factory import get_auth_provider
+from iot_app.auth.providers.azure_easy_auth import AzureEasyAuthProvider
+from iot_app.auth.providers.dev import DevAuthProvider
 
 
 @pytest.mark.unit

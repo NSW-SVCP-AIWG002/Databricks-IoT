@@ -1,5 +1,5 @@
-from auth.exceptions import UnauthorizedError
-from models.user import User
+from iot_app.auth.exceptions import UnauthorizedError
+from iot_app.models.user import User
 
 
 def find_user_by_email(email: str) -> dict:

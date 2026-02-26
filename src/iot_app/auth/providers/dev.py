@@ -1,7 +1,7 @@
 import os
 
-from auth.providers.base import AuthProvider, UserInfo
-from auth.exceptions import UnauthorizedError
+from iot_app.auth.providers.base import AuthProvider, UserInfo
+from iot_app.auth.exceptions import UnauthorizedError
 
 
 class DevAuthProvider(AuthProvider):

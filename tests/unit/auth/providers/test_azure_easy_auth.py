@@ -10,8 +10,8 @@ import json
 import pytest
 from unittest.mock import MagicMock
 
-from auth.providers.azure_easy_auth import AzureEasyAuthProvider
-from auth.exceptions import UnauthorizedError
+from iot_app.auth.providers.azure_easy_auth import AzureEasyAuthProvider
+from iot_app.auth.exceptions import UnauthorizedError
 
 
 # ---------------------------------------------------------------------------

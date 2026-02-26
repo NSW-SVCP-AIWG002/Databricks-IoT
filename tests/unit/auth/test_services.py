@@ -15,8 +15,8 @@ auth/services.py の単体テスト
 import pytest
 from unittest.mock import patch, MagicMock
 
-from auth.services import find_user_by_email
-from auth.exceptions import UnauthorizedError
+from iot_app.auth.services import find_user_by_email
+from iot_app.auth.exceptions import UnauthorizedError
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ class TestFindUserByEmail:
         mock_user.user_id = 42
         mock_user.user_type_id = 2
 
-        with patch('auth.services.User') as mock_user_class:
+        with patch('iot_app.auth.services.User') as mock_user_class:
             mock_user_class.query.filter_by.return_value.first.return_value = mock_user
 
             result = find_user_by_email('yamada@example.com')
@@ -45,7 +45,7 @@ class TestFindUserByEmail:
 
     def test_not_found_raises_unauthorized(self):
         """2.2.1: emailが一致するユーザーが存在しない場合、UnauthorizedError を送出する"""
-        with patch('auth.services.User') as mock_user_class:
+        with patch('iot_app.auth.services.User') as mock_user_class:
             mock_user_class.query.filter_by.return_value.first.return_value = None
 
             with pytest.raises(UnauthorizedError):
@@ -59,7 +59,7 @@ class TestFindUserByEmail:
         mock_user.user_id = 99
         mock_user.user_type_id = 1
 
-        with patch('auth.services.User') as mock_user_class:
+        with patch('iot_app.auth.services.User') as mock_user_class:
             mock_user_class.query.filter_by.return_value.first.return_value = mock_user
 
             find_user_by_email('test@example.com')
@@ -70,7 +70,7 @@ class TestFindUserByEmail:
 
     def test_db_exception_propagates(self):
         """1.3.1: DB例外は握りつぶさず上位へ伝播する"""
-        with patch('auth.services.User') as mock_user_class:
+        with patch('iot_app.auth.services.User') as mock_user_class:
             mock_user_class.query.filter_by.side_effect = Exception("DB connection failed")
 
             with pytest.raises(Exception):

@@ -15,8 +15,8 @@ auth/providers/dev.py の単体テスト
 import pytest
 from unittest.mock import MagicMock
 
-from auth.providers.dev import DevAuthProvider
-from auth.exceptions import UnauthorizedError
+from iot_app.auth.providers.dev import DevAuthProvider
+from iot_app.auth.exceptions import UnauthorizedError
 
 
 @pytest.mark.unit
