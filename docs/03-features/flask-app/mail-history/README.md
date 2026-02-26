@@ -62,7 +62,7 @@
 | カラム名 | 論理名 | データ型 | 必須 | 備考 |
 |----------|-------|---------|------|------|
 | mail_history_id | メール送信履歴ID | INT | ○ | 主キー |
-| mail_history_uuid | メール送信履歴UUID | VARCHAR(32) | ○ | UUID（外部公開用一意識別子） |
+| mail_history_uuid | メール送信履歴UUID | VARCHAR(36) | ○ | UUID（外部公開用一意識別子） |
 | mail_type | メール種別ID | INT | ○ | 外部キー: mail_type_master.mail_type_id |
 | sender_email | 送信元メールアドレス | VARCHAR(254) | ○ | 送信元のメールアドレス |
 | recipients | 送信先メールアドレス | JSON | ○ | 送信先のメールアドレス（JSON形式） |
