@@ -23,6 +23,14 @@
     - [日次集計変換ロジック](#日次集計変換ロジック)
     - [月次集計変換ロジック](#月次集計変換ロジック)
     - [年次集計変換ロジック](#年次集計変換ロジック)
+    - [共通集計処理の実装](#共通集計処理の実装)
+      - [共通部分と差分](#共通部分と差分)
+      - [設定クラス定義](#設定クラス定義)
+      - [センサーカラム定義](#センサーカラム定義)
+      - [共通集計処理](#共通集計処理)
+      - [MERGE処理（共通）](#merge処理共通)
+      - [集計処理の実行](#集計処理の実行)
+      - [共通化のメリット](#共通化のメリット)
   - [シーケンス図](#シーケンス図)
     - [日次バッチ処理全体フロー](#日次バッチ処理全体フロー)
   - [エラーハンドリング](#エラーハンドリング)
@@ -112,8 +120,7 @@ flowchart TD
     GetDate --> CheckSource{シルバー層に<br>対象日データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
-    LogNoData --> EndNoData([処理終了<br>正常完了])
-
+    LogNoData --> EndSuccess([処理終了<br>正常完了])
     CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date = 対象日]
     ReadSilver --> CheckRead{読込結果}
 
@@ -132,7 +139,7 @@ flowchart TD
     WriteGold --> CheckWrite{書込結果}
 
     CheckWrite -->|成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
-    UpdateMeta --> EndSuccess([処理終了<br>正常完了])
+    UpdateMeta --> EndSuccess
 
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
     ErrorWrite --> RetryWrite{リトライ<br>回数確認}
@@ -143,166 +150,38 @@ flowchart TD
 
 #### 処理詳細
 
-**① シルバー層データ読込**
+日次集計処理は[共通集計処理](#共通集計処理の実装)を使用して実行します。
 
-```sql
--- 処理対象日のデータを読込
-WITH silver_data AS (
-    SELECT
-        device_id,
-        organization_id,
-        event_timestamp,
-        event_date,
-        external_temp,
-        set_temp_freezer_1,
-        internal_sensor_temp_freezer_1,
-        internal_temp_freezer_1,
-        df_temp_freezer_1,
-        condensing_temp_freezer_1,
-        adjusted_internal_temp_freezer_1,
-        set_temp_freezer_2,
-        internal_sensor_temp_freezer_2,
-        internal_temp_freezer_2,
-        df_temp_freezer_2,
-        condensing_temp_freezer_2,
-        adjusted_internal_temp_freezer_2,
-        compressor_freezer_1,
-        compressor_freezer_2,
-        fan_motor_1,
-        fan_motor_2,
-        fan_motor_3,
-        fan_motor_4,
-        fan_motor_5,
-        defrost_heater_output_1,
-        defrost_heater_output_2
-    FROM
-        iot_catalog.silver.silver_sensor_data
-    WHERE
-        event_date = :target_date
+**実行例:**
+
+```python
+from datetime import date, timedelta
+
+# 前日の日付を取得
+target_date = date.today() - timedelta(days=1)
+
+# 日次集計を実行
+run_aggregation(
+    period=AggregationPeriod.DAILY,
+    target_filter=f"event_date = '{target_date}'"
 )
 ```
 
-**② 日次集計変換**
+**処理ステップ:**
 
-各集約対象項目（summary_item）と集約方法ID（summary_method_id）の組み合わせごとに統計値を算出します。集約方法はgold_summary_method_masterテーブルと結合し、delete_flag = FALSEの有効な集約方法のみを出力します。
+| ステップ | 処理内容             | 詳細                                 |
+| -------- | -------------------- | ------------------------------------ |
+| ①        | シルバー層データ読込 | `event_date = 対象日` でフィルタ     |
+| ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し |
+| ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理        |
 
-```sql
--- 日次集計（マスタテーブル結合方式）
-WITH sensor_unpivot AS (
-    -- 横持ちデータを縦持ちに変換
-    SELECT
-        device_id,
-        organization_id,
-        event_date AS collection_date,
-        stack(22,
-            1, external_temp,
-            2, set_temp_freezer_1,
-            3, internal_sensor_temp_freezer_1,
-            4, internal_temp_freezer_1,
-            5, df_temp_freezer_1,
-            6, condensing_temp_freezer_1,
-            7, adjusted_internal_temp_freezer_1,
-            8, set_temp_freezer_2,
-            9, internal_sensor_temp_freezer_2,
-            10, internal_temp_freezer_2,
-            11, df_temp_freezer_2,
-            12, condensing_temp_freezer_2,
-            13, adjusted_internal_temp_freezer_2,
-            14, compressor_freezer_1,
-            15, compressor_freezer_2,
-            16, fan_motor_1,
-            17, fan_motor_2,
-            18, fan_motor_3,
-            19, fan_motor_4,
-            20, fan_motor_5,
-            21, defrost_heater_output_1,
-            22, defrost_heater_output_2
-        ) AS (summary_item, sensor_value)
-    FROM silver_data
-),
-daily_stats AS (
-    -- 全ての統計値を事前計算
-    SELECT
-        device_id,
-        organization_id,
-        collection_date,
-        summary_item,
-        AVG(sensor_value) AS AVG,
-        MAX(sensor_value) AS MAX,
-        MIN(sensor_value) AS MIN,
-        PERCENTILE_APPROX(sensor_value, 0.25) AS P25,
-        PERCENTILE_APPROX(sensor_value, 0.5) AS MEDIAN,
-        PERCENTILE_APPROX(sensor_value, 0.75) AS P75,
-        STDDEV(sensor_value) AS STDDEV,
-        PERCENTILE_APPROX(sensor_value, 0.95) AS P95,
-        COUNT(*) AS data_count
-    FROM sensor_unpivot
-    WHERE sensor_value IS NOT NULL
-    GROUP BY device_id, organization_id, collection_date, summary_item
-),
-unpivoted_stats AS (
-    -- 統計値を縦持ちに変換（集約方法コードをキーとして使用）
-    SELECT
-        device_id,
-        organization_id,
-        collection_date,
-        summary_item,
-        data_count,
-        stack(8,
-            'AVG', AVG,
-            'MAX', MAX,
-            'MIN', MIN,
-            'P25', P25,
-            'MEDIAN', MEDIAN,
-            'P75', P75,
-            'STDDEV', STDDEV,
-            'P95', P95
-        ) AS (method_code, summary_value)
-    FROM daily_stats
-)
--- マスタテーブルと結合して有効な集約方法のみ出力
-SELECT
-    u.device_id,
-    u.organization_id,
-    u.collection_date,
-    u.summary_item,
-    m.summary_method_id,
-    u.summary_value,
-    u.data_count,
-    CURRENT_TIMESTAMP() AS create_time
-FROM unpivoted_stats u
-INNER JOIN iot_catalog.gold.gold_summary_method_master m
-    ON u.method_code = m.summary_method_code
-WHERE m.delete_flag = FALSE
-```
+**設定値:**
 
-**マスタテーブル結合方式のメリット:**
-
-| 観点         | 説明                                                    |
-| ------------ | ------------------------------------------------------- |
-| 柔軟性       | マスタテーブルの更新のみで集約方法の追加・削除が可能    |
-| 論理削除対応 | delete_flagをTRUEにすることで特定の集約方法を無効化可能 |
-| 保守性       | SQLコードの変更なしに集約方法を制御可能                 |
-
-**③ ゴールド層へ書込**
-
-```sql
-MERGE INTO iot_catalog.gold.gold_sensor_data_daily_summary AS target
-USING daily_aggregated AS source
-ON target.device_id = source.device_id
-   AND target.organization_id = source.organization_id
-   AND target.collection_date = source.collection_date
-   AND target.summary_item = source.summary_item
-   AND target.summary_method_id = source.summary_method_id
-WHEN MATCHED THEN
-    UPDATE SET
-        summary_value = source.summary_value,
-        data_count = source.data_count,
-        create_time = source.create_time
-WHEN NOT MATCHED THEN
-    INSERT (device_id, organization_id, collection_date, summary_item, summary_method_id, summary_value, data_count, create_time)
-    VALUES (source.device_id, source.organization_id, source.collection_date, source.summary_item, source.summary_method_id, source.summary_value, source.data_count, source.create_time)
-```
+| 項目         | 値                                                |
+| ------------ | ------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_daily_summary` |
+| 時間カラム   | `collection_date`                                 |
+| 時間式       | `event_date`                                      |
 
 #### バリデーション
 
@@ -332,7 +211,7 @@ flowchart TD
     GetMonth --> CheckSource{シルバー層に<br>対象月データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
-    LogNoData --> EndNoData([処理終了<br>正常完了])
+    LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date BETWEEN 月初 AND 月末]
     ReadSilver --> Transform[データ変換<br>センサーデータを月次で集約]
@@ -340,7 +219,7 @@ flowchart TD
     WriteGold --> CheckWrite{書込結果}
 
     CheckWrite -->|成功| UpdateMeta[メタデータ更新]
-    UpdateMeta --> EndSuccess([処理終了<br>正常完了])
+    UpdateMeta --> EndSuccess
 
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
     ErrorWrite --> Retry{リトライ確認}
@@ -351,159 +230,41 @@ flowchart TD
 
 #### 処理詳細
 
-**① シルバー層データ読込**
+月次集計処理は[共通集計処理](#共通集計処理の実装)を使用して実行します。
 
-```sql
--- 対象月のデータを読込
-WITH silver_data AS (
-    SELECT
-        device_id,
-        organization_id,
-        event_timestamp,
-        event_date,
-        DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month,
-        external_temp,
-        set_temp_freezer_1,
-        internal_sensor_temp_freezer_1,
-        internal_temp_freezer_1,
-        df_temp_freezer_1,
-        condensing_temp_freezer_1,
-        adjusted_internal_temp_freezer_1,
-        set_temp_freezer_2,
-        internal_sensor_temp_freezer_2,
-        internal_temp_freezer_2,
-        df_temp_freezer_2,
-        condensing_temp_freezer_2,
-        adjusted_internal_temp_freezer_2,
-        compressor_freezer_1,
-        compressor_freezer_2,
-        fan_motor_1,
-        fan_motor_2,
-        fan_motor_3,
-        fan_motor_4,
-        fan_motor_5,
-        defrost_heater_output_1,
-        defrost_heater_output_2
-    FROM
-        iot_catalog.silver.silver_sensor_data
-    WHERE
-        event_date BETWEEN :month_start AND :month_end
+**実行例:**
+
+```python
+from datetime import date
+from dateutil.relativedelta import relativedelta
+
+# 前月の年月を取得
+last_month = date.today() - relativedelta(months=1)
+month_start = last_month.replace(day=1)
+month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
+
+# 月次集計を実行
+run_aggregation(
+    period=AggregationPeriod.MONTHLY,
+    target_filter=f"event_date BETWEEN '{month_start}' AND '{month_end}'"
 )
 ```
 
-**② 月次集計変換**
+**処理ステップ:**
 
-集約方法はgold_summary_method_masterテーブルと結合し、delete_flag = FALSEの有効な集約方法のみを出力します。
+| ステップ | 処理内容             | 詳細                                          |
+| -------- | -------------------- | --------------------------------------------- |
+| ①        | シルバー層データ読込 | `event_date BETWEEN 月初 AND 月末` でフィルタ |
+| ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し          |
+| ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理                 |
 
-```sql
--- 月次集計（マスタテーブル結合方式）
-WITH sensor_unpivot AS (
-    -- 横持ちデータを縦持ちに変換
-    SELECT
-        device_id,
-        organization_id,
-        collection_year_month,
-        stack(22,
-            1, external_temp,
-            2, set_temp_freezer_1,
-            3, internal_sensor_temp_freezer_1,
-            4, internal_temp_freezer_1,
-            5, df_temp_freezer_1,
-            6, condensing_temp_freezer_1,
-            7, adjusted_internal_temp_freezer_1,
-            8, set_temp_freezer_2,
-            9, internal_sensor_temp_freezer_2,
-            10, internal_temp_freezer_2,
-            11, df_temp_freezer_2,
-            12, condensing_temp_freezer_2,
-            13, adjusted_internal_temp_freezer_2,
-            14, compressor_freezer_1,
-            15, compressor_freezer_2,
-            16, fan_motor_1,
-            17, fan_motor_2,
-            18, fan_motor_3,
-            19, fan_motor_4,
-            20, fan_motor_5,
-            21, defrost_heater_output_1,
-            22, defrost_heater_output_2
-        ) AS (summary_item, sensor_value)
-    FROM silver_data
-),
-monthly_stats AS (
-    -- 全ての統計値を事前計算
-    SELECT
-        device_id,
-        organization_id,
-        collection_year_month,
-        summary_item,
-        AVG(sensor_value) AS AVG,
-        MAX(sensor_value) AS MAX,
-        MIN(sensor_value) AS MIN,
-        PERCENTILE_APPROX(sensor_value, 0.25) AS P25,
-        PERCENTILE_APPROX(sensor_value, 0.5) AS MEDIAN,
-        PERCENTILE_APPROX(sensor_value, 0.75) AS P75,
-        STDDEV(sensor_value) AS STDDEV,
-        PERCENTILE_APPROX(sensor_value, 0.95) AS P95,
-        COUNT(*) AS data_count
-    FROM sensor_unpivot
-    WHERE sensor_value IS NOT NULL
-    GROUP BY device_id, organization_id, collection_year_month, summary_item
-),
-unpivoted_stats AS (
-    -- 統計値を縦持ちに変換（集約方法コードをキーとして使用）
-    SELECT
-        device_id,
-        organization_id,
-        collection_year_month,
-        summary_item,
-        data_count,
-        stack(8,
-            'AVG', AVG,
-            'MAX', MAX,
-            'MIN', MIN,
-            'P25', P25,
-            'MEDIAN', MEDIAN,
-            'P75', P75,
-            'STDDEV', STDDEV,
-            'P95', P95
-        ) AS (method_code, summary_value)
-    FROM monthly_stats
-)
--- マスタテーブルと結合して有効な集約方法のみ出力
-SELECT
-    u.device_id,
-    u.organization_id,
-    u.collection_year_month,
-    u.summary_item,
-    m.summary_method_id,
-    u.summary_value,
-    u.data_count,
-    CURRENT_TIMESTAMP() AS create_time
-FROM unpivoted_stats u
-INNER JOIN iot_catalog.gold.gold_summary_method_master m
-    ON u.method_code = m.summary_method_code
-WHERE m.delete_flag = FALSE
-```
+**設定値:**
 
-**③ ゴールド層へ書込**
-
-```sql
-MERGE INTO iot_catalog.gold.gold_sensor_data_monthly_summary AS target
-USING monthly_aggregated AS source
-ON target.device_id = source.device_id
-   AND target.organization_id = source.organization_id
-   AND target.collection_year_month = source.collection_year_month
-   AND target.summary_item = source.summary_item
-   AND target.summary_method_id = source.summary_method_id
-WHEN MATCHED THEN
-    UPDATE SET
-        summary_value = source.summary_value,
-        data_count = source.data_count,
-        create_time = source.create_time
-WHEN NOT MATCHED THEN
-    INSERT (device_id, organization_id, collection_year_month, summary_item, summary_method_id, summary_value, data_count, create_time)
-    VALUES (source.device_id, source.organization_id, source.collection_year_month, source.summary_item, source.summary_method_id, source.summary_value, source.data_count, source.create_time)
-```
+| 項目         | 値                                                  |
+| ------------ | --------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary` |
+| 時間カラム   | `collection_year_month`                             |
+| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM')`                |
 
 ---
 
@@ -522,7 +283,7 @@ flowchart TD
     GetYear --> CheckSource{シルバー層に<br>対象年データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
-    LogNoData --> EndNoData([処理終了<br>正常完了])
+    LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver["シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年"]
     ReadSilver --> Transform[データ変換<br>センサーデータを年次で集約]
@@ -530,7 +291,7 @@ flowchart TD
     WriteGold --> CheckWrite{書込結果}
 
     CheckWrite -->|成功| UpdateMeta[メタデータ更新]
-    UpdateMeta --> EndSuccess([処理終了<br>正常完了])
+    UpdateMeta --> EndSuccess
 
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
     ErrorWrite --> Retry{リトライ確認}
@@ -541,159 +302,38 @@ flowchart TD
 
 #### 処理詳細
 
-**① シルバー層データ読込**
+年次集計処理は[共通集計処理](#共通集計処理の実装)を使用して実行します。
 
-```sql
--- 対象年のデータを読込
-WITH silver_data AS (
-    SELECT
-        device_id,
-        organization_id,
-        event_timestamp,
-        event_date,
-        YEAR(event_date) AS collection_year,
-        external_temp,
-        set_temp_freezer_1,
-        internal_sensor_temp_freezer_1,
-        internal_temp_freezer_1,
-        df_temp_freezer_1,
-        condensing_temp_freezer_1,
-        adjusted_internal_temp_freezer_1,
-        set_temp_freezer_2,
-        internal_sensor_temp_freezer_2,
-        internal_temp_freezer_2,
-        df_temp_freezer_2,
-        condensing_temp_freezer_2,
-        adjusted_internal_temp_freezer_2,
-        compressor_freezer_1,
-        compressor_freezer_2,
-        fan_motor_1,
-        fan_motor_2,
-        fan_motor_3,
-        fan_motor_4,
-        fan_motor_5,
-        defrost_heater_output_1,
-        defrost_heater_output_2
-    FROM
-        iot_catalog.silver.silver_sensor_data
-    WHERE
-        YEAR(event_date) = :target_year
+**実行例:**
+
+```python
+from datetime import date
+
+# 前年を取得
+target_year = date.today().year - 1
+
+# 年次集計を実行
+run_aggregation(
+    period=AggregationPeriod.YEARLY,
+    target_filter=f"YEAR(event_date) = {target_year}"
 )
 ```
 
-**② 年次集計変換**
+**処理ステップ:**
 
-集約方法はgold_summary_method_masterテーブルと結合し、delete_flag = FALSEの有効な集約方法のみを出力します。
+| ステップ | 処理内容             | 詳細                                   |
+| -------- | -------------------- | -------------------------------------- |
+| ①        | シルバー層データ読込 | `YEAR(event_date) = 対象年` でフィルタ |
+| ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し   |
+| ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理          |
 
-```sql
--- 年次集計（マスタテーブル結合方式）
-WITH sensor_unpivot AS (
-    -- 横持ちデータを縦持ちに変換
-    SELECT
-        device_id,
-        organization_id,
-        collection_year,
-        stack(22,
-            1, external_temp,
-            2, set_temp_freezer_1,
-            3, internal_sensor_temp_freezer_1,
-            4, internal_temp_freezer_1,
-            5, df_temp_freezer_1,
-            6, condensing_temp_freezer_1,
-            7, adjusted_internal_temp_freezer_1,
-            8, set_temp_freezer_2,
-            9, internal_sensor_temp_freezer_2,
-            10, internal_temp_freezer_2,
-            11, df_temp_freezer_2,
-            12, condensing_temp_freezer_2,
-            13, adjusted_internal_temp_freezer_2,
-            14, compressor_freezer_1,
-            15, compressor_freezer_2,
-            16, fan_motor_1,
-            17, fan_motor_2,
-            18, fan_motor_3,
-            19, fan_motor_4,
-            20, fan_motor_5,
-            21, defrost_heater_output_1,
-            22, defrost_heater_output_2
-        ) AS (summary_item, sensor_value)
-    FROM silver_data
-),
-yearly_stats AS (
-    -- 全ての統計値を事前計算
-    SELECT
-        device_id,
-        organization_id,
-        collection_year,
-        summary_item,
-        AVG(sensor_value) AS AVG,
-        MAX(sensor_value) AS MAX,
-        MIN(sensor_value) AS MIN,
-        PERCENTILE_APPROX(sensor_value, 0.25) AS P25,
-        PERCENTILE_APPROX(sensor_value, 0.5) AS MEDIAN,
-        PERCENTILE_APPROX(sensor_value, 0.75) AS P75,
-        STDDEV(sensor_value) AS STDDEV,
-        PERCENTILE_APPROX(sensor_value, 0.95) AS P95,
-        COUNT(*) AS data_count
-    FROM sensor_unpivot
-    WHERE sensor_value IS NOT NULL
-    GROUP BY device_id, organization_id, collection_year, summary_item
-),
-unpivoted_stats AS (
-    -- 統計値を縦持ちに変換（集約方法コードをキーとして使用）
-    SELECT
-        device_id,
-        organization_id,
-        collection_year,
-        summary_item,
-        data_count,
-        stack(8,
-            'AVG', AVG,
-            'MAX', MAX,
-            'MIN', MIN,
-            'P25', P25,
-            'MEDIAN', MEDIAN,
-            'P75', P75,
-            'STDDEV', STDDEV,
-            'P95', P95
-        ) AS (method_code, summary_value)
-    FROM yearly_stats
-)
--- マスタテーブルと結合して有効な集約方法のみ出力
-SELECT
-    u.device_id,
-    u.organization_id,
-    u.collection_year,
-    u.summary_item,
-    m.summary_method_id,
-    u.summary_value,
-    u.data_count,
-    CURRENT_TIMESTAMP() AS create_time
-FROM unpivoted_stats u
-INNER JOIN iot_catalog.gold.gold_summary_method_master m
-    ON u.method_code = m.summary_method_code
-WHERE m.delete_flag = FALSE
-```
+**設定値:**
 
-**③ ゴールド層へ書込**
-
-```sql
-MERGE INTO iot_catalog.gold.gold_sensor_data_yearly_summary AS target
-USING yearly_aggregated AS source
-ON target.device_id = source.device_id
-   AND target.organization_id = source.organization_id
-   AND target.collection_year = source.collection_year
-   AND target.summary_item = source.summary_item
-   AND target.summary_method_id = source.summary_method_id
-WHEN MATCHED THEN
-    UPDATE SET
-        summary_value = source.summary_value,
-        data_count = source.data_count,
-        create_time = source.create_time
-WHEN NOT MATCHED THEN
-    INSERT (device_id, organization_id, collection_year, summary_item, summary_method_id, summary_value, data_count, create_time)
-    VALUES (source.device_id, source.organization_id, source.collection_year, source.summary_item, source.summary_method_id, source.summary_value, source.data_count, source.create_time)
-```
+| 項目         | 値                                                 |
+| ------------ | -------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_yearly_summary` |
+| 時間カラム   | `collection_year`                                  |
+| 時間式       | `YEAR(event_date)`                                 |
 
 ---
 
@@ -713,6 +353,24 @@ WHEN NOT MATCHED THEN
 | 6                 | P75                 | 第3四分位数   | `PERCENTILE_APPROX(sensor_value, 0.75)` |
 | 7                 | STDDEV              | 標準偏差      | `STDDEV(sensor_value)`                  |
 | 8                 | P95                 | 上側5％境界値 | `PERCENTILE_APPROX(sensor_value, 0.95)` |
+
+**初期データ投入SQL:**
+
+```sql
+-- gold_summary_method_master 初期データ
+INSERT INTO iot_catalog.gold.gold_summary_method_master
+(summary_method_id, summary_method_code, summary_method_name, delete_flag, create_time, creator, update_time, updater)
+VALUES
+    (1, 'AVG',    '平均値',        FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (2, 'MAX',    '最大値',        FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (3, 'MIN',    '最小値',        FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (4, 'P25',    '第1四分位数',   FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (5, 'MEDIAN', '中央値',        FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (6, 'P75',    '第3四分位数',   FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (7, 'STDDEV', '標準偏差',      FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
+    (8, 'P95',    '上側5％境界値', FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999);
+```
+作成者ユーザID、更新者ユーザIDはシステム保守者を表す仮想のユーザIDを記入する。
 
 ### マスタテーブル結合方式
 
@@ -756,6 +414,292 @@ WHERE m.delete_flag = FALSE
 | ------------------ | --------------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, collection_year, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
 
+### 共通集計処理の実装
+
+日次・月次・年次集計処理は構造が共通（約90%）のため、パラメータ化された共通関数として実装します。
+
+#### 共通部分と差分
+
+| 項目                   | 共通/差分 | 説明                                                 |
+| ---------------------- | --------- | ---------------------------------------------------- |
+| stack関数によるunpivot | 共通      | 22項目の横持ち→縦持ち変換                            |
+| 統計値計算             | 共通      | AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95                |
+| マスタテーブル結合     | 共通      | gold_summary_method_masterとのINNER JOIN             |
+| MERGE処理              | 共通      | upsert処理                                           |
+| 集約キー               | **差分**  | event_date / collection_year_month / collection_year |
+| 出力テーブル           | **差分**  | daily / monthly / yearly                             |
+| WHERE条件              | **差分**  | 日付条件                                             |
+
+#### 設定クラス定義
+
+```python
+from enum import Enum
+from dataclasses import dataclass
+from typing import Callable
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
+class AggregationPeriod(Enum):
+    """集計期間"""
+    DAILY = "daily"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+@dataclass
+class AggregationConfig:
+    """集計設定"""
+    period: AggregationPeriod
+    output_table: str          # 出力テーブル名
+    time_column: str           # 出力カラム名
+    time_expr: str             # 時間集約のSQL式
+
+# 設定定義
+AGGREGATION_CONFIGS = {
+    AggregationPeriod.DAILY: AggregationConfig(
+        period=AggregationPeriod.DAILY,
+        output_table="iot_catalog.gold.gold_sensor_data_daily_summary",
+        time_column="collection_date",
+        time_expr="event_date"
+    ),
+    AggregationPeriod.MONTHLY: AggregationConfig(
+        period=AggregationPeriod.MONTHLY,
+        output_table="iot_catalog.gold.gold_sensor_data_monthly_summary",
+        time_column="collection_year_month",
+        time_expr="DATE_FORMAT(event_date, 'yyyy/MM')"
+    ),
+    AggregationPeriod.YEARLY: AggregationConfig(
+        period=AggregationPeriod.YEARLY,
+        output_table="iot_catalog.gold.gold_sensor_data_yearly_summary",
+        time_column="collection_year",
+        time_expr="YEAR(event_date)"
+    )
+}
+```
+
+#### センサーカラム定義
+
+```python
+# センサーカラム定義（summary_itemとカラム名のマッピング）
+SENSOR_COLUMNS = [
+    (1, "external_temp"),
+    (2, "set_temp_freezer_1"),
+    (3, "internal_sensor_temp_freezer_1"),
+    (4, "internal_temp_freezer_1"),
+    (5, "df_temp_freezer_1"),
+    (6, "condensing_temp_freezer_1"),
+    (7, "adjusted_internal_temp_freezer_1"),
+    (8, "set_temp_freezer_2"),
+    (9, "internal_sensor_temp_freezer_2"),
+    (10, "internal_temp_freezer_2"),
+    (11, "df_temp_freezer_2"),
+    (12, "condensing_temp_freezer_2"),
+    (13, "adjusted_internal_temp_freezer_2"),
+    (14, "compressor_freezer_1"),
+    (15, "compressor_freezer_2"),
+    (16, "fan_motor_1"),
+    (17, "fan_motor_2"),
+    (18, "fan_motor_3"),
+    (19, "fan_motor_4"),
+    (20, "fan_motor_5"),
+    (21, "defrost_heater_output_1"),
+    (22, "defrost_heater_output_2")
+]
+
+def create_unpivot_expr() -> str:
+    """
+    stack関数の式を生成
+
+    stack関数は横持ちデータを縦持ちに変換する。
+    stack(n, key1, val1, key2, val2, ...) は n 行を生成し、
+    各行に (key, val) のペアを出力する。
+    """
+    items = ", ".join([f"{id}, {col}" for id, col in SENSOR_COLUMNS])
+    return f"stack({len(SENSOR_COLUMNS)}, {items}) AS (summary_item, sensor_value)"
+```
+
+#### 共通集計処理
+
+```python
+def aggregate_sensor_data(
+    silver_df: DataFrame,
+    config: AggregationConfig
+) -> DataFrame:
+    """
+    センサーデータ集計処理（共通ロジック）
+
+    Args:
+        silver_df: フィルタ済みシルバー層データ
+        config: 集計設定（DAILY/MONTHLY/YEARLY）
+
+    Returns:
+        集計済みデータフレーム
+    """
+    # 1. 横持ち→縦持ち変換（stack関数）
+    unpivoted = silver_df.selectExpr(
+        "device_id",
+        "organization_id",
+        f"{config.time_expr} AS {config.time_column}",
+        create_unpivot_expr()
+    ).filter("sensor_value IS NOT NULL")
+
+    # 2. 統計値計算（全集約方法を事前計算）
+    stats = unpivoted.groupBy(
+        "device_id",
+        "organization_id",
+        config.time_column,
+        "summary_item"
+    ).agg(
+        F.avg("sensor_value").alias("AVG"),
+        F.max("sensor_value").alias("MAX"),
+        F.min("sensor_value").alias("MIN"),
+        F.expr("PERCENTILE_APPROX(sensor_value, 0.25)").alias("P25"),
+        F.expr("PERCENTILE_APPROX(sensor_value, 0.5)").alias("MEDIAN"),
+        F.expr("PERCENTILE_APPROX(sensor_value, 0.75)").alias("P75"),
+        F.stddev("sensor_value").alias("STDDEV"),
+        F.expr("PERCENTILE_APPROX(sensor_value, 0.95)").alias("P95"),
+        F.count("*").alias("data_count")
+    )
+
+    # 3. 統計値を縦持ちに変換（集約方法コードをキーとして使用）
+    unpivoted_stats = stats.selectExpr(
+        "device_id",
+        "organization_id",
+        config.time_column,
+        "summary_item",
+        "data_count",
+        """stack(8,
+            'AVG', AVG,
+            'MAX', MAX,
+            'MIN', MIN,
+            'P25', P25,
+            'MEDIAN', MEDIAN,
+            'P75', P75,
+            'STDDEV', STDDEV,
+            'P95', P95
+        ) AS (method_code, summary_value)"""
+    )
+
+    # 4. マスタテーブル結合（有効な集約方法のみ出力）
+    method_master = spark.table("iot_catalog.gold.gold_summary_method_master") \
+        .filter("delete_flag = FALSE")
+
+    result = unpivoted_stats.join(
+        F.broadcast(method_master),
+        unpivoted_stats.method_code == method_master.summary_method_code,
+        "inner"
+    ).select(
+        "device_id",
+        "organization_id",
+        config.time_column,
+        "summary_item",
+        "summary_method_id",
+        "summary_value",
+        "data_count",
+        F.current_timestamp().alias("create_time")
+    )
+
+    return result
+```
+
+#### MERGE処理（共通）
+
+```python
+def merge_to_gold(aggregated_df: DataFrame, config: AggregationConfig):
+    """
+    ゴールド層へのMERGE処理（共通）
+
+    Args:
+        aggregated_df: 集計済みデータ
+        config: 集計設定
+    """
+    from delta.tables import DeltaTable
+
+    gold_table = DeltaTable.forName(spark, config.output_table)
+
+    # MERGEキー（時間カラム以外は共通）
+    merge_condition = f"""
+        target.device_id = source.device_id
+        AND target.organization_id = source.organization_id
+        AND target.{config.time_column} = source.{config.time_column}
+        AND target.summary_item = source.summary_item
+        AND target.summary_method_id = source.summary_method_id
+    """
+
+    gold_table.alias("target").merge(
+        aggregated_df.alias("source"),
+        merge_condition
+    ).whenMatchedUpdate(
+        set={
+            "summary_value": "source.summary_value",
+            "data_count": "source.data_count",
+            "create_time": "source.create_time"
+        }
+    ).whenNotMatchedInsertAll().execute()
+```
+
+#### 集計処理の実行
+
+```python
+def run_aggregation(period: AggregationPeriod, target_filter: str):
+    """
+    集計処理の実行
+
+    Args:
+        period: 集計期間（DAILY/MONTHLY/YEARLY）
+        target_filter: WHERE条件
+
+    Examples:
+        # 日次集計（前日）
+        run_aggregation(AggregationPeriod.DAILY, "event_date = '2026-01-28'")
+
+        # 月次集計（前月）
+        run_aggregation(AggregationPeriod.MONTHLY,
+                       "event_date BETWEEN '2026-01-01' AND '2026-01-31'")
+
+        # 年次集計（前年）
+        run_aggregation(AggregationPeriod.YEARLY, "YEAR(event_date) = 2025")
+    """
+    config = AGGREGATION_CONFIGS[period]
+
+    try:
+        # シルバー層データ読込
+        silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
+            .filter(target_filter)
+
+        if silver_df.isEmpty():
+            logger.warning(f"GOLD_WARN_001: 対象期間のデータが存在しません ({period.value})")
+            return
+
+        # 共通集計処理
+        aggregated = aggregate_sensor_data(silver_df, config)
+
+        # MERGE処理
+        merge_to_gold(aggregated, config)
+
+        logger.info(f"{period.value}集計完了: {aggregated.count()} レコード")
+
+    except Exception as e:
+        error_msg = f"集計処理中にエラーが発生しました: {str(e)}"
+        logger.error(f"GOLD_ERR_002: {error_msg}")
+        notify_error(
+            error_code="GOLD_ERR_002",
+            error_message=error_msg,
+            pipeline_name=config.output_table,
+            target_date=target_filter
+        )
+        raise
+```
+
+#### 共通化のメリット
+
+| 観点     | 効果                                    |
+| -------- | --------------------------------------- |
+| コード量 | 約60%削減（3つの処理→1つの共通関数）    |
+| 保守性   | 統計値追加時、1箇所の修正で全期間に反映 |
+| テスト   | 共通ロジックのテストで3処理をカバー     |
+| バグ修正 | 1箇所の修正で全期間に適用               |
+| 一貫性   | 日次・月次・年次で同一ロジックを保証    |
+
 ---
 
 ## シーケンス図
@@ -767,6 +711,7 @@ sequenceDiagram
     participant Scheduler as ジョブスケジューラ
     participant LDP as LDPパイプライン
     participant Silver as シルバー層<br>silver_sensor_data
+    participant Master as マスタ<br>gold_summary_method_master
     participant GoldDaily as ゴールド層<br>gold_sensor_data_daily_summary
     participant GoldMonthly as ゴールド層<br>gold_sensor_data_monthly_summary
     participant GoldYearly as ゴールド層<br>gold_sensor_data_yearly_summary
@@ -779,7 +724,12 @@ sequenceDiagram
     LDP->>Silver: 前日データ読込
     Silver-->>LDP: センサーデータ
 
-    LDP->>LDP: データ変換<br>（AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95）
+    LDP->>LDP: データ変換<br>（横持ち→縦持ち、統計値計算）
+
+    LDP->>Master: 有効な集約方法を取得<br>（delete_flag = FALSE）
+    Master-->>LDP: 集約方法マスタ
+
+    LDP->>LDP: マスタ結合<br>（有効な集約方法のみ出力）
 
     alt 変換成功
         LDP->>GoldDaily: MERGE INTO gold_sensor_data_daily_summary
@@ -798,7 +748,12 @@ sequenceDiagram
         LDP->>Silver: 前月データ読込
         Silver-->>LDP: センサーデータ
 
-        LDP->>LDP: 月次集計変換<br>（AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95）
+        LDP->>LDP: データ変換<br>（横持ち→縦持ち、統計値計算）
+
+        LDP->>Master: 有効な集約方法を取得<br>（delete_flag = FALSE）
+        Master-->>LDP: 集約方法マスタ
+
+        LDP->>LDP: マスタ結合<br>（有効な集約方法のみ出力）
 
         alt 変換成功
             LDP->>GoldMonthly: MERGE INTO gold_sensor_data_monthly_summary
@@ -818,7 +773,12 @@ sequenceDiagram
         LDP->>Silver: 前年データ読込
         Silver-->>LDP: センサーデータ
 
-        LDP->>LDP: 年次集計変換<br>（AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95）
+        LDP->>LDP: データ変換<br>（横持ち→縦持ち、統計値計算）
+
+        LDP->>Master: 有効な集約方法を取得<br>（delete_flag = FALSE）
+        Master-->>LDP: 集約方法マスタ
+
+        LDP->>LDP: マスタ結合<br>（有効な集約方法のみ出力）
 
         alt 変換成功
             LDP->>GoldYearly: MERGE INTO gold_sensor_data_yearly_summary
@@ -877,20 +837,22 @@ sequenceDiagram
 flowchart TD
     Error([エラー発生]) --> CheckType{通知対象<br>エラーか}
     CheckType -->|対象外| LogOnly[ログ出力のみ]
-    LogOnly --> End1([処理終了])
+    LogOnly --> End([処理終了])
 
     CheckType -->|対象| BuildPayload[通知メッセージ<br>ペイロード作成]
     BuildPayload --> CallWebhook[Teams Webhook<br>呼び出し]
     CallWebhook --> CheckResult{送信結果}
 
     CheckResult -->|成功| LogSuccess[通知成功ログ出力]
-    LogSuccess --> End2([処理終了])
+    LogSuccess --> End
 
     CheckResult -->|失敗| RetryCount{リトライ<br>回数確認}
-    RetryCount -->|3回未満| Wait[5秒待機]
-    Wait --> CallWebhook
+
     RetryCount -->|3回以上| LogFailure[通知失敗ログ出力<br>※処理は続行]
-    LogFailure --> End3([処理終了])
+    LogFailure --> End
+
+    RetryCount -->|3回未満| Wait[指数バックオフ待機<br>1秒→2秒→4秒]
+    Wait --> CallWebhook
 ```
 
 #### 通知メッセージ仕様
@@ -1002,7 +964,9 @@ class TeamsNotifier:
 
             if attempt < self.retry_count - 1:
                 import time
-                time.sleep(5)  # 5秒待機してリトライ
+                # 指数バックオフ（1秒、2秒、4秒）
+                wait_time = 2 ** attempt
+                time.sleep(wait_time)
 
         logger.error(f"Teams通知送信失敗（リトライ上限）: {error_code}")
         return False
@@ -1238,7 +1202,7 @@ CLUSTER BY (collection_year, device_id);
 - **年次集計**: 前年のデータのみを処理
 
 ```python
-# インクリメンタル処理の実装例
+# インクリメンタル処理の実装例（バッチ処理）
 @dlt.table(
     name="gold_sensor_data_daily_summary"
 )
@@ -1247,8 +1211,8 @@ def gold_sensor_data_daily_summary():
     target_date = date_sub(current_date(), 1)
 
     return (
-        dlt.read_stream("silver_sensor_data")
-        .filter(to_date(col("collection_timestamp")) == target_date)
+        dlt.read("silver_sensor_data")
+        .filter(col("event_date") == target_date)
         .transform(perform_daily_aggregation)
     )
 ```
@@ -1322,9 +1286,13 @@ RETAIN 168 HOURS;  -- 7日間
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                                                                | 担当者       |
-| ---------- | ---- | ----------------------------------------------------------------------- | ------------ |
-| 2026-01-26 | 1.0  | 初版作成                                                                | Kei Sugiyama |
-| 2026-01-27 | 2.0  | UCデータベース設計書に準拠（summary_method_id、共通集約方法マスタ対応） | Claude       |
-| 2026-01-27 | 2.1  | データフロー変更（日次・月次・年次すべてシルバー層から直接集計）        | Claude       |
-| 2026-01-27 | 2.2  | マスタテーブル結合方式に変更（集約方法の動的制御、delete_flag対応）     | Claude       |
+| 日付       | 版数 | 変更内容                                                                       | 担当者       |
+| ---------- | ---- | ------------------------------------------------------------------------------ | ------------ |
+| 2026-01-29 | 2.6  | インクリメンタル処理例をdlt.readに修正、event_dateカラム使用に統一             | Kei Sugiyama |
+| 2026-01-29 | 2.5  | シーケンス図にgold_summary_method_master参照を追加                             | Kei Sugiyama |
+| 2026-01-29 | 2.4  | gold_summary_method_master初期データINSERT文追加                               | Kei Sugiyama |
+| 2026-01-29 | 2.3  | 日次・月次・年次集計処理の共通化（共通集計処理セクション追加）                 | Kei Sugiyama |
+| 2026-01-27 | 2.2  | 削除処理SQLの日数計算修正（1825→3650）、Python実装例のバリデーション整合性改善 | Kei Sugiyama |
+| 2026-01-27 | 2.1  | 日次・月次・年次すべてシルバー層から直接集計に処理フロー変更                   | Kei Sugiyama |
+| 2026-01-26 | 2.0  | Teams通知実装仕様追加、エラーメッセージ一覧追加                                | Kei Sugiyama |
+| 2026-01-26 | 1.0  | 初版作成                                                                       | Kei Sugiyama |

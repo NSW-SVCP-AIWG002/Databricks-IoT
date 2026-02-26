@@ -253,7 +253,7 @@
 | (6.5)  | 設置場所              | device_location             | Label          | O   | -    | -      | -      | DB: device_master.device_location                   | ソート可                             |
 | (6.6)  | 所属組織              | organization_name           | Label          | O   | -    | -      | -      | DB: organization_master.organization_name     | ソート可                             |
 | (6.7)  | 証明書期限            | certificate_expiration_date | Label          | O   | -    | -      | -      | DB: device_master.certificate_expiration_date | ソート可                             |
-| (6.8)  | ステータス            | status                      | Label          | O   | -    | -      | -      | DB: device_status_data.status                 | ソート可                             |
+| (6.8)  | ステータス            | status                      | Label          | O   | -    | -      | -      | 現在時刻-device_status_data.last_received_timeがデバイス送信間隔（設定ファイルで管理）以上離れていたら未接続、その他の場合は接続済み                 | ソート可                             |
 | (6.9)  | 操作ボタン            | action_buttons              | Button         | I   | -    | -      | -      | 固定値: 「参照」「更新」、権限制御あり                      |                                      |
 | (6.10) | ページネーション      | pagination                  | Pagination     | I/O | -    | -      | 1      | -                                             | 中央揃え                             |
 | (7.1)  | 機能説明            | explanation                   | Label           | O | -    | -     | -      | 固定値：<br>登録時：デバイス情報を登録します。以下のフォームを入力してください。<br>更新時：デバイス情報を更新します。以下のフォームを更新してください。                                             | -                 |

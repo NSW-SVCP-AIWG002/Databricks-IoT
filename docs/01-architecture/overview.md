@@ -31,7 +31,7 @@ graph TB
             end
 
             subgraph "Serverless Computing"
-                APPS[Databricks Apps<br/>Flask Application]
+                APPS[Azure App Service<br/>Flask Application]
                 LDP[Lakeflow 宣言型パイプライン<br/>Bronze/Silver/Gold]
             end
 
@@ -124,11 +124,10 @@ graph TB
 
 ### 3. Databricks Platform（Azure環境内、Databricks-managed network）
 - **コントロールプレーン**:
-  - Workspace UI/API
-  - Entra ID認証統合
+  - Workspace API
+  - OAuth トークン フェデレーションによるユーザー認証
   - アクセス元IP制限
 - **サーバレスコンピューティング**:
-  - **Databricks Apps (App Compute)**: Flask Webアプリケーションのホスティング
   - **Lakeflow 宣言型パイプライン (LDP)**: Python/SQLによるストリーム処理
 - **クラシックコンピューティング**:
   - **Compute Cluster (VMSS)**: 顧客VNet内デプロイ、バッチ処理・対話型分析
@@ -150,7 +149,7 @@ graph TB
   - Python 3.11ベース
   - Jinja2テンプレート（サーバーサイドレンダリング）
   - REST API提供
-  - Databricks Appsでホスティング
+  - Azure App Serviceでホスティング
 - **ユーザー識別**: リバースプロキシヘッダからのユーザー情報取得
 - **データアクセス**:
   - Unity Catalog (SQL Warehouse経由) - IoTデータ、分析データ
@@ -177,9 +176,9 @@ graph TB
   - Databricks UI/API用Private Link
 - **Azure DNS**: Private Zones（Private Link名前解決）
 - **認証基盤**:
-  - **Entra ID (Azure Active Directory)**: ユーザー認証・トークン発行
-  - **Databricks User認証**: Databricks標準機能（Flaskアプリでは実装しない）
-  - **アクセス元IP制限**: Databricksワークスペース、Databricks Apps公開フロントへのIP制限
+  - **認証共通モジュール**: Azure/AWS/オンプレミス環境に対応
+  - **Databricks接続**: OAuth トークン フェデレーションによるユーザー単位認証とデータスコープ制御
+  - **アクセス元IP制限**: Databricksワークスペース、公開フロントへのIP制限
 - **リバースプロキシ**: 認証成功後、ユーザー識別子・アクセストークンをリクエストヘッダに付与
 
 ## 技術スタック
@@ -207,7 +206,7 @@ graph TB
 - **データアクセス**:
   - @databricks/sql (SQL Warehouse接続)
   - PyMySQL (MySQL互換DB接続)
-- **実行環境**: Databricks Apps (App Compute)
+- **実行環境**: Azure App Service (App Compute)
 
 ### 通信プロトコル
 - **IoTデバイス通信**: MQTT over TLS
@@ -255,7 +254,7 @@ graph LR
     end
 
     subgraph "ユーザーアクセス"
-        M[エンドユーザー] -->|Entra ID認証| N[Databricks Apps]
+        M[エンドユーザー] -->|Entra ID認証| N[Azure App Service]
         N --> J
     end
 ```
@@ -272,7 +271,7 @@ graph LR
 
 ## 編集履歴
 
-| 日付 | バージョン | 編集者 | 変更内容 |
-|------|------------|--------|----------|
-| 2025-11-26 | 1.0 | Claude | 初版作成: Azure環境統合（Azure IoT + Databricks同一環境）の明確化、システム全体構成図とデータフロー図の追加 |
-| 2025-11-26 | 1.1 | Claude | 環境構成セクション削除: 環境構成詳細はinfrastructure.mdに集約（overview.mdはシステム全体像に集中） |
+| 日付       | バージョン | 編集者 | 変更内容                                                                                                    |
+| ---------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------- |
+| 2025-11-26 | 1.0        | Claude | 初版作成: Azure環境統合（Azure IoT + Databricks同一環境）の明確化、システム全体構成図とデータフロー図の追加 |
+| 2025-11-26 | 1.1        | Claude | 環境構成セクション削除: 環境構成詳細はinfrastructure.mdに集約（overview.mdはシステム全体像に集中）          |
