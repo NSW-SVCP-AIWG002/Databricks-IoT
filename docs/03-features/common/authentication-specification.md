@@ -230,7 +230,9 @@ flowchart TD
     RedirectLogin --> End1([認証エラー])
 
     CheckIdP -->|Yes| LookupUser[DBユーザー情報取得<br>find_user_by_email]
-    LookupUser -->|ユーザー未登録| ClearSession1
+    LookupUser -->|ユーザー未登録| Error403[403エラーページ表示<br>errors/403.html]
+    Error403 --> End403([アクセス拒否])
+    LookupUser -->|DBエラー等| ClearSession1
     LookupUser -->|成功| SyncSession[Flaskセッション同期<br>_sync_session]
     SyncSession --> CheckDBToken{Databricksトークン<br>有効?}
 
@@ -633,9 +635,11 @@ def authenticate_request():
     try:
         app_user = find_user_by_email(idp_user_info['email'])
     except UnauthorizedError:
-        # IdPで認証済みだがアプリ未登録 → ログインページへ
-        session.clear()
-        return redirect(auth_provider.logout_url())
+        # IdPで認証済みだがアプリ未登録 → 403エラーページを直接返却
+        # ※ abort(403) は使用しない。他の403（ロール不足）はモーダル表示だが、
+        #   このケースはページ表示前に発生するため、middleware内で直接レンダリングする。
+        logger.warning("アクセス拒否：アプリ未登録ユーザー", extra={"email": idp_user_info.get("email")})
+        return render_template("errors/403.html"), 403
 
     # 4. Flaskセッション同期（IdP認証成功 = セッション有効）
     _sync_session(idp_user_info, app_user)
@@ -672,6 +676,14 @@ def authenticate_request():
 
     return None
 
+# ────────────────────────────────────────────────────────────────
+# 【ログアウトURLの取得規約】
+#
+# ログアウト先URLは必ず auth_provider.logout_url() を使用すること。
+# IdP種別（Azure / AWS / オンプレ）によりURLが異なるため、
+# 直接ハードコード（例: '/.auth/logout'）は禁止。
+# ────────────────────────────────────────────────────────────────
+
 
 def _sync_session(idp_user_info, app_user):
     """IdP認証情報・アプリユーザー情報をFlaskセッションに同期
@@ -698,8 +710,8 @@ def _sync_session(idp_user_info, app_user):
 | エラー種別         | HTTPステータス            | 対応                                             |
 | ------------------ | ------------------------- | ------------------------------------------------ |
 | 未認証             | 401 Unauthorized          | ログインページへリダイレクト                     |
-| ユーザー未登録     | 401 Unauthorized          | ログインページへリダイレクト（アプリ未登録ユーザー） |
-| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示                     |
+| ユーザー未登録     | 403 Forbidden             | 403エラーページ表示（IdP認証済みだがアプリDB未登録）※1 |
+| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示（ロール不足）※2     |
 | Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                       |
 | セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                     |
 | パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ） |
@@ -785,6 +797,16 @@ class PasswordResetError(AuthError):
 
 #### 3.7.4 Flaskエラーハンドラ
 
+> **※1 ユーザー未登録（403）の特例処理**
+>
+> 「IdP認証済みだがアプリDB未登録」ケースは、ページ表示前（middleware内）で発生するため、
+> `abort(403)` を呼ばず `middleware.py` 内で `render_template("errors/403.html"), 403` を直接返す。
+> これにより、下記 `handle_forbidden`（ロール不足用モーダル）は経由しない。
+>
+> **※2 権限不足（403）の共通処理**
+>
+> ロール不足でビュー操作を拒否する場合は `abort(403)` を使用し、下記 `handle_forbidden` 経由でモーダル表示する。
+
 ```python
 # common/error_handlers.py
 from flask import render_template, redirect, url_for, flash
@@ -800,6 +822,8 @@ def register_error_handlers(app):
 
     @app.errorhandler(ForbiddenError)
     def handle_forbidden(e):
+        # ロール不足時: 既存ページ上でモーダル表示（abort(403) 経由のみ到達）
+        # ※ アプリDB未登録ユーザーはmiddlewareで直接処理されここには到達しない
         return render_template('errors/403.html'), 403
 
     @app.errorhandler(TokenExchangeError)

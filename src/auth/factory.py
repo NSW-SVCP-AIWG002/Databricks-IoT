@@ -1,6 +1,7 @@
 from flask import current_app
 
 from auth.providers.azure_easy_auth import AzureEasyAuthProvider
+from auth.providers.dev import DevAuthProvider
 
 
 def get_auth_provider():
@@ -9,6 +10,7 @@ def get_auth_provider():
 
     providers = {
         'azure': AzureEasyAuthProvider,
+        'dev': DevAuthProvider,
     }
 
     provider_class = providers.get(auth_type)

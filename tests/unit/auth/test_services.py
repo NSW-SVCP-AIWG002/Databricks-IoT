@@ -32,7 +32,7 @@ class TestFindUserByEmail:
     def test_success_returns_user_id_and_user_type_id(self):
         """2.1.1: emailが一致するアクティブユーザーが存在する場合、user_id と user_type_id を返す"""
         mock_user = MagicMock()
-        mock_user.id = 42
+        mock_user.user_id = 42
         mock_user.user_type_id = 2
 
         with patch('auth.services.User') as mock_user_class:
@@ -56,7 +56,7 @@ class TestFindUserByEmail:
         （クエリに delete_flag=False が指定されていることで保証）
         """
         mock_user = MagicMock()
-        mock_user.id = 99
+        mock_user.user_id = 99
         mock_user.user_type_id = 1
 
         with patch('auth.services.User') as mock_user_class:
@@ -65,7 +65,7 @@ class TestFindUserByEmail:
             find_user_by_email('test@example.com')
 
             mock_user_class.query.filter_by.assert_called_with(
-                email='test@example.com', delete_flag=False
+                email_address='test@example.com', delete_flag=False
             )
 
     def test_db_exception_propagates(self):

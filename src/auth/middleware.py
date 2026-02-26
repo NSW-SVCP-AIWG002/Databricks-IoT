@@ -1,4 +1,6 @@
-from flask import g, request, session, abort
+import os
+
+from flask import g, request, session, abort, render_template, current_app
 
 from auth.services import find_user_by_email
 from auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
@@ -46,8 +48,11 @@ def authenticate_request():
     try:
         app_user = find_user_by_email(idp_user_info['email'])
     except UnauthorizedError:
-        session.clear()
-        abort(401)
+        # IdP認証済みだがアプリ未登録 → 403エラーページを直接返却
+        # ※ abort(403) は使用しない。他の403（ロール不足）はモーダル表示だが、
+        #   このケースはページ表示前に発生するため middleware 内で直接レンダリングする。
+        logger.warning("アクセス拒否：アプリ未登録ユーザー", extra={"email": idp_user_info.get("email")})
+        return render_template("errors/403.html"), 403
 
     _sync_session(idp_user_info, app_user)
 
@@ -60,15 +65,22 @@ def authenticate_request():
             from flask import redirect, url_for
             return redirect(url_for('account.password_change'))
 
-    try:
-        from auth.token_exchange import TokenExchanger
-        token_exchanger = TokenExchanger()
-        databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
-        g.databricks_token = databricks_token
-    except JWTRetrievalError:
-        abort(500)
-    except TokenExchangeError:
-        abort(500)
+    if current_app.config.get('AUTH_TYPE') == 'dev':
+        # ローカル開発用: Token Exchange をスキップし DEV_DATABRICKS_TOKEN を直接使用
+        dev_token = os.getenv('DEV_DATABRICKS_TOKEN')
+        if not dev_token:
+            logger.error("DEV_DATABRICKS_TOKEN が設定されていません")
+            abort(500)
+        g.databricks_token = dev_token
+    else:
+        try:
+            from auth.token_exchange import TokenExchanger
+            token_exchanger = TokenExchanger()
+            g.databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
+        except JWTRetrievalError:
+            abort(500)
+        except TokenExchangeError:
+            abort(500)
 
     logger.info("認証成功", extra={"email": idp_user_info.get("email")})
 
