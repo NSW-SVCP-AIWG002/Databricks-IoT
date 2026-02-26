@@ -12,6 +12,7 @@ import pytest
 
 from auth.factory import get_auth_provider
 from auth.providers.azure_easy_auth import AzureEasyAuthProvider
+from auth.providers.dev import DevAuthProvider
 
 
 @pytest.mark.unit
@@ -31,6 +32,15 @@ class TestGetAuthProvider:
 
         # Assert
         assert isinstance(result, AzureEasyAuthProvider)
+
+    def test_returns_dev_provider_when_auth_type_is_dev(self, app):
+        """2.1.2: AUTH_TYPE=dev のとき DevAuthProvider インスタンスが返される"""
+        with app.test_request_context("/"):
+            app.config['AUTH_TYPE'] = 'dev'
+
+            result = get_auth_provider()
+
+        assert isinstance(result, DevAuthProvider)
 
     def test_raises_value_error_for_unknown_auth_type(self, app):
         """1.3.6: 未知の AUTH_TYPE が指定された場合、ValueError が発生する"""

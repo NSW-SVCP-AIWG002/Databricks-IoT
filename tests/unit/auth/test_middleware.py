@@ -170,20 +170,28 @@ class TestAuthenticateRequest:
 
                 assert session.get("email") is None
 
-    def test_user_not_registered_clears_session_and_raises_401(self, app):
-        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、セッションをクリアして 401 を発生させる"""
+    def test_user_not_registered_returns_403_error_page(self, app):
+        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、403エラーページを直接返す
+        （abort(403) は使用しない。セッションはクリアしない）
+        """
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
         with app.test_request_context("/dashboard"):
             with patch("auth.middleware.auth_provider", mock_provider):
                 with patch("auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    session["email"] = "existing@example.com"
+                    with patch("auth.middleware.render_template",
+                               return_value="<html>403</html>") as mock_render:
+                        session["email"] = "existing@example.com"
 
-                    with pytest.raises(Unauthorized):
-                        authenticate_request()
+                        result = authenticate_request()
 
-                    assert session.get("email") is None
+                        # 403レスポンスをタプルで直接返す
+                        assert result[1] == 403
+                        # errors/403.html をレンダリングする
+                        mock_render.assert_called_once_with("errors/403.html")
+                        # IdP認証は成功しているためセッションはクリアしない
+                        assert session.get("email") == "existing@example.com"
 
     def test_idp_auth_success_syncs_session_and_returns_none(self, app):
         """2.1.1: IdP 認証成功時、セッションが同期されて None を返す"""
@@ -249,6 +257,42 @@ class TestAuthenticateRequest:
                         assert g.current_user_id == 42
                         assert g.current_user_type_id == 2
 
+    def test_dev_mode_uses_dev_databricks_token(self, app, monkeypatch):
+        """2.1.7: AUTH_TYPE=dev のとき Token Exchange をスキップし
+        DEV_DATABRICKS_TOKEN 環境変数の値が g.databricks_token に設定される
+        """
+        from flask import g
+
+        monkeypatch.setenv("DEV_DATABRICKS_TOKEN", "dev-token-xyz")
+        mock_provider = self._make_mock_provider(
+            user_info=self._default_user_info(),
+            requires_setup=False,
+        )
+
+        with app.test_request_context("/dashboard"):
+            app.config['AUTH_TYPE'] = 'dev'
+            with patch("auth.middleware.auth_provider", mock_provider):
+                with patch("auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    authenticate_request()
+                    assert g.databricks_token == "dev-token-xyz"
+
+    def test_dev_mode_aborts_500_when_dev_token_not_set(self, app, monkeypatch):
+        """1.3.7: AUTH_TYPE=dev かつ DEV_DATABRICKS_TOKEN 未設定時は 500 エラーになる"""
+        monkeypatch.delenv("DEV_DATABRICKS_TOKEN", raising=False)
+        mock_provider = self._make_mock_provider(
+            user_info=self._default_user_info(),
+            requires_setup=False,
+        )
+
+        with app.test_request_context("/dashboard"):
+            app.config['AUTH_TYPE'] = 'dev'
+            with patch("auth.middleware.auth_provider", mock_provider):
+                with patch("auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with pytest.raises(InternalServerError):
+                        authenticate_request()
+
     def test_jwt_retrieval_failure_aborts_with_500(self, app):
         """1.3.6: JWT 取得失敗時（認証基盤の異常）、500 エラーが発生する"""
         mock_provider = self._make_mock_provider(
@@ -313,6 +357,26 @@ class TestAuthenticateRequestLogging:
 
     def _default_app_user(self):
         return {"user_id": 42, "user_type_id": 2}
+
+    def test_user_not_registered_logs_warning(self, app, caplog):
+        """1.4.1.3: アプリ未登録ユーザーのアクセス時に WARN レベルで email フィールド付きログが出力される"""
+        import logging
+
+        mock_provider = self._make_mock_provider(user_info=self._default_user_info())
+
+        with app.test_request_context("/dashboard"):
+            with patch("auth.middleware.auth_provider", mock_provider):
+                with patch("auth.middleware.find_user_by_email",
+                           side_effect=UnauthorizedError("user not found")):
+                    with patch("auth.middleware.render_template",
+                               return_value="<html>403</html>"):
+                        with caplog.at_level(logging.WARNING):
+                            authenticate_request()
+
+        warn_records = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert warn_records, "WARNING レベルのログが出力されていない"
+        assert any(getattr(r, "email", None) is not None for r in warn_records), \
+            "WARNING ログに email フィールドが含まれていない"
 
     def test_auth_success_logs_info(self, app, caplog):
         """1.4.1.3: 認証成功時に INFO レベルで email フィールド付きログが出力される
