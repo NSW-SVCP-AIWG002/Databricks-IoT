@@ -2,18 +2,32 @@
 
 ## 📑 目次
 
-- [概要](#概要)
-- [使用するFlaskルート一覧](#使用するflaskルート一覧)
-- [ワークフロー一覧](#ワークフロー一覧)
-  - [初期表示](#初期表示)
-  - [検索・絞り込み](#検索絞り込み)
-  - [ソート](#ソート)
-  - [ページング](#ページング)
-  - [メール通知履歴詳細表示](#メール通知履歴詳細表示)
-  - [その他の操作](#その他の操作)
-- [使用データベース詳細](#使用データベース詳細)
-- [セキュリティ実装](#セキュリティ実装)
-- [関連ドキュメント](#関連ドキュメント)
+- [メール通知履歴 - ワークフロー仕様書](#メール通知履歴---ワークフロー仕様書)
+  - [📑 目次](#-目次)
+  - [概要](#概要)
+  - [使用するFlaskルート一覧](#使用するflaskルート一覧)
+  - [ルート呼び出しマッピング](#ルート呼び出しマッピング)
+  - [ワークフロー一覧](#ワークフロー一覧)
+    - [初期表示](#初期表示)
+    - [検索・絞り込み](#検索絞り込み)
+    - [ソート](#ソート)
+    - [ページング](#ページング)
+    - [メール通知履歴詳細表示](#メール通知履歴詳細表示)
+    - [その他の操作](#その他の操作)
+  - [使用データベース詳細](#使用データベース詳細)
+    - [使用テーブル一覧](#使用テーブル一覧)
+    - [インデックス最適化](#インデックス最適化)
+  - [トランザクション管理](#トランザクション管理)
+    - [トランザクション開始・終了タイミング](#トランザクション開始終了タイミング)
+  - [セキュリティ実装](#セキュリティ実装)
+    - [認証・認可実装](#認証認可実装)
+    - [データスコープ制限](#データスコープ制限)
+    - [入力値の安全性確保（共通仕様）](#入力値の安全性確保共通仕様)
+    - [ログ出力ルール](#ログ出力ルール)
+  - [関連ドキュメント](#関連ドキュメント)
+    - [機能設計・仕様](#機能設計仕様)
+    - [アーキテクチャ設計](#アーキテクチャ設計)
+    - [共通仕様](#共通仕様)
 
 ---
 
@@ -23,12 +37,12 @@
 
 **このドキュメントの役割:**
 - ✅ ユーザー操作のトリガー条件
-- ✅ 処理フローの詳細（Flaskルート呼び出しシーケンス）
+- ✅ 処理フローの詳細（Flaskルート呼び出しシーケンス、フォーム送信、リダイレクト）
 - ✅ バリデーション実行タイミング（いつチェックするか）
 - ✅ エラーハンドリングフロー
 - ✅ サーバーサイド処理詳細（SQL、変数、条件分岐、コード例）
-- ✅ データベース利用詳細（テーブル操作、インデックス）
-- ✅ セキュリティ実装詳細（認証、データスコープ制限、ログ出力）
+- ✅ データベース利用詳細（トランザクション管理、テーブル操作、インデックス）
+- ✅ セキュリティ実装詳細（認証、入力検証、ログ出力）
 
 **UI仕様書との役割分担:**
 - **UI仕様書**: バリデーションルール定義（何をチェックするか）、UI要素の詳細仕様
@@ -54,6 +68,18 @@
   - `HTML（パーシャル）`: モーダル内部のHTMLのみを返す（`render_template('mail-history/detail_modal.html')`）
 - **Flask Blueprint構成**: `notice_bp`（通知機能Blueprint）
 - **SSR特性**: すべての処理はサーバーサイドで完結（JSONレスポンスなし）
+
+---
+
+## ルート呼び出しマッピング
+
+| ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
+|-------------|---------|-------------|-----------|-----------|---------------|
+| 画面初期表示 | URL直接アクセス | `GET /notice/mail-history` | `page=1` | HTML（メール通知履歴一覧画面） | エラーページ表示 |
+| 検索ボタン押下 | フォーム送信 | `POST /notice/mail-history` | `mail_type_ids, keyword, sent_at_start, sent_at_end` | HTML（検索結果画面） | エラーメッセージ表示 |
+| ページボタン押下 | ボタンクリック | `GET /notice/mail-history` | `page` | HTML（検索結果画面） | エラーページ表示 |
+| ソートヘッダークリック | ボタンクリック | `GET /notice/mail-history` | `sort_id, order` | HTML（検索結果画面） | エラーページ表示 |
+| 詳細ボタン押下 | ボタンクリック | `GET /notice/mail-history/<mail_history_uuid>` | `mail_history_uuid` | HTML（メール通知履歴参照モーダル） | 404エラーページ表示 |
 
 ---
 
@@ -83,7 +109,7 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラーページ表示]
 
-    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1<br>sort_id=4, order=desc]
+    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1<br>sort_id=4, order=desc<br>sent_at_start=現在日時から7日前の00:00<br>sent_at_end=現在日時の23:59]
     Init --> SetParams[Cookieに検索条件を格納]
     SetParams --> Query[DBクエリ実行<br>SELECT * FROM mail_history<br>WHERE organization_id=現在の組織ID<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
     Query --> CheckDB{DBクエリ<br>結果}
@@ -178,6 +204,9 @@ logger.info(f'認証・権限チェック成功: user_id={current_user.user_id},
 
 **実装例:**
 ```python
+from datetime import datetime, time, timedelta
+import pytz
+
 # 設定ファイルから1ページあたりの件数を取得
 PER_PAGE = current_app.config.get('MAIL_HISTORY_PER_PAGE', 25)
 
@@ -190,12 +219,18 @@ page = max(1, request.args.get('page', 1, type=int))
 sort_id = request.args.get('sort_id', 4, type=int)  # デフォルト: 4 (sent_at)
 order = request.args.get('order', 'desc')
 
+# 検索条件の初期値を設定（現在日時基準、JST）
+jst = pytz.timezone('Asia/Tokyo')
+now_jst = datetime.now(jst)
+default_sent_at_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
+default_sent_at_end = now_jst.replace(hour=23, minute=59, second=0, microsecond=0)
+
 # ソート項目IDの検証とカラム名の取得は sort_item_master テーブルで実施
 # ソート順の検証
 if order not in ['asc', 'desc']:
     order = 'desc'
 
-logger.info(f'クエリパラメータ取得成功: page={page}, sort_id={sort_id}, order={order}')
+logger.info(f'クエリパラメータ取得成功: page={page}, sort_id={sort_id}, order={order}, sent_at_start={default_sent_at_start}, sent_at_end={default_sent_at_end}')
 ```
 
 **③ データベースクエリ実行**
@@ -277,7 +312,9 @@ return render_template('mail-history/list.html',
                       total=total,
                       page=page,
                       sort_by=sort_by,
-                      order=order)
+                      order=order,
+                      sent_at_start=default_sent_at_start.strftime('%Y-%m-%d'),
+                      sent_at_end=default_sent_at_end.strftime('%Y-%m-%d'))
 ```
 
 #### 表示メッセージ
@@ -297,7 +334,7 @@ return render_template('mail-history/list.html',
 
 #### UI状態
 
-- 検索条件: デフォルト値（空）
+- 検索条件: 初期値を設定（送信日時（開始）: 現在日時から7日前の00:00、送信日時（終了）: 現在日時の23:59）
 - テーブル: メール通知履歴データ表示
 - ページネーション: 1ページ目を選択状態
 
@@ -962,6 +999,22 @@ flowchart TD
 
 ---
 
+## トランザクション管理
+
+### トランザクション開始・終了タイミング
+
+この機能はすべての操作が読み取り専用（SELECT）のため、トランザクション管理は不要です。詳細は [共通仕様書 - トランザクション管理](../../common/common-specification.md#トランザクション管理) を参照してください。
+
+| ワークフロー | トランザクション | 備考 |
+|------------|----------------|------|
+| 初期表示 | なし | 読み取り専用（SELECT） |
+| 検索・絞り込み | なし | 読み取り専用（SELECT） |
+| ソート | なし | 読み取り専用（SELECT） |
+| ページング | なし | 読み取り専用（SELECT） |
+| メール通知履歴詳細表示 | なし | 読み取り専用（SELECT） |
+
+---
+
 ## セキュリティ実装
 
 ### 認証・認可実装
@@ -1131,7 +1184,7 @@ if mail_type_ids:
 
 ## 関連ドキュメント
 
-### 画面仕様
+### 機能設計・仕様
 - [機能概要 README](./README.md) - 画面の概要、データモデル、使用するテーブル一覧
 - [UI仕様書](./ui-specification.md) - UI要素の詳細、バリデーションルール定義
 
