@@ -11,7 +11,7 @@
 
 **含まれる内容**:
 - 機能一覧（6機能）
-  - FR-001: ログイン認証機能（Entra ID + Databricks User認証）
+  - FR-001: ログイン認証機能（認証共通モジュール: Azure/AWS/オンプレミス対応、OAuth トークン フェデレーション）
   - FR-002: データ取込み機能（MQTT → Event Hubs → LDP）
   - FR-003: アラート機能（異常検知、通知）
   - FR-004: マスタ管理機能（デバイス/ユーザー/組織/アラート設定/デバイス台帳/メール通知設定/アカウント/CSVインポート・エクスポート）
@@ -39,7 +39,7 @@
   - エラーハンドリング
   - 障害復旧（RTO: 4時間、RPO: 1時間）
 - セキュリティ要件
-  - 認証・認可（Entra ID + Databricks User認証、アクセス元IP制限）
+  - 認証・認可（認証共通モジュール: Azure/AWS/オンプレミス対応、OAuth トークン フェデレーション、アクセス元IP制限）
   - データ保護（暗号化100%）
   - 入力検証（SQLインジェクション、XSS対策）
   - 外部通信制限（Private Linkによるセキュア通信）
@@ -80,7 +80,7 @@
   - Lakeflow 宣言型パイプライン (LDP) - Python/SQL
   - App Compute - Flask Application
   - Unity Catalog - Delta Lake（ADLS連携）
-  - Entra ID + Databricks User認証
+  - 認証共通モジュール（Azure/AWS/オンプレミス対応）+ OAuth トークン フェデレーション
   - コンピューティングプレーン構成（サーバレス/クラシック）
 - データベース技術スタック
   - Unity Catalog（センサーデータ、履歴データ）
