@@ -14,7 +14,7 @@ common/error_handlers.py の単体テスト
 import pytest
 from unittest.mock import patch
 
-from werkzeug.exceptions import Unauthorized, NotFound
+from werkzeug.exceptions import Unauthorized, BadRequest, Forbidden, NotFound
 
 from iot_app.common.error_handlers import handle_500, handle_401, handle_4xx
 
@@ -118,3 +118,17 @@ class TestHandle4xx:
                 mock_logger.warning.assert_called_once()
                 _, kwargs = mock_logger.warning.call_args
                 assert kwargs.get("extra", {}).get("httpStatus") == 404
+
+    @pytest.mark.parametrize("error", [
+        BadRequest(),
+        Forbidden(),
+        NotFound(),
+    ])
+    def test_4xx_handler_returns_correct_status_code(self, app, error):
+        """handle_4xx() が渡されたエラーのステータスコードをそのまま返す"""
+        with app.test_request_context("/"):
+            with patch("iot_app.common.error_handlers.logger"):
+                response, status_code = handle_4xx(error)
+
+                assert status_code == error.code
+                assert response == ''

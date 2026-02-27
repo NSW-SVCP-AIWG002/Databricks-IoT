@@ -25,6 +25,7 @@ def handle_401(e):
 def handle_4xx(e):
     """400系例外ハンドラー（401以外）"""
     logger.warning("Client Error", extra={"httpStatus": e.code})
+    return '', e.code
 
 
 def register_error_handlers(app):
