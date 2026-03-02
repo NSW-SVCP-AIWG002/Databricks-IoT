@@ -1384,10 +1384,9 @@ FROM
         ON u.organization_id = oc.parent_organization_id
     INNER JOIN device_master d
         ON oc.subsidiary_organization_id = d.organization_id
+        AND d.delete_flag = FALSE
     INNER JOIN alert_setting_master a
-        ON d.device_id = a.device_id
-WHERE
-    d.delete_flag = FALSE;
+        ON d.device_id = a.device_id;
 ```
 
 **カラム一覧:**
