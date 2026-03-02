@@ -109,7 +109,7 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラーページ表示]
 
-    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1, sort_id=4, order=desc<br>sent_at_start=7日前 00:00<br>sent_at_end=当日 23:59]
+    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1, sort_id=3, order=desc<br>sent_at_start=現在日時から7日前の00:00<br>sent_at_end=現在日時の23:59]
     Init --> SetParams[Cookieに検索条件を格納]
     SetParams --> Query[DBクエリ実行<br>SELECT FROM mail_history<br>WHERE organization_id=現在の組織ID<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
     Query --> CheckDB{DBクエリ結果}
@@ -216,7 +216,7 @@ PER_PAGE = current_app.config.get('MAIL_HISTORY_PER_PAGE', 25)
 
 logger.info('クエリパラメータ取得開始')
 page = max(1, request.args.get('page', 1, type=int))
-sort_id = request.args.get('sort_id', 4, type=int)  # デフォルト: 4 (sent_at)
+sort_id = request.args.get('sort_id', 3, type=int)  # デフォルト: 3 (sent_at)
 order = request.args.get('order', 'desc')
 
 # 検索条件の初期値を設定（現在日時基準、JST）
@@ -433,7 +433,9 @@ WTFormsを使用してフォームデータを検証します。
 | mail_type_name | VARCHAR(50) | NOT NULL | メール種別表示名 |
 | delete_flag | TINYINT | NOT NULL | 論理削除フラグ（0:有効、1:削除） |
 | create_date | DATETIME | NOT NULL | 作成日時 |
+| creator | INT | NOT NULL | レコード作成者のユーザID |
 | update_date | DATETIME | NULL | 更新日時 |
+| modifier | INT | NULL | レコード更新者のユーザID |
 
 **登録データ:**
 
@@ -512,7 +514,7 @@ response.set_cookie('mail_history_search', json.dumps({
     'sent_at_start': form.sent_at_start.data.isoformat() if form.sent_at_start.data else None,
     'sent_at_end': form.sent_at_end.data.isoformat() if form.sent_at_end.data else None,
     'page': 1,
-    'sort_id': 4,  # デフォルト: 4 (sent_at)
+    'sort_id': 3,  # デフォルト: 3 (sent_at)
     'order': 'desc'
 }), httponly=True, samesite='Lax')
 
@@ -643,7 +645,7 @@ Cookieに検索条件を保持する
 **トリガー:** (4) データテーブルのソート可能カラムのヘッダークリック
 
 **前提条件:**
-- ソート可能なカラム（(4.1), (4.2), (4.3)）のヘッダーをクリック
+- ソート可能なカラム（(4.1)メール種別、(4.2)件名、(4.4)送信日時）のヘッダーをクリック
 
 **処理概要:**
 - Cookieから検索条件を取得
@@ -708,8 +710,8 @@ flowchart TD
 # メール種別でソート（昇順） - 項目ID: 1
 GET /notice/mail-history?sort_id=1&order=asc
 
-# 送信日時でソート（降順） - 項目ID: 4
-GET /notice/mail-history?sort_id=4&order=desc
+# 送信日時でソート（降順） - 項目ID: 3
+GET /notice/mail-history?sort_id=3&order=desc
 ```
 
 **実装例:**
@@ -724,7 +726,7 @@ def mail_history_list():
     search_params = json.loads(cookie_data) if cookie_data else {}
 
     # ソート項目IDを取得
-    sort_id = request.args.get('sort_id', search_params.get('sort_id', 4), type=int)  # デフォルト: 4 (sent_at)
+    sort_id = request.args.get('sort_id', search_params.get('sort_id', 3), type=int)  # デフォルト: 3 (sent_at)
     order = request.args.get('order', search_params.get('order', 'desc'))
 
     # ソート項目IDをカラム名にマッピング（sort_item_master テーブルで検証）
@@ -767,7 +769,7 @@ def mail_history_list():
 
 ### ページング
 
-**トリガー:** (4.7) ページネーションのページ番号ボタンクリック
+**トリガー:** (4.6) ページネーションのページ番号ボタンクリック
 
 **前提条件:**
 - 複数ページのデータが存在する

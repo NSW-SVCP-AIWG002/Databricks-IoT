@@ -96,7 +96,9 @@
 | mail_type_name | メール種別名 | VARCHAR(50) | ○ | メール種別の表示名 |
 | delete_flag | 削除フラグ | TINYINT | ○ | 論理削除フラグ（0: 有効, 1: 削除） |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザID |
 | update_date | 更新日時 | DATETIME | - | レコード更新日時 |
+| modifier | 更新者 | INT | - | レコード更新者のユーザID |
 
 #### インデックス
 

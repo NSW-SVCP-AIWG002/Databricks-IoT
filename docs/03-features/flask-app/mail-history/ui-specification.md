@@ -197,7 +197,7 @@
 ```html
 <div class="form-group">
   <label for="sentAtStart" class="form-label">送信日時（開始）</label>
-  <input type="date" id="sentAtStart" name="sent_at_start" class="form-input">
+  <input type="date" id="sentAtStart" name="sent_at_start" class="form-input" value="{{ sent_at_start }}">
 </div>
 ```
 
@@ -211,7 +211,7 @@
 ```html
 <div class="form-group">
   <label for="sentAtEnd" class="form-label">送信日時（終了）</label>
-  <input type="date" id="sentAtEnd" name="sent_at_end" class="form-input">
+  <input type="date" id="sentAtEnd" name="sent_at_end" class="form-input" value="{{ sent_at_end }}">
 </div>
 ```
 
