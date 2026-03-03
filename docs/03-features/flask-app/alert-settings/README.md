@@ -224,8 +224,8 @@ JUDGMENT_TIMES = [
 - `alert_email_flag`: メール送信フラグ
 - `page`: ページ番号（デフォルト: 1）
 - `per_page`: 1ページあたりの件数（デフォルト: 25）
-- `sort_by`: ソートフィールド（デフォルト: alert_id）
-- `order`: ソート順（デフォルト: asc）
+- `sort_item_id`: ソート項目ID（デフォルト: 0、0=alert_id でソート）
+- `sort_order`: ソート順（デフォルト: asc）
 
 ### アラート設定登録
 
