@@ -585,6 +585,16 @@
 **初期データ:**
 | view_id | sort_item_id | sort_item_name | sort_order | 説明 |
 | ------- | ------------ | -------------- | ---------- | ---- |
+| 7 | 0 | device_inventory_id | 0 | デバイス台帳管理: デバイス在庫ID（未選択時のデフォルト） |
+| 7 | 1 | device_uuid | 1 | デバイス台帳管理: クラウドに登録するデバイスID |
+| 7 | 2 | device_name | 2 | デバイス台帳管理: デバイス名 |
+| 7 | 3 | device_type_id | 3 | デバイス台帳管理: デバイス種別 |
+| 7 | 4 | sim_id | 4 | デバイス台帳管理: SIMID |
+| 7 | 5 | mac_address | 5 | デバイス台帳管理: MACアドレス |
+| 7 | 6 | inventory_status_id | 6 | デバイス台帳管理: 在庫状況 |
+| 7 | 7 | purchase_date | 7 | デバイス台帳管理: 購入日 |
+| 7 | 8 | manufacturer_warranty_end_date | 8 | デバイス台帳管理: 保証期限 |
+| 7 | 9 | inventory_location | 9 | デバイス台帳管理: 在庫場所 |
 
 ---
 
