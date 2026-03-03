@@ -33,7 +33,7 @@ import importlib.util
 import os
 import re
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -135,6 +135,15 @@ llm_clean_code = _llm_api.clean_code  # Markdown コードブロック抽出
 
 _common = _load_module("ai_chat_common", "src/utils/common.py")
 trim_messages = _common.trim_messages
+unique_by_api = _common.unique_by_api
+
+_dataframe = _load_module("ai_chat_dataframe", "src/utils/dataframe.py")
+to_records_json_or_none = _dataframe.to_records_json_or_none
+get_df_summary = _dataframe.get_df_summary
+get_df_schema_info = _dataframe.get_df_schema_info
+auto_convert_numeric_columns = _dataframe._auto_convert_numeric_columns
+
+create_plot = _graph_api.create_plot
 
 
 # ============================================================
@@ -233,6 +242,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is True
+        assert detail == ""
 
     # --- 禁止パターン検出 ---
 
@@ -264,6 +274,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_eval_function_detected(self):
         """2.1: eval() を検出して (False, ...) を返す"""
@@ -273,6 +284,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_exec_function_detected(self):
         """2.1: exec() を検出して (False, ...) を返す"""
@@ -282,6 +294,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_compile_function_detected(self):
         """2.1: compile() を検出して (False, ...) を返す"""
@@ -291,6 +304,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_getattr_function_detected(self):
         """2.1: getattr() を検出して (False, ...) を返す"""
@@ -300,6 +314,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_setattr_function_detected(self):
         """2.1: setattr() を検出して (False, ...) を返す"""
@@ -309,6 +324,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_delattr_function_detected(self):
         """2.1: delattr() を検出して (False, ...) を返す"""
@@ -318,6 +334,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_dunder_builtins_detected(self):
         """2.1: __builtins__ を検出して (False, ...) を返す"""
@@ -327,6 +344,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_dunder_globals_detected(self):
         """2.1: __globals__ を検出して (False, ...) を返す"""
@@ -336,6 +354,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_dunder_dict_detected(self):
         """2.1: __dict__ を検出して (False, ...) を返す"""
@@ -345,6 +364,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_subprocess_detected(self):
         """2.1: subprocess を検出して (False, ...) を返す"""
@@ -354,6 +374,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_os_system_detected(self):
         """2.1: os.system を検出して (False, ...) を返す"""
@@ -363,6 +384,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_os_popen_detected(self):
         """2.1: os.popen を検出して (False, ...) を返す"""
@@ -372,6 +394,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_socket_detected(self):
         """2.1: socket を検出して (False, ...) を返す"""
@@ -381,6 +404,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     def test_pathlib_detected(self):
         """2.1: pathlib を検出して (False, ...) を返す"""
@@ -390,6 +414,7 @@ class TestValidateGeneratedCode:
         is_safe, detail = validate_generated_code(code)
         # Assert
         assert is_safe is False
+        assert "禁止パターン検出" in detail
 
     # --- 違反詳細 ---
 
@@ -412,6 +437,52 @@ class TestValidateGeneratedCode:
         # Assert
         assert is_safe is False
         assert "import" in detail
+
+    # --- ネットワーク通信禁止パターン（設計書 L1 ネットワーク禁止パターン）---
+    # TODO: 以下3テストは FORBIDDEN_PATTERNS に requests/urllib/http.client が
+    #       未実装のため現状 xfail（設計書と実装の乖離）。実装追加後に xfail 解除のこと。
+
+    @pytest.mark.xfail(
+        reason="FORBIDDEN_PATTERNS に requests パターン未実装（設計書との乖離）",
+        strict=False,
+    )
+    def test_requests_detected(self):
+        """A-1: requests を検出して (False, ...) を返す（設計書 L1 ネットワーク禁止パターン）"""
+        # Arrange
+        code = "requests.get('http://example.com')"
+        # Act
+        is_safe, detail = validate_generated_code(code)
+        # Assert
+        assert is_safe is False
+        assert "禁止パターン検出" in detail
+
+    @pytest.mark.xfail(
+        reason="FORBIDDEN_PATTERNS に urllib パターン未実装（設計書との乖離）",
+        strict=False,
+    )
+    def test_urllib_detected(self):
+        """A-2: urllib を検出して (False, ...) を返す（設計書 L1 ネットワーク禁止パターン）"""
+        # Arrange
+        code = "urllib.request.urlopen('http://example.com')"
+        # Act
+        is_safe, detail = validate_generated_code(code)
+        # Assert
+        assert is_safe is False
+        assert "禁止パターン検出" in detail
+
+    @pytest.mark.xfail(
+        reason="FORBIDDEN_PATTERNS に http.client パターン未実装（設計書との乖離）",
+        strict=False,
+    )
+    def test_http_client_detected(self):
+        """A-3: http.client を検出して (False, ...) を返す（設計書 L1 ネットワーク禁止パターン）"""
+        # Arrange
+        code = "http.client.HTTPConnection('example.com')"
+        # Act
+        is_safe, detail = validate_generated_code(code)
+        # Assert
+        assert is_safe is False
+        assert "禁止パターン検出" in detail
 
 
 # ============================================================
@@ -674,6 +745,7 @@ class TestLlmApiCleanCode:
         # Assert
         assert "以下" not in result
         assert "以上" not in result
+        assert "```" not in result
         assert result.strip() == "x = 1"
 
     def test_empty_code_block_returns_empty(self):
@@ -703,6 +775,7 @@ class TestLlmApiCleanCode:
         # Assert
         assert not result.startswith("\n")
         assert not result.endswith("\n")
+        assert result == "x = 1"
 
 
 # ============================================================
@@ -1130,3 +1203,504 @@ class TestSanitizeQuestionControlCharacters:
         assert "昨日" in result
         assert "温度" in result
         assert "は" in result
+
+
+# ============================================================
+# 13. execute_with_timeout — L2 制限付き実行名前空間
+# ============================================================
+
+@pytest.mark.unit
+class TestExecuteWithTimeoutL2Namespace:
+    """L2 制限付き実行名前空間のテスト
+
+    観点: セキュリティ（L2 __builtins__={} による組み込み関数アクセス遮断）
+    設計書: workflow-specification.md §L2 制限付き実行名前空間
+    """
+
+    def test_open_blocked_in_restricted_namespace(self):
+        """B-1: __builtins__={} の名前空間では open() が NameError になる"""
+        # Arrange
+        namespace = {"__builtins__": {}}
+        code = "f = open('/etc/passwd')"
+        # Act & Assert
+        with pytest.raises((NameError, TypeError)):
+            execute_with_timeout(code, namespace)
+
+    def test_eval_blocked_in_restricted_namespace(self):
+        """B-2: __builtins__={} の名前空間では eval() が NameError になる"""
+        # Arrange
+        namespace = {"__builtins__": {}}
+        code = "result = eval('1+1')"
+        # Act & Assert
+        with pytest.raises((NameError, TypeError)):
+            execute_with_timeout(code, namespace)
+
+    def test_print_allowed_when_explicitly_passed(self):
+        """B-3: print は名前空間に明示的に渡されている場合に使用可能"""
+        # Arrange: create_plot() と同等の名前空間
+        namespace = {"__builtins__": {}, "print": print, "result": None}
+        code = "result = 'ok'"
+        # Act（例外なし）
+        execute_with_timeout(code, namespace)
+        # Assert
+        assert namespace["result"] == "ok"
+
+    def test_unrestricted_namespace_allows_builtins(self):
+        """B-4: __builtins__ を制限しない場合は組み込み関数が使用可能（制限の有効性を対比確認）"""
+        # Arrange
+        import builtins
+        namespace = {"__builtins__": builtins}
+        code = "x = len([1, 2, 3])"
+        # Act（例外なし）
+        execute_with_timeout(code, namespace)
+        # Assert
+        assert namespace["x"] == 3
+
+
+# ============================================================
+# 14. unique_by_api — API 重複排除
+# ============================================================
+
+@pytest.mark.unit
+class TestUniqueByApi:
+    """unique_by_api() のテスト
+
+    観点: 2.1 正常系処理
+    設計書: workflow-specification.md §Plannerノード処理詳細「API重複排除」
+    """
+
+    def test_no_duplicates_returns_same_list(self):
+        """C-1: 重複なしのリストはそのまま返る"""
+        # Arrange
+        api_list = [
+            {"api": "GenieAPI", "prompt": "query1"},
+            {"api": "GraphAPI", "prompt": "draw"},
+        ]
+        # Act
+        result = unique_by_api(api_list)
+        # Assert
+        assert len(result) == 2
+        assert result[0]["api"] == "GenieAPI"
+        assert result[1]["api"] == "GraphAPI"
+
+    def test_duplicate_api_keeps_first_occurrence(self):
+        """C-2: 同一 api 名が複数ある場合、先頭のエントリのみ残る"""
+        # Arrange
+        api_list = [
+            {"api": "GenieAPI", "prompt": "first"},
+            {"api": "GenieAPI", "prompt": "second"},
+            {"api": "GenieAPI", "prompt": "third"},
+        ]
+        # Act
+        result = unique_by_api(api_list)
+        # Assert
+        assert len(result) == 1
+        assert result[0]["prompt"] == "first"
+
+    def test_multiple_api_types_with_duplicates(self):
+        """C-3: 複数 API 種別にまたがる重複を適切に排除する"""
+        # Arrange
+        api_list = [
+            {"api": "GenieAPI", "prompt": "q1"},
+            {"api": "GraphAPI", "prompt": "draw1"},
+            {"api": "GenieAPI", "prompt": "q2"},
+            {"api": "LLMAnalysisAPI", "prompt": "analysis"},
+            {"api": "GraphAPI", "prompt": "draw2"},
+        ]
+        # Act
+        result = unique_by_api(api_list)
+        # Assert
+        assert len(result) == 3
+        apis = [item["api"] for item in result]
+        assert apis == ["GenieAPI", "GraphAPI", "LLMAnalysisAPI"]
+
+    def test_empty_list_returns_empty(self):
+        """C-4: 空リストを渡すと空リストが返る"""
+        # Arrange
+        api_list = []
+        # Act
+        result = unique_by_api(api_list)
+        # Assert
+        assert result == []
+
+
+# ============================================================
+# 15. to_records_json_or_none — DataFrame→JSON 変換
+# ============================================================
+
+@pytest.mark.unit
+class TestToRecordsJsonOrNone:
+    """to_records_json_or_none() のテスト
+
+    観点: 2.1 正常系処理, 1.1 境界値
+    設計書: workflow-specification.md §GenieAPIノード処理詳細
+    """
+
+    def test_none_returns_none(self):
+        """D-1: None を渡すと None が返る"""
+        # Act
+        result = to_records_json_or_none(None)
+        # Assert
+        assert result is None
+
+    def test_str_returns_as_is(self):
+        """D-2: str を渡すとそのまま返る（すでに JSON である想定）"""
+        # Arrange
+        json_str = '[{"a": 1}]'
+        # Act
+        result = to_records_json_or_none(json_str)
+        # Assert
+        assert result == json_str
+
+    def test_empty_dataframe_returns_none(self):
+        """D-3: 空の DataFrame を渡すと None が返る"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame()
+        # Act
+        result = to_records_json_or_none(df)
+        # Assert
+        assert result is None
+
+    def test_nonempty_dataframe_returns_json_string(self):
+        """D-4: 非空の DataFrame を渡すと records 形式の JSON 文字列が返る"""
+        import pandas as pd
+        import json
+        # Arrange
+        df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        # Act
+        result = to_records_json_or_none(df)
+        # Assert
+        assert isinstance(result, str)
+        records = json.loads(result)
+        assert len(records) == 2
+        assert records[0]["a"] == 1
+
+    def test_unsupported_type_returns_none(self):
+        """D-5: 非対応型（int 等）を渡すと None が返る"""
+        # Act
+        result = to_records_json_or_none(42)
+        # Assert
+        assert result is None
+
+
+# ============================================================
+# 16. get_df_summary — DataFrame 要約情報生成
+# ============================================================
+
+@pytest.mark.unit
+class TestGetDfSummary:
+    """get_df_summary() のテスト
+
+    観点: 2.1 正常系処理
+    設計書: workflow-specification.md §GenieAPIノード処理詳細
+        「df.info()、df.head()、df.describe()（数値カラムのみ）を文字列化」
+    """
+
+    def test_normal_json_returns_summary_sections(self):
+        """E-1: 通常 JSON から info/head セクションを含む要約が返る"""
+        import json
+        # Arrange
+        data = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_summary(json_str)
+        # Assert
+        assert "DataFrame Information" in result
+        assert "df.info()" in result
+        assert "df.head()" in result
+
+    def test_numeric_columns_include_describe_section(self):
+        """E-2: 数値カラムを含む場合 df.describe() セクションが含まれる"""
+        import json
+        # Arrange
+        data = [{"val": 10, "count": 5}, {"val": 20, "count": 3}]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_summary(json_str)
+        # Assert
+        assert "df.describe()" in result
+
+    def test_no_numeric_columns_excludes_describe_section(self):
+        """E-3: 数値カラムがない場合 df.describe() セクションは含まれない"""
+        import json
+        # Arrange
+        data = [{"name": "Alice", "city": "Tokyo"}, {"name": "Bob", "city": "Osaka"}]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_summary(json_str)
+        # Assert
+        assert "df.describe()" not in result
+
+    def test_object_numeric_string_auto_converted(self):
+        """E-4: object 型の数値文字列が自動変換されて describe に現れる"""
+        import json
+        # Arrange: "val" が文字列だが数値として解釈可能
+        data = [{"val": "10", "label": "A"}, {"val": "20", "label": "B"}]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_summary(json_str)
+        # Assert: val が数値変換されて describe に含まれる
+        assert "df.describe()" in result
+
+
+# ============================================================
+# 17. _auto_convert_numeric_columns — object 型→数値型自動変換
+# ============================================================
+
+@pytest.mark.unit
+class TestAutoConvertNumericColumns:
+    """_auto_convert_numeric_columns() のテスト
+
+    観点: 2.1 正常系処理, 1.1 境界値
+    設計書: workflow-specification.md §GenieAPIノード処理詳細
+        「object 型カラムの自動数値変換（pd.to_numeric）」
+    """
+
+    def test_numeric_string_column_converted_to_numeric(self):
+        """F-1: 数値文字列の object 型カラムが数値型に変換される"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"val": ["1.5", "2.5", "3.5"], "label": ["a", "b", "c"]})
+        # Act
+        result = auto_convert_numeric_columns(df)
+        # Assert
+        assert result["val"].dtype != object
+        assert result["label"].dtype == object  # 非数値はそのまま
+
+    def test_non_numeric_string_column_unchanged(self):
+        """F-2: 数値に変換できない object 型カラムはそのまま維持される"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"name": ["Alice", "Bob", "Charlie"]})
+        # Act
+        result = auto_convert_numeric_columns(df)
+        # Assert
+        assert result["name"].dtype == object
+
+    def test_already_numeric_column_unchanged(self):
+        """F-3: すでに数値型のカラムは変換処理の対象外でそのまま維持される"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"val": [1, 2, 3]})
+        original_dtype = df["val"].dtype
+        # Act
+        result = auto_convert_numeric_columns(df)
+        # Assert
+        assert result["val"].dtype == original_dtype
+
+    def test_empty_dataframe_no_exception(self):
+        """F-4: 空 DataFrame を渡しても例外が発生しない"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame()
+        # Act（例外なし）
+        result = auto_convert_numeric_columns(df)
+        # Assert
+        assert result.empty
+
+
+# ============================================================
+# 18. get_df_schema_info — LLM 用スキーマ情報生成
+# ============================================================
+
+@pytest.mark.unit
+class TestGetDfSchemaInfo:
+    """get_df_schema_info() のテスト
+
+    観点: 2.1 正常系処理, 1.1 境界値
+    設計書: workflow-specification.md §LLMノード処理詳細
+        「object 型/category 型のユニーク値を抽出（20件未満は全数、以上はTop10）」
+    """
+
+    def test_empty_string_returns_no_data_message(self):
+        """G-1: 空文字列を渡すと「分析対象のデータがありません。」を返す"""
+        # Act
+        result = get_df_schema_info("")
+        # Assert
+        assert result == "分析対象のデータがありません。"
+
+    def test_normal_json_returns_schema_string(self):
+        """G-2: 通常 JSON からスキーマ情報文字列が返る"""
+        import json
+        # Arrange
+        data = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_schema_info(json_str)
+        # Assert
+        assert "DataFrame Schema" in result
+        assert "First 3 Rows" in result
+
+    def test_fewer_than_20_unique_vals_shows_all(self):
+        """G-3: ユニーク値が 20 件未満のカラムは全数表示される（「total」表記なし）"""
+        import json
+        # Arrange: 10 種類のカテゴリ（20 件未満）
+        data = [{"category": f"cat{i % 10}"} for i in range(30)]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_schema_info(json_str)
+        # Assert: Top10 表記（"total N"）が含まれないこと
+        assert "total 10" not in result
+
+    def test_20_or_more_unique_vals_shows_top10_with_total(self):
+        """G-4: ユニーク値が 20 件以上のカラムは Top10 + total N 表示される"""
+        import json
+        # Arrange: 25 種類のカテゴリ（20 件以上）
+        data = [{"category": f"cat{i}"} for i in range(25)]
+        json_str = json.dumps(data)
+        # Act
+        result = get_df_schema_info(json_str)
+        # Assert: "total 25" が含まれること
+        assert "total 25" in result
+
+
+# ============================================================
+# 19. trim_messages — 設計書値（15 往復 / 512KB）での動作確認
+# ============================================================
+
+@pytest.mark.unit
+class TestTrimMessagesDesignValues:
+    """trim_messages() — 設計書記載値（max_turns=15, max_size_bytes=512KB）でのテスト
+
+    観点: 2.1 正常系処理, 1.1 境界値
+    設計書: workflow-specification.md §会話状態の永続化処理
+        「往復数制限: HumanMessage の数で最大15往復」
+        「サイズ制限: 全メッセージの UTF-8 バイト合計で最大 512KB」
+
+    # TODO: common.py の実装値（max_turns=5, max_size_bytes=100KB）と乖離あり。
+    #       設計書値に合わせた実装修正が必要。
+    """
+
+    _MAX_TURNS = 15
+    _MAX_SIZE = 512 * 1024  # 512KB
+
+    def test_exactly_15_turns_not_trimmed(self):
+        """H-1: 設計値 max_turns=15 ちょうどでは削除されない"""
+        # Arrange
+        messages = sum([_make_turn(f"q{i}") for i in range(self._MAX_TURNS)], [])
+        # Act
+        result = trim_messages(messages, max_turns=self._MAX_TURNS, max_size_bytes=self._MAX_SIZE)
+        # Assert
+        human_count = sum(1 for m in result if isinstance(m, MockHumanMessage))
+        assert human_count == self._MAX_TURNS
+
+    def test_16_turns_oldest_removed(self):
+        """H-2: 設計値 max_turns=15 超過（16 往復）で最古の 1 往復が削除される"""
+        # Arrange
+        messages = sum([_make_turn(f"q{i}") for i in range(16)], [])
+        # Act
+        result = trim_messages(messages, max_turns=self._MAX_TURNS, max_size_bytes=self._MAX_SIZE)
+        # Assert
+        human_count = sum(1 for m in result if isinstance(m, MockHumanMessage))
+        assert human_count == self._MAX_TURNS
+        contents = [m.content for m in result if isinstance(m, MockHumanMessage)]
+        assert "q0" not in contents   # 最古が除去された
+        assert "q15" in contents      # 最新が残る
+
+    def test_within_512kb_not_trimmed(self):
+        """H-3: 設計値 512KB 以内のメッセージは削除されない"""
+        # Arrange: 各 1KB × 10 件 = 10KB（512KB 以内）
+        messages = [MockAIMessage("x" * 1024) for _ in range(10)]
+        # Act
+        result = trim_messages(messages, max_turns=100, max_size_bytes=self._MAX_SIZE)
+        # Assert
+        assert len(result) == 10
+
+    def test_exceeds_512kb_oldest_removed(self):
+        """H-4: 設計値 512KB 超過で古いメッセージが削除される"""
+        # Arrange: 各 100KB × 6 件 = 600KB（512KB 超過）
+        messages = [MockAIMessage("x" * 100 * 1024) for _ in range(6)]
+        # Act
+        result = trim_messages(messages, max_turns=100, max_size_bytes=self._MAX_SIZE)
+        # Assert
+        total_size = sum(len(str(m.content).encode("utf-8")) for m in result)
+        assert total_size <= self._MAX_SIZE
+
+
+# ============================================================
+# 20. create_plot — リトライ機構（最大 5 回）
+# ============================================================
+
+@pytest.mark.unit
+class TestCreatePlotRetry:
+    """create_plot() のリトライ機構のテスト
+
+    観点: 2.1 正常系処理, 1.3 エラーハンドリング
+    設計書: workflow-specification.md §GraphAPIノード処理詳細
+        「リトライ機構（最大5回）/ リトライ時もステップ6の静的解析を再実行」
+    """
+
+    def test_retry_succeeds_on_second_attempt(self):
+        """I-1: 1回目失敗→2回目成功でリトライが機能し、結果が返る"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"x": [1, 2, 3]})
+        responses = [
+            ValueError("LLM error on first try"),
+            {"plot_code": "fig = 1", "explain": "success_message"},
+        ]
+
+        def side_effect(_prompt, _sql_query, _df_arg):
+            resp = responses.pop(0)
+            if isinstance(resp, Exception):
+                raise resp
+            return resp
+
+        # Act
+        with patch.object(_graph_api, "plot_code_node", side_effect=side_effect) as mock_fn:
+            _fig, message = create_plot("test prompt", "SELECT 1", df)
+
+        # Assert
+        assert mock_fn.call_count == 2
+        assert message == "success_message"
+
+    def test_max_5_retries_plot_code_node_called_5_times(self):
+        """I-2: 4 回失敗後の 5 回目呼び出しで plot_code_node が計 5 回呼ばれる"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"x": [1]})
+        responses = [
+            ValueError("error 1"),
+            ValueError("error 2"),
+            ValueError("error 3"),
+            ValueError("error 4"),
+            {"plot_code": "no_fig_here", "explain": "gave_up"},
+        ]
+
+        def side_effect(_prompt, _sql_query, _df_arg):
+            resp = responses.pop(0)
+            if isinstance(resp, Exception):
+                raise resp
+            return resp
+
+        # Act
+        with patch.object(_graph_api, "plot_code_node", side_effect=side_effect) as mock_fn:
+            fig, message = create_plot("test prompt", "SELECT 1", df)
+
+        # Assert: 5 回呼ばれ、fig なしコードで None が返る
+        assert mock_fn.call_count == 5
+        assert fig is None
+        assert message == "gave_up"
+
+    def test_error_message_appended_to_prompt_on_retry(self):
+        """I-3: リトライ時にエラーメッセージがプロンプトに追記される"""
+        import pandas as pd
+        # Arrange
+        df = pd.DataFrame({"x": [1]})
+        captured_prompts = []
+
+        def side_effect(prompt, _sql_query, _df_arg):
+            captured_prompts.append(prompt)
+            if len(captured_prompts) == 1:
+                raise ValueError("specific_error_detail")
+            return {"plot_code": "fig = 1", "explain": "done"}
+
+        # Act
+        with patch.object(_graph_api, "plot_code_node", side_effect=side_effect):
+            create_plot("original_prompt", "SELECT 1", df)
+
+        # Assert: 2 回呼ばれ、2 回目のプロンプトにエラー内容が含まれる
+        assert len(captured_prompts) == 2
+        assert "specific_error_detail" in captured_prompts[1]
+        assert "次のエラー出ないようにしてください" in captured_prompts[1]
