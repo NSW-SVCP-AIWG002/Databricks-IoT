@@ -29,6 +29,8 @@
 
 # 依存関係・設定ファイル
 !/requirements.txt
+!/wsgi.py
+!/pytest.ini
 !/Dockerfile
 
 # 環境変数テンプレート（実際の.envは除外）
@@ -50,3 +52,7 @@ credentials/
 
 # データファイルは除外
 users.json
+
+# Python cache（src配下も含めて除外）
+__pycache__/
+*.py[cod]

@@ -9,6 +9,7 @@
 1. **データ集計**: シルバー層センサーデータの日次・月次・年次集計
 2. **サマリ生成**: 集約対象項目ごとの統計値（平均、最大、最小等）算出
 3. **長期保存**: 10年間のデータ保持
+4. **障害通知**: エラー発生時のTeams通知
 
 ---
 
@@ -159,16 +160,20 @@ flowchart TB
         GoldDaily[(gold_sensor_data_daily_summary)]
         GoldMonthly[(gold_sensor_data_monthly_summary)]
         GoldYearly[(gold_sensor_data_yearly_summary)]
+        GoldMethod[(gold_summary_method_master)]
     end
 
     SensorData --> D_Read
     D_Read --> D_Group --> D_Agg --> GoldDaily
+    D_Agg -.-> |データ参照| GoldMethod
 
     SensorData --> M_Read
     M_Read --> M_Group --> M_Agg --> GoldMonthly
-
+    M_Agg -.-> |データ参照| GoldMethod
+    
     SensorData --> Y_Read
     Y_Read --> Y_Group --> Y_Agg --> GoldYearly
+    Y_Agg -.-> |データ参照| GoldMethod
 ```
 
 ---
