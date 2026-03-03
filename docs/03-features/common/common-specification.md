@@ -62,13 +62,12 @@
 **対象:**
 - Flask SSRルート（サーバーサイドレンダリング）
 - HTMLレスポンスまたはリダイレクト
-- Databricks Apps環境でのホスティング
 
 **アーキテクチャ:**
 - **Webフレームワーク**: Flask + Jinja2
-- **認証基盤**: Databricks認証（Entra ID統合）
+- **認証基盤**: 認証共通モジュール（Azure/AWS/オンプレミス対応）※詳細は[認証仕様書](./authentication-specification.md)を参照
 - **データベース**: MySQL互換DB（OLTP）、Unity Catalog（分析）
-- **デプロイ環境**: Databricks Apps (App Compute)
+- **デプロイ環境**: Azure App Service / AWS EC2 / オンプレミスサーバー
 
 ---
 
@@ -76,15 +75,19 @@
 
 すべてのFlaskルートで使用する共通HTTPステータスコードを定義します。
 
-| コード | 説明                  | 使用場面                           | Flask実装                              |
-| ------ | --------------------- | ---------------------------------- | -------------------------------------- |
-| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                    |
-| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                           |
-| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error modal   |
-| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
-| 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
-| 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template()` with error modal   |
+| コード | 説明                  | 使用場面                           | Flask実装                            |
+| ------ | --------------------- | ---------------------------------- | ------------------------------------ |
+| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                  |
+| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                         |
+| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error       |
+| 401    | Unauthorized          | 認証エラー                         | ログインページへリダイレクト         |
+| 403    | Forbidden             | 権限不足                           | `render_template('errors/403.html')` |
+| 404    | Not Found             | リソース未検出                     | `render_template('errors/404.html')` |
+| 409    | Conflict              | 競合エラー（重複登録など）         | `render_template()` with error       |
+| 422    | Unprocessable Entity  | バリデーションエラー               | `render_template()` with form errors |
+| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')` |
+| 502    | Bad Gateway           | 外部API連携エラー                  | `render_template('errors/502.html')` |
+| 503    | Service Unavailable   | メンテナンス中                     | `render_template('errors/503.html')` |
 
 **注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
 
@@ -94,15 +97,17 @@
 
 アプリケーション内部で使用するエラーコードを定義します。
 
-| コード             | 説明                 | HTTPステータス | 表示方法                             |
-| ------------------ | -------------------- | -------------- | ------------------------------------ |
-| AUTH_FAILED        | 認証失敗             | 401            | ログイン画面へリダイレクト |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーメッセージモーダル表示                         |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーメッセージモーダル表示                         |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーメッセージモーダル表示                         |
+| コード             | 説明                 | HTTPステータス | 表示方法                          |
+| ------------------ | -------------------- | -------------- | --------------------------------- |
+| AUTH_FAILED        | 認証失敗             | 401            | ログインページへリダイレクト      |
+| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                      |
+| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ          |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ          |
+| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ          |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                      |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                      |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                      |
 
 **Flask実装例:**
 
@@ -147,12 +152,14 @@ except Exception as e:
 
 | エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
 | -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
-| パラメータ不正       | 入力パラメータの形式・値が不正 | エラーメッセージモーダル表示 | 400            | 開始前                 |
-| 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーメッセージモーダル表示 | 500            | 開始後（ロールバック） |
+| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示         | 400, 422       | 開始前                 |
+| 認証エラー           | 認証失敗                       | ログインページへリダイレクト | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | エラーページまたはFlash      | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash      | 404            | 読み取りのみ           |
+| 競合エラー           | データの重複・競合             | フォームにエラー表示         | 409            | 開始後（ロールバック） |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ   | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ   | 502            | 開始後（ロールバック） |
+| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ   | 504            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 
@@ -178,55 +185,386 @@ except Exception as e:
 
 **注:** ログ出力の詳細は[ログ出力ポリシー](#ログ出力ポリシー)セクションを参照してください。
 
+### エラー通知（Teams）
+
+エラー発生時、システム保守者が属するTeamsの管理チャネルに対して通知を行います。通知はTeamsチャネルに登録されたワークフロー（Incoming Webhook）を実行することで実現します。
+エラー通知対象のエラー内容は各機能の設計書を参照。
+
+#### 通知フロー
+
+```mermaid
+flowchart TD
+    Error([エラー発生]) --> CheckType{通知対象<br>エラーか}
+    CheckType -->|対象外| LogOnly[ログ出力のみ]
+    LogOnly --> End([処理続行])
+
+    CheckType -->|対象| BuildPayload[通知メッセージ<br>ペイロード作成]
+    BuildPayload --> CallWebhook[Teams Webhook<br>呼び出し]
+    CallWebhook --> CheckResult{送信結果}
+
+    CheckResult -->|成功| LogSuccess[通知成功ログ出力]
+    LogSuccess --> End([処理続行])
+
+    CheckResult -->|失敗| RetryCount{リトライ<br>回数確認}
+    RetryCount -->|3回以上| LogFailure[通知失敗ログ出力<br>※処理は続行]
+    RetryCount -->|3回未満| Wait[5秒待機]
+    Wait --> CallWebhook
+    LogFailure --> End([処理続行])
+```
+
+#### 通知メッセージ仕様
+
+| 項目           | 内容                                  |
+| -------------- | ------------------------------------- |
+| 宛先           | システム保守者用Teams管理チャネル     |
+| 通知方式       | Teamsワークフロー（Incoming Webhook） |
+| メッセージ形式 | Adaptive Card（JSON）                 |
+
+**通知内容:**
+
+| 項目         | 説明                            | 例                                |
+| ------------ | ------------------------------- | --------------------------------- |
+| タイトル     | アラート種別と優先度            | [高] シルバー層パイプラインエラー |
+| エラーコード | 発生したエラーのコード          | SILVER_ERR_001                    |
+| エラー内容   | エラーメッセージ                | OLTP DBへの接続に失敗しました     |
+| 発生日時     | エラー発生のタイムスタンプ      | 2026-01-29 10:15:42 JST           |
+| パイプライン | 対象パイプライン名              | silver_sensor_data_pipeline       |
+| バッチID     | foreachBatchのバッチID          | 12345                             |
+| 詳細情報     | スタックトレース（先頭500文字） | -                                 |
+| 対処リンク   | 運用手順書へのリンク            | -                                 |
+
+#### Webhook設定
+
+**環境変数:**
+
+| 変数名                    | 説明                              | 設定場所                |
+| ------------------------- | --------------------------------- | ----------------------- |
+| TEAMS_WEBHOOK_URL         | TeamsワークフローのWebhook URL    | Databricks Secret Scope |
+| TEAMS_WEBHOOK_TIMEOUT_SEC | Webhook呼び出しタイムアウト（秒） | パイプライン設定        |
+| TEAMS_WEBHOOK_RETRY_COUNT | リトライ回数                      | パイプライン設定        |
+
+**Secret Scope設定:**
+
+```python
+# Databricks Secret Scopeからwebhook URLを取得
+webhook_url = dbutils.secrets.get(scope="iot-pipeline-secrets", key="teams-webhook-url")
+```
+
+#### 通知実装例（Python）
+
+```python
+import requests
+import json
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class TeamsNotifier:
+    """Teams通知クラス"""
+
+    def __init__(self, webhook_url: str, timeout: int = 30, retry_count: int = 3):
+        self.webhook_url = webhook_url
+        self.timeout = timeout
+        self.retry_count = retry_count
+
+    def send_error_notification(
+        self,
+        error_code: str,
+        error_message: str,
+        pipeline_name: str,
+        batch_id: int = None,
+        stack_trace: str = None
+    ) -> bool:
+        """
+        エラー通知をTeamsに送信
+
+        Args:
+            error_code: エラーコード（例: SILVER_ERR_001）
+            error_message: エラーメッセージ
+            pipeline_name: パイプライン名
+            batch_id: foreachBatchのバッチID（オプション）
+            stack_trace: スタックトレース（オプション）
+
+        Returns:
+            bool: 送信成功時True
+        """
+        payload = self._build_adaptive_card(
+            error_code=error_code,
+            error_message=error_message,
+            pipeline_name=pipeline_name,
+            batch_id=batch_id,
+            stack_trace=stack_trace
+        )
+
+        for attempt in range(self.retry_count):
+            try:
+                response = requests.post(
+                    self.webhook_url,
+                    json=payload,
+                    timeout=self.timeout,
+                    headers={"Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    logger.info(f"Teams通知送信成功: {error_code}")
+                    return True
+                else:
+                    logger.warning(
+                        f"Teams通知送信失敗 (試行 {attempt + 1}/{self.retry_count}): "
+                        f"status={response.status_code}"
+                    )
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    f"Teams通知送信エラー (試行 {attempt + 1}/{self.retry_count}): {str(e)}"
+                )
+
+            if attempt < self.retry_count - 1:
+                import time
+                time.sleep(5)  # 5秒待機してリトライ
+
+        logger.error(f"Teams通知送信失敗（リトライ上限）: {error_code}")
+        return False
+
+    def _build_adaptive_card(
+        self,
+        error_code: str,
+        error_message: str,
+        pipeline_name: str,
+        batch_id: int = None,
+        stack_trace: str = None
+    ) -> dict:
+        """Adaptive Cardペイロードを構築"""
+
+        priority = "高" if error_code.startswith("SILVER_ERR") else "中"
+        priority_color = "attention" if priority == "高" else "warning"
+
+        facts = [
+            {"title": "エラーコード", "value": error_code},
+            {"title": "エラー内容", "value": error_message},
+            {"title": "発生日時", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S JST")},
+            {"title": "パイプライン", "value": pipeline_name}
+        ]
+
+        if batch_id is not None:
+            facts.append({"title": "バッチID", "value": str(batch_id)})
+
+        card = {
+            "type": "message",
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                        "type": "AdaptiveCard",
+                        "version": "1.4",
+                        "body": [
+                            {
+                                "type": "TextBlock",
+                                "size": "Large",
+                                "weight": "Bolder",
+                                "text": f"[{priority}] シルバー層パイプラインエラー",
+                                "color": priority_color
+                            },
+                            {
+                                "type": "FactSet",
+                                "facts": facts
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        # スタックトレースがある場合は追加（先頭500文字）
+        if stack_trace:
+            card["attachments"][0]["content"]["body"].append({
+                "type": "TextBlock",
+                "text": f"**詳細情報:**\n```\n{stack_trace[:500]}\n```",
+                "wrap": True,
+                "size": "Small"
+            })
+
+        return card
+
+
+# グローバルインスタンス（パイプライン起動時に初期化）
+_notifier = None
+
+def get_teams_notifier() -> TeamsNotifier:
+    """TeamsNotifierのシングルトンインスタンスを取得"""
+    global _notifier
+    if _notifier is None:
+        webhook_url = dbutils.secrets.get(scope="iot-pipeline-secrets", key="teams-webhook-url")
+        _notifier = TeamsNotifier(webhook_url)
+    return _notifier
+
+
+def notify_error(error_code: str, error_message: str, batch_id: int = None, stack_trace: str = None):
+    """エラー通知のヘルパー関数"""
+    notifier = get_teams_notifier()
+    notifier.send_error_notification(
+        error_code=error_code,
+        error_message=error_message,
+        pipeline_name="silver_sensor_data_pipeline",
+        batch_id=batch_id,
+        stack_trace=stack_trace
+    )
+```
+
+#### 組み込み例
+
+```python
+import traceback
+
+def process_sensor_batch(batch_df, batch_id):
+    """
+    foreachBatchで呼び出されるメイン処理関数（Teams通知付き）
+    """
+    try:
+        # JSONパース処理
+        parsed_df = parse_sensor_data(batch_df)
+
+        # アラート判定処理
+        with_alerts = evaluate_alerts(parsed_df)
+
+        # Delta Lake書込み
+        write_to_delta_lake(with_alerts)
+
+        # OLTP DB更新
+        update_oltp_db(with_alerts, batch_id)
+
+        # メール送信キュー登録
+        enqueue_email_notifications(with_alerts, batch_id)
+
+        logger.info(f"バッチ処理完了: batch_id={batch_id}, records={batch_df.count()}")
+
+    except pymysql.Error as e:
+        # OLTP接続エラー
+        error_msg = f"OLTP DBへの接続に失敗しました: {str(e)}"
+        logger.error(f"SILVER_ERR_001: {error_msg}")
+        notify_error(
+            error_code="SILVER_ERR_001",
+            error_message=error_msg,
+            batch_id=batch_id,
+            stack_trace=traceback.format_exc()
+        )
+        # 処理は続行（Delta Lake書込みはロールバックしない）
+
+    except Exception as e:
+        # その他のエラー
+        error_msg = f"センサーデータの処理中にエラーが発生しました: {str(e)}"
+        logger.error(f"SILVER_ERR_003: {error_msg}")
+        notify_error(
+            error_code="SILVER_ERR_003",
+            error_message=error_msg,
+            batch_id=batch_id,
+            stack_trace=traceback.format_exc()
+        )
+        raise  # Delta Lake書込みエラーは再スロー
+
+
+def update_oltp_db(df, batch_id):
+    """OLTP DB更新処理（リトライ付き）"""
+    max_retries = 3
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            with get_mysql_connection() as conn:
+                update_device_status(conn, df)
+                insert_alert_history(conn, df)
+                conn.commit()
+            return  # 成功
+
+        except pymysql.Error as e:
+            last_error = e
+            if not is_retryable_error(e):
+                break  # リトライ不可能なエラー
+
+            if attempt < max_retries - 1:
+                wait_time = OLTP_RETRY_INTERVALS[attempt]
+                logger.warning(f"OLTP更新リトライ ({attempt + 1}/{max_retries}): {wait_time}秒待機")
+                time.sleep(wait_time)
+
+    # リトライ上限到達
+    error_msg = f"OLTP DBへの接続に失敗しました（{max_retries}回リトライ後）: {str(last_error)}"
+    logger.error(f"SILVER_ERR_001: {error_msg}")
+    notify_error(
+        error_code="SILVER_ERR_001",
+        error_message=error_msg,
+        batch_id=batch_id,
+        stack_trace=traceback.format_exc()
+    )
+```
+
 ---
 
 ## 認証・認可
 
+**詳細仕様:** 認証アーキテクチャの詳細は[認証仕様書](./authentication-specification.md)を参照してください。
+
 ### 認証方式
 
-| 項目           | 内容                                                          |
-| -------------- | ------------------------------------------------------------- |
-| 認証基盤       | Databricks認証（Entra ID統合）                                |
-| 認証方式       | Databricksワークスペース認証（Databricks標準機能）            |
-| セッション管理 | Databricksが自動管理                                          |
-| アクセス制限   | アクセス元IP制限（Databricksワークスペース、Databricks Apps） |
+| 項目           | 内容                                                                |
+| -------------- | ------------------------------------------------------------------- |
+| 認証基盤       | 認証共通モジュール（Azure/AWS/オンプレミス対応）                    |
+| 認証方式       | AuthProviderパターンによる抽象化                                    |
+| セッション管理 | 環境に応じた管理（Azure: Easy Auth連動、AWS: ALB連動、自前: Flask） |
+| アクセス制限   | アクセス元IP制限（Databricksワークスペース）                        |
 
-**重要:** Flaskアプリケーション内で認証処理は実装しません。Databricks Appsのリバースプロキシが認証を処理します。
+**対応環境:**
+
+| 環境         | 認証方式              | 認証プロバイダー        |
+| ------------ | --------------------- | ----------------------- |
+| Azure        | Easy Auth（Entra ID） | `AzureEasyAuthProvider` |
+| AWS          | ALB + Cognito         | `AWSCognitoProvider`    |
+| オンプレミス | 自前認証（Flask IdP） | `LocalIdPProvider`      |
 
 ### 認証フロー
 
-1. ユーザーがDatabricks Appsにアクセス
-2. Databricksが自動的にEntra ID認証を要求
-3. 認証成功後、リバースプロキシがリクエストヘッダーにユーザー情報を付与
-4. Flaskアプリケーションはヘッダーからユーザー情報を取得
-5. 組織IDでデータスコープを制限
+認証フローは環境によって異なりますが、共通して以下の処理を行います:
+
+1. ユーザーがアプリケーションにアクセス
+2. 認証プロバイダー（IdP）による認証
+3. 認証成功後、リバースプロキシがリクエストヘッダーにユーザー情報・JWTを付与
+4. Flaskアプリケーションはヘッダーからユーザー情報を取得（AuthProviderパターン）
+5. OAuth Token ExchangeによりDatabricksアクセストークンを取得
+6. Unity Catalog接続時、ユーザー単位のデータスコープ制御を実現
+
+**注:** 認証フローの詳細は[認証仕様書](./authentication-specification.md)を参照してください。
 
 ### ユーザー情報取得
 
-Flaskアプリケーションは、リバースプロキシから以下のヘッダーでユーザー情報を取得します：
+FlaskアプリケーションはAuthProviderを通じてユーザー情報を取得します:
 
 ```python
-from flask import request
+from flask import g, request, abort
+from auth.factory import get_auth_provider
 
 def get_current_user():
-    """リバースプロキシヘッダーからユーザー情報を取得"""
-    user_id = request.headers.get('X-Forwarded-User')
-    email = request.headers.get('X-Forwarded-Email')
+    """AuthProviderからユーザー情報を取得
 
-    if not user_id or not email:
-        # 認証エラー（通常は発生しない）
-        abort(401)
+    注意: 通常はAuthMiddleware（before_request）で認証処理が行われ、
+    g.current_userが設定されます。この関数は認証済みユーザーへの
+    アクセスを提供するヘルパーです。
+    """
+    if hasattr(g, 'current_user'):
+        return g.current_user
+
+    provider = get_auth_provider()
+    user_info = provider.get_user_info(request)
 
     # データベースからユーザー情報を取得
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(email=user_info['email']).first()
     if not user:
-        # ユーザーが未登録の場合の処理
         abort(403)
 
+    g.current_user = user
     return user
 ```
 
-**注:** ヘッダー名（`X-Forwarded-User`、`X-Forwarded-Email`）は、Databricks Appsの実際の仕様に合わせて調整してください。
+**注:** 環境変数`AUTH_TYPE`（azure/aws/local）により、使用するAuthProviderが決定されます。
 
 ### ロール定義
 
@@ -932,70 +1270,17 @@ db.session.commit()
 
 すべてのFlaskルートで共通するログ出力の方針を定義します。
 
+> **実装詳細**（ロガー実装・自動付与フィールド・タイミングパターン・フィールド規則）は [ログ設計書](./logging-specification.md) を参照してください。
+
 ### ログレベル定義
 
 | ログレベル | 使用場面       | 出力内容                                                     |
 | ---------- | -------------- | ------------------------------------------------------------ |
 | **ERROR**  | エラー発生時   | HTTPステータス 500系、データベースエラー、外部API連携エラー  |
-| **WARN**   | 警告事象発生時 | HTTPステータス 400系、バリデーションエラー、認証・認可エラー |
-| **INFO**   | 通常処理       | ルート呼び出し開始・終了、主要な処理ステップ                 |
-| **DEBUG**  | 開発・調査用   | 詳細な処理内容、変数値（本番環境では無効化）                 |
+| **WARN**   | 警告事象発生時 | HTTPステータス 400系、認証・認可エラー |
+| **INFO**   | 通常処理       | リクエスト開始・終了、認証成功、外部API呼び出し・完了、MySQL書き込み |
+| **DEBUG**  | 開発・調査用   | SQL SELECT クエリ（本番環境では無効化）                 |
 
-### 必須ログ出力項目
-
-すべてのFlaskルートで以下の項目をログ出力します：
-
-#### リクエスト開始時（INFO）
-
-```json
-{
-  "level": "INFO",
-  "timestamp": "2025-11-01T10:00:00.123+09:00",
-  "requestId": "req_abc123",
-  "method": "POST",
-  "endpoint": "/users/create",
-  "userId": "usr_001",
-  "organizationId": "org_001",
-  "ipAddress": "192.168.1.100",
-  "userAgent": "Mozilla/5.0..."
-}
-```
-
-#### レスポンス返却時（INFO）
-
-```json
-{
-  "level": "INFO",
-  "timestamp": "2025-11-01T10:00:00.456+09:00",
-  "requestId": "req_abc123",
-  "method": "POST",
-  "endpoint": "/users/create",
-  "httpStatus": 302,
-  "processingTime": 123,
-  "userId": "usr_001",
-  "organizationId": "org_001"
-}
-```
-
-**注:** `processingTime` はミリ秒単位
-
-#### エラー発生時（ERROR/WARN）
-
-```json
-{
-  "level": "ERROR",
-  "timestamp": "2025-11-01T10:00:00.789+09:00",
-  "requestId": "req_abc123",
-  "method": "POST",
-  "endpoint": "/users/create",
-  "httpStatus": 500,
-  "errorCode": "DATABASE_ERROR",
-  "errorMessage": "データベース接続に失敗しました",
-  "userId": "usr_001",
-  "organizationId": "org_001",
-  "stackTrace": "..."
-}
-```
 
 ### 出力禁止項目（機密情報）
 
@@ -1011,8 +1296,8 @@ db.session.commit()
 - ❌ クレジットカード番号
 - ❌ マイナンバー
 - ❌ 生年月日（フルフォーマット）
-- ❌ メールアドレス（一部マスキングなしの場合）
-- ❌ 電話番号（一部マスキングなしの場合）
+- ❌ メールアドレス（マスキングなしでの出力）※認証失敗時の `raw_email` は例外（下記参照）
+- ❌ 電話番号（マスキングなしでの出力）
 - ❌ 住所（詳細）
 
 #### その他機密情報
@@ -1022,13 +1307,14 @@ db.session.commit()
 
 ### マスキング方針
 
-個人情報を出力する必要がある場合は、以下のルールでマスキングします：
+個人情報を出力する必要がある場合は、以下のルールでマスキングします。マスキングは `LoggerAdapter` が指定キー名を検出して自動適用します。
 
-| 項目           | マスキング方法           | 例                   |
-| -------------- | ------------------------ | -------------------- |
-| メールアドレス | ローカル部の一部をマスク | `ya****@example.com` |
-| 電話番号       | 中間4桁をマスク          | `090-****-5678`      |
-| ユーザー名     | 姓のみ表示               | `山田****`           |
+| キー名 | マスキング方法 | 例 |
+| --- | --- | --- |
+| `email` | ローカル部の先頭2文字以外を `****` に置換 | `ya****@example.com` |
+| `phone` | 中間4桁をマスク | `090-****-5678` |
+
+> **認証失敗時の例外**: 管理外（未登録）のメールアドレスは `raw_email` キーで出力し、マスキングを適用しない。マスキングすると調査不能になるため意図的な非マスクとする。
 
 ### ログローテーション
 
@@ -1041,12 +1327,10 @@ db.session.commit()
 
 ### ログ保存先
 
-| 環境     | 保存先                                        | 備考                               |
-| -------- | --------------------------------------------- | ---------------------------------- |
-| 開発環境 | Databricks Apps標準ログ                       | Databricks Apps環境                |
-| 本番環境 | Databricks Apps標準ログ + Azure Log Analytics | クエリ・分析可能、アラート設定済み |
-
-**注:** Databricks Appsの標準ログ出力先は、Databricksの仕様に従ってください。
+| 環境     | 保存先                              | 備考                               |
+| -------- | ----------------------------------- | ---------------------------------- |
+| 開発環境 | stdout（JSON）+ `app.log`（テキスト） | ローカル開発時の可読性確保 |
+| stg / 本番環境 | stdout（JSON）→ Azure Log Analytics | フィールド単位のクエリ・アラート設定 |
 
 ---
 
@@ -1161,8 +1445,13 @@ def load_application_settings():
 
 ## 関連ドキュメント
 
+### 認証・セキュリティ
+
+- [認証仕様書](./authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
+
 ### 機能設計・仕様
 
+- [ログ設計書](./logging-specification.md) - ロガー実装・タイミングパターン・フィールド規則の詳細
 - [機能別実装ガイド作成ルール](../feature-guide.md) - 実装ガイドの作成方法
 - [UI仕様書テンプレート](../templates/ui-specification-template.md) - ui-specification.md のテンプレート
 - [ワークフロー仕様書テンプレート](../templates/workflow-specification-template.md) - workflow-specification.md のテンプレート
