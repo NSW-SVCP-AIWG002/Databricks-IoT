@@ -1,0 +1,8 @@
+command:
+  - streamlit
+  - run
+  - streamlit_app.py
+  
+env:
+  - name: SECRET_KEY
+    valueFrom: secret
