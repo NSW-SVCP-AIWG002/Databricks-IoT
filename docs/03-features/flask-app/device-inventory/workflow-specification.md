@@ -104,7 +104,7 @@ flowchart TD
 
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> InitParams[検索条件にデフォルト値を<br>入力]
-    InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master]
+    InitParams --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master<br>SELECT * FROM sort_item_master<br>WHERE view_id=7 AND delete_flag=FALSE]
     LoadMaster --> CheckMaster{マスタ取得結果}
 
     CheckMaster -->|失敗| Error500[500エラーモーダル表示]
@@ -139,7 +139,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_column`, `sort_order` |
+| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_item_id`, `sort_order` |
 
 #### バリデーション
 
@@ -186,7 +186,7 @@ if 'page' in request.args:
     purchase_date_from = conditions.get('purchase_date_from', None)
     purchase_date_to = conditions.get('purchase_date_to', None)
     page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
-    sort_column = conditions.get('sort_column', 'device_inventory_id')
+    sort_item_id = conditions.get('sort_item_id', 0)
     sort_order = conditions.get('sort_order', 'desc')
 else:
     # 初期表示時: Cookie検索条件をクリア
@@ -201,7 +201,7 @@ else:
     purchase_date_from = None
     purchase_date_to = None
     page = 1
-    sort_column = 'device_inventory_id'
+    sort_item_id = 0
     sort_order = 'desc'
 
 per_page = 25  # 固定
@@ -251,16 +251,32 @@ query = (
 if device_uuid:
     query = query.filter(device_master.device_uuid.like(f'%{device_uuid}%'))
 
-# ソート
-if sort_column:
-    # sort_orderが未選択の場合は降順をデフォルトとする
-    order_direction = sort_order if sort_order else 'desc'
-    query = query.order_by(
-        getattr(device_master, sort_column).desc() if order_direction == 'desc'
-        else getattr(device_master, sort_column).asc()
-    )
+# ソート項目IDをカラム名にマッピング（sort_item_master テーブルで検証）
+# view_id = 7, sort_item_id = sort_item_id, delete_flag = FALSE で検索
+# 取得した sort_item_name をカラム名として使用
+# sort_item_id=0 (未選択) の場合は device_inventory_id をデフォルトとして使用
+sort_item = SortItemMaster.query.filter_by(
+    view_id=7,
+    sort_item_id=sort_item_id,
+    delete_flag=False
+).first()
+sort_column = sort_item.sort_item_name if sort_item else 'device_inventory_id'
+
+# sort_orderが未選択または不正な場合は降順をデフォルトとする
+order_direction = sort_order if sort_order in ['asc', 'desc'] else 'desc'
+
+# カラムが所属するテーブルを判定してソート適用
+_DEVICE_MASTER_SORT_COLUMNS = {
+    'device_uuid', 'device_name', 'device_type_id', 'sim_id', 'mac_address'
+}
+if sort_column in _DEVICE_MASTER_SORT_COLUMNS:
+    sort_attr = getattr(device_master, sort_column)
 else:
-    query = query.order_by(device_master.device_inventory_id.desc())
+    sort_attr = getattr(device_inventory_master, sort_column)
+
+query = query.order_by(
+    sort_attr.desc() if order_direction == 'desc' else sort_attr.asc()
+)
 
 # 件数取得
 total = query.count()
@@ -283,7 +299,7 @@ if 'page' not in request.args:
         'inventory_location': inventory_location,
         'purchase_date_from': purchase_date_from,
         'purchase_date_to': purchase_date_to,
-        'sort_column': sort_column,
+        'sort_item_id': sort_item_id,
         'sort_order': sort_order,
         'page': page
     }
@@ -294,7 +310,7 @@ return render_template('admin/device_inventory_master/list.html',
                       total=total,
                       page=page,
                       per_page=per_page,
-                      sort_column=sort_column,
+                      sort_item_id=sort_item_id,
                       sort_order=sort_order,
                       device_uuid=device_uuid,
                       device_name=device_name,
@@ -348,7 +364,8 @@ flowchart TD
 
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
-    Convert --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
+    Convert --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master<br>SELECT * FROM sort_item_master<br>WHERE view_id=7 AND delete_flag=FALSE]
+    LoadMaster --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
@@ -369,7 +386,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_column`, `sort_order`。デバイス・在庫状況名をDBから取得 |
+| 台帳一覧表示（検索） | `GET /admin/device-inventory` | クエリパラメータ: `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_item_id`, `sort_order`。デバイス・在庫状況・ソート項目をDBから取得 |
 
 #### バリデーション
 
@@ -399,7 +416,7 @@ inventory_status = request.args.get('inventory_status', 'all')
 inventory_location = request.args.get('inventory_location', '')
 purchase_date_from = request.args.get('purchase_date_from')
 purchase_date_to = request.args.get('purchase_date_to')
-sort_column = request.args.get('sort_column', 'device_inventory_id')
+sort_item_id = request.args.get('sort_item_id', 0, type=int)
 sort_order = request.args.get('sort_order', 'desc')
 page = 1  # 検索時はページを1にリセット
 ```
@@ -464,7 +481,7 @@ search_conditions = {
     'inventory_location': inventory_location,
     'purchase_date_from': purchase_date_from,
     'purchase_date_to': purchase_date_to,
-    'sort_column': sort_column,
+    'sort_item_id': sort_item_id,
     'sort_order': sort_order,
     'page': page
 }
@@ -484,8 +501,50 @@ set_search_conditions_cookie('device_inventory', search_conditions)
 
 ソート条件を変更して `GET /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
+**ソート項目マスタ:**
+フロントエンドから送信されるソート項目IDと実際のカラム名のマッピングは、`sort_item_master` テーブルで管理します。セキュリティのため、テーブルに登録された項目IDのみを受け付けます。
+
+**テーブル構造:** `sort_item_master`
+
+| カラム物理名 | カラム論理名 | データ型 | NULL | PK | FK | デフォルト値 | 説明 |
+|------------|------------|---------|------|----|----|-------------|------|
+| view_id | 画面ID | INT | NOT NULL | ○ | - | - | 画面固有のID |
+| sort_item_id | ソート項目ID | INT | NOT NULL | ○ | - | - | ソート項目固有のID |
+| sort_item_name | ソート項目名 | VARCHAR(100) | NOT NULL | - | - | - | ソート項目の内容（カラム名） |
+| sort_order | 表示順序 | INT | NOT NULL | - | - | - | ソート項目リストでの表示順 |
+| delete_flag | 削除フラグ | BOOLEAN | NOT NULL | - | - | FALSE | 論理削除状態：TRUE　その他の場合：FALSE |
+| create_date | 作成日時 | DATETIME | NOT NULL | - | - | CURRENT_TIMESTAMP | レコード作成日時 |
+| update_date | 更新日時 | DATETIME | NULL | - | - | - | レコード更新日時 |
+
+**デバイス台帳管理画面の初期データ（view_id = 7）:**
+
+| view_id | sort_item_id | sort_item_name | sort_order | delete_flag | 説明 |
+|---------|-------------|----------------|-----------|------------|------|
+| 7 | 0 | device_inventory_id | 0 | FALSE | デバイス在庫ID（未選択時のデフォルト） |
+| 7 | 1 | device_uuid | 1 | FALSE | クラウドに登録するデバイスID |
+| 7 | 2 | device_name | 2 | FALSE | デバイス名 |
+| 7 | 3 | device_type_id | 3 | FALSE | デバイス種別 |
+| 7 | 4 | sim_id | 4 | FALSE | SIMID |
+| 7 | 5 | mac_address | 5 | FALSE | MACアドレス |
+| 7 | 6 | inventory_status_id | 6 | FALSE | 在庫状況 |
+| 7 | 7 | purchase_date | 7 | FALSE | 購入日 |
+| 7 | 8 | manufacturer_warranty_end_date | 8 | FALSE | メーカー保証終了日 |
+| 7 | 9 | inventory_location | 9 | FALSE | 在庫場所 |
+
+**注意事項:**
+- `sort_item_id=0`（デバイス在庫ID）は未選択時のデフォルトソート項目
+- 未選択時（sort_item_id=0）はフロントエンドからサーバーへ `sort_item_id=0` を送信する
+- 昇順/降順の情報はテーブルに保持しない
+- 現在のソート状態（昇順/降順）はフロントエンドで管理し、リクエストパラメータ `sort_order` (asc/desc) で送信される
+- 第2ソートキーとして常に `device_inventory_id ASC` を使用し、ページング時の並び順を一定に保つ
+- `device_uuid`・`device_name`・`device_type_id`・`sim_id` は `device_master`、それ以外は `device_inventory_master` のカラムを参照する
+
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_inventory_id&sort_order=desc&page=1
+# デバイス名でソート（昇順） - 項目ID: 2
+GET /admin/device-inventory?sort_item_id=2&sort_order=asc&page=1
+
+# 未選択（デバイス在庫IDデフォルト降順） - 項目ID: 0
+GET /admin/device-inventory?sort_item_id=0&sort_order=desc&page=1
 ```
 
 ---
@@ -509,7 +568,7 @@ GET /admin/device-inventory?device_name=...&sort_column=device_inventory_id&sort
 ページ番号を変更して `GET /admin/device-inventory` へリダイレクト。検索条件とソート条件は保持。
 
 ```
-GET /admin/device-inventory?device_name=...&sort_column=device_inventory_id&sort_order=desc&page=3
+GET /admin/device-inventory?device_name=...&sort_item_id=0&sort_order=desc&page=3
 ```
 
 ---
@@ -903,7 +962,7 @@ flowchart TD
 
     OpenModal -->|削除ボタン押下| StartTx[トランザクション開始]
     StartTx --> DeleteInventory[UPDATE<br>device_inventory_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_uuid IN :uuids]
-    DeleteInventory --> DeleteDevice[UPDATE<br>device_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_id IN<br>対象のdevice_inventory_id]
+    DeleteInventory --> DeleteDevice[UPDATE<br>device_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_id IN<br>(SELECT device_inventory_id<br>FROM device_inventory_master<br>WHERE device_inventory_uuid IN :uuids)]
     DeleteDevice --> Query{DBクエリ結果}
 
     Query -->|0件削除| Error404[404エラーモーダル表示]
@@ -1133,6 +1192,7 @@ def list_device_inventory_master():
 | 9 | user_master | ユーザーマスタ | SELECT | 認証 | 現在ユーザー情報取得 |
 | 10 | organization_master | 組織マスタ | SELECT | 登録、更新 | 組織選択肢取得(結合) |
 | 11 | organization_closure | 組織閉包テーブル | SELECT | 登録、更新 | 組織選択肢取得(結合) |
+| 12 | sort_item_master | ソート項目マスタ | SELECT | 初期表示、検索、ソート | ソート項目の検証とカラム名マッピング（view_id=7） |
 
 ### テーブル結合関係
 
