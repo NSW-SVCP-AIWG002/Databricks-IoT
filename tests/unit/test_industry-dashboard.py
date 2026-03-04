@@ -1168,7 +1168,7 @@ class TestExportSensorDataCsv:
 
         # Assert
         # None は空文字に変換される（ワークフロー仕様書: data.external_temp or ''）
-        assert ",," in csv_text or csv_text  # 空フィールドが含まれること
+        assert ",," in csv_text  # 空フィールドが含まれること
 
     # ------------------------------------------------------------------
     # 3.5.2 エスケープ処理
@@ -1273,7 +1273,6 @@ class TestExportSensorDataCsv:
         # Arrange
         with patch("src.services.industry_dashboard_service.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 27, 12, 0, 0)
-            mock_dt.strptime = datetime.strptime  # strptime は本物を使う
 
             # Act
             response = self._call_export(mocker, sensor_rows=[])
