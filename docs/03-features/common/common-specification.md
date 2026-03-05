@@ -1050,7 +1050,7 @@ db.session.commit()
 
 ### 概要
 
-データベースのマスタテーブルではなく、**設定ファイル（config.py）で管理する項目**を定義します。
+データベースのマスタテーブルではなく、**設定ファイル（constants.py）で管理する項目**を定義します。
 
 **設定ファイル管理の利点:**
 - Pythonコードとして直接参照でき、型安全性が高い
@@ -1061,13 +1061,13 @@ db.session.commit()
 
 **設定ファイル格納場所:**
 ```
-config/
-└── config.py  # アプリケーション設定（全項目統合）
+common/
+└── src/iot_app/common/constants.py    # アプリケーション設定（全項目統合）
 ```
 
 ### 設定ファイル全体構造
 
-`config/config.py` には、以下の全設定項目を統合して管理します。
+`src/iot_app/common/constants.py` には、以下の全設定項目を統合して管理します。
 
 ```python
 # アラート比較演算子
@@ -1099,7 +1099,7 @@ MASTER_DEFAULTS = {
 **Flaskでの読み込み実装例:**
 
 ```python
-from config.config import ALERT_OPERATORS, JUDGMENT_TIMES, PAGINATION, MASTER_DEFAULTS
+from iot_app.common.constants import ALERT_OPERATORS, JUDGMENT_TIMES, PAGINATION, MASTER_DEFAULTS
 ```
 
 ---
