@@ -8,7 +8,6 @@
   - [機能一覧](#機能一覧)
   - [画面一覧](#画面一覧)
   - [データモデル](#データモデル)
-    - [使用テーブル一覧](#使用テーブル一覧)
     - [テーブル定義](#テーブル定義)
       - [dashboard\_master（ダッシュボードマスタ）](#dashboard_masterダッシュボードマスタ)
       - [インデックス](#インデックス)
@@ -20,13 +19,15 @@
       - [インデックス](#インデックス-3)
       - [dashboard\_user\_setting（ダッシュボードユーザー設定）](#dashboard_user_settingダッシュボードユーザー設定)
       - [インデックス](#インデックス-4)
+      - [gold\_summary\_method\_master（集約方法マスタ）](#gold_summary_method_master集約方法マスタ)
+      - [インデックス](#インデックス-5)
   - [Flaskルート一覧](#flaskルート一覧)
   - [アクセス権限](#アクセス権限)
   - [実装ステータス](#実装ステータス)
   - [関連ドキュメント](#関連ドキュメント)
     - [仕様書](#仕様書)
     - [共通仕様](#共通仕様)
-    - [関連機能](#関連機能)
+    - [ガジェット仕様](#ガジェット仕様)
     - [要件定義](#要件定義)
 
 ---
@@ -78,8 +79,6 @@
 ---
 
 ## データモデル
-
-### 使用テーブル一覧
 
 ### テーブル定義
 
@@ -193,6 +192,25 @@
 |---------------|--------|-----|------|
 | PRIMARY | user_id | 主キー | ユーザーの一意識別子 |
 
+#### gold_summary_method_master（集約方法マスタ）
+
+| カラム名 | 論理名 | データ型 | 必須 | 備考 |
+|----------|-------|---------|------|------|
+| summary_method_id | 集計方法ID | INT | ○ | 集約方法の一意識別子（主キー、AutoIncrement） |
+| summary_method_code | 集計方法コード | VARCHAR(20) | ○ | 集約方法コード |
+| summary_method_name | 集計方法名 | VARCHAR(30) | ○ | 集約方法名 |
+| create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザーID |
+| update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
+| modifier | 更新者 | INT | ○ | レコード更新者のユーザーID |
+| delete_flag | 削除フラグ | BOOLEAN | ○ | 論理削除状態（デフォルト: FALSE） |
+
+#### インデックス
+
+| インデックス名 | カラム | 種別 | 目的 |
+|---------------|--------|-----|------|
+| PRIMARY | summary_method_id | 集約方法ID | 集約方法の一意識別子 |
+
 ---
 
 ## Flaskルート一覧
@@ -215,8 +233,8 @@
 | 14 | ダッシュボードグループ削除確認画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認画面表示 | HTML（モーダル） |
 | 15 | ダッシュボードグループ削除実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) |
 | 16 | ガジェット追加画面 | `/customer-dashboard/gadgets/add` | GET | ガジェット追加画面表示 | HTML（モーダル） |
-| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/<gadget_type_id>/create` | GET | ガジェット登録画面表示 | HTML（モーダル） |
-| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/<gadget_type_id>/register` | POST | ガジェット登録処理 | リダイレクト (302) |
+| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録画面表示、ガジェット毎にFlaskルートが異なる | HTML（モーダル） |
+| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理、ガジェット毎にFlaskルートが異なる | リダイレクト (302) |
 | 19 | ガジェットタイトル更新画面 | `/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新画面表示 | HTML（モーダル） |
 | 20 | ガジェットタイトル更新実行 | `/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) |
 | 21 | ガジェット削除確認画面 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認画面表示 | HTML（モーダル） |
@@ -273,14 +291,13 @@
 
 - [UI仕様書](./ui-specification.md) - 画面レイアウト・UI要素・バリデーション
 - [ワークフロー仕様書](./workflow-specification.md) - 処理フロー・API統合・エラーハンドリング
-- [ベストプラクティス](./best-practices.md) - カスタマイズ可能ダッシュボード設計のベストプラクティス
 
 ### 共通仕様
 
-- [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
-- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード等
+- [UI共通仕様書](../../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
+- [共通仕様書](../../../common/common-specification.md) - HTTPステータスコード、エラーコード等
 
-### 関連機能
+### ガジェット仕様
 
 - [業種別ダッシュボード](../industry-dashboard/) - 業種別ダッシュボード機能
 - [デバイス管理](../devices/) - デバイス情報の管理
