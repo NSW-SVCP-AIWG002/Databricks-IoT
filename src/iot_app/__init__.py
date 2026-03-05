@@ -22,4 +22,9 @@ def create_app():
     def health():
         return jsonify(status='ok'), 200
 
+    # 開発環境専用 Blueprint
+    if config_name == "development":
+        from iot_app.views.dev import dev_bp
+        app.register_blueprint(dev_bp)
+
     return app
