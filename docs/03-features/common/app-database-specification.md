@@ -37,6 +37,7 @@
     - [25. ダッシュボードガジェットマスタ (dashboard\_gadget\_master)](#25-ダッシュボードガジェットマスタ-dashboard_gadget_master)
     - [26. ガジェット種別マスタ (gadget\_type\_master)](#26-ガジェット種別マスタ-gadget_type_master)
     - [27. ダッシュボードユーザー設定 (dashboard\_user\_setting)](#27-ダッシュボードユーザー設定-dashboard_user_setting)
+    - [28. サマリー計算手法マスタ（gold\_summary\_method\_master）](#28-サマリー計算手法マスタgold_summary_method_master)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -131,7 +132,7 @@
 | 25  | dashboard_gadget_master  | ダッシュボードガジェットマスタ | ガジェットを管理                                                             |
 | 26  | gadget_type_master       | ガジェット種別マスタ          | ガジェット種別を管理                                                         |
 | 27  | dashboard_user_setting   | ダッシュボードユーザー設定     | ダッシュボードのユーザー固有設定を管理                                        |
-
+| 27  | gold_summary_method_master | サマリー計算手法マスタ      | サマリ作成時の計算手法を管理                                                  |
 
 ---
 
@@ -498,15 +499,18 @@
 
 **概要**: 測定項目を管理するマスタテーブル
 
-| #   | カラム物理名          | カラム論理名 | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                           |
-| --- | --------------------- | ------------ | ----------- | -------- | --- | --- | ----------------- | ---------------------------------------------- |
-| 1   | measurement_item_id   | 測定項目ID   | INT         | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、測定項目の一意識別子                 |
-| 2   | measurement_item_name | 測定項目名   | VARCHAR(50) | NOT NULL | -   | -   | -                 | センサーで読み取る、機器に関する測定項目の名前 |
-| 3   | create_date           | 作成日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
-| 4   | creator               | 作成者       | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                       |
-| 5   | update_date           | 更新日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                           |
-| 6   | modifier              | 更新者       | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                       |
-| 7   | delete_flag           | 削除フラグ   | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE        |
+| #   | カラム物理名             | カラム論理名          | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                                    |
+| --- | ----------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | ----------------------------------------------------- |
+| 1   | measurement_item_id     | 測定項目ID            | INT         | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、測定項目の一意識別子                           |
+| 2   | measurement_item_name   | 測定項目名            | VARCHAR(50) | NOT NULL | -   | -   | -                 | センサーで読み取る、機器に関する測定項目の名前             |
+| 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名       |
+| 4   | display_name            | 表示名               | VARCHAR(50) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する名前 |
+| 5   | unit_name               | 単位                 | VARCHAR(10) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する単位 |
+| 6   | create_date             | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                         |
+| 7   | creator                 | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                  |
+| 8   | update_date             | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                      |
+| 9   | modifier                | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                  |
+| 10  | delete_flag             | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                    |
 
 **インデックス:**
 - PRIMARY KEY: `measurement_item_id`
@@ -934,6 +938,29 @@
 
 **ビジネスルール:**
 - ダッシュボード設定はユーザーに紐づく
+
+---
+
+### 28. サマリー計算手法マスタ（gold_summary_method_master）
+
+**概要**: UnityCatalogのゴールドデータ作成時にどの計算手法にのっとって作成されたものかを表現するマスタ
+
+| #   | カラム物理名        | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                           |
+| --- | ------------------- | -------------- | ----------- | -------- | --- | --- | ----------------- | ---------------------------------------------- |
+| 1   | summary_method_id   | 集約方法ID     | INT         | NOT NULL | 〇  | -   | -                 |  システム内での一意識別子                       |
+| 2   | summary_method_code | 集約方法コード | VARCHAR(20) | NOT NULL | -   | -   | -                 | 集約方法をコードで表現したもの（MAX、MINなど） |
+| 3   | summary_method_name | 集約方法名     | VARCHAR(30) | NOT NULL | -   | -   | -                 | 集約方法名（最大値、最小値など）               |
+| 4   | create_date         | 作成日時       | DATETIME   | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
+| 5   | creator             | 作成者        | INT         | NOT NULL | -   | -   | -                 | レコード作成ユーザのユーザID                   |
+| 6   | update_date         | 更新日時       | DATETIME   | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                               |
+| 7   | modifier             | 更新者        | INT         | NOT NULL | -   | -   | -                 | レコード更新ユーザのユーザID                   |
+| 8   | delete_flag         | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | -                 | 論理削除時使用                                 |
+
+**インデックス:**
+- PRIMARY KEY: `summary_method_id`
+
+**ビジネスルール:**
+- Webアプリケーションの管理画面上で操作不可のマスタ
 
 ---
 

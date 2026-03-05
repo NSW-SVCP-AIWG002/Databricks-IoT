@@ -83,57 +83,43 @@
       - [エラーハンドリング](#エラーハンドリング-9)
       - [ログ出力タイミング](#ログ出力タイミング-9)
     - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+    - [ガジェット登録](#ガジェット登録)
+    - [ガジェットタイトル更新](#ガジェットタイトル更新)
       - [処理フロー](#処理フロー-10)
       - [バリデーション](#バリデーション-5)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-10)
-      - [エラーハンドリング](#エラーハンドリング-10)
-    - [ガジェット登録](#ガジェット登録)
-      - [処理詳細](#処理詳細)
-    - [ガジェットタイトル更新](#ガジェットタイトル更新)
-      - [処理フロー](#処理フロー-11)
-      - [バリデーション](#バリデーション-6)
-      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-11)
       - [表示メッセージ](#表示メッセージ-9)
-      - [エラーハンドリング](#エラーハンドリング-11)
+      - [エラーハンドリング](#エラーハンドリング-10)
       - [ログ出力タイミング](#ログ出力タイミング-10)
     - [ガジェット削除](#ガジェット削除)
-      - [処理フロー](#処理フロー-12)
-      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-12)
+      - [処理フロー](#処理フロー-11)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-11)
       - [表示メッセージ](#表示メッセージ-10)
-      - [エラーハンドリング](#エラーハンドリング-12)
+      - [エラーハンドリング](#エラーハンドリング-11)
       - [ログ出力タイミング](#ログ出力タイミング-11)
     - [ガジェットデータ取得](#ガジェットデータ取得)
-      - [処理フロー](#処理フロー-13)
-      - [Flaskルート](#flaskルート-3)
-      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-13)
-      - [エラーハンドリング](#エラーハンドリング-13)
-      - [ログ出力タイミング](#ログ出力タイミング-12)
     - [レイアウト保存](#レイアウト保存)
-      - [処理フロー](#処理フロー-14)
-      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-14)
+      - [処理フロー](#処理フロー-12)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-12)
       - [表示メッセージ](#表示メッセージ-11)
-      - [エラーハンドリング](#エラーハンドリング-14)
-      - [ログ出力タイミング](#ログ出力タイミング-13)
+      - [エラーハンドリング](#エラーハンドリング-12)
+      - [ログ出力タイミング](#ログ出力タイミング-12)
     - [日時設定ボタン](#日時設定ボタン)
-      - [処理フロー](#処理フロー-15)
-      - [処理詳細](#処理詳細-1)
-      - [エラーハンドリング](#エラーハンドリング-15)
+      - [処理フロー](#処理フロー-13)
+      - [処理詳細](#処理詳細)
+      - [エラーハンドリング](#エラーハンドリング-13)
     - [日時初期化](#日時初期化)
-      - [処理フロー](#処理フロー-16)
-      - [処理詳細](#処理詳細-2)
+      - [処理フロー](#処理フロー-14)
+      - [処理詳細](#処理詳細-1)
     - [自動更新](#自動更新)
-      - [処理フロー](#処理フロー-17)
-      - [処理詳細](#処理詳細-3)
+      - [処理フロー](#処理フロー-15)
+      - [処理詳細](#処理詳細-2)
     - [データソース選択](#データソース選択)
-      - [処理フロー](#処理フロー-18)
-      - [処理詳細](#処理詳細-4)
+      - [処理フロー](#処理フロー-16)
+      - [処理詳細](#処理詳細-3)
     - [CSVエクスポート](#csvエクスポート)
-      - [処理フロー](#処理フロー-19)
-      - [Flaskルート](#flaskルート-4)
-      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-15)
-      - [エラーハンドリング](#エラーハンドリング-16)
     - [展開・縮小操作](#展開縮小操作)
-      - [処理詳細](#処理詳細-5)
+      - [処理詳細](#処理詳細-4)
   - [使用データベース詳細](#使用データベース詳細)
     - [使用テーブル一覧](#使用テーブル一覧)
   - [トランザクション管理](#トランザクション管理)
@@ -191,8 +177,8 @@
 | 14 | ダッシュボードグループ削除確認画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認モーダル表示 | HTML（モーダル） | - |
 | 15 | ダッシュボードグループ削除実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
 | 16 | ガジェット追加画面 | `/customer-dashboard/gadgets/add` | GET | ガジェット追加モーダル表示 | HTML（モーダル） | - |
-| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/<gadget_type_id>/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/<gadget_type_id>/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
+| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/customer-dashboard/gadgets/bar-chart/create`） |
+| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard`、ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/customer-dashboard/gadgets/bar-chart/register`） |
 | 19 | ガジェットタイトル更新画面 | `/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新モーダル表示 | HTML（モーダル） | - |
 | 20 | ガジェットタイトル更新実行 | `/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
 | 21 | ガジェット削除確認画面 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認モーダル表示 | HTML（モーダル） | - |
@@ -243,7 +229,7 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 登録画面ボタン押下 | ボタンクリック | `GET /customer-dashboard/gadgets/<gadget_type_id>/create` | `gadget_type_id` | HTML（モーダル） | エラーモーダル表示 |
+| 登録画面ボタン押下 | ボタンクリック | `GET /customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 登録・更新モーダル
@@ -1826,93 +1812,25 @@ DBクエリ実行の直前、直後に操作ログを出力する
 - ガジェット追加モーダルが表示されている
 - ガジェット種別が選択されている
 
-#### 処理フロー
+詳細はガジェット個別仕様書の`ガジェット登録モーダル表示`を参照してください。
 
-```mermaid
-flowchart TD
-    Start([登録画面ボタンクリック]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
-
-    CheckAuth -->|認証OK| Validate[バリデーション<br>ガジェット種別]
-    Validate --> CheckValidate{バリデーションOK?}
-    CheckValidate -->|NG| Error400[400エラーモーダル表示]
-
-    CheckValidate -->|OK| Template[ガジェット登録モーダル表示<br>ガジェット種別毎に異なるモーダルを表示]
-    Template --> Response[HTMLレスポンス返却]
-
-    LoginRedirect --> End([処理完了])
-    Response --> End
-    Error400 --> End
-```
-
-#### バリデーション
-
-**実行タイミング:** 登録画面ボタン押下時
-
-**バリデーションルール:**
-
-| 項目 | ルール | エラーメッセージ |
-|------|--------|-----------------|
-| ガジェット種別 | 必須 | ガジェットを選択してください |
-
-#### 処理詳細（サーバーサイド）
-
-**実装例:**
-```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<int:gadget_type_id>/create', methods=['GET'])
-@require_auth
-def gadget_create(gadget_type_id):
-    """ガジェット登録モーダル表示"""
-    # ガジェット種別の存在チェック（バリデーション）
-    gadget_type = db.session.query(GadgetTypeMaster).filter(
-        GadgetTypeMaster.gadget_type_id == gadget_type_id,
-        GadgetTypeMaster.delete_flag == False
-    ).first()
-
-    if not gadget_type:
-        return render_template(
-            'customer_dashboard/modals/gadget_add.html',
-            error='ガジェットを選択してください'
-        ), 400
-
-    # ガジェット種別毎のフォームを生成
-    form = get_gadget_form_by_type(gadget_type_id)
-
-    # ガジェット種別毎に異なるモーダルテンプレートを表示
-    template_name = get_gadget_template_name(gadget_type_id)
-
-    return render_template(
-        f'customer_dashboard/modals/gadget_register/{template_name}.html',
-        form=form,
-        gadget_type=gadget_type
-    )
-```
-
-#### エラーハンドリング
-
-| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
-|--------------|-----------|---------|---------|
-| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
+- **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
+- **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
+- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
+- **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
 ---
 
 ### ガジェット登録
 
-**トリガー:** ガジェット登録モーダルの登録ボタンクリック
+詳細はガジェット個別仕様書の`ガジェット登録`を参照してください。
 
-#### 処理詳細
-
-詳細は以下のガジェット個別設計書を参照
-
-- **棒グラフ:** [URL]
-- **円グラフ:** [URL]
-- **帯グラフ:** [URL]
-- **時系列グラフ:** [URL]
-- **表グラフ:** [URL]
-
-**注:** 上記以外のガジェットに関しては本スコープでは対象外
+- **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
+- **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
+- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
+- **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
 ---
 
@@ -2144,132 +2062,13 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ### ガジェットデータ取得
 
-**トリガー:** 画面初期表示時 / 日時初期化ボタンクリック時 / 自動更新時（60秒間隔）
+詳細はガジェット個別仕様書の`ガジェットデータ取得`を参照してください。
 
-**前提条件:**
-- ガジェットが表示されている
-- データソース設定が存在する
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ガジェットデータ取得リクエスト<br>AJAX]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| Error401[401エラーレスポンス]
-
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>ガジェットのデータソースが<br>アクセス可能な組織に属するか確認]
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーレスポンス]
-
-    CheckScope -->|スコープOK| GetConfig[ガジェット設定取得<br>DB dashboard_gadget_master]
-    GetConfig --> SensorQuery[センサーデータ取得<br>Unity Catalog sensor_data_view]
-    SensorQuery --> CheckQuery{クエリ結果}
-    CheckQuery -->|失敗| Error500[500エラーレスポンス]
-    CheckQuery -->|成功| FormatData[ECharts用データフォーマット変換]
-    FormatData --> Response[JSONレスポンス返却]
-
-    Error401 --> End([処理完了])
-    Error404 --> End
-    Response --> End
-    Error500 --> End
-```
-
-#### Flaskルート
-
-| ルート | エンドポイント | 詳細 |
-|-------|---------------|------|
-| ガジェットデータ取得 | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` |
-
-#### 処理詳細（サーバーサイド）
-
-**① ガジェット設定取得**
-
-**使用テーブル:** dashboard_gadget_master
-
-**SQL詳細:**
-```sql
-SELECT
-  gadget_id,
-  gadget_type_id,
-  chart_config,
-  data_source_config
-FROM
-  dashboard_gadget_master
-WHERE
-  gadget_uuid = :gadget_uuid
-  AND delete_flag = FALSE
-```
-
-**② センサーデータ取得**
-
-**使用テーブル:** Unity Catalogのシルバーデータまたはゴールドデータ（ガジェットの日時設定によって参照先が異なる）
-
-**SQL詳細（シルバーデータの場合）:**
-```sql
-SELECT
-  *
-FROM
-  iot_catalog.views.sensor_data_view
-WHERE
-  device_id = :device_id
-  AND event_timestamp BETWEEN :start_datetime AND :end_datetime
-ORDER BY
-  event_timestamp ASC
-```
-
-**実装例:**
-```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-@require_auth
-def gadget_data(gadget_uuid):
-    """ガジェットデータ取得（AJAX）"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # ガジェット設定取得
-    gadget = get_gadget_by_id(gadget_uuid)
-    if not gadget:
-        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
-
-    # データスコープ制限チェック
-    data_source_config = json.loads(gadget.data_source_config)
-    if not check_data_source_access(data_source_config, accessible_org_ids):
-        return jsonify({'error': 'アクセス権限がありません'}), 404
-
-    try:
-        # ユーザー設定から選択中組織IDと選択中デバイスIDを取得
-        user_setting = get_dashboard_user_setting(g.current_user.user_id)
-        organization_id = user_setting.organization_id
-        device_id = user_setting.device_id
-
-        # センサーデータ取得
-        sensor_data = get_sensor_data_for_gadget(gadget, organization_id, device_id)
-
-        # ECharts用データフォーマット変換
-        chart_data = format_chart_data(gadget, sensor_data)
-
-        return jsonify({
-            'gadget_uuid': gadget_uuid,
-            'chart_data': chart_data,
-            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-        })
-
-    except Exception as e:
-        logger.error(f'ガジェットデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
-        return jsonify({'error': 'データの取得に失敗しました'}), 500
-```
-
-#### エラーハンドリング
-
-| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
-|--------------|-----------|---------|---------|
-| 401 | 認証エラー | 401エラーレスポンス | - |
-| 404 | リソース不存在 | 404エラーレスポンス | 指定されたガジェットが見つかりません |
-| 500 | データベースエラー | 500エラーレスポンス | データの取得に失敗しました |
-
-#### ログ出力タイミング
-
-DBクエリ実行の直前、直後に操作ログを出力する
+- **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
+- **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
+- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
+- **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
 ---
 
@@ -2573,89 +2372,13 @@ ORDER BY
 
 ### CSVエクスポート
 
-**トリガー:** (8.4) CSVエクスポートボタンクリック
+詳細はガジェット個別仕様書の`CSVエクスポート`を参照してください。
 
-**前提条件:**
-- ガジェットが表示されている
-- データが存在する
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([CSVエクスポートボタンクリック]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
-
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック]
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
-
-    CheckScope -->|スコープOK| GetConfig[ガジェット設定取得]
-    GetConfig --> SensorQuery[センサーデータ取得<br>Unity Catalog sensor_data_view]
-    SensorQuery --> CheckQuery{クエリ結果}
-    CheckQuery -->|失敗| Error500[500エラーページ表示]
-    CheckQuery -->|成功| FormatCSV[CSVフォーマット変換]
-    FormatCSV --> Response[CSVダウンロードレスポンス]
-
-    LoginRedirect --> End([処理完了])
-    Error404 --> End
-    Response --> End
-    Error500 --> End
-```
-
-#### Flaskルート
-
-| ルート | エンドポイント | 詳細 |
-|-------|---------------|------|
-| CSVエクスポート | `GET /customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` |
-
-#### 処理詳細（サーバーサイド）
-
-**実装例:**
-```python
-def export_gadget_csv(gadget, accessible_org_ids):
-    """ガジェットデータCSVエクスポート"""
-    import csv
-    from io import StringIO
-
-    # ガジェット設定からデータソースを取得
-    data_source_config = json.loads(gadget.data_source_config)
-
-    # センサーデータ取得
-    sensor_data_list = get_sensor_data_for_csv(gadget, data_source_config)
-
-    # CSV形式で出力
-    si = StringIO()
-    writer = csv.writer(si)
-
-    # ヘッダー行（ガジェット種別に応じて動的に生成）
-    headers = get_csv_headers(gadget.gadget_type_id)
-    writer.writerow(headers)
-
-    # データ行
-    for data in sensor_data_list:
-        row = format_csv_row(data, gadget.gadget_type_id)
-        writer.writerow(row)
-
-    # レスポンス作成
-    output = make_response(si.getvalue())
-    device_uuid = data_source_config.get('device_uuid', 'unknown')
-    chart_name = gadget.gadget_name
-    filename = f"{chart_name}_{device_uuid}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
-    output.headers["Content-Disposition"] = f"attachment; filename={filename}"
-    output.headers["Content-type"] = "text/csv; charset=utf-8-sig"
-
-    return output
-```
-
-#### エラーハンドリング
-
-| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
-|--------------|-----------|---------|---------|
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたガジェットが見つかりません |
-| 500 | データベースエラー | 500エラーページ表示 | CSVエクスポートに失敗しました |
+- **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
+- **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
+- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
+- **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
 ---
 
