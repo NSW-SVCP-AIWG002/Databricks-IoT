@@ -238,7 +238,9 @@ src/
     │   ├── mail_setting_service.py  # メール通知設定CRUD
     │   ├── alert_history_service.py # アラート履歴参照
     │   ├── mail_history_service.py  # メール通知履歴参照
-    │   ├── dashboard_service.py   # ダッシュボードデータ取得（Unity Catalog経由）
+    │   ├── industry_dashboard_service.py # 店舗モニタリングデータ取得（Unity Catalog経由）
+    │   ├── customer_dashboard_service.py # 顧客作成ダッシュボードデータ取得（Unity Catalog経由）
+    │   ├── chat_service.py               # AIチャット処理
     │   └── csv_service.py         # CSVインポート・エクスポート共通処理
     │
     ├── views/                     # Blueprint定義（ルーティング・リクエスト/レスポンス制御）
@@ -257,9 +259,11 @@ src/
     │   │   ├── __init__.py
     │   │   ├── mail_settings.py   # /notice/mail-settings/* メール通知設定ルーティング
     │   │   └── mail_history.py    # /notice/mail-history/* メール通知履歴ルーティング
-    │   ├── dashboard/             # ダッシュボード Blueprint（DSH-001）
-    │   │   ├── __init__.py
-    │   │   └── views.py           # /, /dashboard ダッシュボード表示ルーティング
+    │   ├── analysis/              # 分析機能 Blueprint（ANL-001〜003）
+    │   │   ├── __init__.py        # Blueprint登録
+    │   │   ├── industry_dashboard.py  # /analysis/industry-dashboard/* 店舗モニタリング ルーティング
+    │   │   ├── customer_dashboard.py  # /analysis/customer-dashboard 顧客作成ダッシュボード ルーティング
+    │   │   └── chat.py                # /analysis/chat AIチャット ルーティング
     │   ├── account/               # アカウント Blueprint（ACC-001〜002）
     │   │   ├── __init__.py
     │   │   └── views.py           # /account/* 言語設定・ユーザ情報参照ルーティング
@@ -293,7 +297,10 @@ src/
     │   ├── notice/
     │   │   ├── mail_settings/     # メール通知設定テンプレート
     │   │   └── mail_history/      # メール通知履歴テンプレート
-    │   ├── dashboard/             # ダッシュボードテンプレート
+    │   ├── analysis/
+    │   │   ├── industry_dashboard/    # 店舗モニタリングテンプレート
+    │   │   ├── customer_dashboard/    # 顧客作成ダッシュボードテンプレート
+    │   │   └── chat/                  # AIチャットテンプレート
     │   ├── account/               # アカウントテンプレート
     │   └── transfer/              # CSVインポートテンプレート
     │
@@ -312,7 +319,7 @@ src/
         │       ├── modal.css
         │       ├── sort.css
         │       └── spinner.css
-        ├── images/                # アイコン等の画像
+        ├── icons/                 # SVGアイコン（Material Icons、インラインSVG用）
         └── js/
             ├── main.js            # グローバルJS（検索条件のsessionStorage保持等）
             └── components/        # コンポーネント別JS
@@ -355,7 +362,9 @@ tests/
 │   │   ├── test_device_stock_service.py
 │   │   ├── test_mail_setting_service.py
 │   │   ├── test_mail_history_service.py
-│   │   ├── test_dashboard_service.py
+│   │   ├── test_industry_dashboard_service.py
+│   │   ├── test_customer_dashboard_service.py
+│   │   ├── test_chat_service.py
 │   │   └── test_csv_service.py
 │   ├── models/                          # src/models/と1:1対応
 │   │   ├── test_device.py
@@ -382,7 +391,9 @@ tests/
 │   ├── test_alert_history_routes.py
 │   ├── test_mail_setting_routes.py
 │   ├── test_mail_history_routes.py
-│   ├── test_dashboard_routes.py
+│   ├── test_industry_dashboard_routes.py
+│   ├── test_customer_dashboard_routes.py
+│   ├── test_chat_routes.py
 │   ├── test_account_routes.py
 │   ├── test_transfer_routes.py
 │   └── test_auth_routes.py
