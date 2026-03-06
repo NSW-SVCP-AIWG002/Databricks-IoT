@@ -884,7 +884,7 @@ class TestGetLatestSensorData:
         mock_cursor.execute.assert_called_once()
         call_args = mock_cursor.execute.call_args
         assert any(
-            42 in str(arg) or 42 in (arg if isinstance(arg, (list, tuple, dict)) else [])
+            str(42) in str(arg) or 42 in (arg if isinstance(arg, (list, tuple, dict)) else [])
             for arg in call_args.args + tuple(call_args.kwargs.values())
         )
 
