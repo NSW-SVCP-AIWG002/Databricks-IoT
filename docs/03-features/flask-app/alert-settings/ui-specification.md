@@ -338,7 +338,7 @@
 | (2.4) | アラートレベル | alert_level_name | Select | I/O | - | - | - | DB: alert_level_master.alert_level_name | ドロップダウン |
 | (2.5) | アラート通知 | alert_notification_flag | Select | I/O | - | - | - | - | ドロップダウン |
 | (2.6) | メール送信 | alert_email_flag | Select | I/O | - | - | - | - | ドロップダウン |
-| (2.7) | ソート項目 | sort_item | Select | I/O | - | - | - | - | ドロップダウン |
+| (2.7) | ソート項目 | sort_item_id | Select | I/O | - | - | - | DB: sort_item_master.sort_item_name | ドロップダウン |
 | (2.8) | ソート順 | sort_order | Select | I/O | - | - | - | - | ドロップダウン |
 | (2.9) | 検索ボタン | search_button | Button | I | - | - | - | 固定値: 「検索」 | プライマリボタン、中央揃え |
 ||
@@ -482,17 +482,7 @@
 **2.7: ソート項目ドロップダウン**
 - 概要: 一覧のソート対象項目を選択
 - ラベル: 「ソート項目」
-- 選択肢:
-  - 未選択
-  - アラート名
-  - 組織名
-  - デバイス名
-  - アラート発生条件
-  - アラート復旧条件
-  - 判定時間
-  - アラートレベル
-  - アラート通知
-  - メール送信
+- 選択肢: sort_item_masterテーブルから取得（「未選択」を先頭に追加）
 - デフォルト: 未選択
 
 **2.8: ソート順ドロップダウン**

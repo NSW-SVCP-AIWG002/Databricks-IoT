@@ -43,7 +43,7 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | アラート設定一覧表示 | `/alert/alert-setting` | GET | アラート設定一覧・検索 | HTML | ページング・検索対応。デバイス・測定項目・アラートレベル名はDBから取得。検索条件用に組織マスタ・アラートレベルマスタも取得 |
+| 1 | アラート設定一覧表示 | `/alert/alert-setting` | GET | アラート設定一覧・検索 | HTML | ページング・検索対応。デバイス・測定項目・アラートレベル名はDBから取得。検索条件用に組織マスタ・アラートレベルマスタ・ソート項目マスタも取得 |
 | 2 | アラート設定登録フォーム表示 | `/alert/alert-setting/create` | GET | 登録フォーム表示 | HTML | デバイス・測定項目・アラートレベルはDBから、比較演算子・判定時間は設定ファイルから取得 |
 | 3 | アラート設定登録実行 | `/alert/alert-setting/create` | POST | アラート設定登録処理 | リダイレクト (302) | 成功時: 一覧へ、失敗時: フォーム再表示 |
 | 4 | アラート設定更新フォーム表示 | `/alert/alert-setting/<alert_uuid>/edit` | GET | 更新フォーム表示 | HTML | 現在の設定値を表示。デバイス・測定項目・アラートレベルはDBから、比較演算子・判定時間は設定ファイルから取得 |
@@ -85,9 +85,9 @@ flowchart TD
 
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> InitParams[検索条件にデフォルト値を<br>入力]
-    InitParams --> GetMaster[検索条件用マスタデータ取得<br>organization_master<br>alert_level_master<br>データスコープ制限適用]
+    InitParams --> GetMaster[検索条件用マスタデータ取得<br>organization_master<br>alert_level_master<br>sort_item_master<br>データスコープ制限適用]
 
-    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie]
+    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie<br>sort_item_idを含む]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
     OverridePage --> GetMaster
 
@@ -120,7 +120,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| アラート設定一覧表示 | `GET /alert/alert-setting` | クエリパラメータ:`page`。デバイス・測定項目・アラートレベル名をDBから取得。検索条件用に組織マスタ・アラートレベルマスタも取得 |
+| アラート設定一覧表示 | `GET /alert/alert-setting` | クエリパラメータ:`page`。デバイス・測定項目・アラートレベル名をDBから取得。検索条件用に組織マスタ・アラートレベルマスタ・ソート項目マスタも取得 |
 
 #### バリデーション
 
@@ -163,8 +163,8 @@ if 'page' in request.args:
     alert_email_flag = conditions.get('alert_email_flag', 'すべて')
     page = request.args.get('page', 1, type=int)  # クエリパラメータから取得
     per_page = conditions.get('per_page', 25)
-    sort_by = conditions.get('sort_by', 'alert_id')
-    order = conditions.get('order', 'asc')
+    sort_item_id = conditions.get('sort_item_id', 0)  # sort_item_master の sort_item_id（0=alert_id）
+    sort_order = conditions.get('sort_order', 'asc')  # asc / desc（デフォルト: asc）
 else:
     # 初期表示時: デフォルト値を使用
     alert_name = ''
@@ -175,14 +175,18 @@ else:
     alert_email_flag = 'すべて'
     page = 1
     per_page = 25
-    sort_by = 'alert_id'
-    order = 'asc'
+    sort_item_id = 0       # デフォルト: アラートID（sort_item_master.sort_item_id = 0）
+    sort_order = 'asc'     # デフォルト: 昇順
+
+# ソート順の検証（許可値: asc, desc のみ、不正値はデフォルト昇順）
+if sort_order not in ['asc', 'desc']:
+    sort_order = 'asc'
 ```
 
 **③ 検索条件用マスタデータ取得**
 
 ```python
-from models import organization_master, organization_closure, alert_level_master
+from models import organization_master, organization_closure, alert_level_master, sort_item_master
 
 # 組織マスタ取得（データスコープ制限適用）
 organizations = (
@@ -201,6 +205,15 @@ alert_levels = (
     alert_level_master.query
     .filter(alert_level_master.delete_flag == False)
     .order_by(alert_level_master.alert_level_id)
+    .all()
+)
+
+# ソート項目マスタ取得（view_id = 6: アラート設定一覧画面）
+sort_items = (
+    sort_item_master.query
+    .filter(sort_item_master.view_id == 6)
+    .filter(sort_item_master.delete_flag == False)
+    .order_by(sort_item_master.sort_order)
     .all()
 )
 ```
@@ -234,11 +247,56 @@ query = query.join(organization_closure, organization_master.organization_id == 
 query = query.join(user_master, organization_closure.parent_organization_id == user_master.organization_id)
 query = query.filter(user_master.email_address == current_user.email_address)
 
-# ソート
-query = query.order_by(
-    getattr(alert_setting_master, sort_by).asc() if(order == 'asc' or order == 'not_selected')
-    else getattr(alert_setting_master, sort_by).desc()
-)
+# ソート項目IDをカラム名にマッピング（sort_item_master テーブルで検証）
+# view_id = 6（アラート設定一覧画面）, sort_item_id = sort_item_id, delete_flag = FALSE で検索
+# 取得した sort_item_name をソートキーとして使用（sort_item_id=0 は alert_id）
+sort_by = None
+sort_item = sort_item_master.query.filter_by(
+    view_id=6,
+    sort_item_id=sort_item_id,
+    delete_flag=False
+).first()
+if sort_item:
+    sort_by = sort_item.sort_item_name
+
+# ソート適用
+# sort_item_name に応じてソートカラムを決定（クロステーブル対応）
+SORT_COLUMN_MAP = {
+    'alert_id':                                      alert_setting_master.alert_id,
+    'alert_name':                                    alert_setting_master.alert_name,
+    'organization_name':                             organization_master.organization_name,
+    'device_name':                                   device_master.device_name,
+    'alert_conditions_measurement_item_id':          measurement_item_occur.measurement_item_id,
+    'alert_recovery_conditions_measurement_item_id': measurement_item_recovery.measurement_item_id,
+    'judgment_time':                                 alert_setting_master.judgment_time,
+    'alert_level_id':                                alert_setting_master.alert_level_id,
+    'alert_notification_flag':                       alert_setting_master.alert_notification_flag,
+    'alert_email_flag':                              alert_setting_master.alert_email_flag,
+}
+
+if sort_by:
+    sort_column = SORT_COLUMN_MAP.get(sort_by)
+    if sort_column is not None:
+        if sort_by == 'alert_id':
+            # alert_id は一意なため第2ソートキー不要
+            query = query.order_by(
+                sort_column.asc() if sort_order == 'asc' else sort_column.desc()
+            )
+        else:
+            query = query.order_by(
+                sort_column.asc() if sort_order == 'asc' else sort_column.desc(),
+                alert_setting_master.alert_id.asc()  # 第2ソートキー
+            )
+    else:
+        # sort_item_name がマップに存在しない場合は alert_id にフォールバック
+        query = query.order_by(
+            alert_setting_master.alert_id.asc() if sort_order == 'asc' else alert_setting_master.alert_id.desc()
+        )
+else:
+    # sort_item_id が sort_item_master に存在しない場合（異常系）: alert_id でフォールバック
+    query = query.order_by(
+        alert_setting_master.alert_id.asc() if sort_order == 'asc' else alert_setting_master.alert_id.desc()
+    )
 
 # ページング
 offset = (page - 1) * per_page
@@ -258,10 +316,11 @@ return render_template('alert_settings/list.html',
                       total=total,
                       page=page,
                       per_page=per_page,
-                      sort_by=sort_by,
-                      order=order,
-                      organizations=organizations,  # 組織マスタ（検索条件用）
-                      alert_levels=alert_levels)    # アラートレベルマスタ（検索条件用）
+                      sort_item_id=sort_item_id,             # 選択中のソート項目ID（デフォルト: 0=アラートID）
+                      sort_order=sort_order,       # 選択中のソート順（デフォルト: asc）
+                      organizations=organizations, # 組織マスタ（検索条件用）
+                      alert_levels=alert_levels,   # アラートレベルマスタ（検索条件用）
+                      sort_items=sort_items)        # ソート項目マスタ（検索条件用）
 ```
 
 #### エラーハンドリング
@@ -321,7 +380,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| アラート設定一覧表示（検索） | `GET /alert/alert-setting` | クエリパラメータ: `alert_name`, `organization_name`, `device_name`, `alert_level_id`, `alert_notification_flag`, `alert_email_flag`, `page`, `per_page`, `sort_by`, `order`。デバイス・測定項目・アラートレベル名をDBから取得 |
+| アラート設定一覧表示（検索） | `GET /alert/alert-setting` | クエリパラメータ: `alert_name`, `organization_name`, `device_name`, `alert_level_id`, `alert_notification_flag`, `alert_email_flag`, `page`, `per_page`, `sort_item_id`, `sort_order`。デバイス・測定項目・アラートレベル名をDBから取得 |
 
 #### バリデーション
 
@@ -395,8 +454,44 @@ if request.args.get('alert_email_flag') == '1':
 ソート条件を変更して `GET /alert/alert-setting` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
 ```
-GET /alert/alert-setting?alert_name=...&sort_column=alert_name&sort_order=desc&page=1
+GET /alert/alert-setting?alert_name=...&sort_item_id=1&sort_order=asc&page=1
 ```
+
+**ソート項目マスタ:**
+フロントエンドから送信されるソート項目IDと実際のカラム名のマッピングは、`sort_item_master` テーブルで管理します。セキュリティのため、テーブルに登録された項目IDのみを受け付けます（ホワイトリスト方式）。
+
+**テーブル構造:** `sort_item_master`
+
+| カラム物理名 | カラム論理名 | データ型 | NULL | PK | デフォルト値 | 説明 |
+|------------|------------|---------|------|----|-----------|----|
+| view_id | 画面ID | INT | NOT NULL | ○ | - | 画面固有のID |
+| sort_item_id | ソート項目ID | INT | NOT NULL | ○ | - | ソート項目固有のID |
+| sort_item_name | ソート項目名 | VARCHAR(100) | NOT NULL | - | - | ソートに使用するDBカラム名 |
+| sort_order | 表示順序 | INT | NOT NULL | - | - | ドロップダウンでの表示順 |
+| delete_flag | 削除フラグ | BOOLEAN | NOT NULL | - | FALSE | 論理削除 |
+
+**アラート設定一覧画面の初期データ（view_id = 6）:**
+
+| view_id | sort_item_id | sort_item_name | sort_order | delete_flag | 説明 |
+|---------|-------------|----------------|-----------|------------|------|
+| 6 | 0 | alert_id | 0 | FALSE | アラートID（デフォルトソート・「未選択」時に使用） |
+| 6 | 1 | alert_name | 1 | FALSE | アラート名（alert_setting_master.alert_name） |
+| 6 | 2 | organization_name | 2 | FALSE | 組織名（organization_master.organization_name） |
+| 6 | 3 | device_name | 3 | FALSE | デバイス名（device_master.device_name） |
+| 6 | 4 | alert_conditions_measurement_item_id | 4 | FALSE | アラート発生条件（測定項目IDでソート） |
+| 6 | 5 | alert_recovery_conditions_measurement_item_id | 5 | FALSE | アラート復旧条件（測定項目IDでソート） |
+| 6 | 6 | judgment_time | 6 | FALSE | 判定時間（alert_setting_master.judgment_time） |
+| 6 | 7 | alert_level_id | 7 | FALSE | アラートレベル（alert_setting_master.alert_level_id） |
+| 6 | 8 | alert_notification_flag | 8 | FALSE | アラート通知（alert_setting_master.alert_notification_flag） |
+| 6 | 9 | alert_email_flag | 9 | FALSE | メール送信（alert_setting_master.alert_email_flag） |
+
+**注意事項:**
+- 昇順/降順の情報はテーブルに保持しない
+- 現在のソート状態（昇順/降順）は Cookie で管理し、リクエストパラメータ `sort_order` (asc/desc) で送信される
+- `sort_order` のデフォルト値は `asc`（昇順）。未選択・不正値の場合も昇順を適用する
+- `sort_item_id=0` は `alert_id` に対応する特別エントリ。「未選択」時のデフォルト値として使用する
+- `alert_id` でソートする場合は一意なため第2ソートキーを付与しない。それ以外の項目には `alert_id ASC` を第2ソートキーとして付与し、ページング時の並び順を安定させる
+- `organization_name` / `device_name` のようなクロステーブル項目は、既存JOINのカラムを使用してソートする
 
 ---
 
@@ -419,7 +514,7 @@ GET /alert/alert-setting?alert_name=...&sort_column=alert_name&sort_order=desc&p
 ページ番号を変更して `GET /alert/alert-setting` へリダイレクト。検索条件とソート条件は保持。
 
 ```
-GET /alert/alert-setting?alert_name=...&sort_column=alert_name&sort_order=asc&page=3
+GET /alert/alert-setting?alert_name=...&sort_item_id=1&sort_order=asc&page=3
 ```
 
 ---
@@ -847,6 +942,7 @@ def list_alert_settings():
 | 8 | organization_master | 組織マスタ | SELECT | 初期表示、検索、データスコープ制限 | 組織情報取得、検索条件用選択肢表示 |
 | 9 | organization_closure | 組織閉包テーブル | SELECT | 初期表示、検索、データスコープ制限 | 組織階層関係の取得 |
 | 10 | user_master | ユーザーマスタ | SELECT | データスコープ制限 | ログインユーザーの所属組織特定 |
+| 11 | sort_item_master | ソート項目マスタ | SELECT | 初期表示、検索、ソート | ソート項目の選択肢取得とカラム名マッピング（view_id = 6） |
 
 ### SQL実行順序
 
@@ -936,6 +1032,7 @@ def delete_alert_settings():
 - SQLインジェクション対策: SQLAlchemy ORM使用（プリペアドステートメント）
 - XSS対策: Jinja2自動エスケープ
 - CSRF対策: Flask-WTF CSRF保護
+- ソート項目の安全性確保: フロントエンドからカラム名文字列を直接受け取らず、整数ID（`sort_item_id`）を経由して `sort_item_master` テーブルで検証済みのカラム名にマッピング（ホワイトリスト方式）。これによりSQLインジェクションリスクを排除する。
 
 ### ログ出力ルール
 
@@ -964,6 +1061,7 @@ def delete_alert_settings():
 
 ### 共通仕様
 - [共通仕様書](../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
+- [認証仕様書](../common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 - [UI共通仕様書](../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
@@ -978,3 +1076,4 @@ def delete_alert_settings():
 |------|------------|--------|----------|
 | 2025-12-10 | 1.0 | Claude | 初版作成（アラート設定管理画面のワークフロー仕様を定義） |
 | 2026-02-04 | 1.1 | Claude | AIレビュー完了版 |
+| 2026-03-03 | 1.2 | Claude | ソート項目をsort_item_masterテーブルから取得する方式に変更。sort_byパラメータをsort_item_idに変更。初期表示フロー・マスタ取得・DBクエリ・HTMLレンダリング・使用テーブル一覧・セキュリティ実装を更新。ソートセクションにsort_item_master初期データ（view_id=6）を追加。第2ソートキー（alert_id ASC）を追加。 |

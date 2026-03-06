@@ -224,8 +224,8 @@ JUDGMENT_TIMES = [
 - `alert_email_flag`: メール送信フラグ
 - `page`: ページ番号（デフォルト: 1）
 - `per_page`: 1ページあたりの件数（デフォルト: 25）
-- `sort_by`: ソートフィールド（デフォルト: alert_id）
-- `order`: ソート順（デフォルト: asc）
+- `sort_item_id`: ソート項目ID（デフォルト: 0、0=alert_id でソート）
+- `sort_order`: ソート順（デフォルト: asc）
 
 ### アラート設定登録
 
@@ -295,6 +295,7 @@ JUDGMENT_TIMES = [
 - [UI仕様書](./ui-specification.md) - アラート設定管理画面のUI仕様
 - [ワークフロー仕様書](./workflow-specification.md) - ワークフロー・処理フロー詳細
 - [共通仕様書](../../03-features/common/common-specification.md) - HTTPステータスコード、エラーコード等
+- [認証仕様書](../../03-features/common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 - [UI共通仕様書](../../03-features/common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ### 要件定義
