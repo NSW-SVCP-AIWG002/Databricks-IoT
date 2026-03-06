@@ -214,7 +214,13 @@ flowchart TD
     LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date BETWEEN 月初 AND 月末]
-    ReadSilver --> Transform[データ変換<br>センサーデータを月次で集約]
+    ReadSilver --> CheckRead{読込結果}
+    CheckRead -->|成功| Transform[データ変換<br>センサーデータを月次で集約]
+    CheckRead -->|失敗| ErrorRead[エラーログ出力]
+    ErrorRead --> RetryRead{リトライ<br>回数確認}
+    RetryRead -->|3回未満| ReadSilver
+    RetryRead -->|3回以上| AlertRead[エラー通知]
+    AlertRead --> EndError
     Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_monthly_summary]
     WriteGold --> CheckWrite{書込結果}
 
@@ -260,11 +266,11 @@ run_aggregation(
 
 **設定値:**
 
-| 項目         | 値                                                  |
-| ------------ | --------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary` |
-| 時間カラム   | `collection_year_month`                             |
-| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM')`                |
+| 項目         | 値                                                            |
+| ------------ | ------------------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary`           |
+| 時間カラム   | `collection_year_month`                                       |
+| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month` |
 
 ---
 
@@ -286,7 +292,13 @@ flowchart TD
     LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver["シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年"]
-    ReadSilver --> Transform[データ変換<br>センサーデータを年次で集約]
+    ReadSilver --> CheckRead{読込結果}
+    CheckRead -->|成功| Transform[データ変換<br>センサーデータを年次で集約]
+    CheckRead -->|失敗| ErrorRead[エラーログ出力]
+    ErrorRead --> RetryRead{リトライ<br>回数確認}
+    RetryRead -->|3回未満| ReadSilver
+    RetryRead -->|3回以上| AlertRead[エラー通知]
+    AlertRead --> EndError
     Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_yearly_summary]
     WriteGold --> CheckWrite{書込結果}
 
@@ -333,7 +345,7 @@ run_aggregation(
 | ------------ | -------------------------------------------------- |
 | 出力テーブル | `iot_catalog.gold.gold_sensor_data_yearly_summary` |
 | 時間カラム   | `collection_year`                                  |
-| 時間式       | `YEAR(event_date)`                                 |
+| 時間式       | `YEAR(event_date) AS collection_year`              |
 
 ---
 
@@ -398,6 +410,8 @@ WHERE m.delete_flag = FALSE
 | ------------------ | ---------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, event_date, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
 
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
+
 ### 月次集計変換ロジック
 
 シルバー層センサーデータを月次で集計し、マスタテーブルで有効な集約方法のレコードを生成します。
@@ -406,6 +420,8 @@ WHERE m.delete_flag = FALSE
 | ------------------ | --------------------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, collection_year_month, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
 
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
+
 ### 年次集計変換ロジック
 
 シルバー層センサーデータを年次で集計し、マスタテーブルで有効な集約方法のレコードを生成します。
@@ -413,6 +429,8 @@ WHERE m.delete_flag = FALSE
 | 入力データ         | 集約キー                                                  | 出力                                                  |
 | ------------------ | --------------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, collection_year, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
+
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
 
 ### 共通集計処理の実装
 
@@ -438,6 +456,7 @@ from dataclasses import dataclass
 from typing import Callable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException  # リトライ対象外例外（テーブル未存在・権限不足等）
 
 class AggregationPeriod(Enum):
     """集計期間"""
@@ -539,6 +558,9 @@ def aggregate_sensor_data(
         "device_id",
         "organization_id",
         f"{config.time_expr} AS {config.time_column}",
+        # → DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month（月次）
+        # → YEAR(event_date) AS collection_year（年次）
+        
         create_unpivot_expr()
     ).filter("sensor_value IS NOT NULL")
 
@@ -592,7 +614,7 @@ def aggregate_sensor_data(
         "organization_id",
         config.time_column,
         "summary_item",
-        "summary_method_id",
+        "summary_method_id", # gold_summary_method_master から取得
         "summary_value",
         "data_count",
         F.current_timestamp().alias("create_time")
@@ -631,8 +653,7 @@ def merge_to_gold(aggregated_df: DataFrame, config: AggregationConfig):
     ).whenMatchedUpdate(
         set={
             "summary_value": "source.summary_value",
-            "data_count": "source.data_count",
-            "create_time": "source.create_time"
+            "data_count": "source.data_count"
         }
     ).whenNotMatchedInsertAll().execute()
 ```
@@ -661,28 +682,65 @@ def run_aggregation(period: AggregationPeriod, target_filter: str):
     """
     config = AGGREGATION_CONFIGS[period]
 
+    # フェーズ1: シルバー層データ読込（最大3回リトライ）
+    MAX_READ_RETRY = 3
+    silver_df = None
+    for attempt in range(1, MAX_READ_RETRY + 1):
+        try:
+            silver_df = dlt.read("silver_sensor_data") \
+                .filter(target_filter)
+            break  # 読込成功
+        except (AnalysisException, PermissionError) as e:
+            # リトライ対象外（テーブル未存在・権限不足・不正なクエリ等）
+            error_msg = f"シルバー層からのデータ読込に失敗しました（リトライ不可）: {str(e)}"
+            logger.error(f"GOLD_ERR_001: {error_msg}")
+            notify_error(
+                error_code="GOLD_ERR_001",
+                error_message=error_msg,
+                pipeline_name=config.output_table,
+                target_date=target_filter
+            )
+            raise
+        except Exception as e:
+            # リトライ対象（ネットワーク・タイムアウト等の一時的エラー）
+            error_msg = f"シルバー層からのデータ読込に失敗しました (試行 {attempt}/{MAX_READ_RETRY}): {str(e)}"
+            logger.error(f"GOLD_ERR_001: {error_msg}")
+            if attempt >= MAX_READ_RETRY:
+                notify_error(
+                    error_code="GOLD_ERR_001",
+                    error_message=error_msg,
+                    pipeline_name=config.output_table,
+                    target_date=target_filter
+                )
+                raise
+
+    if silver_df.isEmpty():
+        logger.warning(f"GOLD_WARN_001: 対象期間のデータが存在しません ({period.value})")
+        return
+
+    # フェーズ2: 集計処理
     try:
-        # シルバー層データ読込
-        silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
-            .filter(target_filter)
-
-        if silver_df.isEmpty():
-            logger.warning(f"GOLD_WARN_001: 対象期間のデータが存在しません ({period.value})")
-            return
-
-        # 共通集計処理
         aggregated = aggregate_sensor_data(silver_df, config)
-
-        # MERGE処理
-        merge_to_gold(aggregated, config)
-
-        logger.info(f"{period.value}集計完了: {aggregated.count()} レコード")
-
     except Exception as e:
-        error_msg = f"集計処理中にエラーが発生しました: {str(e)}"
+        error_msg = f"データ変換中にエラーが発生しました: {str(e)}"
         logger.error(f"GOLD_ERR_002: {error_msg}")
         notify_error(
             error_code="GOLD_ERR_002",
+            error_message=error_msg,
+            pipeline_name=config.output_table,
+            target_date=target_filter
+        )
+        raise
+
+    # フェーズ3: MERGE処理（書込）
+    try:
+        merge_to_gold(aggregated, config)
+        logger.info(f"{period.value}集計完了: {aggregated.count()} レコード")
+    except Exception as e:
+        error_msg = f"ゴールド層への書込に失敗しました: {str(e)}"
+        logger.error(f"GOLD_ERR_003: {error_msg}")
+        notify_error(
+            error_code="GOLD_ERR_003",
             error_message=error_msg,
             pipeline_name=config.output_table,
             target_date=target_filter
@@ -790,6 +848,11 @@ sequenceDiagram
         end
     end
 ```
+
+> **月初・年初判定の責務分担:**
+> 月次・年次集計の起動判断（月初=1日か、年初=1月1日か）は**スケジューラが行う**。
+> パイプラインは `run_aggregation()` を受動的に呼び出すだけであり、日付判定ロジックを内包しない。
+> スケジューラは毎日深夜に日次集計を起動し、当日が月初であれば月次集計も、1月1日であれば年次集計も追加で起動する。
 
 ---
 
@@ -1054,7 +1117,7 @@ def gold_sensor_data_daily_summary():
         # シルバー層からデータ読込
         silver_df = dlt.read("silver_sensor_data")
         daily_data = silver_df.filter(
-            to_date(col("collection_timestamp")) == target_date
+            col("event_date") == target_date
         )
 
         if daily_data.isEmpty():
@@ -1112,7 +1175,7 @@ def gold_sensor_data_daily_summary():
         # 対象日のデータをフィルタ
         target_date = date_sub(current_date(), 1)
         daily_data = silver_df.filter(
-            to_date(col("collection_timestamp")) == target_date
+            col("event_date") == target_date
         )
 
         # データが存在しない場合
@@ -1120,8 +1183,32 @@ def gold_sensor_data_daily_summary():
             logger.warning("GOLD_WARN_001: 対象期間のデータが存在しません")
             return spark.createDataFrame([], schema)
 
-        # 集計処理
-        aggregated = perform_daily_aggregation(daily_data)
+        # バリデーション前後の件数差分を取得してスキップ数をログ出力
+        count_before = daily_data.count()
+        validated_data = daily_data.filter(
+            "device_id IS NOT NULL "
+            "AND organization_id IS NOT NULL "
+            "AND collection_date IS NOT NULL "
+            "AND summary_item BETWEEN 1 AND 22"
+        )
+        count_after = validated_data.count()
+        skip_count = count_before - count_after
+
+        if skip_count > 0:
+            logger.warning(
+                f"GOLD_WARN_002候補: バリデーション失敗により {skip_count} 件をスキップしました "
+                f"（全 {count_before} 件中）"
+            )
+            if skip_count >= 100:
+                notify_error(
+                    error_code="GOLD_WARN_002",
+                    error_message=f"バリデーション失敗により {skip_count} 件をスキップしました",
+                    pipeline_name="gold_sensor_data_daily_summary",
+                    target_date=str(target_date)
+                )
+
+        # 集計処理（バリデーション済みデータのみ使用）
+        aggregated = perform_daily_aggregation(validated_data)
 
         logger.info(f"日次集計完了: {aggregated.count()} レコード")
         return aggregated
@@ -1239,6 +1326,8 @@ spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
 | gold_sensor_data_monthly_summary | 10年間   | 7日間          | DELETE + VACUUM |
 | gold_sensor_data_yearly_summary  | 10年間   | 7日間          | DELETE + VACUUM |
 
+gold_summary_method_masterについては、恒久保持とし、データ削除は行わない。
+
 ### 削除処理
 
 ```sql
@@ -1249,6 +1338,14 @@ WHERE collection_date < DATE_SUB(CURRENT_DATE(), 3650);
 -- 削除後のVACUUM処理（7日以上前の履歴を物理削除）
 VACUUM iot_catalog.gold.gold_sensor_data_daily_summary
 RETAIN 168 HOURS;  -- 7日間
+
+-- 月次サマリ削除例（10年以上前）
+DELETE FROM iot_catalog.gold.gold_sensor_data_monthly_summary
+WHERE collection_year_month < DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 3650), 'yyyy/MM');
+
+-- 年次サマリ削除例（10年以上前）
+DELETE FROM iot_catalog.gold.gold_sensor_data_yearly_summary
+WHERE collection_year < YEAR(DATE_SUB(CURRENT_DATE(), 3650));
 ```
 
 ### 削除スケジュール
