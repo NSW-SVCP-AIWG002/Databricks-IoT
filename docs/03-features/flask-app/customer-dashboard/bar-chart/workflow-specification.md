@@ -74,17 +74,17 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 顧客作成ダッシュボード表示 | `/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | HTML | - |
-| 2 | ガジェットデータ取得 | `/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
-| 3 | ガジェット登録画面 | `/customer-dashboard/gadgets/bar-chart/create` | GET | 棒グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ガジェット登録実行 | `/customer-dashboard/gadgets/bar-chart/register` | POST | 棒グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 5 | CSVエクスポート | `/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | HTML | - |
+| 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
+| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/bar-chart/create` | GET | 棒グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/bar-chart/register` | POST | 棒グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
 - **レスポンス形式**:
   - `HTML`: Jinja2テンプレートをレンダリングして返す（`render_template()`）
   - `HTML（モーダル）`: モーダルダイアログ用のHTMLフラグメントを返す
-  - `リダイレクト (302)`: 処理成功後に `/customer-dashboard` へリダイレクト
+  - `リダイレクト (302)`: 処理成功後に `/analysis/customer-dashboard` へリダイレクト
   - `JSON (AJAX)`: JavaScriptからの非同期リクエストに対してJSONレスポンスを返す
   - `CSV`: CSVファイルをダウンロードレスポンスとして返す
 - **Flask Blueprint構成**: `customer_dashboard_bp` として実装
@@ -97,19 +97,19 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /customer-dashboard`, `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | エラーページ表示 |
-| 表示時間単位切替（時/日/週/月） | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| 集計時間幅選択 | ドロップダウン選択 | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| 時間帯選択 | デイトタイムピッカー選択 | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| 更新ボタン押下 | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| CSVエクスポートボタン押下 | ボタンクリック | `GET /customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | エラーページ表示 |
+| 表示時間単位切替（時/日/週/月） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 集計時間幅選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 時間帯選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
 
 ### 棒グラフガジェット登録モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /customer-dashboard/gadgets/bar-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
-| 登録ボタン押下 | ボタンクリック | `POST /customer-dashboard/gadgets/bar-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/bar-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/bar-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
 
 ---
 
@@ -131,7 +131,7 @@
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 顧客作成ダッシュボード表示 | `GET /customer-dashboard` | クエリパラメータ: なし |
+| 顧客作成ダッシュボード表示 | `GET /analysis/customer-dashboard` | クエリパラメータ: なし |
 
 #### バリデーション
 
@@ -231,7 +231,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ガジェットデータ取得 | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
+| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
 
 #### バリデーション
 
@@ -481,7 +481,7 @@ def format_bar_chart_data(rows, display_unit, interval='10min', summary_method_i
 **⑥ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
 @require_auth
 def gadget_bar_chart_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
@@ -616,7 +616,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 棒グラフガジェット登録画面 | `GET /customer-dashboard/gadgets/bar-chart/create` | パラメータ: なし |
+| 棒グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/bar-chart/create` | パラメータ: なし |
 
 #### バリデーション
 
@@ -766,7 +766,7 @@ ORDER BY
 **⑧ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/bar-chart/create', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/create', methods=['GET'])
 @require_auth
 def gadget_bar_chart_create():
     """棒グラフガジェット登録モーダル表示"""
@@ -853,7 +853,7 @@ flowchart TD
     CheckInsert -->|失敗| Error500[500エラーページ表示]
     CheckInsert -->|成功| Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -867,7 +867,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 棒グラフガジェット登録実行 | `POST /customer-dashboard/gadgets/bar-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` |
+| 棒グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/bar-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` |
 
 #### バリデーション
 
@@ -982,7 +982,7 @@ INSERT INTO dashboard_gadget_master (
 **④ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/bar-chart/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/register', methods=['POST'])
 @require_auth
 def gadget_bar_chart_register():
     """棒グラフガジェット登録実行"""
@@ -1137,7 +1137,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| CSVエクスポート | `GET /customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
+| CSVエクスポート | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
 
 #### バリデーション
 
@@ -1189,7 +1189,7 @@ flowchart TD
 **⑤ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
 @require_auth
 def gadget_csv_export(gadget_uuid):
     """棒グラフガジェット CSVエクスポート"""
@@ -1328,7 +1328,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
 @require_auth
 def dashboard_register():
     logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')

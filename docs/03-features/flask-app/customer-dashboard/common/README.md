@@ -70,11 +70,11 @@
 
 | 画面ID | 画面名 | スラッグ | 表示方式 | 概要 |
 |--------|--------|---------|---------|------|
-| CDS-001 | 顧客作成ダッシュボード表示画面 | `/customer-dashboard` | 画面 | ダッシュボード/ダッシュボードグループ/ガジェットを表示 |
-| CDS-002 | ダッシュボード管理モーダル | `/customer-dashboard/dashboards` | モーダル | ダッシュボードの登録/表示切替/削除を選択 |
-| CDS-003 | ガジェット追加モーダル | `/customer-dashboard/gadgets/add` | モーダル | 追加するガジェットの種別を選択 |
-| CDS-004 | 登録・更新モーダル | `/customer-dashboard/dashboards/create`, `/customer-dashboard/dashboards/<dashboard_uuid>/edit`, `/customer-dashboard/groups/create`, `/customer-dashboard/groups/<dashboard_group_uuid>/edit`, `/customer-dashboard/gadgets/<gadget_uuid>/edit` | モーダル | ダッシュボード登録/ダッシュボードタイトル更新/ダッシュボードグループ登録/ダッシュボードグループタイトル更新/ガジェットタイトル更新 |
-| CDS-005 | 削除確認モーダル | `/customer-dashboard/dashboards/<dashboard_uuid>/delete`, `/customer-dashboard/groups/<dashboard_group_uuid>/delete`, `/customer-dashboard/gadgets/<gadget_uuid>/delete` | モーダル | ダッシュボード削除/ダッシュボードグループ削除/ガジェット削除の確認 |
+| CDS-001 | 顧客作成ダッシュボード表示画面 | `/analysis/customer-dashboard` | 画面 | ダッシュボード/ダッシュボードグループ/ガジェットを表示 |
+| CDS-002 | ダッシュボード管理モーダル | `/analysis/customer-dashboard/dashboards` | モーダル | ダッシュボードの登録/表示切替/削除を選択 |
+| CDS-003 | ガジェット追加モーダル | `/analysis/customer-dashboard/gadgets/add` | モーダル | 追加するガジェットの種別を選択 |
+| CDS-004 | 登録・更新モーダル | `/analysis/customer-dashboard/dashboards/create`, `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/edit`, `/analysis/customer-dashboard/groups/create`, `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/edit`, `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | モーダル | ダッシュボード登録/ダッシュボードタイトル更新/ダッシュボードグループ登録/ダッシュボードグループタイトル更新/ガジェットタイトル更新 |
+| CDS-005 | 削除確認モーダル | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete`, `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete`, `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | モーダル | ダッシュボード削除/ダッシュボードグループ削除/ガジェット削除の確認 |
 
 ---
 
@@ -217,31 +217,31 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 |
 |----|---------|---------------|---------|------|---------------|
-| 1 | 顧客作成ダッシュボード表示 | `/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML |
-| 2 | ダッシュボード管理画面 | `/customer-dashboard/dashboards` | GET | ダッシュボード管理画面表示 | HTML（モーダル） |
-| 3 | ダッシュボード登録画面 | `/customer-dashboard/dashboards/create` | GET | ダッシュボード登録画面表示 | HTML（モーダル） |
-| 4 | ダッシュボード登録実行 | `/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) |
-| 5 | ダッシュボードタイトル更新画面 | `/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新画面表示 | HTML（モーダル） |
-| 6 | ダッシュボードタイトル更新実行 | `/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) |
-| 7 | ダッシュボード削除確認画面 | `/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認画面表示 | HTML（モーダル） |
-| 8 | ダッシュボード削除実行 | `/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) |
-| 9 | ダッシュボード表示切替 | `/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) |
-| 10 | ダッシュボードグループ登録画面 | `/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録画面表示 | HTML（モーダル） |
-| 11 | ダッシュボードグループ登録実行 | `/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) |
-| 12 | ダッシュボードグループタイトル更新画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新画面表示 | HTML（モーダル） |
-| 13 | ダッシュボードグループタイトル更新実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) |
-| 14 | ダッシュボードグループ削除確認画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認画面表示 | HTML（モーダル） |
-| 15 | ダッシュボードグループ削除実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) |
-| 16 | ガジェット追加画面 | `/customer-dashboard/gadgets/add` | GET | ガジェット追加画面表示 | HTML（モーダル） |
-| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録画面表示、ガジェット毎にFlaskルートが異なる | HTML（モーダル） |
-| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理、ガジェット毎にFlaskルートが異なる | リダイレクト (302) |
-| 19 | ガジェットタイトル更新画面 | `/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新画面表示 | HTML（モーダル） |
-| 20 | ガジェットタイトル更新実行 | `/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) |
-| 21 | ガジェット削除確認画面 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認画面表示 | HTML（モーダル） |
-| 22 | ガジェット削除実行 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) |
-| 23 | ガジェットデータ取得 | `/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) |
-| 24 | レイアウト保存 | `/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) |
-| 25 | CSVエクスポート | `/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML |
+| 2 | ダッシュボード管理画面 | `/analysis/customer-dashboard/dashboards` | GET | ダッシュボード管理画面表示 | HTML（モーダル） |
+| 3 | ダッシュボード登録画面 | `/analysis/customer-dashboard/dashboards/create` | GET | ダッシュボード登録画面表示 | HTML（モーダル） |
+| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) |
+| 5 | ダッシュボードタイトル更新画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新画面表示 | HTML（モーダル） |
+| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) |
+| 7 | ダッシュボード削除確認画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認画面表示 | HTML（モーダル） |
+| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) |
+| 9 | ダッシュボード表示切替 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) |
+| 10 | ダッシュボードグループ登録画面 | `/analysis/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録画面表示 | HTML（モーダル） |
+| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) |
+| 12 | ダッシュボードグループタイトル更新画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新画面表示 | HTML（モーダル） |
+| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) |
+| 14 | ダッシュボードグループ削除確認画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認画面表示 | HTML（モーダル） |
+| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) |
+| 16 | ガジェット追加画面 | `/analysis/customer-dashboard/gadgets/add` | GET | ガジェット追加画面表示 | HTML（モーダル） |
+| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録画面表示、ガジェット毎にFlaskルートが異なる | HTML（モーダル） |
+| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理、ガジェット毎にFlaskルートが異なる | リダイレクト (302) |
+| 19 | ガジェットタイトル更新画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新画面表示 | HTML（モーダル） |
+| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) |
+| 21 | ガジェット削除確認画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認画面表示 | HTML（モーダル） |
+| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) |
+| 23 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) |
+| 24 | レイアウト保存 | `/analysis/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) |
+| 25 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV |
 
 ---
 
