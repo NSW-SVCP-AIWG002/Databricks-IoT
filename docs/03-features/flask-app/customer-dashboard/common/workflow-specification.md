@@ -161,37 +161,37 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 顧客作成ダッシュボード表示 | `/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML | - |
-| 2 | ダッシュボード管理画面 | `/customer-dashboard/dashboards` | GET | ダッシュボード管理モーダル表示 | HTML（モーダル） | - |
-| 3 | ダッシュボード登録画面 | `/customer-dashboard/dashboards/create` | GET | ダッシュボード登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ダッシュボード登録実行 | `/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 5 | ダッシュボードタイトル更新画面 | `/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 6 | ダッシュボードタイトル更新実行 | `/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 7 | ダッシュボード削除確認画面 | `/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認モーダル表示 | HTML（モーダル） | - |
-| 8 | ダッシュボード削除実行 | `/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 9 | ダッシュボード表示切替 | `/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 10 | ダッシュボードグループ登録画面 | `/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録モーダル表示 | HTML（モーダル） | - |
-| 11 | ダッシュボードグループ登録実行 | `/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 12 | ダッシュボードグループタイトル更新画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 13 | ダッシュボードグループタイトル更新実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 14 | ダッシュボードグループ削除確認画面 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認モーダル表示 | HTML（モーダル） | - |
-| 15 | ダッシュボードグループ削除実行 | `/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 16 | ガジェット追加画面 | `/customer-dashboard/gadgets/add` | GET | ガジェット追加モーダル表示 | HTML（モーダル） | - |
-| 17 | ガジェット登録画面 | `/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/customer-dashboard/gadgets/bar-chart/create`） |
-| 18 | ガジェット登録実行 | `/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/customer-dashboard`、ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/customer-dashboard/gadgets/bar-chart/register`） |
-| 19 | ガジェットタイトル更新画面 | `/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 20 | ガジェットタイトル更新実行 | `/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 21 | ガジェット削除確認画面 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認モーダル表示 | HTML（モーダル） | - |
-| 22 | ガジェット削除実行 | `/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) | 成功時: `/customer-dashboard` |
-| 23 | ガジェットデータ取得 | `/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
-| 24 | レイアウト保存 | `/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) | 非同期通信 |
-| 25 | CSVエクスポート | `/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML | - |
+| 2 | ダッシュボード管理画面 | `/analysis/customer-dashboard/dashboards` | GET | ダッシュボード管理モーダル表示 | HTML（モーダル） | - |
+| 3 | ダッシュボード登録画面 | `/analysis/customer-dashboard/dashboards/create` | GET | ダッシュボード登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 5 | ダッシュボードタイトル更新画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新モーダル表示 | HTML（モーダル） | - |
+| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 7 | ダッシュボード削除確認画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認モーダル表示 | HTML（モーダル） | - |
+| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 9 | ダッシュボード表示切替 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 10 | ダッシュボードグループ登録画面 | `/analysis/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録モーダル表示 | HTML（モーダル） | - |
+| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 12 | ダッシュボードグループタイトル更新画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新モーダル表示 | HTML（モーダル） | - |
+| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 14 | ダッシュボードグループ削除確認画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認モーダル表示 | HTML（モーダル） | - |
+| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 16 | ガジェット追加画面 | `/analysis/customer-dashboard/gadgets/add` | GET | ガジェット追加モーダル表示 | HTML（モーダル） | - |
+| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/analysis/customer-dashboard/gadgets/bar-chart/create`） |
+| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard`、ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/analysis/customer-dashboard/gadgets/bar-chart/register`） |
+| 19 | ガジェットタイトル更新画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新モーダル表示 | HTML（モーダル） | - |
+| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 21 | ガジェット削除確認画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認モーダル表示 | HTML（モーダル） | - |
+| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 23 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
+| 24 | レイアウト保存 | `/analysis/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) | 非同期通信 |
+| 25 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
 - **レスポンス形式**:
   - `HTML`: Jinja2テンプレートをレンダリングして返す（`render_template()`）
   - `HTML（モーダル）`: モーダルダイアログ用のHTMLフラグメントを返す
-  - `リダイレクト (302)`: 処理成功後に `/customer-dashboard` へリダイレクト
+  - `リダイレクト (302)`: 処理成功後に `/analysis/customer-dashboard` へリダイレクト
   - `JSON (AJAX)`: JavaScriptからの非同期リクエストに対してJSONレスポンスを返す
   - `CSV`: CSVファイルをダウンロードレスポンスとして返す
 - **Flask Blueprint構成**: `customer_dashboard_bp` として実装
@@ -204,52 +204,52 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /customer-dashboard` | なし | HTML（顧客作成ダッシュボード画面） | エラーページ表示 |
-| ダッシュボード管理ボタン押下 | ボタンクリック | `GET /customer-dashboard/dashboards` | なし | HTML（モーダル） | エラーページ表示 |
-| 日時設定ボタン押下（今日/昨日/今週/今月/今年） | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
-| カスタムボタン押下（適用） | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
-| 日時初期化ボタン押下 | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
-| 自動更新ON | チェックボックス変更 | `POST /customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard` | なし | HTML（顧客作成ダッシュボード画面） | エラーページ表示 |
+| ダッシュボード管理ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/dashboards` | なし | HTML（モーダル） | エラーページ表示 |
+| 日時設定ボタン押下（今日/昨日/今週/今月/今年） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
+| カスタムボタン押下（適用） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
+| 日時初期化ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
+| 自動更新ON | チェックボックス変更 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
 | 組織選択変更 | セレクト変更 | なし（クライアントサイド処理） | - | - | - |
 | デバイス選択変更 | セレクト変更 | なし（クライアントサイド処理） | - | - | - |
 | 編集モード切替 | トグル変更 | なし（クライアントサイド処理） | - | - | - |
-| レイアウト保存ボタン押下 | ボタンクリック | `POST /customer-dashboard/layout/save` | レイアウト情報（JSON） | JSON | エラーモーダル表示 |
-| CSVエクスポートボタン押下 | ボタンクリック | `GET /customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
+| レイアウト保存ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/layout/save` | レイアウト情報（JSON） | JSON | エラーモーダル表示 |
+| CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
 
 ### ダッシュボード管理モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 登録ボタン押下 | ボタンクリック | `GET /customer-dashboard/dashboards/create` | なし | HTML（モーダル） | エラーモーダル表示 |
-| 削除ボタン押下 | ボタンクリック | `GET /customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | HTML（モーダル） | エラーモーダル表示 |
-| 変更ボタン押下 | ボタンクリック | `POST /customer-dashboard/dashboards/<dashboard_uuid>/switch` | `dashboard_uuid` | リダイレクト | エラーモーダル表示 |
+| 登録ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/dashboards/create` | なし | HTML（モーダル） | エラーモーダル表示 |
+| 削除ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | HTML（モーダル） | エラーモーダル表示 |
+| 変更ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/switch` | `dashboard_uuid` | リダイレクト | エラーモーダル表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### ガジェット追加モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 登録画面ボタン押下 | ボタンクリック | `GET /customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示 |
+| 登録画面ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 登録・更新モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| ダッシュボード登録実行 | フォーム送信 | `POST /customer-dashboard/dashboards/register` | `dashboard_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードタイトル更新実行 | フォーム送信 | `POST /customer-dashboard/dashboards/<dashboard_uuid>/update` | `dashboard_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードグループ登録実行 | フォーム送信 | `POST /customer-dashboard/groups/register` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードグループタイトル更新実行 | フォーム送信 | `POST /customer-dashboard/groups/<dashboard_group_uuid>/update` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
-| ガジェットタイトル更新実行 | フォーム送信 | `POST /customer-dashboard/gadgets/<gadget_uuid>/update` | `gadget_name` | リダイレクト | フォーム再表示 |
+| ダッシュボード登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/register` | `dashboard_name` | リダイレクト | フォーム再表示 |
+| ダッシュボードタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | `dashboard_name` | リダイレクト | フォーム再表示 |
+| ダッシュボードグループ登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/register` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
+| ダッシュボードグループタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
+| ガジェットタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | `gadget_name` | リダイレクト | フォーム再表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 削除確認モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| ダッシュボード削除実行 | ボタンクリック | `POST /customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | リダイレクト | エラーモーダル表示 |
-| ダッシュボードグループ削除実行 | ボタンクリック | `POST /customer-dashboard/groups/<dashboard_group_uuid>/delete` | `dashboard_group_uuid` | リダイレクト | エラーモーダル表示 |
-| ガジェット削除実行 | ボタンクリック | `POST /customer-dashboard/gadgets/<gadget_uuid>/delete` | `gadget_uuid` | リダイレクト | エラーモーダル表示 |
+| ダッシュボード削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | リダイレクト | エラーモーダル表示 |
+| ダッシュボードグループ削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | `dashboard_group_uuid` | リダイレクト | エラーモーダル表示 |
+| ガジェット削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | `gadget_uuid` | リダイレクト | エラーモーダル表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ---
@@ -268,7 +268,7 @@
 
 ```mermaid
 flowchart TD
-    Start([GET /customer-dashboard]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Start([GET /analysis/customer-dashboard]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
@@ -325,7 +325,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 顧客作成ダッシュボード表示 | `GET /customer-dashboard` | クエリパラメータ: なし |
+| 顧客作成ダッシュボード表示 | `GET /analysis/customer-dashboard` | クエリパラメータ: なし |
 
 #### バリデーション
 
@@ -504,7 +504,7 @@ ORDER BY
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard', methods=['GET'])
 @require_auth
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
@@ -629,7 +629,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ダッシュボード管理画面 | `GET /customer-dashboard/dashboards` | パラメータ: なし |
+| ダッシュボード管理画面 | `GET /analysis/customer-dashboard/dashboards` | パラメータ: なし |
 
 #### 処理詳細（サーバーサイド）
 
@@ -653,7 +653,7 @@ ORDER BY
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/dashboards', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards', methods=['GET'])
 @require_auth
 def dashboard_management():
     """ダッシュボード管理モーダル表示"""
@@ -715,7 +715,7 @@ flowchart TD
     CheckInsert -->|成功| UpdateSetting[ユーザー設定更新<br>選択中ダッシュボードIDを更新]
     UpdateSetting --> Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -728,8 +728,8 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ダッシュボード登録画面 | `GET /customer-dashboard/dashboards/create` | パラメータ: なし |
-| ダッシュボード登録実行 | `POST /customer-dashboard/dashboards/register` | フォームデータ: `dashboard_name` |
+| ダッシュボード登録画面 | `GET /analysis/customer-dashboard/dashboards/create` | パラメータ: なし |
+| ダッシュボード登録実行 | `POST /analysis/customer-dashboard/dashboards/register` | フォームデータ: `dashboard_name` |
 
 #### バリデーション
 
@@ -808,7 +808,7 @@ ON DUPLICATE KEY UPDATE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
 @require_auth
 def dashboard_register():
     """ダッシュボード登録実行"""
@@ -894,7 +894,7 @@ flowchart TD
     UpdateSetting --> CheckUpdate{DB操作結果}
     CheckUpdate -->|失敗| Error500[500エラーページ表示]
     CheckUpdate -->|成功| Commit[トランザクションコミット]
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
 
     LoginRedirect --> End([処理完了])
     Redirect --> End
@@ -906,7 +906,7 @@ flowchart TD
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
 @require_auth
 def dashboard_switch(dashboard_uuid):
     """ダッシュボード表示切替"""
@@ -984,7 +984,7 @@ flowchart TD
     CheckUpdate -->|失敗| Error500
     CheckUpdate -->|成功| Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -1024,7 +1024,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/<string:dashboard_uuid>/update', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/update', methods=['POST'])
 @require_auth
 def dashboard_update(dashboard_uuid):
     """ダッシュボードタイトル更新実行"""
@@ -1149,7 +1149,7 @@ flowchart TD
     CheckDelete -->|成功| UpdateSetting[ユーザー設定更新<br>別のダッシュボードに切替<br>dashboard_id昇順の最初]
     UpdateSetting --> Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功メッセージモーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -1216,7 +1216,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/<string:dashboard_uuid>/delete', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/delete', methods=['POST'])
 @require_auth
 def dashboard_delete(dashboard_uuid):
     """ダッシュボード削除実行"""
@@ -1328,7 +1328,7 @@ flowchart TD
     CheckInsert -->|失敗| Error500[500エラーページ表示]
     CheckInsert -->|成功| Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -1382,7 +1382,7 @@ INSERT INTO dashboard_group_master (
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/groups/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/register', methods=['POST'])
 @require_auth
 def group_register():
     """ダッシュボードグループ登録実行"""
@@ -1490,7 +1490,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/groups/<string:dashboard_group_uuid>/update', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/<string:dashboard_group_uuid>/update', methods=['POST'])
 @require_auth
 def group_update(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新実行"""
@@ -1612,7 +1612,7 @@ flowchart TD
     CheckDelete -->|失敗| Error500
     CheckDelete -->|成功| Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/customer-dashboard]
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功メッセージモーダル表示]
 
     LoginRedirect --> End([処理完了])
@@ -1659,7 +1659,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/groups/<string:dashboard_group_uuid>/delete', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/<string:dashboard_group_uuid>/delete', methods=['POST'])
 @require_auth
 def group_delete(dashboard_group_uuid):
     """ダッシュボードグループ削除実行"""
@@ -1872,7 +1872,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<string:gadget_uuid>/update', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/update', methods=['POST'])
 @require_auth
 def gadget_update(gadget_uuid):
     """ガジェットタイトル更新実行"""
@@ -1987,7 +1987,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/gadgets/<string:gadget_uuid>/delete', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/delete', methods=['POST'])
 @require_auth
 def gadget_delete(gadget_uuid):
     """ガジェット削除実行"""
@@ -2089,7 +2089,7 @@ flowchart TD
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
     CheckAuth -->|認証OK| GetLayout[JavaScriptからレイアウト情報を収集<br>各ガジェットのposition_x, position_y,<br>display_order]
-    GetLayout --> SendAjax[AJAXリクエスト送信<br>POST /customer-dashboard/layout/save]
+    GetLayout --> SendAjax[AJAXリクエスト送信<br>POST /analysis/customer-dashboard/layout/save]
     SendAjax --> UpdateDB[レイアウト情報更新<br>DB dashboard_gadget_master UPDATE]
     UpdateDB --> CheckUpdate{DB操作結果}
     CheckUpdate -->|失敗| Error500[500エラーレスポンス]
@@ -2123,7 +2123,7 @@ WHERE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/customer-dashboard/layout/save', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/layout/save', methods=['POST'])
 @require_auth
 def layout_save():
     """レイアウト保存（AJAX）"""
@@ -2184,7 +2184,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 flowchart TD
     Start([日時設定ボタンクリック<br>今日/昨日/今週/今月/今年]) --> CalcDateRange[押下されたボタンに応じて<br>日時範囲を計算]
     CalcDateRange --> UpdateGadgets[各ガジェットの日時設定を更新<br>ガジェット種別ごとの変換ルールを適用]
-    UpdateGadgets --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /customer-dashboard/gadgets/<gadget_uuid>/data]
+    UpdateGadgets --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data]
     FetchData --> UpdateChart[EChartsグラフを再描画]
     UpdateChart --> UpdateTime[最終更新時刻を更新]
     UpdateTime --> End([処理完了])
@@ -2204,7 +2204,7 @@ flowchart TD
     CheckValidate -->|NG| Error400[400エラーモーダル表示]
 
     CheckValidate -->|OK| UpdateGadgets[各ガジェットの日時設定を更新<br>開始日時～終了日時を適用]
-    UpdateGadgets --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /customer-dashboard/gadgets/<gadget_uuid>/data]
+    UpdateGadgets --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data]
     FetchData --> UpdateChart[EChartsグラフを再描画]
     UpdateChart --> UpdateTime[最終更新時刻を更新]
 
@@ -2259,7 +2259,7 @@ flowchart TD
     Confirm --> CheckConfirm{ユーザー選択}
     CheckConfirm -->|いいえ| CloseModal[モーダルを閉じる]
     CheckConfirm -->|はい| ResetDateTime[各ガジェットの表示日時を<br>最新日時にリセット]
-    ResetDateTime --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /customer-dashboard/gadgets/<gadget_uuid>/data]
+    ResetDateTime --> FetchData[各ガジェットのデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data]
     FetchData --> UpdateChart[EChartsグラフを再描画]
     UpdateChart --> UpdateTime[最終更新時刻を更新]
     UpdateTime --> End([処理完了])
@@ -2289,7 +2289,7 @@ flowchart TD
     CheckEnabled -->|OFF| ClearInterval[タイマー停止<br>clearInterval]
     ClearInterval --> End([処理完了])
 
-    CheckEnabled -->|ON| FetchData[各ガジェットのデータを再取得<br>AJAX: POST /customer-dashboard/gadgets/<gadget_uuid>/data]
+    CheckEnabled -->|ON| FetchData[各ガジェットのデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data]
     FetchData --> UpdateChart[EChartsグラフを再描画]
     UpdateChart --> UpdateTime[最終更新時刻を更新]
     UpdateTime --> Wait
@@ -2504,7 +2504,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@customer_dashboard_bp.route('/customer-dashboard/dashboards/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
 @require_auth
 def dashboard_register():
     logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
