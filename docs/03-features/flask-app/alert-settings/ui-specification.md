@@ -330,7 +330,7 @@
 | (1.2) | ヘッダータイトル | header_title | - | O | - | - | - | 固定値: アラート設定管理 | 固定表示 |
 | (1.3) | CSVエクスポートボタン | export_button | Button | I | - | - | - | 固定値: 「エクスポート」 | プライマリボタン |
 | (1.4) | 登録ボタン | register_button | Button | I | - | - | - | 固定値: 「登録」 | プライマリボタン |
-| (1.5) | 削除ボタン | delete_button | Button | I | - | - | - | 固定値: 「削除」 | デンジャーボタン |
+| (1.5) | 削除ボタン | delete_button | Button | I | - | - | - | 固定値: 「削除」 | デンジャーボタン、チェックボックス未選択時は非活性 |
 ||
 | (2.1) | アラート名 | alert_name | Textarea | I/O | - | - | - | - | テキストエリア |
 | (2.2) | 組織名 | organization_name | Select | I/O | - | - | - | DB: organization_master.organization_name | ドロップダウン |
@@ -338,20 +338,20 @@
 | (2.4) | アラートレベル | alert_level_name | Select | I/O | - | - | - | DB: alert_level_master.alert_level_name | ドロップダウン |
 | (2.5) | アラート通知 | alert_notification_flag | Select | I/O | - | - | - | - | ドロップダウン |
 | (2.6) | メール送信 | alert_email_flag | Select | I/O | - | - | - | - | ドロップダウン |
-| (2.7) | ソート項目 | sort_item | Select | I/O | - | - | - | - | ドロップダウン |
+| (2.7) | ソート項目 | sort_item_id | Select | I/O | - | - | - | DB: sort_item_master.sort_item_name | ドロップダウン |
 | (2.8) | ソート順 | sort_order | Select | I/O | - | - | - | - | ドロップダウン |
 | (2.9) | 検索ボタン | search_button | Button | I | - | - | - | 固定値: 「検索」 | プライマリボタン、中央揃え |
 ||
 | (3.1) | チェックボックス | select_checkbox | Checkbox | I | - | - | - | - | 削除対象選択用 |
-| (3.2) | アラート名 | alert_name | Label | O | - | - | - | DB: alert_setting_master.alert_name | - |
-| (3.3) | 組織名 | organization_name | Label | O | - | - | - | DB: organization_master.organization_name | - |
-| (3.4) | デバイス名 | device_name | Label | O | - | - | - | DB: device_master.device_name | - |
-| (3.5) | アラート発生条件 | alert_conditions | Label | O | - | - | - | DB: measurement_item_master.measurement_item_name, DB: alert_setting_master.alert_conditions_operator, DB: alert_setting_master.alert_conditions_threshold | 省略表示（最大100文字） |
-| (3.6) | アラート復旧条件 | alert_recovery_conditions | Label | O | - | - | - | DB: measurement_item_master.measurement_item_name, DB: alert_setting_master.alert_recovery_conditions_operator, DB: alert_setting_master.alert_recovery_conditions_threshold | 省略表示（最大100文字） |
-| (3.7) | 判定時間 | judgment_time | Label | O | - | - | - | DB: alert_setting_master.judgment_time | 表示単位は分とする |
-| (3.8) | アラートレベル | alert_level_name | Label | O | - | - | - | DB: alert_level_master.alert_level_name | - |
-| (3.9) | アラート通知 | alert_notification_flag | Label | O | - | - | - | DB: alert_setting_master.alert_notification_flag | - |
-| (3.10) | メール送信 | alert_email_flag | Label | O | - | - | - | DB: alert_setting_master.alert_email_flag | - |
+| (3.2) | アラート名 | alert_name | Label | O | - | - | - | DB: alert_setting_master.alert_name | ソート可 |
+| (3.3) | 組織名 | organization_name | Label | O | - | - | - | DB: organization_master.organization_name | ソート可 |
+| (3.4) | デバイス名 | device_name | Label | O | - | - | - | DB: device_master.device_name | ソート可 |
+| (3.5) | アラート発生条件 | alert_conditions | Label | O | - | - | - | DB: measurement_item_master.measurement_item_name, DB: alert_setting_master.alert_conditions_operator, DB: alert_setting_master.alert_conditions_threshold | 省略表示（最大100文字） ソート可 |
+| (3.6) | アラート復旧条件 | alert_recovery_conditions | Label | O | - | - | - | DB: measurement_item_master.measurement_item_name, DB: alert_setting_master.alert_recovery_conditions_operator, DB: alert_setting_master.alert_recovery_conditions_threshold | 省略表示（最大100文字） ソート可 |
+| (3.7) | 判定時間 | judgment_time | Label | O | - | - | - | DB: alert_setting_master.judgment_time | 表示単位は分とする ソート可 |
+| (3.8) | アラートレベル | alert_level_name | Label | O | - | - | - | DB: alert_level_master.alert_level_name | ソート可 |
+| (3.9) | アラート通知 | alert_notification_flag | Label | O | - | - | - | DB: alert_setting_master.alert_notification_flag | ソート可 |
+| (3.10) | メール送信 | alert_email_flag | Label | O | - | - | - | DB: alert_setting_master.alert_email_flag | ソート可 |
 | (3.11) | 参照ボタン | reference_button | Button | I | - | - | - | 固定値:「参照」 | プライマリボタン |
 | (3.12) | 更新ボタン | update_button | Button | I | - | - | - | 固定値:「更新」 | プライマリボタン |
 | (3.13) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号 | 中央揃え |
@@ -442,14 +442,14 @@
 ```
 
 **2.1: アラート名入力**
-- 概要: アラート名でキーワード検索
+- 概要: アラート名で部分一致検索
 - ラベル: 「アラート名」
 
 **2.2: 組織名ドロップダウン**
 - 概要: 組織名を選択
 - ラベル: 「組織名」
 - 選択肢: すべて、または組織マスタから取得（データスコープ制限適用）
-- デフォルト: 「すべて」
+- デフォルト: すべて
 
 **2.3: デバイス名入力**
 - 概要: デバイス名で部分一致検索
@@ -459,7 +459,7 @@
 - 概要: アラートレベルでフィルタリング
 - ラベル: 「アラートレベル」
 - 選択肢: alert_level_masterテーブルから取得（「すべて」を先頭に追加）
-- デフォルト: 「すべて」
+- デフォルト: すべて
 
 **2.5: アラート通知ドロップダウン**
 - 概要: アラート通知が有効かどうかでフィルタリング
@@ -468,7 +468,7 @@
   - すべて
   - 有効
   - 無効
-- デフォルト: 「すべて」
+- デフォルト: すべて
 
 **2.6: メール送信ドロップダウン**
 - 概要: メール送信が有効かどうかでフィルタリング
@@ -477,28 +477,22 @@
   - すべて
   - 有効
   - 無効
-- デフォルト: 「すべて」
+- デフォルト: すべて
 
 **2.7: ソート項目ドロップダウン**
 - 概要: 一覧のソート対象項目を選択
 - ラベル: 「ソート項目」
-- 選択肢:
-  - 「未選択」
-  - 「アラート名」
-  - 「デバイス名」
-  - 「アラートレベル」
-  - 「アラート通知」
-  - 「メール送信」
-- デフォルト: 「未選択」
+- 選択肢: sort_item_masterテーブルから取得（「未選択」を先頭に追加）
+- デフォルト: 未選択
 
 **2.8: ソート順ドロップダウン**
 - 概要: 一覧のソート順（昇順・降順）を選択
 - ラベル: 「ソート順」
 - 選択肢:
-  - 「未選択」
-  - 「昇順」
-  - 「降順」
-- デフォルト: 「未選択」
+  - 未選択
+  - 昇順
+  - 降順
+- デフォルト: 未選択
 
 **2.9: 検索ボタン**
 - 概要: 押下時に検索処理を実行する
@@ -685,8 +679,8 @@
 - 入力タイプ: Input
 - 制約:
   - 数値入力のみ
-  - 最大値: 1.7976931348623157e+308
-  - 最小値: -1.7976931348623157e+308
+  - 最大値: 999,999,999,999,999
+  - 最小値: -999,999,999,999,999
   - 有効数字: 最大15桁
   - 小数点以下桁数: 最大15桁（有効数字の範囲内）
 
@@ -710,8 +704,8 @@
 - 入力タイプ: Input
 - 制約:
   - 数値入力のみ
-  - 最大値: 1.7976931348623157e+308
-  - 最小値: -1.7976931348623157e+308
+  - 最大値: 999,999,999,999,999
+  - 最小値: -999,999,999,999,999
   - 有効数字: 最大15桁
   - 小数点以下桁数: 最大15桁（有効数字の範囲内）
 
@@ -933,3 +927,4 @@
 | 日付 | バージョン | 編集者 | 変更内容 |
 |------|------------|--------|----------|
 | 2025-12-10 | 1.0 | Claude | 初版作成（アラート設定管理画面のUI仕様を定義） |
+| 2026-02-04 | 1.1 | Claude | AIレビュー完了版 |
