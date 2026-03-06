@@ -11,6 +11,7 @@ services:
       - MYSQL_USER=user
       - MYSQL_PASSWORD=password
       - MYSQL_DATABASE=databricks_iot
+      - PYTHONPATH=/workspaces/Databricks-IoT/src
     depends_on:
       db:
         condition: service_healthy
