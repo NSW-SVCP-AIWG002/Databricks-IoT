@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIチャット</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/chat.css') }}">
+    <!-- marked.js: AIレスポンスのMarkdownレンダリング用 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify: XSS対策サニタイズ -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <!-- Plotly: グラフ描画 -->
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+    <div class="layout">
+        <!-- (1) グローバルメニュー -->
+        <nav class="sidebar" aria-label="グローバルナビゲーション">
+            <div class="sidebar__logo">IoT System</div>
+            <ul class="sidebar__menu">
+                <li class="sidebar__menu-item">
+                    <a href="/" class="sidebar__menu-link">ダッシュボード</a>
+                </li>
+                <li class="sidebar__menu-item sidebar__menu-item--active">
+                    <a href="/chat" class="sidebar__menu-link">AIチャット</a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="main-content">
+            <!-- (2) 画面タイトル -->
+            <header class="page-header">
+                <h1 class="page-header__title">AIチャット</h1>
+            </header>
+
+            <div class="chat-wrapper">
+                <!-- (3) チャットコンテナ -->
+                <div class="chat-container">
+                    <!-- (3.1) チャット履歴表示エリア -->
+                    <div
+                        id="chat_history"
+                        class="chat-history"
+                        role="log"
+                        aria-live="polite"
+                        aria-label="チャット履歴"
+                    ></div>
+
+                    <!-- (3.2) ローディング表示（条件付き） -->
+                    <div
+                        id="loading_indicator"
+                        class="loading-indicator"
+                        style="display: none;"
+                        role="status"
+                        aria-busy="true"
+                    >
+                        <span class="loading-indicator__icon">🤖</span>
+                        <span class="loading-indicator__text">回答を生成中です...</span>
+                    </div>
+                </div>
+
+                <!-- (4) 入力エリア -->
+                <div class="input-area">
+                    <form id="chat_form" class="input-form" novalidate>
+                        <div class="input-wrapper">
+                            <textarea
+                                id="question_input"
+                                name="question"
+                                class="form-control input-textarea"
+                                placeholder="質問を入力してください...（例: 昨日の第1冷凍庫の平均温度は？）"
+                                maxlength="1000"
+                                rows="2"
+                                autocomplete="off"
+                                aria-label="質問入力"
+                                required
+                            ></textarea>
+                            <button
+                                type="submit"
+                                id="submit_btn"
+                                class="btn btn--primary input-submit"
+                                aria-label="質問を送信"
+                                disabled
+                            >
+                                送信
+                            </button>
+                        </div>
+                        <div class="input-footer">
+                            <span id="char_count" class="char-count">0/1000</span>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- (5) フッター -->
+                <div class="chat-footer">
+                    <button
+                        id="new_conversation_btn"
+                        class="btn btn--secondary"
+                        type="button"
+                    >
+                        🔄 新しい会話を開始
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/components/chat.js') }}"></script>
+</body>
+</html>
