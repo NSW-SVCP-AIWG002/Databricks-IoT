@@ -2,30 +2,68 @@
 
 ## タスク一覧
 
-| #   | タスク名           | 対象ファイル                                                                                                                                 | 対応テスト                                                       | 実装フロー状態 | 備考                                       |
-| --- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------- | ------------------------------------------ |
-| 0   | パッケージ初期化   | `src/__init__.py`（新規）, `src/views/__init__.py`（新規）, `src/views/industry_dashboard/__init__.py`（新規）                              | -                                                                | 完了           | create_app/db 再エクスポート               |
-| 1   | データ定義層       | `src/iot_app/models/device.py`, `organization.py`, `alert.py`, `src/iot_app/databricks/unity_catalog_connector.py`                          | `tests/unit/services/test_industry_dashboard_service.py`         | 完了           | Device, OrganizationClosure 等             |
-| 2   | ビジネスロジック層 | `src/iot_app/services/industry_dashboard_service.py`                                                                                        | `tests/unit/services/test_industry_dashboard_service.py`         | 完了           | 10関数 + 1内部ヘルパー                     |
-| 3   | インターフェース層 | `src/views/industry_dashboard/views.py`, `store_monitoring.html`, `device_details.html`, `src/iot_app/__init__.py`（Blueprint登録追加）     | `tests/integration/test_industry_dashboard_routes.py`            | 完了           | Blueprint登録 `/industry-dashboard/` 前置  |
+| #  | タスク名                    | 対象ファイル                                                                                          | 対応テスト                                                              | 実装フロー状態 | 備考 |
+|----|-----------------------------|------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|--------------|------|
+| 1  | ビジネスロジック層            | `src/iot_app/services/industry_dashboard_service.py`                                                | `tests/unit/services/test_industry_dashboard_service.py`               | 完了         | 既存実装済み（10関数 + 1内部ヘルパー） |
+| 2  | インターフェース層 - views    | `src/iot_app/views/analysis/industry_dashboard.py`                                                  | なし（単体テスト対象外）                                                 | 完了         | analysis_bp を実装。workflow-specification.md に従う |
+| 3  | インターフェース層 - templates | `src/iot_app/templates/analysis/industry_dashboard/store_monitoring.html` `device_details.html`   | なし（単体テスト対象外）                                                 | 完了         | ui-specification.md のワイヤーフレーム・要素詳細に従う |
+| 4  | アプリファクトリ更新           | `src/iot_app/__init__.py`                                                                           | なし                                                                    | 完了         | Blueprint登録を正しいパスに修正。`src/__init__.py` も作成 |
+
+---
+
+## タスク詳細
+
+### タスク2: インターフェース層 - views
+
+**実装内容:**
+- Blueprint名: `analysis_bp`（Flask登録名: `analysis`）
+- ルート一覧（url_prefix なし）:
+  - `GET  analysis/industry-dashboard/store-monitoring` → `store_monitoring()`
+  - `POST analysis/industry-dashboard/store-monitoring` → `store_monitoring_search()`
+  - `GET  analysis/industry-dashboard/store-monitoring/<device_uuid>` → `show_sensor_info(device_uuid)`
+  - `GET  analysis/industry-dashboard/device-details/<device_uuid>` → `device_details(device_uuid)`
+  - `POST analysis/industry-dashboard/device-details/<device_uuid>` → `device_details_search(device_uuid)`
+- CSVエクスポートは `device_details()` 内の `?export=csv` 分岐で処理
+
+### タスク4: アプリファクトリ更新
+
+**変更内容（影響範囲: `create_app()` 内のBlueprint登録1箇所）:**
+
+現在（誤ったパス）:
+```python
+from views.industry_dashboard.views import dashboard_bp
+app.register_blueprint(dashboard_bp)
+```
+
+変更後（正しいパス）:
+```python
+from iot_app.views.analysis.industry_dashboard import analysis_bp
+app.register_blueprint(analysis_bp)
+```
+
+**影響範囲:** `create_app()` のBlueprint登録1箇所のみ。`/health` ルートおよび `dev_bp` には影響なし。
+
+---
 
 ## 実装フロー状態
 
 | 状態     | 意味                 |
-| -------- | -------------------- |
+|---------|---------------------|
 | 未着手   | 実装未開始           |
 | 実装中   | ① 実装 実施中        |
 | テスト中 | ② pytest 実行中      |
 | 修正中   | ③ テスト失敗・修正中 |
 | 完了     | ④ 全テスト通過       |
 
+---
+
 ## セルフレビュー進捗
 
-| 観点                         | 状態 | 確認結果 |
-| ---------------------------- | ---- | -------- |
-| 機能: 設計書との差分         | 完了 | ルート5本・サービス関数10本すべて設計書通り実装。URL prefix `/industry-dashboard/` 一致。 |
-| 機能: テスト仕様カバレッジ   | 完了 | 単体テスト 81/81 通過（テストコードバグ `42 in str(arg)` → `str(42) in str(arg)` を修正して解消）。結合テストはユーザー指示によりスキップ。 |
-| 機能: インターフェース整合性 | 完了 | **要注意**: `iot_app/__init__.py` の `from views.industry_dashboard.views import dashboard_bp` と結合テストのパッチパス `src.views.industry_dashboard.views.*` が不一致。結合テスト実行時にはパッチが効かない可能性あり。修正が必要な場合は `from src.views.industry_dashboard.views import dashboard_bp` に変更。 |
-| 非機能: セキュリティ         | 完了 | SQLAlchemy ORM + `?` プレースホルダでSQLインジェクション対策済み。Cookie は `httponly=True, samesite="Lax"` 設定済み。 |
-| 非機能: ログ準拠             | 完了 | **指摘**: views.py の `except Exception: abort(500)` ブロックにエラーログ出力なし。本番環境での障害追跡に影響する可能性あり（別途対応を検討）。 |
-| 非機能: エラーハンドリング   | 完了 | `abort(500)` + `if hasattr(e, "code"): raise` パターンで HTTPException を再発行。404/400/500 を適切に返却。 |
+| 観点                         | 状態   | 確認結果 |
+|-----------------------------|--------|---------|
+| 機能: 設計書との差分          | 完了   | ⚠️ Cookie: ページング時も`_set_cookie`を呼ぶ（仕様はページング時更新なし）。実害軽微。 |
+| 機能: テスト仕様カバレッジ    | 完了   | ✅ service層81件全通過。views/templateはテスト対象外。 |
+| 機能: インターフェース整合性  | 完了   | ✅ service関数10件の呼び出し引数すべて整合。 |
+| 非機能: セキュリティ          | 完了   | ❌ middleware.py が空のため`g.current_user`未設定（要別途実装）。Cookie属性・スコープ制限は✅。 |
+| 非機能: ログ準拠              | 完了   | ❌ loggerなし。仕様「DBクエリ前後にログ出力」未実装（要別途実装）。 |
+| 非機能: エラーハンドリング    | 完了   | ✅ 404/400/500のabort処理、HTTPException再raiseすべて正しく実装。 |

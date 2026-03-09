@@ -1,7 +1,290 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta charset="UTF-8"><title>デバイス詳細</title></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デバイス詳細</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
 <body>
-<h1>デバイス詳細</h1>
+  <div class="layout">
+    {# グローバルメニュー #}
+    <nav class="sidebar">
+      <ul class="sidebar__menu">
+        <li class="sidebar__item"><a href="{{ url_for('analysis.store_monitoring') }}">ホーム</a></li>
+        <li class="sidebar__item"><a href="#">管理機能</a></li>
+        <li class="sidebar__item"><a href="#">アラート</a></li>
+        <li class="sidebar__item"><a href="#">通知</a></li>
+        <li class="sidebar__item"><a href="#">CSV</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      {# (6) 画面タイトル / (7) アクションボタン #}
+      <div class="page__header">
+        <h1 class="page__title">デバイス詳細</h1>
+        <div class="page__actions">
+          <a href="{{ url_for('analysis.store_monitoring') }}" class="button button--primary">デバイス変更</a>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <div class="content-area__top">
+          {# (8) デバイス情報表示 #}
+          <section class="device-info">
+            <dl class="device-info__list">
+              <dt class="device-info__label">デバイス名:</dt>
+              <dd class="device-info__value">{{ device.device_name }}</dd>
+              <dt class="device-info__label">デバイス種別:</dt>
+              <dd class="device-info__value">{{ device.device_type_name if device.device_type_name else '' }}</dd>
+              <dt class="device-info__label">モデル情報:</dt>
+              <dd class="device-info__value">{{ device.device_model if device.device_model else '' }}</dd>
+              <dt class="device-info__label">店舗名:</dt>
+              <dd class="device-info__value">{{ device.organization_name if device.organization_name else '' }}</dd>
+            </dl>
+          </section>
+
+          {# (9) アラート一覧 #}
+          <section class="section">
+            <div class="section__header">
+              <h2 class="section__title">アラート一覧</h2>
+              <span class="section__count">{{ alerts_total }}件</span>
+            </div>
+            <div class="table-wrapper">
+              <table class="table" style="min-width:800px;">
+                <thead>
+                  <tr>
+                    <th class="table__th" style="width:25%;">アラート発生日時 <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:35%;">アラート名 <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:20%;">アラートレベル <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:20%;">ステータス <span class="sort-indicator">↕</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for alert in alerts %}
+                  <tr>
+                    <td class="table__td">
+                      {% if alert.alert_occurrence_datetime %}
+                        {{ alert.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+                      {% endif %}
+                    </td>
+                    <td class="table__td">{{ alert.alert_name }}</td>
+                    <td class="table__td">
+                      <span class="badge
+                        {% if alert.alert_level_name == 'Critical' %}badge--danger
+                        {% elif alert.alert_level_name == 'Warning' %}badge--warning
+                        {% else %}badge--info{% endif %}">
+                        {{ alert.alert_level_name }}
+                      </span>
+                    </td>
+                    <td class="table__td">
+                      <span class="badge
+                        {% if alert.alert_status_name == '発生中' %}badge--danger
+                        {% else %}badge--info{% endif %}">
+                        {{ alert.alert_status_name }}
+                      </span>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {# (9.6) ページネーション #}
+            <div class="pagination">
+              {% set total_pages = (alerts_total // per_page) + (1 if alerts_total % per_page > 0 else 0) %}
+              {% if page > 1 %}
+                <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, page=page-1) }}" class="pagination__link">&lt;</a>
+              {% endif %}
+              {% for p in range(1, total_pages + 1) %}
+                <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, page=p) }}"
+                   class="pagination__link {% if p == page %}pagination__link--active{% endif %}">{{ p }}</a>
+              {% endfor %}
+              {% if page < total_pages %}
+                <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, page=page+1) }}" class="pagination__link">&gt;</a>
+              {% endif %}
+            </div>
+          </section>
+        </div>
+
+        {# (10) 表示期間変更 / (11) CSVエクスポート #}
+        <section class="period-control">
+          <form method="POST" action="{{ url_for('analysis.device_details_search', device_uuid=device.device_uuid) }}" class="period-control__form">
+            <div class="period-control__inputs">
+              <input
+                type="datetime-local"
+                id="search_start_datetime"
+                name="search_start_datetime"
+                class="form-group__input"
+                value="{{ search_params.get('search_start_datetime', '') }}"
+              >
+              <span class="period-control__separator">～</span>
+              <input
+                type="datetime-local"
+                id="search_end_datetime"
+                name="search_end_datetime"
+                class="form-group__input"
+                value="{{ search_params.get('search_end_datetime', '') }}"
+              >
+            </div>
+            <div class="period-control__actions">
+              <button type="submit" class="button button--primary">表示期間変更</button>
+              <label class="checkbox">
+                <input type="checkbox" id="auto_update" class="checkbox__input">
+                <span class="checkbox__label">自動更新</span>
+              </label>
+            </div>
+          </form>
+          <div class="csv-export">
+            <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, export='csv') }}"
+               class="button button--secondary">CSVエクスポート</a>
+          </div>
+        </section>
+
+        {# (12) 時系列グラフ / (13) 凡例 #}
+        <section class="graph-section">
+          <div class="graph-section__header">
+            <h2 class="graph-section__title">時系列グラフ</h2>
+            <span class="graph-section__updated" id="graph-updated-time"></span>
+          </div>
+          <div class="graph-section__body">
+            <div id="time-series-chart" style="width:100%; height:400px;"></div>
+            <div class="legend" id="chart-legend">
+              <label class="legend__item">
+                <input type="checkbox" class="legend__checkbox" id="select-all" checked>
+                <span class="legend__label">全選択/全解除</span>
+              </label>
+              {# 凡例項目 #}
+              {% set series_names = [
+                '外気温度', '第1冷凍 設定温度', '第1冷凍 庫内センサー温度',
+                '第1冷凍 表示温度', '第1冷凍 DF温度', '第1冷凍 凝縮温度',
+                '第1冷凍 微調整後庫内温度', '第2冷凍 設定温度', '第2冷凍 庫内センサー温度',
+                '第2冷凍 表示温度', '第2冷凍 DF温度', '第2冷凍 凝縮温度',
+                '第2冷凍 微調整後庫内温度', '第1冷凍 圧縮機', '第2冷凍 圧縮機',
+                '第1ファンモータ', '第2ファンモータ', '第3ファンモータ',
+                '第4ファンモータ', '第5ファンモータ', '防露ヒータ出力(1)', '防露ヒータ出力(2)'
+              ] %}
+              {% for name in series_names %}
+              <label class="legend__item">
+                <input type="checkbox" class="legend__checkbox legend__series-cb" value="{{ name }}" checked>
+                <span class="legend__label">{{ name }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // グラフデータ（サーバーサイドから受け取る）
+    var graphData = {{ graph_data | tojson }};
+
+    // Apache ECharts 初期化
+    var chartDom = document.getElementById('time-series-chart');
+    if (chartDom && typeof echarts !== 'undefined') {
+      var myChart = echarts.init(chartDom);
+
+      // タイムスタンプリスト
+      var timestamps = graphData.map(function(row) { return row.event_timestamp; });
+
+      var seriesConfig = [
+        { name: '外気温度',               field: 'external_temp',                   color: '#000000', type: 'solid' },
+        { name: '第1冷凍 設定温度',        field: 'set_temp_freezer_1',              color: '#007DFF', type: 'dashed' },
+        { name: '第1冷凍 庫内センサー温度', field: 'internal_sensor_temp_freezer_1',  color: '#007DFF', type: 'solid' },
+        { name: '第1冷凍 表示温度',        field: 'internal_temp_freezer_1',         color: '#FF8800', type: 'solid' },
+        { name: '第1冷凍 DF温度',          field: 'df_temp_freezer_1',               color: '#FF8800', type: 'dashed' },
+        { name: '第1冷凍 凝縮温度',        field: 'condensing_temp_freezer_1',       color: '#CC65FF', type: 'solid' },
+        { name: '第1冷凍 微調整後庫内温度', field: 'adjusted_internal_temp_freezer_1', color: '#005885', type: 'solid' },
+        { name: '第2冷凍 設定温度',        field: 'set_temp_freezer_2',              color: '#A7D672', type: 'dashed' },
+        { name: '第2冷凍 庫内センサー温度', field: 'internal_sensor_temp_freezer_2',  color: '#621C97', type: 'solid' },
+        { name: '第2冷凍 表示温度',        field: 'internal_temp_freezer_2',         color: '#621C97', type: 'dashed' },
+        { name: '第2冷凍 DF温度',          field: 'df_temp_freezer_2',               color: '#00A02F', type: 'solid' },
+        { name: '第2冷凍 凝縮温度',        field: 'condensing_temp_freezer_2',       color: '#00A02F', type: 'dashed' },
+        { name: '第2冷凍 微調整後庫内温度', field: 'adjusted_internal_temp_freezer_2', color: '#009EEC', type: 'solid' },
+        { name: '第1冷凍 圧縮機',          field: 'compressor_freezer_1',            color: '#CC65FF', type: 'dashed' },
+        { name: '第2冷凍 圧縮機',          field: 'compressor_freezer_2',            color: '#9ED262', type: 'dashed' },
+        { name: '第1ファンモータ',          field: 'fan_motor_1',                    color: '#000000', type: 'dashed' },
+        { name: '第2ファンモータ',          field: 'fan_motor_2',                    color: '#767676', type: 'solid' },
+        { name: '第3ファンモータ',          field: 'fan_motor_3',                    color: '#767676', type: 'dashed' },
+        { name: '第4ファンモータ',          field: 'fan_motor_4',                    color: '#D6D6D6', type: 'solid' },
+        { name: '第5ファンモータ',          field: 'fan_motor_5',                    color: '#D6D6D6', type: 'dashed' },
+        { name: '防露ヒータ出力(1)',        field: 'defrost_heater_output_1',         color: '#005280', type: 'dashed' },
+        { name: '防露ヒータ出力(2)',        field: 'defrost_heater_output_2',         color: '#009CEC', type: 'dashed' },
+      ];
+
+      var series = seriesConfig.map(function(cfg) {
+        return {
+          name: cfg.name,
+          type: 'line',
+          data: graphData.map(function(row) { return row[cfg.field]; }),
+          lineStyle: { color: cfg.color, type: cfg.type },
+          itemStyle: { color: cfg.color },
+          smooth: false,
+          showSymbol: false,
+        };
+      });
+
+      var option = {
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          data: timestamps,
+          axisLabel: { formatter: function(val) { return val ? val.substring(0, 16) : ''; } }
+        },
+        yAxis: { type: 'value' },
+        dataZoom: [{ type: 'inside' }, { type: 'slider' }],
+        series: series,
+        legend: { show: false }
+      };
+
+      myChart.setOption(option);
+
+      // 最終更新時刻
+      var now = new Date();
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      document.getElementById('graph-updated-time').textContent =
+        '最終更新時刻: ' + now.getFullYear() + '/' + pad(now.getMonth()+1) + '/' + pad(now.getDate()) +
+        ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+
+      // 凡例チェックボックス
+      var seriesCbs = document.querySelectorAll('.legend__series-cb');
+      var selectAll = document.getElementById('select-all');
+
+      seriesCbs.forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          myChart.dispatchAction({
+            type: cb.checked ? 'legendSelect' : 'legendUnSelect',
+            name: cb.value
+          });
+          selectAll.checked = Array.from(seriesCbs).every(function(c) { return c.checked; });
+        });
+      });
+
+      selectAll.addEventListener('change', function() {
+        seriesCbs.forEach(function(cb) {
+          cb.checked = selectAll.checked;
+          myChart.dispatchAction({
+            type: selectAll.checked ? 'legendSelect' : 'legendUnSelect',
+            name: cb.value
+          });
+        });
+      });
+
+      // 自動更新（60秒ごと）
+      var autoUpdateCb = document.getElementById('auto_update');
+      var autoUpdateTimer = null;
+      if (autoUpdateCb) {
+        autoUpdateCb.addEventListener('change', function() {
+          if (autoUpdateCb.checked) {
+            autoUpdateTimer = setInterval(function() { location.reload(); }, 60000);
+          } else {
+            if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+          }
+        });
+      }
+    }
+  </script>
 </body>
 </html>

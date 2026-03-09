@@ -1,7 +1,258 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta charset="UTF-8"><title>店舗モニタリング</title></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店舗モニタリング</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
 <body>
-<h1>店舗モニタリング</h1>
+  <div class="layout">
+    {# グローバルメニュー #}
+    <nav class="sidebar">
+      <ul class="sidebar__menu">
+        <li class="sidebar__item"><a href="{{ url_for('analysis.store_monitoring') }}">ホーム</a></li>
+        <li class="sidebar__item"><a href="#">管理機能</a></li>
+        <li class="sidebar__item"><a href="#">アラート</a></li>
+        <li class="sidebar__item"><a href="#">通知</a></li>
+        <li class="sidebar__item"><a href="#">CSV</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      {# (1) 画面タイトル #}
+      <h1 class="page__title">店舗モニタリング</h1>
+
+      {# (2) 検索フォーム #}
+      <section class="search-form">
+        <div class="search-form__header">
+          <span class="search-form__label">検索条件</span>
+          <button type="button" class="search-form__toggle" aria-expanded="true">▼</button>
+        </div>
+        <form method="POST" action="{{ url_for('analysis.store_monitoring_search') }}" class="search-form__body">
+          <div class="search-form__fields">
+            <div class="form-group">
+              <label class="form-group__label" for="organization_name">店舗名</label>
+              <input
+                type="text"
+                id="organization_name"
+                name="organization_name"
+                class="form-group__input"
+                placeholder="店舗を検索..."
+                maxlength="200"
+                value="{{ search_params.get('organization_name', '') }}"
+              >
+            </div>
+            <div class="form-group">
+              <label class="form-group__label" for="device_name">デバイス名</label>
+              <input
+                type="text"
+                id="device_name"
+                name="device_name"
+                class="form-group__input"
+                maxlength="100"
+                value="{{ search_params.get('device_name', '') }}"
+              >
+            </div>
+          </div>
+          <div class="search-form__actions">
+            <button type="submit" class="button button--primary">検索</button>
+          </div>
+        </form>
+      </section>
+
+      <div class="content-area">
+        {# (3) アラート一覧 #}
+        <section class="section">
+          <div class="section__header">
+            <h2 class="section__title">アラート一覧</h2>
+            <span class="section__count">{{ alerts_total }}件</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="table" style="min-width:800px;">
+              <thead>
+                <tr>
+                  <th class="table__th" style="width:20%;">アラート発生日時 <span class="sort-indicator">↕</span></th>
+                  <th class="table__th" style="width:25%;">デバイス名 <span class="sort-indicator">↕</span></th>
+                  <th class="table__th" style="width:25%;">アラート名 <span class="sort-indicator">↕</span></th>
+                  <th class="table__th" style="width:15%;">アラートレベル <span class="sort-indicator">↕</span></th>
+                  <th class="table__th" style="width:15%;">ステータス <span class="sort-indicator">↕</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for alert in alerts %}
+                <tr>
+                  <td class="table__td">
+                    {% if alert.alert_occurrence_datetime %}
+                      {{ alert.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+                    {% endif %}
+                  </td>
+                  <td class="table__td">{{ alert.device_name }}</td>
+                  <td class="table__td">{{ alert.alert_name }}</td>
+                  <td class="table__td">
+                    <span class="badge
+                      {% if alert.alert_level_name == 'Critical' %}badge--danger
+                      {% elif alert.alert_level_name == 'Warning' %}badge--warning
+                      {% else %}badge--info{% endif %}">
+                      {{ alert.alert_level_name }}
+                    </span>
+                  </td>
+                  <td class="table__td">
+                    <span class="badge
+                      {% if alert.alert_status_name == '発生中' %}badge--danger
+                      {% else %}badge--info{% endif %}">
+                      {{ alert.alert_status_name }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {# (3.7) ページネーション #}
+          <div class="pagination">
+            {% set total_pages = (alerts_total // per_page) + (1 if alerts_total % per_page > 0 else 0) %}
+            {% if page > 1 %}
+              <a href="{{ url_for('analysis.store_monitoring', page=page-1) }}" class="pagination__link">&lt;</a>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+              <a href="{{ url_for('analysis.store_monitoring', page=p) }}"
+                 class="pagination__link {% if p == page %}pagination__link--active{% endif %}">{{ p }}</a>
+            {% endfor %}
+            {% if page < total_pages %}
+              <a href="{{ url_for('analysis.store_monitoring', page=page+1) }}" class="pagination__link">&gt;</a>
+            {% endif %}
+          </div>
+        </section>
+
+        <div class="content-area__columns">
+          {# (4) デバイス一覧 #}
+          <section class="section">
+            <div class="section__header">
+              <h2 class="section__title">デバイス一覧</h2>
+              <span class="section__count">{{ devices_total }}台</span>
+            </div>
+            <div class="table-wrapper">
+              <table class="table" style="min-width:800px;">
+                <thead>
+                  <tr>
+                    <th class="table__th" style="width:30%;">店舗名 <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:25%;">デバイス名 <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:15%;">ステータス <span class="sort-indicator">↕</span></th>
+                    <th class="table__th" style="width:30%;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for device in devices %}
+                  <tr {% if selected_device and selected_device.device_uuid == device.device_uuid %}class="table__tr--selected"{% endif %}>
+                    <td class="table__td">{{ device.organization_name if device.organization_name else '' }}</td>
+                    <td class="table__td">{{ device.device_name }}</td>
+                    <td class="table__td">
+                      <span class="badge
+                        {% if device.status == '接続済み' %}badge--success
+                        {% else %}badge--secondary{% endif %}">
+                        {{ device.status if device.status else '未接続' }}
+                      </span>
+                    </td>
+                    <td class="table__td">
+                      <a href="{{ url_for('analysis.show_sensor_info', device_uuid=device.device_uuid) }}"
+                         class="button button--primary button--sm">センサー情報表示</a>
+                      <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid) }}"
+                         class="button button--primary button--sm">デバイス詳細</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {# (4.6) ページネーション #}
+            <div class="pagination">
+              {% set device_total_pages = (devices_total // per_page) + (1 if devices_total % per_page > 0 else 0) %}
+              {% if page > 1 %}
+                <a href="{{ url_for('analysis.store_monitoring', page=page-1) }}" class="pagination__link">&lt;</a>
+              {% endif %}
+              {% for p in range(1, device_total_pages + 1) %}
+                <a href="{{ url_for('analysis.store_monitoring', page=p) }}"
+                   class="pagination__link {% if p == page %}pagination__link--active{% endif %}">{{ p }}</a>
+              {% endfor %}
+              {% if page < device_total_pages %}
+                <a href="{{ url_for('analysis.store_monitoring', page=page+1) }}" class="pagination__link">&gt;</a>
+              {% endif %}
+            </div>
+          </section>
+
+          {# (5) センサー情報表示 #}
+          {% if show_sensor_info and selected_device %}
+          <section class="sensor-info">
+            <div class="sensor-info__header">
+              <h2 class="sensor-info__title">センサー情報表示</h2>
+              {% if sensor_data and sensor_data.event_timestamp %}
+              <span class="sensor-info__updated">
+                最終更新時刻: {{ sensor_data.event_timestamp.strftime('%Y/%m/%d %H:%M:%S') }}
+              </span>
+              {% endif %}
+            </div>
+            <div class="sensor-info__body">
+              <dl class="sensor-info__list">
+                <dt class="sensor-info__label">デバイス名:</dt>
+                <dd class="sensor-info__value">{{ selected_device.device_name }}</dd>
+                <dt class="sensor-info__label">デバイス種別:</dt>
+                <dd class="sensor-info__value">{{ selected_device.device_type_name if selected_device.device_type_name else '' }}</dd>
+                <dt class="sensor-info__label">モデル情報:</dt>
+                <dd class="sensor-info__value">{{ selected_device.device_model if selected_device.device_model else '' }}</dd>
+                {% if sensor_data %}
+                <dt class="sensor-info__label">外気温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.external_temp }}</dd>
+                <dt class="sensor-info__label">第1冷凍 設定温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.set_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 庫内センサー温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.internal_sensor_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 庫内温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.internal_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 DF温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.df_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 凝縮温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.condensing_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 微調整後庫内温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.adjusted_internal_temp_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 設定温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.set_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 庫内センサー温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.internal_sensor_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 庫内温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.internal_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 DF温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.df_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 凝縮温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.condensing_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 微調整後庫内温度:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.adjusted_internal_temp_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第1冷凍 圧縮機:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.compressor_freezer_1 }}</dd>
+                <dt class="sensor-info__label">第2冷凍 圧縮機:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.compressor_freezer_2 }}</dd>
+                <dt class="sensor-info__label">第1ファンモータ:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.fan_motor_1 }}</dd>
+                <dt class="sensor-info__label">第2ファンモータ:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.fan_motor_2 }}</dd>
+                <dt class="sensor-info__label">第3ファンモータ:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.fan_motor_3 }}</dd>
+                <dt class="sensor-info__label">第4ファンモータ:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.fan_motor_4 }}</dd>
+                <dt class="sensor-info__label">第5ファンモータ:</dt>
+                <dd class="sensor-info__value">{{ sensor_data.fan_motor_5 }}</dd>
+                <dt class="sensor-info__label">防露ヒータ出力(1):</dt>
+                <dd class="sensor-info__value">{{ sensor_data.defrost_heater_output_1 }}</dd>
+                <dt class="sensor-info__label">防露ヒータ出力(2):</dt>
+                <dd class="sensor-info__value">{{ sensor_data.defrost_heater_output_2 }}</dd>
+                {% endif %}
+              </dl>
+            </div>
+          </section>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
 </body>
 </html>
