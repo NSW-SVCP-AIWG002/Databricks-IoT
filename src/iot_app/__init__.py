@@ -17,6 +17,10 @@ def create_app():
 
     db.init_app(app)
 
+    # before_request: 認証ミドルウェア
+    from iot_app.auth.middleware import set_mock_current_user
+    app.before_request(set_mock_current_user)
+
     # ヘルスチェックルート（認証除外パス）
     @app.route('/health')
     def health():
