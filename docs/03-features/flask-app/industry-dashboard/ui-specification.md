@@ -35,7 +35,7 @@
 |------|------|
 | 画面ID | `IDS-001` |
 | 画面名 | 店舗モニタリング画面 |
-| 画面パス | `/industry-dashboard/store-monitoring` |
+| 画面パス | `analysis/industry-dashboard/store-monitoring` |
 | アクセス権限 | システム保守者、管理者、販社ユーザ、サービス利用者（すべてのロール） |
 | 親画面 | なし |
 | 子画面 | IDS-002（デバイス詳細画面） |
@@ -642,7 +642,7 @@
 **CSVエクスポートボタン:**
 - 概要: 現在の検索条件でセンサーデータをCSVダウンロード
 - スタイル: セカンダリボタン
-- クリック時: `/industry-dashboard/device-details/<device_uuid>?export=csv`にリクエスト
+- クリック時: `analysis/industry-dashboard/device-details/<device_uuid>?export=csv`にリクエスト
 
 ---
 
