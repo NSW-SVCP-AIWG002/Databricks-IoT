@@ -17,9 +17,8 @@ def create_app():
 
     db.init_app(app)
 
-    # before_request: 認証ミドルウェア
-    from iot_app.auth.middleware import set_mock_current_user
-    app.before_request(set_mock_current_user)
+    from iot_app.auth.middleware import setup_middleware
+    setup_middleware(app)
 
     # ヘルスチェックルート（認証除外パス）
     @app.route('/health')
@@ -27,8 +26,8 @@ def create_app():
         return jsonify(status='ok'), 200
 
     # 業種別ダッシュボード Blueprint
-    from views.industry_dashboard.views import dashboard_bp
-    app.register_blueprint(dashboard_bp)
+    from iot_app.views.analysis.industry_dashboard import analysis_bp
+    app.register_blueprint(analysis_bp)
 
     # 開発環境専用 Blueprint
     if config_name == "development":

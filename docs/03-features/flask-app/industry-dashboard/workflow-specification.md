@@ -102,12 +102,12 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 店舗モニタリング初期表示 | `analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
-| 2 | 店舗モニタリング検索 | `analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
-| 3 | センサー情報表示 | `analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
-| 4 | デバイス詳細初期表示 | `analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
-| 5 | デバイス詳細検索 | `analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
-| 6 | CSVエクスポート | `analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
+| 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
+| 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
+| 3 | センサー情報表示 | `/analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
+| 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
+| 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
+| 6 | CSVエクスポート | `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
 
 **注:**
 - **レスポンス形式**:
@@ -121,21 +121,21 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
-| 検索ボタン押下 | フォーム送信 | `POST analysis/industry-dashboard/store-monitoring` | `organization_name, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
-| ページボタン押下 | リンククリック | `GET analysis/industry-dashboard/store-monitoring` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
-| センサー情報表示ボタン押下 | ボタンクリック | `GET analysis/industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
-| デバイス詳細ボタン押下 | ボタンクリック | `GET analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
+| 検索ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/store-monitoring` | `organization_name, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
+| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/store-monitoring` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
+| センサー情報表示ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
+| デバイス詳細ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
 
 ### デバイス詳細画面
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | デバイス詳細ボタン押下 | `GET analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
-| 表示期間変更ボタン押下 | フォーム送信 | `POST analysis/industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | HTML（検索結果画面） | エラーメッセージ表示 |
-| ページボタン押下 | リンククリック | `GET analysis/industry-dashboard/device-details/<device_uuid>` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
-| デバイス変更ボタン押下 | ボタンクリック | `GET analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
-| CSVエクスポート | ボタンクリック | `GET analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | 検索条件 | CSVダウンロード | エラーメッセージ表示 |
+| 画面初期表示 | デバイス詳細ボタン押下 | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
+| 表示期間変更ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | HTML（検索結果画面） | エラーメッセージ表示 |
+| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
+| デバイス変更ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
+| CSVエクスポート | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | 検索条件 | CSVダウンロード | エラーメッセージ表示 |
 
 ---
 
@@ -153,7 +153,7 @@
 
 ```mermaid
 flowchart TD
-    Start([GET analysis/industry-dashboard/store-monitoring]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Start([GET /analysis/industry-dashboard/store-monitoring]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
@@ -201,7 +201,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 店舗モニタリング初期表示 | `GET analysis/industry-dashboard/store-monitoring` | クエリパラメータ: `page` |
+| 店舗モニタリング初期表示 | `GET /analysis/industry-dashboard/store-monitoring` | クエリパラメータ: `page` |
 
 #### バリデーション
 
@@ -349,7 +349,7 @@ LIMIT :item_per_page OFFSET 0
 
 **実装例:**
 ```python
-@analysis_bp.route('analysis/industry-dashboard/store-monitoring', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring', methods=['GET'])
 @require_auth
 def store_monitoring():
     """店舗モニタリング初期表示・ページング"""
@@ -611,7 +611,7 @@ LIMIT :item_per_page OFFSET (:page - 1) * :item_per_page
 
 **実装例:**
 ```python
-@analysis_bp.route('analysis/industry-dashboard/store-monitoring', methods=['POST'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring', methods=['POST'])
 @require_auth
 def store_monitoring_search():
     """店舗モニタリング検索"""
@@ -729,7 +729,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| センサー情報表示 | `GET analysis/industry-dashboard/store-monitoring/<device_uuid>` | パスパラメータ: `device_uuid` |
+| センサー情報表示 | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | パスパラメータ: `device_uuid` |
 
 #### 処理詳細（サーバーサイド）
 
@@ -765,7 +765,7 @@ LIMIT 1
 
 **実装例:**
 ```python
-@analysis_bp.route('analysis/industry-dashboard/store-monitoring/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring/<device_uuid>', methods=['GET'])
 @require_auth
 def show_sensor_info(device_uuid):
     """センサー情報表示"""
@@ -851,7 +851,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ```mermaid
 flowchart TD
-    Start([GET analysis/industry-dashboard/device-details/<device_uuid>]) --> Auth[認証チェック]
+    Start([GET /analysis/industry-dashboard/device-details/<device_uuid>]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
@@ -902,7 +902,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| デバイス詳細初期表示 | `GET analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid`、クエリパラメータ: `page` |
+| デバイス詳細初期表示 | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid`、クエリパラメータ: `page` |
 
 #### 処理詳細（サーバーサイド）
 
@@ -942,7 +942,7 @@ ORDER BY
 
 **実装例:**
 ```python
-@analysis_bp.route('analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
 @require_auth
 def device_details(device_uuid):
     """デバイス詳細初期表示・ページング"""
@@ -1092,7 +1092,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| デバイス詳細検索 | `POST analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid` |
+| デバイス詳細検索 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid` |
 
 #### バリデーション
 
@@ -1130,7 +1130,7 @@ def validate_date_range(start_datetime_str, end_datetime_str):
 
 **実装例:**
 ```python
-@analysis_bp.route('analysis/industry-dashboard/device-details/<device_uuid>', methods=['POST'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['POST'])
 @require_auth
 def device_details_search(device_uuid):
     """デバイス詳細検索（表示期間変更）"""
@@ -1429,7 +1429,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@analysis_bp.route('analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
 @require_auth
 def device_details(device_uuid):
     logger.info(f'デバイス詳細表示開始: user_id={g.current_user.user_id}, device_uuid={device_uuid}')
