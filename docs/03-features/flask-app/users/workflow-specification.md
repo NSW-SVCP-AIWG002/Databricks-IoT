@@ -764,8 +764,8 @@ flowchart TD
     DupResult -->|重複あり| DupError[フォーム再表示<br>このメールアドレスは既に登録されています]
     DupError --> ValidEnd[処理中断]
 
-    DupResult -->|重複なし| CreateUser[レコード作成<br>delete_flag=TRUE<br>databricks_user_id='']
-    CreateUser --> CheckCreate{レコード作成<br>操作結果}
+    DupResult -->|重複なし| CreateUser[OLTP DB.user_master<br>ユーザー登録<br>INSERT INTO<br> user_master<br>delete_flag=TRUE<br>databricks_user_id='']
+    CreateUser --> CheckCreate{OLTP DB<br>操作結果}
 
     CheckCreate -->|失敗| Error500
     CheckCreate -->|成功| CreateDatabricksUser[Databricks User作成<br>POST /api/2.0/preview/scim/v2/Users]
@@ -782,18 +782,31 @@ flowchart TD
 
     InsertUC --> CheckUC{UnityCatalog<br>操作結果}
     CheckUC -->|失敗| RollbackUC[ロールバック<br>UnityCatalog.<br>user_master]
-    CheckUC --> |成功| ActivateUser[ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
+    CheckUC --> |成功| ActivateUser[OLTP DB.user_master<br>ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
 
 　　RollbackUC --> CleenUpDG[Databricksワークスペースグループからユーザーを削除]
 
     ActivateUser --> CheckActivate{OLTP DB UPDATE<br>操作結果}
     CheckActivate -->|失敗| RollbackDB[ロールバック<br>OLTP DB.<br>user_master]
-    CheckActivate --> |成功| Flash[フラッシュメッセージ設定<br>ユーザーを登録しました]
-    Flash --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_users]
+    CheckActivate --> |成功| CheckEnv{環境判定<br>requires_additional_setup?}
+
+    CheckEnv -->|Azure/AWS| FlashCloud[フラッシュメッセージ設定<br>ユーザーを登録しました]
+    CheckEnv -->|オンプレミス| InsertUserPw[user_password INSERT<br>password_hash = NULL]
+
+    InsertUserPw --> InsertToken[password_reset_token INSERT<br>token_type = INVITE<br>有効期限7日]
+    InsertToken --> SendInvite[招待メール送信<br>パスワード設定リンク通知]
+    SendInvite --> CheckMail{メール送信結果}
+
+    CheckMail -->|失敗| FlashMailError[フラッシュメッセージ設定<br>ユーザーを登録しましたが<br>招待メール送信に失敗しました]
+    CheckMail -->|成功| FlashOnprem[フラッシュメッセージ設定<br>ユーザーを登録し<br>招待メールを送信しました]
+
+    FlashCloud --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_users]
+    FlashOnprem --> Redirect
+    FlashMailError --> Redirect
 
     RollbackDB　--> RollbackUC
     CleenUpDG --> CleenUpDU
-    
+
 
     Redirect --> End([処理完了])
     ValidEnd --> End
@@ -801,6 +814,7 @@ flowchart TD
     Error403 --> End
 ```
 ※1　403エラー発生時、登録モーダルを閉じる。
+※2　環境判定は`auth_provider.requires_additional_setup()`で行います。オンプレミス環境（`AUTH_TYPE=local`）の場合のみ招待メール送信処理を実行します。
 
 ##### 処理詳細（サーバーサイド）
 
@@ -1053,8 +1067,57 @@ def create_user():
         db.session.commit()
         logger.info(f'ユーザー登録コミット成功: user_id={user_id}')
 
-        # ⑩ 成功メッセージ
-        flash('ユーザーを登録しました', 'success')
+        # ⑩ オンプレミス環境の場合：招待リンク送信
+        if auth_provider.requires_additional_setup():
+            try:
+                # user_password INSERT（password_hash=NULL）
+                logger.info('user_password登録開始（オンプレミス環境）')
+                user_password = UserPassword(
+                    user_id=user.user_id,
+                    password_hash=None,  # 未設定
+                    password_expires_date=None,
+                    created_date=datetime.utcnow(),
+                    updated_date=datetime.utcnow()
+                )
+                db.session.add(user_password)
+
+                # password_reset_token INSERT（token_type=INVITE）
+                logger.info('招待トークン生成開始')
+                import secrets
+                import hashlib
+                raw_token = secrets.token_urlsafe(32)
+                token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+                reset_token = PasswordResetToken(
+                    token_hash=token_hash,
+                    user_id=user.user_id,
+                    token_type=1,  # INVITE
+                    expires_date=datetime.utcnow() + timedelta(days=7),
+                    created_date=datetime.utcnow(),
+                    updated_date=datetime.utcnow()
+                )
+                db.session.add(reset_token)
+                db.session.commit()
+                logger.info('招待トークン生成成功')
+
+                # 招待メール送信
+                logger.info('招待メール送信開始')
+                invite_url = url_for('auth.password_reset_execute', token=raw_token, _external=True)
+                send_invite_email(
+                    to_email=form.email_address.data,
+                    user_name=form.user_name.data,
+                    invite_url=invite_url
+                )
+                logger.info('招待メール送信成功')
+
+                flash('ユーザーを登録し、招待メールを送信しました', 'success')
+
+            except Exception as invite_error:
+                logger.error(f'招待メール送信失敗: {str(invite_error)}')
+                flash('ユーザーを登録しましたが、招待メール送信に失敗しました', 'warning')
+        else:
+            # Azure/AWS環境
+            flash('ユーザーを登録しました', 'success')
 
         # ⑪ 一覧画面へリダイレクト
         return redirect(url_for('admin.users.list_users'))
@@ -1104,10 +1167,14 @@ def create_user():
 
 ##### 表示メッセージ
 
-| メッセージID | 表示内容                     | 表示タイミング                  | 表示場所                               |
-| ------------ | ---------------------------- | ------------------------------- | -------------------------------------- |
-| -            | ユーザーを登録しました       | ユーザー登録成功時              | ステータスメッセージモーダル（成功）   |
-| -            | ユーザーの登録に失敗しました | API呼び出し失敗時、DB操作失敗時 | ステータスメッセージモーダル（エラー） |
+| メッセージID | 表示内容                                               | 表示タイミング                           | 表示場所                               |
+| ------------ | ------------------------------------------------------ | ---------------------------------------- | -------------------------------------- |
+| -            | ユーザーを登録しました                                 | ユーザー登録成功時（Azure/AWS環境）      | ステータスメッセージモーダル（成功）   |
+| -            | ユーザーを登録し、招待メールを送信しました             | ユーザー登録成功時（オンプレミス環境）   | ステータスメッセージモーダル（成功）   |
+| -            | ユーザーを登録しましたが、招待メール送信に失敗しました | 招待メール送信失敗時（オンプレミス環境） | ステータスメッセージモーダル（警告）   |
+| -            | ユーザーの登録に失敗しました                           | API呼び出し失敗時、DB操作失敗時          | ステータスメッセージモーダル（エラー） |
+
+**注**: オンプレミス環境（`AUTH_TYPE=local`）では、ユーザー登録時に招待メールが送信されます。詳細は[認証仕様書 5.6節](../../common/authentication-specification.md#56-ユーザー新規登録時の認証処理)を参照してください。
 
 ##### UI状態
 
@@ -1982,15 +2049,19 @@ def export_users_csv(users):
 
 ### 使用テーブル一覧
 
-| No  | テーブル名           | 論理名             | 操作種別 | ワークフロー                                    | 目的                               | インデックス利用                                 |
-| --- | -------------------- | ------------------ | -------- | ----------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| 1   | user_master          | ユーザーマスタ     | SELECT   | 初期表示、検索、参照                            | ユーザー情報の一覧取得             | PRIMARY KEY (user_id)<br>INDEX (organization_id) |
-| 2   | user_master          | ユーザーマスタ     | INSERT   | ユーザー登録                                    | ユーザー情報の新規登録             | -                                                |
-| 3   | user_master          | ユーザーマスタ     | UPDATE   | ユーザー更新、削除                              | ユーザー情報の更新・論理削除       | PRIMARY KEY (user_id)                            |
-| 4   | organization_master  | 組織マスタ         | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 組織選択肢取得                     | PRIMARY KEY (organization_id)                    |
-| 5   | organization_closure | 組織閉方テーブル   | SELECT   | 全ワークフロー                                  | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
-| 6   | user_type_master     | ユーザー種別マスタ | SELECT   | 初期表示、登録/更新画面表示、検索条件、一覧表示 | ユーザー種別選択肢取得             | PRIMARY KEY (user_type_id)                       |
-| 7   | region_master        | 地域マスタ         | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 地域選択肢取得                     | PRIMARY KEY (region_id)                          |
+| No  | テーブル名           | 論理名                     | 操作種別 | ワークフロー                                    | 目的                               | インデックス利用                                 |
+| --- | -------------------- | -------------------------- | -------- | ----------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| 1   | user_master          | ユーザーマスタ             | SELECT   | 初期表示、検索、参照                            | ユーザー情報の一覧取得             | PRIMARY KEY (user_id)<br>INDEX (organization_id) |
+| 2   | user_master          | ユーザーマスタ             | INSERT   | ユーザー登録                                    | ユーザー情報の新規登録             | -                                                |
+| 3   | user_master          | ユーザーマスタ             | UPDATE   | ユーザー更新、削除                              | ユーザー情報の更新・論理削除       | PRIMARY KEY (user_id)                            |
+| 4   | organization_master  | 組織マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 組織選択肢取得                     | PRIMARY KEY (organization_id)                    |
+| 5   | organization_closure | 組織閉方テーブル           | SELECT   | 全ワークフロー                                  | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
+| 6   | user_type_master     | ユーザー種別マスタ         | SELECT   | 初期表示、登録/更新画面表示、検索条件、一覧表示 | ユーザー種別選択肢取得             | PRIMARY KEY (user_type_id)                       |
+| 7   | region_master        | 地域マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 地域選択肢取得                     | PRIMARY KEY (region_id)                          |
+| 8   | user_password        | ユーザーパスワード         | INSERT   | ユーザー登録（オンプレミス環境のみ）            | パスワード管理レコード作成         | PRIMARY KEY (user_id)                            |
+| 9   | password_reset_token | パスワードリセットトークン | INSERT   | ユーザー登録（オンプレミス環境のみ）            | 招待トークン発行                   | PRIMARY KEY (token_hash)                         |
+
+**注**: No.8, 9はオンプレミス環境（`AUTH_TYPE=local`）でのみ使用します。Azure/AWS環境ではIdP（Entra ID/Cognito）がユーザー認証を管理するため、これらのテーブルは使用しません。詳細は[認証仕様書](../../common/authentication-specification.md)を参照してください。
 
 ### インデックス最適化
 
@@ -2223,6 +2294,7 @@ class UserCreateForm(FlaskForm):
 
 ### 共通仕様
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
+- [認証仕様書](../../common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 - [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
