@@ -15,6 +15,7 @@
   - [ボタン](#ボタン)
   - [アラート・通知](#アラート通知)
   - [フォーム要素](#フォーム要素)
+  - [検索フォーム](#検索フォーム)
   - [テーブル表示](#テーブル表示)
   - [ページネーション](#ページネーション)
   - [ソート](#ソート)
@@ -41,14 +42,13 @@
 - **CSS3**: カスタムプロパティ（CSS変数）、Flexbox、Grid
 - **BEM命名規則**: Block__Element--Modifier
 - **Jinja2テンプレート**: Flask SSRテンプレートエンジン
-- **JavaScript**: バニラJS（ライブラリなし）
+- **JavaScript**: グラフ描画ライブラリとしてApache EChartsを使用
 
 ### アーキテクチャ
 
 - **Flask + Jinja2**: サーバーサイドレンダリング（SSR）
-- **UIライブラリ不使用**: Bootstrap、Tailwind、CSS Modules等のライブラリは使用しない
+- **UIライブラリ**: Apache EChartsのみ使用
 - **カスタムCSS**: すべてのスタイルを独自に定義
-- **Databricks Apps**: ホスティング環境（App Compute）
 
 ---
 
@@ -85,7 +85,8 @@ static/
     │   ├── modal.js
     │   ├── validation.js
     │   ├── toast.js
-    │   └── sort.js
+    │   ├── sort.js
+    │   └── pagination.js
     └── main.js
 ```
 
@@ -149,6 +150,9 @@ static/
   /* フォーカス */
   --color-focus-shadow: rgba(128, 189, 255, 0.25);
   --color-danger-focus-shadow: rgba(220, 53, 69, 0.25);
+
+  /* 検索条件バッジ */
+  --color-search-badge: #e3f2fd;
 }
 ```
 
@@ -278,11 +282,11 @@ Block__Element--Modifier
 
 #### 仕様
 
-| タイプ | 用途 | BEMクラス | 使用場面 |
-|--------|------|-----------|----------|
-| **プライマリボタン** | 主要なアクション | `.button--primary` | 登録、保存、検索、更新 |
-| **セカンダリボタン** | 補助的なアクション | `.button--secondary` | キャンセル |
-| **危険ボタン** | 削除などの危険な操作 | `.button--danger` | 削除、無効化 |
+| タイプ               | 用途                 | BEMクラス            | 使用場面               |
+| -------------------- | -------------------- | -------------------- | ---------------------- |
+| **プライマリボタン** | 主要なアクション     | `.button--primary`   | 登録、保存、検索、更新 |
+| **セカンダリボタン** | 補助的なアクション   | `.button--secondary` | キャンセル             |
+| **危険ボタン**       | 削除などの危険な操作 | `.button--danger`    | 削除、無効化           |
 
 #### CSS定義（button.css）
 
@@ -393,182 +397,7 @@ Block__Element--Modifier
 
 ---
 
-### アラート・通知
-
-#### 仕様
-
-| タイプ | 用途 | BEMクラス | アイコン |
-|--------|------|-----------|----------|
-| **成功** | 操作成功メッセージ | `.alert--success` | ✓ チェックマーク |
-| **エラー** | エラーメッセージ | `.alert--error` | ✕ エラーアイコン |
-| **警告** | 警告メッセージ | `.alert--warning` | ⚠ 警告アイコン |
-| **情報** | 情報メッセージ | `.alert--info` | ℹ 情報アイコン |
-
-#### CSS定義（alert.css）
-
-```css
-/* アラート基本スタイル */
-.alert {
-  background-color: var(--color-white);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--border-radius-base);
-  box-shadow: var(--shadow-lg);
-  min-width: 320px;
-}
-
-.alert__header {
-  display: flex;
-  align-items: center;
-  text-align: left;
-  padding: var(--spacing-4) var(--spacing-4) var(--spacing-2);
-}
-
-.alert__icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  font-size: var(--font-size-lg);
-}
-
-.alert__title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-gray-900);
-  margin-left: var(--spacing-2);
-}
-
-.alert__body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-0) var(--spacing-4) var(--spacing-4);
-}
-
-.alert__body button {
-  align-items: right;
-}
-
-.alert__message {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-normal);
-  color: var(--color-gray-900);
-}
-
-/* トースト（固定位置表示） */
-.toast-container {
-  position: fixed;
-  top: var(--spacing-4);
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.toast {
-  margin-bottom: var(--spacing-2);
-  animation: fadeInDown 0.3s ease-out;
-}
-
-.toast--fade-out {
-  animation: fadeOut 0.3s ease-out forwards;
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-```
-
-#### HTML例
-
-```html
-<!-- 成功メッセージ -->
-<div class="alert" role="alert">
-  <div class="alert__header">
-    <span class="alert__icon">✔</span>
-    <h2 class="alert__title">通知メッセージ</h2>
-  </div>
-  <div class="alert__body">
-    <h4 class="alert__message">ユーザを登録しました</h4>
-    <button class="button button--secondary button--small">
-        <span class="button__text">閉じる</span>
-    </button>
-  </div>
-</div>
-
-<!-- エラーメッセージ -->
- <div class="alert" role="alert">
-  <div class="alert__header">
-    <span class="alert__icon">✕</span>
-    <h2 class="alert__title">通知メッセージ</h2>
-  </div>
-  <div class="alert__body">
-    <h4 class="alert__message">データの取得に失敗しました。</h4>
-    <button class="button button--secondary button--small">
-        <span class="button__text">閉じる</span>
-    </button>
-  </div>
-</div>
-
-<!-- トースト表示 -->
-<div class="toast-container">
-  <div class="alert toast" role="alert">
-    <div class="alert__header">
-      <span class="alert__icon">✔</span>
-      <h2 class="alert__title">通知メッセージ</h2>
-    </div>
-    <div class="alert__body">
-      <h4 class="alert__message">ユーザを登録しました</h4>
-      <button class="button button--secondary button--small">
-          <span class="button__text">閉じる</span>
-      </button>
-    </div>
-  </div>
-</div>
-```
-
-#### Jinja2テンプレート例
-
-```jinja2
-{# macros/alert.html #}
-{% macro alert(message, type='info', closable=True) %}
-<div class="alert alert--{{ type }}" role="alert">
-  <span class="alert__icon">
-    {% if type == 'success' %}✓
-    {% elif type == 'error' %}✕
-    {% elif type == 'warning' %}⚠
-    {% else %}ℹ
-    {% endif %}
-  </span>
-  <p class="alert__message">{{ message }}</p>
-  {% if closable %}
-  <button class="alert__close" onclick="this.parentElement.remove()" aria-label="閉じる">
-    ✕
-  </button>
-  {% endif %}
-</div>
-{% endmacro %}
-```
-
----
-
+>>>>>>> feature/auth_doc
 ### フォーム要素
 
 #### テキスト入力
@@ -630,29 +459,6 @@ Block__Element--Modifier
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-/* エラー状態 */
-.form-input--error {
-  border-color: var(--color-danger);
-}
-
-.form-input--error:hover {
-  border-color: var(--color-danger);
-}
-
-.form-input--error:focus {
-  border-color: var(--color-danger);
-  box-shadow: 0 0 0 2px var(--color-danger-focus-shadow);
-}
-
-/* エラーメッセージ */
-.form-error {
-  font-size: var(--font-size-lg);
-  color: var(--color-danger);
-  margin-top: var(--spacing-1);
-  display: flex;
-  align-items: center;
-}
 ```
 
 **HTML例**
@@ -670,24 +476,6 @@ Block__Element--Modifier
     maxlength="255"
     required
   >
-</div>
-
-<!-- エラー状態 -->
-<div class="form-group">
-  <label for="email" class="form-label">
-    メールアドレス <span class="form-label__required">必須</span>
-  </label>
-  <input
-    type="email"
-    id="email"
-    class="form-input form-input--error"
-    required
-    aria-invalid="true"
-    aria-describedby="email-error"
-  >
-  <p id="email-error" class="form-error">
-    有効なメールアドレスを入力してください
-  </p>
 </div>
 ```
 
@@ -722,12 +510,6 @@ Block__Element--Modifier
   cursor: not-allowed;
 }
 
-/* エラー状態 */
-.form-select--error {
-  border-color: var(--color-danger);
-  background-color: var(--color-danger-light);
-}
-
 /* 複数選択 */
 .form-select--multiple {
   height: auto;
@@ -740,7 +522,7 @@ Block__Element--Modifier
 <!-- 単一選択 -->
 <div class="form-group">
   <label for="role" class="form-label">
-    権限 <span class="form-label__required">*</span>
+    権限 <span class="form-label__required">必須</span>
   </label>
   <select id="role" class="form-select" required>
     <option value="" selected>選択してください</option>
@@ -863,6 +645,161 @@ Block__Element--Modifier
 
 ---
 
+### 検索フォーム
+
+検索機能を持つ画面で使用する検索フォームの共通UIパターン。
+
+#### 折りたたみ機能
+
+検索フォームは折りたたみ可能とする。展開時は▼、縮小時は▶アイコンを表示する。
+
+**CSS定義（form.css）**
+
+```css
+/* 検索フォームコンテナ */
+.search-form {
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+}
+
+/* 検索フォームヘッダー */
+.search-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-3) var(--spacing-4);
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-form__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+}
+
+.search-form__toggle-icon {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+/* 検索フォームボディ */
+.search-form__body {
+  padding: var(--spacing-4);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+/* 折りたたみ時 */
+.search-form--collapsed .search-form__body {
+  display: none;
+}
+```
+
+**HTML例**
+
+```html
+<div class="search-form" id="searchForm">
+  <div class="search-form__header" onclick="toggleSearchForm()">
+    <span class="search-form__title">検索条件</span>
+    <span class="search-form__toggle-icon" id="searchToggleIcon">▼</span>
+  </div>
+  <div class="search-form__body" id="searchFormBody">
+    <!-- 検索フォーム入力項目 -->
+  </div>
+</div>
+```
+
+**JavaScript実装（main.js）**
+
+```javascript
+function toggleSearchForm() {
+  const form = document.getElementById('searchForm');
+  const icon = document.getElementById('searchToggleIcon');
+  const isCollapsed = form.classList.toggle('search-form--collapsed');
+  icon.textContent = isCollapsed ? '▶' : '▼';
+}
+```
+
+#### 検索条件表示エリア
+
+現在適用中の検索条件をバッジ形式で表示するエリア。検索フォームとテーブルの間に配置する。
+
+**CSS定義（form.css）**
+
+```css
+/* 検索条件表示エリア */
+.search-conditions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-3);
+}
+
+.search-conditions__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  white-space: nowrap;
+}
+
+.search-conditions__badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-search-badge);
+  border-radius: var(--border-radius-base);
+  color: var(--color-gray-700);
+}
+```
+
+**HTML例**
+
+```html
+<div class="search-conditions">
+  <span class="search-conditions__label">現在の検索条件：</span>
+  <span class="search-conditions__badge">組織名：NSW株式会社</span>
+  <span class="search-conditions__badge">ステータス：契約中</span>
+</div>
+```
+
+#### 検索結果件数表示エリア
+
+検索結果の件数を表示するエリア。検索条件表示エリアの下、テーブルの上に配置する。
+
+**CSS定義（form.css）**
+
+```css
+/* 検索結果件数表示 */
+.search-result-count {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-700);
+  margin-bottom: var(--spacing-3);
+}
+
+.search-result-count__label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-result-count__value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+```
+
+**HTML例**
+
+```html
+<div class="search-result-count">
+  <span class="search-result-count__label">検索結果：</span>
+  <span class="search-result-count__value">25</span> 件
+</div>
+```
+
+---
+
 ### テーブル表示
 
 #### 基本仕様
@@ -960,6 +897,11 @@ Block__Element--Modifier
   color: var(--color-danger);
 }
 
+.table__badge--inactive {
+  background-color: var(--color-secondary);
+  color: var(--color-white);
+}
+
 /* アクションボタン */
 .table__actions {
   display: flex;
@@ -1019,9 +961,6 @@ Block__Element--Modifier
     <tbody class="table__body">
       <tr>
         <td>
-          <div class="table__checkbox">
-            <input type="checkbox" id="isDelete" class="table__checkbox-input" checked>
-          </div>
         </td>
         <td>001</td>
         <td>
@@ -1150,10 +1089,11 @@ Block__Element--Modifier
 
 **1ページあたりの表示件数:**
 
-| 画面 | デフォルト件数 | 変更可能 |
-|------|--------------|----------|
-| 一覧画面 | 25件 | × 固定 |
-| ダッシュボード | 25件 | × 固定 |
+| 画面                   | デフォルト件数                 | 変更可能 |
+| ---------------------- | ------------------------------ | -------- |
+| 一覧画面               | 25件                           | × 固定   |
+| 業種別ダッシュボード   | 10件                           | × 固定   |
+| 顧客作成ダッシュボード | 1000件（ページネーションなし） | × 固定   |
 
 ---
 
@@ -1203,7 +1143,7 @@ Block__Element--Modifier
       <th>
         <button class="sort-button" onclick="sortTable('name')">
           ユーザ名
-          <span class="sort-icon">⇅</span>
+          <span class="sort-icon">↕</span>
         </button>
       </th>
       <th>
@@ -1233,13 +1173,13 @@ Block__Element--Modifier
 - 全件ソートは検索フォーム内のドロップダウンでソート条件を設定
 - 部分ソートはデータテーブルのヘッダーをクリックすることでソート条件を設定（ソート範囲は現在表示されているページ内）
 - 全件ソートはサーバー側、部分ソートはクライアント側でソート処理を実施
-- APIは初回に全件データを取得
+- APIは初回に1ページ目のデータと全件のページ数を取得
 - 部分ソートのソート順変更時はAPIコール不要
 
 **ソート順の切り替え:**
 1. 初回クリック: 昇順（↑）
 2. 2回目クリック: 降順（↓）
-3. 3回目クリック: ソートなし
+3. 3回目クリック: ソートなし（↕）
 4. 4回目クリック: 昇順に戻る
 
 ---
@@ -1332,7 +1272,7 @@ Block__Element--Modifier
 }
 
 .modal__icon {
-  width: 40x;
+  width: 40px;
   height: 40px;
 }
 
@@ -1385,21 +1325,18 @@ Block__Element--Modifier
         <h2 id="modal-title" class="modal__title">ユーザ登録</h2>
       </div>
       <h4 id="modal-description" class="modal__description">ユーザ情報を登録します。以下のフォームを入力してください。</h4>
-
-      <!-- 入力エラー時のみ表示 -->
-      <h4 id="modal-description--error" class="modal__description--error">入力内容にエラーがあります。</h4>
     </div>
     <div class="modal__body">
       <form>
         <div class="form-group">
           <label for="modalEmail" class="form-label">
-            メールアドレス <span class="form-label__required">*</span>
+            メールアドレス <span class="form-label__required">必須</span>
           </label>
           <input type="email" id="modalEmail" class="form-input" required>
         </div>
         <div class="form-group">
           <label for="modalName" class="form-label">
-            ユーザ名 <span class="form-label__required">*</span>
+            ユーザ名 <span class="form-label__required">必須</span>
           </label>
           <input type="text" id="modalName" class="form-input" required>
         </div>
@@ -1441,8 +1378,125 @@ Block__Element--Modifier
 
 **閉じる方法:**
 - キャンセルボタン: `onclick`イベント
-- ESCキー: JavaScriptでキーボードイベントハンドラー追加
-- 背景クリック: オーバーレイの`onclick`イベント
+
+---
+
+#### ステータスメッセージモーダル
+
+登録・更新・削除の成功時、およびエラー発生時に表示するモーダル。サイズは `.modal--small`（max-width: 400px）を使用する。
+
+**CSS追加定義（modal.css）**
+
+```css
+/* ステータスメッセージモーダル - タイトルカラー */
+.modal__title--success {
+  color: var(--color-success);
+}
+
+.modal__title--error {
+  color: var(--color-danger);
+}
+```
+
+**HTML例（成功）**
+
+```html
+<!-- ステータスメッセージモーダル（成功） -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="status-title">
+  <div class="modal modal--small">
+    <div class="modal__header">
+      <div class="modal__header-group">
+        <img class="modal__icon" src="/static/images/icon-success.svg" alt="成功">
+        <h2 id="status-title" class="modal__title modal__title--success">登録完了</h2>
+      </div>
+      <p class="modal__description">登録が完了しました。</p>
+    </div>
+    <div class="modal__footer">
+      <button class="button button--primary" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+```
+
+**HTML例（エラー）**
+
+```html
+<!-- ステータスメッセージモーダル（エラー） -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="status-title">
+  <div class="modal modal--small">
+    <div class="modal__header">
+      <div class="modal__header-group">
+        <img class="modal__icon" src="/static/images/icon-error.svg" alt="エラー">
+        <h2 id="status-title" class="modal__title modal__title--error">エラー</h2>
+      </div>
+      <p class="modal__description--error">処理中にエラーが発生しました。</p>
+    </div>
+    <div class="modal__footer">
+      <button class="button button--secondary" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+#### 登録・更新確認モーダル
+
+登録・更新実行前に操作を確認するためのモーダル。サイズは `.modal--small` を使用する。
+
+**HTML例**
+
+```html
+<!-- 登録確認モーダル -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-reg-title">
+  <div class="modal modal--small">
+    <div class="modal__header">
+      <div class="modal__header-group">
+        <img class="modal__icon" src="">
+        <h2 id="confirm-reg-title" class="modal__title">登録確認</h2>
+      </div>
+      <p class="modal__description">この内容で登録してもよろしいですか？</p>
+    </div>
+    <div class="modal__footer">
+      <button class="button button--primary">はい</button>
+      <button class="button button--secondary" onclick="closeModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 更新確認モーダル -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-upd-title">
+  <div class="modal modal--small">
+    <div class="modal__header">
+      <div class="modal__header-group">
+        <img class="modal__icon" src="">
+        <h2 id="confirm-upd-title" class="modal__title">更新確認</h2>
+      </div>
+      <p class="modal__description">この内容で更新してもよろしいですか？</p>
+    </div>
+    <div class="modal__footer">
+      <button class="button button--primary">はい</button>
+      <button class="button button--secondary" onclick="closeModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+#### モーダルの閉じる方法ルール
+
+モーダルの種類に応じて、閉じる方法を以下のルールに従う。
+
+| モーダル種別                                 | ボタン               | ESCキー | 背景クリック |
+| -------------------------------------------- | -------------------- | ------- | ------------ |
+| フォームモーダル（登録・更新）               | キャンセルボタンのみ | ×       | ×            |
+| 参照モーダル                                 | 閉じるボタン         | ○       | ○            |
+| 確認モーダル（削除・登録・更新確認）         | キャンセルボタンのみ | ×       | ×            |
+| ステータスメッセージモーダル（成功・エラー） | 閉じるボタン         | ○       | ×            |
+
+**フォームモーダル・確認モーダルでESCキーと背景クリックを無効にする理由:**
+- 誤操作による入力内容の消失・操作のキャンセルを防止するため
 
 ---
 
@@ -1454,18 +1508,17 @@ Block__Element--Modifier
 
 #### バリデーションルール
 
-| バリデーション種別 | HTML属性 | JavaScriptチェック |
-|-------------------|----------|---------------------|
-| **必須チェック** | `required` | `input.value.trim() === ''` |
-| **文字数チェック** | `minlength`, `maxlength` | `input.value.length < min \|\| input.value.length > max` |
-| **メール形式** | `type="email"` | `/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value)` |
-| **数値範囲** | `min`, `max` | `Number(input.value) < min \|\| Number(input.value) > max` |
+| バリデーション種別 | HTML属性                 | JavaScriptチェック                                         |
+| ------------------ | ------------------------ | ---------------------------------------------------------- |
+| **必須チェック**   | `required`               | `input.value.trim() === ''`                                |
+| **文字数チェック** | `minlength`, `maxlength` | `input.value.length < min \|\| input.value.length > max`   |
+| **メール形式**     | `type="email"`           | `/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value)`           |
+| **数値範囲**       | `min`, `max`             | `Number(input.value) < min \|\| Number(input.value) > max` |
 
 #### バリデーションタイミング
 
-| タイミング | 対象 | 動作 | 実装方法 |
-|-----------|------|------|---------|
-| **フォーカスアウト** | すべて | エラーがあれば表示 | JavaScript `blur`イベント |
+| タイミング         | 対象   | 動作                                                         | 実装方法                    |
+| ------------------ | ------ | ------------------------------------------------------------ | --------------------------- |
 | **送信ボタン押下** | すべて | エラーがあれば送信を中断、最初のエラーフィールドにフォーカス | JavaScript `submit`イベント |
 
 #### 実装例
@@ -1478,13 +1531,11 @@ Block__Element--Modifier
 
 ### エラーの種類と表示方法
 
-| エラー種別 | 表示方法 | BEMクラス | 自動消去 |
-|-----------|---------|-----------|---------|
-| **バリデーションエラー** | インライン | `.form-error` | × 手動で修正 |
-| **API呼び出しエラー（400系）** | インライン or バナー | `.alert--error` | × 手動で閉じる |
-| **API呼び出しエラー（500系）** | バナー | `.alert--error` | × 手動で閉じる |
-| **ネットワークエラー** | バナー | `.alert--error` | × 手動で閉じる |
-| **成功メッセージ** | トースト | `.toast .alert--success` | x 手動で閉じる |
+| エラー種別                                                 | 表示方法                             | BEMクラス                | 自動消去     |
+| ---------------------------------------------------------- | ------------------------------------ | ------------------------ | ------------ |
+| **API呼び出しエラー（400系、バリデーションエラーも含む）** | エラーモーダル                       | `.alert--error`          | 手動で閉じる |
+| **API呼び出しエラー（500系、ネットワークエラーも含む）**   | エラーページ                         | `.alert--error`          | 手動で閉じる |
+| **成功メッセージ**                                         | ステータスメッセージモーダル（成功） | `.modal--status-success` | 手動で閉じる |
 
 ### エラーメッセージの文言
 
@@ -1505,13 +1556,13 @@ Block__Element--Modifier
 
 ### ローディングの種類
 
-| タイプ | 用途 | BEMクラス |
-|--------|------|----------|
+| タイプ                         | 用途                   | BEMクラス          |
+| ------------------------------ | ---------------------- | ------------------ |
 | **フルスクリーンローディング** | 画面全体の初期読み込み | `.loading-overlay` |
-| **オーバーレイローディング** | モーダル内の処理 | `.loading-overlay` |
-| **インラインローディング** | テーブルの再読み込み | `.spinner` |
-| **ボタンローディング** | ボタン押下後の処理 | `.button--loading` |
-| **スケルトンスクリーン** | 一覧のローディング | `.skeleton` |
+| **オーバーレイローディング**   | モーダル内の処理       | `.loading-overlay` |
+| **インラインローディング**     | テーブルの再読み込み   | `.spinner`         |
+| **ボタンローディング**         | ボタン押下後の処理     | `.button--loading` |
+| **スケルトンスクリーン**       | 一覧のローディング     | `.skeleton`        |
 
 ### スピナーデザイン
 
@@ -1631,27 +1682,27 @@ Block__Element--Modifier
 
 **主要なキー:**
 
-| キー | 動作 |
-|------|------|
-| Tab | 次の要素へフォーカス移動 |
-| Shift + Tab | 前の要素へフォーカス移動 |
-| Enter | ボタン押下、リンククリック |
-| Space | チェックボックス/ラジオボタンの切り替え |
-| Esc | モーダルを閉じる |
-| ↑ / ↓ | ドロップダウンの選択肢移動 |
+| キー        | 動作                                    |
+| ----------- | --------------------------------------- |
+| Tab         | 次の要素へフォーカス移動                |
+| Shift + Tab | 前の要素へフォーカス移動                |
+| Enter       | ボタン押下、リンククリック              |
+| Space       | チェックボックス/ラジオボタンの切り替え |
+| Esc         | モーダルを閉じる                        |
+| ↑ / ↓       | ドロップダウンの選択肢移動              |
 
 ### スクリーンリーダー対応
 
 **必須のaria属性:**
 
-| 要素 | aria属性 | 実装例 |
-|------|---------|--------|
-| ボタン | `aria-label` | `<button aria-label="閉じる">` |
-| フォーム | `role="form"`, `aria-label` | `<form aria-label="ユーザ検索">` |
-| エラーメッセージ | `role="alert"`, `aria-live="assertive"` | `<div class="alert" role="alert">` |
-| ローディング | `aria-busy="true"`, `aria-live="polite"` | `<div class="spinner" role="status">` |
-| モーダル | `role="dialog"`, `aria-modal="true"` | `<div class="modal-overlay" role="dialog" aria-modal="true">` |
-| テーブル | `aria-label` | `<table aria-label="ユーザ一覧">` |
+| 要素             | aria属性                                 | 実装例                                                        |
+| ---------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| ボタン           | `aria-label`                             | `<button aria-label="閉じる">`                                |
+| フォーム         | `role="form"`, `aria-label`              | `<form aria-label="ユーザ検索">`                              |
+| エラーメッセージ | `role="alert"`, `aria-live="assertive"`  | `<div class="alert" role="alert">`                            |
+| ローディング     | `aria-busy="true"`, `aria-live="polite"` | `<div class="spinner" role="status">`                         |
+| モーダル         | `role="dialog"`, `aria-modal="true"`     | `<div class="modal-overlay" role="dialog" aria-modal="true">` |
+| テーブル         | `aria-label`                             | `<table aria-label="ユーザ一覧">`                             |
 
 **スクリーンリーダー専用テキスト:**
 
@@ -1718,14 +1769,14 @@ Block__Element--Modifier
 }
 ```
 
-| サイズ | 幅 | メディアクエリ | 対象デバイス |
-|--------|-----|--------------|-------------|
-| **Extra small (xs)** | 〜575px | `@media (max-width: 575px)` | スマートフォン |
-| **Small (sm)** | 576px〜767px | `@media (min-width: 576px)` | 大型スマートフォン |
-| **Medium (md)** | 768px〜991px | `@media (min-width: 768px)` | タブレット |
-| **Large (lg)** | 992px〜1199px | `@media (min-width: 992px)` | ノートPC |
-| **Extra large (xl)** | 1200px〜1399px | `@media (min-width: 1200px)` | デスクトップPC |
-| **XXL** | 1400px〜 | `@media (min-width: 1400px)` | 大画面デスクトップ |
+| サイズ               | 幅             | メディアクエリ               | 対象デバイス       |
+| -------------------- | -------------- | ---------------------------- | ------------------ |
+| **Extra small (xs)** | 〜575px        | `@media (max-width: 575px)`  | スマートフォン     |
+| **Small (sm)**       | 576px〜767px   | `@media (min-width: 576px)`  | 大型スマートフォン |
+| **Medium (md)**      | 768px〜991px   | `@media (min-width: 768px)`  | タブレット         |
+| **Large (lg)**       | 992px〜1199px  | `@media (min-width: 992px)`  | ノートPC           |
+| **Extra large (xl)** | 1200px〜1399px | `@media (min-width: 1200px)` | デスクトップPC     |
+| **XXL**              | 1400px〜       | `@media (min-width: 1400px)` | 大画面デスクトップ |
 
 ### レスポンシブ対応
 
@@ -1776,9 +1827,9 @@ Block__Element--Modifier
 
 ### 対応ブラウザ
 
-| ブラウザ | 最小バージョン |
-|---------|--------------|
-| Google Chrome | 最新版 ||
+| ブラウザ      | 最小バージョン |
+| ------------- | -------------- |
+| Google Chrome | 最新版         |  |
 
 ### 推奨環境
 
@@ -1792,23 +1843,29 @@ Block__Element--Modifier
 
 ### 遷移方法
 
-| 遷移元 | 遷移先 | 方法 |
-|--------|--------|------|
+| 遷移元             | 遷移先 | 方法                         |
+| ------------------ | ------ | ---------------------------- |
 | グローバルメニュー | 各画面 | グローバルメニューをクリック |
 
 ### 状態の保持
 
 **検索条件の保持:**
-- セッションストレージに保存
-- 別画面からグローバルメニューで戻る際に復元
-- ブラウザバック時も復元
+- Cookieに保存
+- 画面初期表示時と検索実行時にCookieをクリアし、新しい検索条件を保存
+- ページング時にCookieから検索条件を取得
 
-```javascript
-// 検索条件を保存
-sessionStorage.setItem('searchParams', JSON.stringify({ keyword: '山田', role: 'admin' }));
+```python
+# 検索条件を保存
+response.set_cookie(
+    'organization_search_params',
+    json.dumps(search_params),
+    max_age=86400,  # 24時間
+    httponly=True,
+    samesite='Lax'
+)
 
-// 検索条件を復元
-const searchParams = JSON.parse(sessionStorage.getItem('searchParams') || '{}');
+# 検索条件を取得
+cookie_data = request.cookies.get('organization_search_params')
 ```
 
 ### 確認ダイアログ
@@ -1937,21 +1994,7 @@ class Modal {
   init() {
     if (!this.overlay) return;
 
-    // 背景クリックで閉じる
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay) {
-        this.close();
-      }
-    });
-
-    // ESCキーで閉じる
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isOpen()) {
-        this.close();
-      }
-    });
-
-    // 閉じるボタン
+    // キャンセルボタン
     const closeButtons = this.overlay.querySelectorAll('.modal__close');
     closeButtons.forEach(btn => {
       btn.addEventListener('click', () => this.close());
@@ -1992,74 +2035,6 @@ function closeUserModal() {
 }
 ```
 
-### トースト通知
-
-**toast.js**
-
-```javascript
-// トースト通知
-class Toast {
-  constructor(container = 'toast-container') {
-    this.container = document.getElementById(container);
-    if (!this.container) {
-      this.container = document.createElement('div');
-      this.container.id = container;
-      this.container.className = 'toast-container';
-      document.body.appendChild(this.container);
-    }
-  }
-
-  show(message, type = 'info', duration = 3000) {
-    const toast = document.createElement('div');
-    toast.className = `alert alert--${type} toast`;
-    toast.setAttribute('role', 'alert');
-
-    const icons = {
-      success: '✓',
-      error: '✕',
-      warning: '⚠',
-      info: 'ℹ'
-    };
-
-    toast.innerHTML = `
-      <span class="alert__icon">${icons[type]}</span>
-      <p class="alert__message">${message}</p>
-    `;
-
-    this.container.appendChild(toast);
-
-    // 自動削除
-    setTimeout(() => {
-      toast.classList.add('toast--fade-out');
-      setTimeout(() => {
-        toast.remove();
-      }, 300);
-    }, duration);
-  }
-
-  success(message, duration) {
-    this.show(message, 'success', duration);
-  }
-
-  error(message, duration) {
-    this.show(message, 'error', duration);
-  }
-
-  warning(message, duration) {
-    this.show(message, 'warning', duration);
-  }
-
-  info(message, duration) {
-    this.show(message, 'info', duration);
-  }
-}
-
-// 使用例
-const toast = new Toast();
-toast.success('保存しました');
-toast.error('エラーが発生しました');
-```
-
 ### テーブルソート
 
 **sort.js**
@@ -2075,6 +2050,12 @@ class TableSort {
   }
 
   init() {
+    // 元の行順序を記録
+    const rows = this.tbody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+      row.dataset.originalIndex = index;
+    });
+
     const sortButtons = this.table.querySelectorAll('.sort-button');
     sortButtons.forEach(button => {
       button.addEventListener('click', (e) => {
@@ -2088,18 +2069,32 @@ class TableSort {
   sort(column) {
     const rows = Array.from(this.tbody.querySelectorAll('tr'));
     const currentOrder = this.sortState[column] || 'none';
-    const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
 
-    rows.sort((a, b) => {
-      const aValue = a.querySelector(`[data-column="${column}"]`)?.textContent || '';
-      const bValue = b.querySelector(`[data-column="${column}"]`)?.textContent || '';
+    // 3段階サイクル: none → asc → desc → none
+    let newOrder;
+    if (currentOrder === 'none') {
+      newOrder = 'asc';
+    } else if (currentOrder === 'asc') {
+      newOrder = 'desc';
+    } else {
+      newOrder = 'none';
+    }
 
-      if (newOrder === 'asc') {
-        return aValue.localeCompare(bValue, 'ja');
-      } else {
-        return bValue.localeCompare(aValue, 'ja');
-      }
-    });
+    if (newOrder !== 'none') {
+      rows.sort((a, b) => {
+        const aValue = a.querySelector(`[data-column="${column}"]`)?.textContent || '';
+        const bValue = b.querySelector(`[data-column="${column}"]`)?.textContent || '';
+
+        if (newOrder === 'asc') {
+          return aValue.localeCompare(bValue, 'ja');
+        } else {
+          return bValue.localeCompare(aValue, 'ja');
+        }
+      });
+    } else {
+      // ソートなしの場合は元の順序に戻す
+      rows.sort((a, b) => Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0));
+    }
 
     // テーブルを再構築
     this.tbody.innerHTML = '';
@@ -2112,7 +2107,7 @@ class TableSort {
     // すべてのアイコンをリセット
     const allIcons = this.table.querySelectorAll('.sort-icon');
     allIcons.forEach(icon => {
-      icon.textContent = '⇅';
+      icon.textContent = '↕';
       icon.classList.remove('sort-icon--active');
     });
 
@@ -2123,10 +2118,12 @@ class TableSort {
 
     if (order === 'asc') {
       icon.textContent = '↑';
+      icon.classList.add('sort-icon--active');
     } else if (order === 'desc') {
       icon.textContent = '↓';
+      icon.classList.add('sort-icon--active');
     }
-    icon.classList.add('sort-icon--active');
+    // 'none' の場合はデフォルト ↕ のまま（sort-icon--active なし）
   }
 }
 
@@ -2145,7 +2142,7 @@ class Pagination {
     this.container = document.getElementById(containerId);
     this.currentPage = options.currentPage || 1;
     this.totalPages = options.totalPages || 1;
-    this.itemsPerPage = options.itemsPerPage || 20;
+    this.itemsPerPage = options.itemsPerPage || 25;
     this.totalItems = options.totalItems || 0;
     this.onPageChange = options.onPageChange || (() => {});
     this.render();
