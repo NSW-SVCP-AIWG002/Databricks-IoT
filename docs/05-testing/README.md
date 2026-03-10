@@ -83,16 +83,45 @@ pytest --cov=app --cov-report=html
 
 ## 📚 ドキュメントの使い方
 
-### 1. テスト戦略を理解する
+各テストレベルのディレクトリには、以下の3ファイルが用意されています。
 
-- **[test-strategy.md](./test-strategy.md)** - テストピラミッド、テストレベル別の方針
-- **[test-quality-metrics.md](./test-quality-metrics.md)** - カバレッジ目標値、品質メトリクス
+### 1. 単体テスト（unit-test/）
 
-### 2. テスト種別ごとのガイドを参照する
+| ファイル | 用途 |
+| --- | --- |
+| [unit-test-perspectives.md](./unit-test/unit-test-perspectives.md) | 汎用的なテスト観点チェックリスト。テスト実装時に参照し、該当する観点を選択する |
+| [unit-test-guide.md](./unit-test/unit-test-guide.md) | テストコード実装例・パターン集。観点の参照方法やコードの書き方を確認する |
+| [テストコード作成用プロンプト.md](./unit-test/テストコード作成用プロンプト.md) | AI（Claude Code等）にテストコード作成を依頼する際のプロンプトテンプレート |
 
-- **単体テストを実装する**: [unit-test/unit-test-guide.md](./unit-test/unit-test-guide.md)
-- **結合テストを実装する**: [integration-test/integration-test-guide.md](./integration-test/integration-test-guide.md)
-- **E2Eテストを実施する**: [e2e-test/e2e-test-guide.md](./e2e-test/e2e-test-guide.md)
+### 2. 結合テスト（integration-test/）
+
+| ファイル | 用途 |
+| --- | --- |
+| [integration-test-perspectives.md](./integration-test/integration-test-perspectives.md) | 汎用的なテスト観点チェックリスト。テスト実装時に参照し、該当する観点を選択する |
+| [integration-test-guide.md](./integration-test/integration-test-guide.md) | テストコード実装例・パターン集。観点の参照方法やコードの書き方を確認する |
+| [テストコード作成用プロンプト.md](./integration-test/テストコード作成用プロンプト.md) | AI（Claude Code等）にテストコード作成を依頼する際のプロンプトテンプレート |
+
+### 3. E2Eテスト（e2e-test/）
+
+| ファイル | 用途 |
+| --- | --- |
+| [e2e-test-perspectives.md](./e2e-test/e2e-test-perspectives.md) | 汎用的なテスト観点チェックリスト。テスト実施時に参照し、該当するシナリオを選択する |
+| [e2e-test-guide.md](./e2e-test/e2e-test-guide.md) | テスト実施ガイドライン。手動テスト・自動化の進め方を確認する |
+| [テストコード作成用プロンプト.md](./e2e-test/テストコード作成用プロンプト.md) | AI（Claude Code等）にテストコード作成を依頼する際のプロンプトテンプレート |
+
+### 4. AIを活用したテストコード作成
+
+各テストレベルの `テストコード作成用プロンプト.md` を使うことで、AIにテストコードを自動生成させることができます。
+
+```
+テストコード作成用プロンプト.md を開く
+       ↓
+<機能名> を対象機能名に差し替える
+       ↓
+プロンプト全体を Claude Code 等のAIに貼り付けて実行
+       ↓
+生成されたテストコードをレビューし、必要に応じて修正する
+```
 
 ---
 
