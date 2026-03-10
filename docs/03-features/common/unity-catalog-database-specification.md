@@ -796,17 +796,17 @@ RETURN (
     ARRAY_CONTAINS(iot_catalog.security.user_accessible_orgs(), organization_id)
 );
 
--- VIEWにRow Access Policyを適用
-ALTER VIEW iot_catalog.views.sensor_data_view
+-- VIEWのもととなるテーブルに対してRow Access Policyを適用
+ALTER TABLE iot_catalog.silver.silver_sensor_data
 SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
-ALTER VIEW iot_catalog.views.daily_summary_view
+ALTER TABLE iot_catalog.gold.gold_sensor_data_daily_summary
 SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
-ALTER VIEW iot_catalog.views.monthly_summary_view
+ALTER TABLE iot_catalog.gold.gold_sensor_data_monthly_summary
 SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
-ALTER VIEW iot_catalog.views.yearly_summary_view
+ALTER TABLE iot_catalog.gold.gold_sensor_data_yearly_summary
 SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 ```
 
