@@ -1,1326 +1,1346 @@
-# ダッシュボード棒グラフ - ワークフロー仕様書
+# 顧客作成ダッシュボード棒グラフガジェット - ワークフロー仕様書
 
-## 目次
+## 📑 目次
 
-- [概要](#概要)
-  - [このドキュメントの役割](#このドキュメントの役割)
-  - [対象機能](#対象機能)
-- [処理フロー全体図](#処理フロー全体図)
-- [Flaskルート定義](#flaskルート定義)
-  - [ルート一覧](#ルート一覧)
-  - [グラフデータ取得API](#グラフデータ取得api)
-  - [CSV出力API](#csv出力api)
-- [データ取得ワークフロー](#データ取得ワークフロー)
-  - [処理フロー図](#処理フロー図)
-  - [表示単位別データソース](#表示単位別データソース)
-  - [データ取得実装](#データ取得実装)
-  - [シルバー層クエリ（時単位）](#シルバー層クエリ時単位)
-  - [ゴールド層クエリ（日単位）](#ゴールド層クエリ日単位)
-  - [ゴールド層クエリ（週単位）](#ゴールド層クエリ週単位)
-  - [ゴールド層クエリ（月単位）](#ゴールド層クエリ月単位)
-- [CSV出力ワークフロー](#csv出力ワークフロー)
-  - [処理フロー図](#処理フロー図-1)
-  - [CSV出力実装](#csv出力実装)
-- [バリデーション仕様](#バリデーション仕様)
-  - [リクエストパラメータ定義](#リクエストパラメータ定義)
-  - [バリデーション実装](#バリデーション実装)
-  - [許可値一覧](#許可値一覧)
-- [エラーハンドリング](#エラーハンドリング)
-  - [エラー分類](#エラー分類)
-  - [エラーハンドリング実装](#エラーハンドリング実装)
-- [セキュリティ設計](#セキュリティ設計)
-  - [入力検証](#入力検証)
-- [パフォーマンス設計](#パフォーマンス設計)
-  - [性能目標](#性能目標)
-  - [最適化方針](#最適化方針)
-- [テスト仕様](#テスト仕様)
-  - [単体テスト](#単体テスト)
-  - [統合テスト](#統合テスト)
-- [関連ドキュメント](#関連ドキュメント)
-- [変更履歴](#変更履歴)
+- [顧客作成ダッシュボード棒グラフガジェット - ワークフロー仕様書](#顧客作成ダッシュボード棒グラフガジェット---ワークフロー仕様書)
+  - [📑 目次](#-目次)
+  - [概要](#概要)
+  - [使用するFlaskルート一覧](#使用するflaskルート一覧)
+  - [ルート呼び出しマッピング](#ルート呼び出しマッピング)
+    - [棒グラフガジェット](#棒グラフガジェット)
+    - [棒グラフガジェット登録モーダル](#棒グラフガジェット登録モーダル)
+  - [ワークフロー一覧](#ワークフロー一覧)
+    - [ガジェット初期表示](#ガジェット初期表示)
+      - [処理フロー](#処理フロー)
+      - [Flaskルート](#flaskルート)
+      - [バリデーション](#バリデーション)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド)
+    - [ガジェットデータ取得](#ガジェットデータ取得)
+      - [処理フロー](#処理フロー-1)
+      - [Flaskルート](#flaskルート-1)
+      - [バリデーション](#バリデーション-1)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-1)
+    - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+      - [処理フロー](#処理フロー-2)
+      - [Flaskルート](#flaskルート-2)
+      - [バリデーション](#バリデーション-2)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-2)
+      - [エラーハンドリング](#エラーハンドリング)
+    - [ガジェット登録](#ガジェット登録)
+      - [処理フロー](#処理フロー-3)
+      - [Flaskルート](#flaskルート-3)
+      - [バリデーション](#バリデーション-3)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-3)
+      - [エラーハンドリング](#エラーハンドリング-1)
+    - [CSVエクスポート](#csvエクスポート)
+      - [処理フロー](#処理フロー-4)
+      - [Flaskルート](#flaskルート-4)
+      - [バリデーション](#バリデーション-4)
+      - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-4)
+      - [エラーハンドリング](#エラーハンドリング-2)
+  - [セキュリティ実装](#セキュリティ実装)
+    - [認証・認可実装](#認証認可実装)
+    - [ログ出力ルール](#ログ出力ルール)
+  - [関連ドキュメント](#関連ドキュメント)
+
+**重要:** 顧客作成ダッシュボード画面の共通仕様は [共通ワークフロー仕様書](../common/workflow-specification.md) を参照してください。
 
 ---
 
 ## 概要
 
-このドキュメントは、ダッシュボード棒グラフ機能のデータ取得ワークフロー、エラーハンドリングの詳細を記載します。
+このドキュメントは、顧客作成ダッシュボード棒グラフ機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
 
-### このドキュメントの役割
+**このドキュメントの役割:**
+- ✅ ユーザー操作のトリガー条件
+- ✅ 処理フローの詳細（Flaskルート呼び出し、フォーム送信、AJAX通信）
+- ✅ エラーハンドリングフロー
+- ✅ サーバーサイド処理詳細（SQL、変数、条件分岐、コード例）
+- ✅ データベース利用詳細（トランザクション管理、テーブル操作）
+- ✅ セキュリティ実装詳細（認証、データスコープ制限、ログ出力）
+- ✅ クライアントサイド処理詳細（AJAX、ドラッグ＆ドロップ、自動更新）
 
-- データ取得APIの処理フロー
-- シルバー層/ゴールド層からのデータ取得ロジック
-- バリデーション・エラーハンドリング
-- CSV出力処理
+**UI仕様書との役割分担:**
+- **UI仕様書**: 画面レイアウト、UI要素の詳細仕様
+- **ワークフロー仕様書**: 処理フロー、データベース処理、エラーハンドリング、サーバーサイド実装詳細
 
-### 対象機能
-
-| 機能ID | 機能名 | 処理内容 |
-| ------ | ------ | -------- |
-| DBG-001 | グラフ表示 | センサーデータを棒グラフで時系列表示 |
-| DBG-002 | 表示単位切替 | 時/日/週/月単位での表示切替 |
-| DBG-003 | 期間選択 | 日時ピッカーによる表示期間の指定 |
-| DBG-004 | 集計間隔選択 | データの集計間隔を選択（時単位のみ） |
-| DBG-005 | CSVエクスポート | 表示データをCSVファイルとしてダウンロード |
-| DBG-006 | ガジェット登録 | 棒グラフガジェットの新規登録 |
+**注:** UI要素の詳細は [UI仕様書](./ui-specification.md) を参照してください。
 
 ---
 
-## Flaskルート定義
+## 使用するFlaskルート一覧
 
-### ルート一覧
+この機能で使用するすべてのFlaskルート（エンドポイント）を記載します。
 
-| メソッド | URL | 関数名 | 説明 |
-| -------- | --- | ------ | ---- |
-| GET | /api/customer-dashboard/bar-chart/data | get_bar_chart_data | グラフデータ取得API |
-| GET | /api/customer-dashboard/bar-chart/export | export_bar_chart_csv | CSV出力API |
-| POST | /api/customer-dashboard/bar-chart/register | register_bar_chart | ガジェット登録API |
-| GET | /api/customer-dashboard/bar-chart/aggregation-methods | get_aggregation_methods | 集約方法一覧取得API |
+| No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
+|----|---------|---------------|---------|------|---------------|------|
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | HTML | - |
+| 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
+| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/bar-chart/create` | GET | 棒グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/bar-chart/register` | POST | 棒グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
-### グラフデータ取得API
-
-```python
-from flask import Blueprint, jsonify, request, g
-from datetime import datetime, timedelta
-from functools import wraps
-import pytz
-
-bp = Blueprint('dashboard_bar_chart', __name__)
-JST = pytz.timezone('Asia/Tokyo')
-
-# =============================================================================
-# デコレータ定義
-# =============================================================================
-def login_required(f):
-    """認証チェックデコレータ"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not g.get('current_user'):
-            return jsonify({'status': 'error', 'message': '認証が必要です'}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-def require_role(*roles):
-    """権限チェックデコレータ"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if g.current_user.role not in roles:
-                return jsonify({'status': 'error', 'message': 'アクセス権限がありません'}), 403
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-# =============================================================================
-# グラフデータ取得API
-# =============================================================================
-@bp.route('/api/customer-dashboard/bar-chart/data', methods=['GET'])
-@login_required
-@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
-def get_bar_chart_data():
-    """
-    棒グラフ用データを取得
-
-    リクエストパラメータ:
-    - device_id: デバイスID（必須）
-    - display_unit: 表示単位 hour/day/week/month（必須）
-    - interval: 集計間隔（時単位のみ必須）
-    - item: 表示項目（必須）
-    - method_id: 集計方法ID（必須）
-    - base_datetime: 基準日時（必須）
-
-    レスポンス:
-    - 成功時: {"status": "success", "data": {...}}
-    - エラー時: {"status": "error", "message": "..."}
-    """
-    # パラメータ取得
-    params = {
-        'device_id': request.args.get('device_id'),
-        'display_unit': request.args.get('display_unit'),
-        'interval': request.args.get('interval'),
-        'item': request.args.get('item'),
-        'method_id': request.args.get('method_id', type=int),
-        'base_datetime': request.args.get('base_datetime')
-    }
-
-    # バリデーション
-    errors = validate_chart_params(params)
-    if errors:
-        return jsonify({'status': 'error', 'message': errors[0]}), 400
-
-    # データ取得
-    try:
-        data = get_chart_data(
-            device_id=params['device_id'],
-            display_unit=params['display_unit'],
-            interval=params['interval'],
-            item=params['item'],
-            method_id=params['method_id'],
-            base_datetime=datetime.fromisoformat(params['base_datetime'])
-        )
-
-        if not data['values']:
-            return jsonify({
-                'status': 'success',
-                'data': {
-                    'labels': [],
-                    'values': [],
-                    'item_name': data['item_name'],
-                    'unit': data['unit'],
-                    'device_name': data['device_name'],
-                    'message': '指定期間のデータがありません'
-                }
-            })
-
-        return jsonify({'status': 'success', 'data': data})
-
-    except Exception as e:
-        logger.error(f'Chart data fetch error: {e}')
-        return jsonify({'status': 'error', 'message': 'データの取得に失敗しました'}), 500
-```
-
-### CSV出力API
-
-```python
-from flask import Response
-import csv
-import io
-
-# =============================================================================
-# CSV出力API
-# =============================================================================
-@bp.route('/api/customer-dashboard/bar-chart/export', methods=['GET'])
-@login_required
-@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
-def export_bar_chart_csv():
-    """
-    グラフデータをCSVとしてエクスポート
-
-    リクエストパラメータ:
-    get_bar_chart_dataと同一
-
-    レスポンス:
-    - 成功時: CSVファイルダウンロード
-    - エラー時: JSONエラーレスポンス
-    """
-    # パラメータ取得・バリデーション（get_bar_chart_dataと同一）
-    params = {
-        'device_id': request.args.get('device_id'),
-        'display_unit': request.args.get('display_unit'),
-        'interval': request.args.get('interval'),
-        'item': request.args.get('item'),
-        'method_id': request.args.get('method_id', type=int),
-        'base_datetime': request.args.get('base_datetime')
-    }
-
-    errors = validate_chart_params(params)
-    if errors:
-        return jsonify({'status': 'error', 'message': errors[0]}), 400
-
-    try:
-        # データ取得
-        data = get_chart_data(
-            device_id=params['device_id'],
-            display_unit=params['display_unit'],
-            interval=params['interval'],
-            item=params['item'],
-            method_id=params['method_id'],
-            base_datetime=datetime.fromisoformat(params['base_datetime'])
-        )
-
-        # CSV生成
-        output = io.StringIO()
-        writer = csv.writer(output)
-
-        # ヘッダー行
-        writer.writerow(['日時', f'{data["item_name"]} ({data["unit"]})'])
-
-        # データ行
-        for label, value in zip(data['labels'], data['values']):
-            writer.writerow([label, value])
-
-        # レスポンス生成
-        output.seek(0)
-        timestamp = datetime.now(JST).strftime('%Y%m%d%H%M%S')
-        filename = f'bar_chart_{params["device_id"]}_{timestamp}.csv'
-
-        return Response(
-            output.getvalue(),
-            mimetype='text/csv; charset=utf-8',
-            headers={
-                'Content-Disposition': f'attachment; filename="{filename}"'
-            }
-        )
-
-    except Exception as e:
-        logger.error(f'CSV export error: {e}')
-        return jsonify({'status': 'error', 'message': 'CSV出力に失敗しました'}), 500
-```
-
-### ガジェット登録API
-
-```python
-# =============================================================================
-# ガジェット登録API
-# =============================================================================
-@bp.route('/api/customer-dashboard/bar-chart/register', methods=['POST'])
-@login_required
-@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
-def register_bar_chart():
-    """
-    棒グラフガジェットを登録
-
-    リクエストボディ:
-    - title: ガジェットタイトル（必須）
-    - device_mode: 表示デバイス選択（'specified' or 'tree_linked'）（必須）
-    - device_id: デバイスID（device_mode='specified'の場合必須）
-    - group_id: グループID（必須）
-    - aggregation_method_id: 集約方法ID（必須）
-    - item: 表示項目（必須、1つのみ）
-    - min_value: Y軸最小値（任意）
-    - max_value: Y軸最大値（任意）
-    - gadget_size: 部品サイズ（必須）
-
-    レスポンス:
-    - 成功時: {"status": "success", "gadget_id": "..."}
-    - エラー時: {"status": "error", "message": "..."}
-    """
-    data = request.get_json()
-
-    # バリデーション
-    errors = validate_register_params(data)
-    if errors:
-        return jsonify({'status': 'error', 'message': errors[0]}), 400
-
-    try:
-        # ガジェット登録
-        # TODO: 登録先DBにガジェット情報を保存
-        gadget = BarChartGadget(
-            title=data['title'],
-            device_mode=data['device_mode'],
-            device_id=data.get('device_id'),
-            group_id=data['group_id'],
-            aggregation_method_id=data['aggregation_method_id'],
-            item=data['item'],
-            min_value=data.get('min_value'),
-            max_value=data.get('max_value'),
-            gadget_size=data['gadget_size'],
-            created_by=g.current_user.id
-        )
-        db.session.add(gadget)
-        db.session.commit()
-
-        return jsonify({
-            'status': 'success',
-            'gadget_id': gadget.id
-        }), 201
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'Gadget registration error: {e}')
-        return jsonify({'status': 'error', 'message': '登録に失敗しました'}), 500
-
-
-def validate_register_params(data: dict) -> list:
-    """
-    登録パラメータをバリデーション
-    """
-    errors = []
-
-    # title
-    if not data.get('title'):
-        errors.append('タイトルは必須です')
-    elif len(data['title']) > 20:
-        errors.append('タイトルは20文字以内で入力してください')
-
-    # device_mode
-    if data.get('device_mode') not in ['specified', 'tree_linked']:
-        errors.append('表示デバイス選択が不正です')
-
-    # device_id (指定デバイスモード時のみ必須)
-    if data.get('device_mode') == 'specified':
-        if not data.get('device_id'):
-            errors.append('デバイスIDは必須です')
-        elif not UUID_PATTERN.match(data['device_id']):
-            errors.append('デバイスIDの形式が不正です')
-
-    # group_id
-    if not data.get('group_id'):
-        errors.append('グループIDは必須です')
-
-    # aggregation_method_id
-    if not data.get('aggregation_method_id'):
-        errors.append('集約方法は必須です')
-    elif data['aggregation_method_id'] not in range(1, 9):
-        errors.append('集約方法が不正です')
-
-    # item（1つのみ）
-    if not data.get('item'):
-        errors.append('表示項目は必須です')
-    elif data['item'] not in ALLOWED_ITEMS:
-        errors.append(f'不正な項目です: {data["item"]}')
-
-    # min_value / max_value（任意、両方入力時は大小チェック）
-    min_val = data.get('min_value')
-    max_val = data.get('max_value')
-
-    if min_val is not None:
-        try:
-            min_val = float(min_val)
-        except (ValueError, TypeError):
-            errors.append('最小値は数値で入力してください')
-            min_val = None
-
-    if max_val is not None:
-        try:
-            max_val = float(max_val)
-        except (ValueError, TypeError):
-            errors.append('最大値は数値で入力してください')
-            max_val = None
-
-    if min_val is not None and max_val is not None:
-        if min_val >= max_val:
-            errors.append('最小値は最大値より小さい値を入力してください')
-
-    # gadget_size
-    VALID_GADGET_SIZES = ['2x2', '2x4']
-    if not data.get('gadget_size'):
-        errors.append('部品サイズは必須です')
-    elif data['gadget_size'] not in VALID_GADGET_SIZES:
-        errors.append('部品サイズが不正です')
-
-    return errors
-```
-
-### 集約方法一覧取得API
-
-```python
-# =============================================================================
-# 集約方法一覧取得API
-# =============================================================================
-@bp.route('/api/customer-dashboard/bar-chart/aggregation-methods', methods=['GET'])
-@login_required
-def get_aggregation_methods():
-    """
-    集約方法一覧を取得
-
-    レスポンス:
-    - 成功時: {"status": "success", "data": [...]}
-    """
-    try:
-        # gold_summary_method_masterから有効な集約方法を取得
-        methods = get_active_aggregation_methods()
-
-        return jsonify({
-            'status': 'success',
-            'data': methods
-        })
-
-    except Exception as e:
-        logger.error(f'Aggregation methods fetch error: {e}')
-        return jsonify({'status': 'error', 'message': '集約方法の取得に失敗しました'}), 500
-
-
-def get_active_aggregation_methods() -> list:
-    """
-    有効な集約方法一覧を取得
-
-    Returns:
-        list: 集約方法リスト
-    """
-    query = """
-    SELECT
-        summary_method_id,
-        summary_method_code,
-        summary_method_name
-    FROM iot_catalog.gold.gold_summary_method_master
-    WHERE delete_flag = FALSE
-    ORDER BY summary_method_id
-    """
-
-    result = spark.sql(query).collect()
-
-    return [
-        {
-            'id': row.summary_method_id,
-            'code': row.summary_method_code,
-            'name': row.summary_method_name
-        }
-        for row in result
-    ]
-```
-
-**集約方法マスタ（gold_summary_method_master）:**
-
-| summary_method_id | summary_method_code | summary_method_name | 計算ロジック |
-| ----------------- | ------------------- | ------------------- | ------------ |
-| 1 | AVG | 平均値 | `AVG(sensor_value)` |
-| 2 | MAX | 最大値 | `MAX(sensor_value)` |
-| 3 | MIN | 最小値 | `MIN(sensor_value)` |
-| 4 | P25 | 第1四分位数 | `PERCENTILE_APPROX(sensor_value, 0.25)` |
-| 5 | MEDIAN | 中央値 | `PERCENTILE_APPROX(sensor_value, 0.5)` |
-| 6 | P75 | 第3四分位数 | `PERCENTILE_APPROX(sensor_value, 0.75)` |
-| 7 | STDDEV | 標準偏差 | `STDDEV(sensor_value)` |
-| 8 | P95 | 上側5％境界値 | `PERCENTILE_APPROX(sensor_value, 0.95)` |
+**注:**
+- **レスポンス形式**:
+  - `HTML`: Jinja2テンプレートをレンダリングして返す（`render_template()`）
+  - `HTML（モーダル）`: モーダルダイアログ用のHTMLフラグメントを返す
+  - `リダイレクト (302)`: 処理成功後に `/analysis/customer-dashboard` へリダイレクト
+  - `JSON (AJAX)`: JavaScriptからの非同期リクエストに対してJSONレスポンスを返す
+  - `CSV`: CSVファイルをダウンロードレスポンスとして返す
+- **Flask Blueprint構成**: `customer_dashboard_bp` として実装
 
 ---
 
-## データ取得ワークフロー
+## ルート呼び出しマッピング
 
-### 処理フロー図
+### 棒グラフガジェット
+
+| ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
+|-------------|---------|-------------|-----------|-----------|---------------|
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に棒グラフガジェットを埋め込み） | エラーページ表示 |
+| 表示時間単位切替（時/日/週/月） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 集計時間幅選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 時間帯選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
+
+### 棒グラフガジェット登録モーダル
+
+| ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
+|-------------|---------|-------------|-----------|-----------|---------------|
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/bar-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/bar-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
+
+---
+
+## ワークフロー一覧
+
+### ガジェット初期表示
+
+**トリガー:** 顧客作成ダッシュボード画面アクセス時
+
+**前提条件:**
+- ユーザーがログイン済み（Databricks認証完了）
+- 適切な権限を持っている（システム保守者、管理者、販社ユーザ、サービス利用者）
+
+#### 処理フロー
+
+[共通ワークフロー仕様書](../common/workflow-specification.md) のダッシュボード初期表示と同様の処理フローに従います。
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 顧客作成ダッシュボード表示 | `GET /analysis/customer-dashboard` | クエリパラメータ: なし |
+
+#### バリデーション
+
+**実行タイミング:** なし
+
+**データスコープ制限:**
+- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
+  - ユーザーの `organization_id` を親組織IDとして検索
+  - 下位組織リスト（`subsidiary_organization_id`）を取得
+  - そのリストに該当する組織のデータのみアクセス可能
+  - **ロールによる条件分岐は一切行わない**
+
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
+
+#### 処理詳細（サーバーサイド）
+
+[共通ワークフロー仕様書](../common/workflow-specification.md) のダッシュボード初期表示の処理詳細（①〜⑨）と同様の処理を実行します。
+
+棒グラフガジェット固有の追加処理はありません。
+
+---
+
+### ガジェットデータ取得
+
+**トリガー:** 画面初期表示時 / 表示時間単位切替時 / 集計時間幅選択時 / 時間帯選択時 / 更新ボタン押下時
+
+**前提条件:**
+- ガジェットが表示されている
+- データソース設定が存在する
+
+#### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([API呼び出し]) --> Validate{パラメータ<br>バリデーション}
+    Start([ガジェットデータ取得リクエスト<br>AJAX]) --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[401エラーレスポンス]
+    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>ガジェットがアクセス可能な組織に属するか確認]
 
-    Validate -->|エラー| Return400[400エラー返却<br>バリデーションエラー]
-    Return400 --> End1([終了])
+    Scope --> CheckScope{スコープOK?}
+    CheckScope -->|スコープ外| Error404[404エラーレスポンス]
+    CheckScope -->|スコープOK| Validate[バリデーション<br>リクエストパラメータ]
 
-    Validate -->|OK| UnitCheck{表示単位<br>判定}
+    Validate --> CheckValidate{バリデーションOK?}
+    CheckValidate -->|NG| Error400[400エラーレスポンス]
+    CheckValidate -->|OK| GetConfig[ガジェット設定取得<br>DB dashboard_gadget_master]
 
-    UnitCheck -->|時| QuerySilver[シルバー層クエリ<br>silver_sensor_data]
-    QuerySilver --> AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
+    GetConfig --> CheckGetConfig{DBクエリ結果}
+    CheckGetConfig -->|失敗| Error500[500エラーレスポンス]
+    CheckGetConfig -->|成功| CheckDeviceId[データソース設定に<br>デバイスIDが設定されているかを確認]
 
-    UnitCheck -->|日| QueryGoldDay[ゴールド層クエリ<br>TODO:新規テーブル]
-    QueryGoldDay --> AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
+    CheckDeviceId --> ExistDeviceId{デバイスID設定あり?}
+    ExistDeviceId -->|設定なし| GetUserSetting[ユーザー設定から選択中デバイスIDを取得]
+    ExistDeviceId -->|設定あり| UnitCheck{表示単位<br>判定}
 
-    UnitCheck -->|週| QueryGoldWeek[ゴールド層クエリ<br>daily_summary]
-    QueryGoldWeek --> AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
+    GetUserSetting --> UnitCheck
 
-    UnitCheck -->|月| QueryGoldMonth[ゴールド層クエリ<br>daily_summary]
-    QueryGoldMonth --> AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
+    UnitCheck -->|時| SilverDataColumnNameQuery[シルバーデータカラム名取得<br>DB measurement_item_master]
+    SilverDataColumnNameQuery --> CheckSilverDataColumnNameQuery{DBクエリ結果}
+    CheckSilverDataColumnNameQuery -->|NG| Error500
+    CheckSilverDataColumnNameQuery -->|OK| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
+
+    QuerySilver --> CheckQuerySilver{DBクエリ結果}
+    CheckQuerySilver -->|NG| Error500
+    CheckQuerySilver -->|OK| AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
+
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
+    QueryGoldDay --> CheckQueryGoldDay{DBクエリ結果}
+    CheckQueryGoldDay -->|NG| Error500
+    CheckQueryGoldDay -->|OK| AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
+
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldWeek --> CheckQueryGoldWeek{DBクエリ結果}
+    CheckQueryGoldWeek -->|NG| Error500
+    CheckQueryGoldWeek -->|OK| AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
+
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldMonth --> CheckQueryGoldMonth{DBクエリ結果}
+    CheckQueryGoldMonth -->|NG| Error500
+    CheckQueryGoldMonth -->|OK| AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
 
     AggregateSilver --> Format[データ整形<br>labels/values配列生成]
     AggregateDay --> Format
     AggregateWeek --> Format
     AggregateMonth --> Format
 
-    Format --> HasData{データ<br>存在?}
+    Format --> ReturnData[JSONデータ返却]
 
-    HasData -->|なし| ReturnEmpty[空データ返却]
-    ReturnEmpty --> End2([終了])
-
-    HasData -->|あり| ReturnData[JSONデータ返却]
-    ReturnData --> End3([終了])
+    Error401 --> End([処理完了])
+    Error404 --> End
+    Error400 --> End
+    Error500 --> End
+    ReturnData --> End
 ```
 
-### 表示単位別データソース
+#### Flaskルート
 
-| 表示単位 | データソース | 集計間隔 | 表示目盛り | データ本数 |
-| -------- | ------------ | -------- | ---------- | ---------- |
-| 時（hour） | シルバー層 silver_sensor_data | 1/2/3/5/10/15分（選択可） | 集計間隔と同じ | 可変 |
-| 日（day） | **TODO**（新規時間単位サマリーテーブル） | 1時間（固定） | 2時間ごと（0時, 2時, ..., 22時） | 24本 |
-| 週（week） | ゴールド層 daily_summary | 1日（固定） | 1日ごと（日曜〜土曜） | 7本 |
-| 月（month） | ゴールド層 daily_summary | 1日（固定） | 2日飛ばし（奇数日のみ表示） | 月の日数分 |
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
 
-**日単位の補足:**
-- データは1時間単位で24本取得
-- 表示目盛りは2時間ごと（0時, 2時, 4時, ..., 22時）
-- 取得先テーブルは今後作成予定（TODO）
+#### バリデーション
 
-**月単位の補足:**
-- データは1日単位で月の全日分取得
-- 表示目盛りは奇数日のみ（1日, 3日, 5日, ..., 月末奇数日）
+**実行タイミング:** データスコープ制限チェック完了後
 
-### データ取得実装
+**バリデーションルール:**
+
+| 項目 | ルール | エラーメッセージ |
+|------|--------|-----------------|
+| 表示単位 | 許容値（hour/day/week/month） | 表示単位が不正です |
+| 集計間隔（時単位のみ） | 許容値（1min, 2min, 3min, 5min, 10min, 15min） | 集計間隔が不正です |
+| 基準日時 | 形式（YYYY/MM/DD HH:mm:ss） | 日付形式が不正です |
+
+#### 処理詳細（サーバーサイド）
+
+**① ガジェット設定取得**
+
+**使用テーブル:** dashboard_gadget_master
+
+**SQL詳細:**
+```sql
+SELECT
+  gadget_id,
+  gadget_uuid,
+  gadget_type_id,
+  chart_config,
+  data_source_config
+FROM
+  dashboard_gadget_master
+WHERE
+  gadget_uuid = :gadget_uuid
+  AND delete_flag = FALSE
+```
+
+**chart_config JSON スキーマ:**
+```json
+{
+  "measurement_item_id": 1,
+  "summary_method_id": 1,
+  "min_value": 0.0,
+  "max_value": 100.0
+}
+```
+
+**data_source_config JSON スキーマ:**
+```json
+{
+  "device_id": 12345
+}
+```
+※ `device_id` が `null` の場合はデバイス可変モード
+
+---
+
+**② デバイスID決定**
+
+`data_source_config.device_id` を参照し、デバイスIDを決定します。
+
+- **デバイス固定モード** (`device_id` が設定されている場合): `data_source_config.device_id` を使用
+- **デバイス可変モード** (`device_id` が `null` の場合): ユーザー設定 (`dashboard_user_setting.device_id`) を使用
+
+**SQL詳細（ユーザー設定取得）:**
+```sql
+SELECT
+  device_id
+FROM
+  dashboard_user_setting
+WHERE
+  user_id = :current_user_id
+  AND delete_flag = FALSE
+```
+
+---
+
+**③ 表示単位別センサーデータ取得**
+
+| display_unit | 参照層 | テーブル | 集計粒度 |
+|-------------|-------|---------|--------|
+| hour | シルバー層 | sensor_data_view | インターバル単位（1/2/3/5/10/15分） |
+| day | ゴールド層 | gold_sensor_data_hourly_summary | 1時間単位（24本） |
+| week | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（7本、日曜〜土曜） |
+| month | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（月の全日） |
+
+**時間範囲の決定:**
+
+| display_unit | start | end |
+|-------------|-------|-----|
+| hour | base_datetime の時刻を00分00秒に切り捨て | start + 1時間 |
+| day | base_datetime の日付 00:00:00 | base_datetime の日付 23:59:59 |
+| week | base_datetime の週の日曜日 00:00:00 | base_datetime の週の土曜日 23:59:59 |
+| month | base_datetime の月の初日 00:00:00 | base_datetime の月の最終日 23:59:59 |
+
+**SQL詳細（display_unit=hour / シルバー層）:**
+```sql
+SELECT
+  event_timestamp 
+  , external_temp
+  , set_temp_freezer_1
+  , internal_sensor_temp_freezer_1
+  , internal_temp_freezer_1
+  , df_temp_freezer_1
+  , condensing_temp_freezer_1 
+  , adjusted_internal_temp_freezer_1
+  , set_temp_freezer_2
+  , internal_sensor_temp_freezer_2
+  , internal_temp_freezer_2
+  , df_temp_freezer_2
+  , condensing_temp_freezer_2
+  , adjusted_internal_temp_freezer_2
+  , compressor_freezer_1
+  , compressor_freezer_2
+  , fan_motor_1
+  , fan_motor_2
+  , fan_motor_3
+  , fan_motor_4
+  , fan_motor_5
+  , defrost_heater_output_1
+  , defrost_heater_output_2
+FROM
+  iot_catalog.views.sensor_data_view
+WHERE
+  device_id = :device_id
+  AND event_timestamp BETWEEN :start_datetime AND :end_datetime
+ORDER BY
+  event_timestamp ASC
+```
+
+**SQL詳細（display_unit=hour / 測定項目マスタ）:**
+```sql
+SELECT
+  silver_data_column_name
+FROM
+  measurement_item_master
+WHERE
+  measurement_item_id = :measurement_item_id
+```
+
+※ インターバル単位のグループ化・集計・表示項目選択はPython側で実施する（下記④参照）
+
+**SQL詳細（display_unit=day / ゴールド層 hourly）:**
+```sql
+SELECT
+  collection_hour,
+  summary_value
+FROM
+  iot_catalog.gold.gold_sensor_data_hourly_summary
+WHERE
+  device_id = :device_id
+  AND summary_item = :measurement_item_id
+  AND summary_method_id = :summary_method_id
+  AND collection_date = :target_date
+ORDER BY
+  collection_hour ASC
+```
+
+**SQL詳細（display_unit=week または month / ゴールド層 daily）:**
+```sql
+SELECT
+  collection_date,
+  summary_value
+FROM
+  iot_catalog.gold.gold_sensor_data_daily_summary
+WHERE
+  device_id = :device_id
+  AND summary_item = :measurement_item_id
+  AND summary_method_id = :summary_method_id
+  AND collection_date BETWEEN :start_date AND :end_date
+ORDER BY
+  collection_date ASC
+```
+
+---
+
+**④ データ整形**
+
+取得データを ECharts 棒グラフ用の `labels` / `values` 配列に変換します。
+
+| display_unit | ラベル形式 | 備考 |
+|-------------|---------|------|
+| hour | HH:mm | インターバル単位の開始時刻 |
+| day | HH | 0〜23時（24本） |
+| week | E | 日曜〜土曜（7本） |
+| month | DD | 月初〜月末（目盛りはフロント側で奇数日のみ表示） |
 
 ```python
-from databricks import sql as databricks_sql
-from datetime import datetime, timedelta
-from calendar import monthrange
-import pytz
-
-JST = pytz.timezone('Asia/Tokyo')
-
-# =============================================================================
-# Databricks SQL Connector設定
-# =============================================================================
-DATABRICKS_CONFIG = {
-    'server_hostname': dbutils.secrets.get('iot-secrets', 'databricks-host'),
-    'http_path': dbutils.secrets.get('iot-secrets', 'databricks-http-path'),
-    'access_token': dbutils.secrets.get('iot-secrets', 'databricks-token')
+INTERVAL_MINUTES = {
+    '1min': 1, '2min': 2, '3min': 3,
+    '5min': 5, '10min': 10, '15min': 15
 }
 
-def get_databricks_connection():
-    """Databricks SQL接続を取得"""
-    return databricks_sql.connect(**DATABRICKS_CONFIG)
-
-
-# =============================================================================
-# チャートデータ取得メイン処理
-# =============================================================================
-def get_chart_data(
-    device_id: str,
-    display_unit: str,
-    interval: str,
-    item: str,
-    method_id: int,
-    base_datetime: datetime
-) -> dict:
-    """
-    棒グラフ用データを取得
-
-    Args:
-        device_id: デバイスID
-        display_unit: 表示単位（hour/day/week/month）
-        interval: 集計間隔（時単位のみ使用）
-        item: 表示項目（センサーカラム名）
-        method_id: 集計方法ID
-        base_datetime: 基準日時
-
-    Returns:
-        {
-            'labels': ['15:00', '15:10', ...],
-            'values': [120, 135, ...],
-            'item_name': '通信通電時間',
-            'unit': 'm',
-            'device_name': 'デバイス001'
-        }
-    """
-    # デバイス名・項目情報取得
-    device_info = get_device_info(device_id)
-    item_info = get_item_info(item)
-
-    # 表示単位に応じてデータ取得
+def format_bar_chart_data(rows, display_unit, interval='10min', summary_method_id=1):
+    labels, values = [], []
     if display_unit == 'hour':
-        raw_data = fetch_silver_data(device_id, item, interval, base_datetime)
+        # 測定項目マスタから silver_data_column_name を事前に取得したうえで使用する
+        column_name = measurement_item['silver_data_column_name']
+
+        interval_min = INTERVAL_MINUTES.get(interval, 1)
+        groups = {}
+        for row in rows:
+            dt = row['event_timestamp']
+            bucket = dt.replace(
+                minute=(dt.minute // interval_min) * interval_min,
+                second=0, microsecond=0
+            )
+            key = bucket.strftime('%H:%M')
+            groups.setdefault(key, []).append(row[column_name])
+        for key in sorted(groups):
+            labels.append(key)
+            values.append(aggregate_values(groups[key], summary_method_id))
     elif display_unit == 'day':
-        raw_data = fetch_gold_daily_data(device_id, item, method_id, base_datetime)
-    elif display_unit == 'week':
-        raw_data = fetch_gold_weekly_data(device_id, item, method_id, base_datetime)
-    else:  # month
-        raw_data = fetch_gold_monthly_data(device_id, item, method_id, base_datetime)
-
-    # データ整形
-    labels = [row['time_label'] for row in raw_data]
-    values = [row['value'] for row in raw_data]
-
-    return {
-        'labels': labels,
-        'values': values,
-        'item_name': item_info['measurement_item_name'],
-        'unit': item_info['unit'],
-        'device_name': device_info['device_name']
-    }
+        for row in rows:
+            labels.append(f"{row['collection_hour']:02d}:00")
+            values.append(row['summary_value'])
+    elif display_unit in ('week', 'month'):
+        for row in rows:
+            labels.append(row['collection_date'].strftime('%m/%d'))
+            values.append(row['summary_value'])
+    return {'labels': labels, 'values': values}
 ```
 
-### シルバー層クエリ（時単位）
+---
 
-```python
-# =============================================================================
-# シルバー層データ取得（時単位）
-# =============================================================================
-def fetch_silver_data(
-    device_id: str,
-    item: str,
-    interval: str,
-    base_datetime: datetime
-) -> list:
-    """
-    シルバー層からセンサーデータを取得し、指定間隔で集計
+**⑤ レスポンス形式**
 
-    Args:
-        device_id: デバイスID
-        item: センサーカラム名
-        interval: 集計間隔（1min/2min/3min/5min/10min/15min）
-        base_datetime: 基準日時
-
-    Returns:
-        [{'time_label': '15:00', 'value': 120.5}, ...]
-
-    表示例（base_datetime=15:58:39, interval=10min）:
-        15:10, 15:20, 15:30, 15:40, 15:50, 16:00
-    """
-    # 集計間隔をSQLのINTERVAL用に変換
-    interval_mapping = {
-        '1min': 1,
-        '2min': 2,
-        '3min': 3,
-        '5min': 5,
-        '10min': 10,
-        '15min': 15
-    }
-    interval_minutes = interval_mapping.get(interval, 10)
-
-    # 表示期間計算（基準日時の前後1時間）
-    start_datetime = base_datetime - timedelta(hours=1)
-    end_datetime = base_datetime + timedelta(hours=1)
-
-    query = f"""
-        SELECT
-            DATE_TRUNC('minute', event_timestamp) -
-                INTERVAL (MINUTE(event_timestamp) % {interval_minutes}) MINUTE AS time_bucket,
-            DATE_FORMAT(
-                DATE_TRUNC('minute', event_timestamp) -
-                    INTERVAL (MINUTE(event_timestamp) % {interval_minutes}) MINUTE,
-                'HH:mm'
-            ) AS time_label,
-            AVG({item}) AS value
-        FROM iot_catalog.silver.silver_sensor_data
-        WHERE device_id = :device_id
-          AND event_timestamp >= :start_datetime
-          AND event_timestamp < :end_datetime
-        GROUP BY time_bucket
-        ORDER BY time_bucket
-    """
-
-    with get_databricks_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    'device_id': device_id,
-                    'start_datetime': start_datetime.isoformat(),
-                    'end_datetime': end_datetime.isoformat()
-                }
-            )
-            columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+```json
+{
+  "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "chart_data": {
+    "labels": ["00:00", "00:05", "00:10"],
+    "values": [10.5, 12.3, 9.8]
+  },
+  "updated_at": "2026/03/05 12:00:00"
+}
 ```
 
-### ゴールド層クエリ（日単位）
-
-**TODO:** 取得先テーブルは新規作成予定。テーブル名・スキーマが確定後に実装。
-
-```python
-# =============================================================================
-# ゴールド層データ取得（日単位）
-# =============================================================================
-def fetch_gold_hourly_data(
-    device_id: str,
-    item: str,
-    method_id: int,
-    base_datetime: datetime
-) -> list:
-    """
-    ゴールド層から日単位データを取得（1時間単位）
-
-    Args:
-        device_id: デバイスID
-        item: センサーカラム名（summary_item）
-        method_id: 集計方法ID
-        base_datetime: 基準日時
-
-    Returns:
-        [{'time_label': '0時', 'value': 120.5}, ...]
-
-    データ取得:
-        0時〜23時の24本（1時間単位で集計済み）
-
-    表示目盛り:
-        2時間ごと（0時, 2時, 4時, ..., 22時）
-        ※目盛り表示はフロント側で制御
-    """
-    # TODO: 取得先テーブルが確定後に実装
-    # テーブル名: gold_sensor_data_hourly_summary（仮）
-
-    base_date = base_datetime.date()
-
-    query = """
-        SELECT
-            collection_hour,
-            CONCAT(collection_hour, '時') AS time_label,
-            summary_value AS value
-        FROM iot_catalog.gold.gold_sensor_data_hourly_summary  -- TODO: テーブル名確定後に修正
-        WHERE device_id = :device_id
-          AND summary_item = :item
-          AND summary_method_id = :method_id
-          AND collection_date = :base_date
-        ORDER BY collection_hour
-    """
-
-    with get_databricks_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    'device_id': device_id,
-                    'item': item,
-                    'method_id': method_id,
-                    'base_date': base_date.isoformat()
-                }
-            )
-            columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+データなしの場合:
+```json
+{
+  "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "chart_data": {"labels": [], "values": []},
+  "updated_at": "2026/03/05 12:00:00"
+}
 ```
 
-### ゴールド層クエリ（週単位）
+---
+
+**⑥ 実装例**
 
 ```python
-# =============================================================================
-# ゴールド層データ取得（週単位）
-# =============================================================================
-def fetch_gold_weekly_data(
-    device_id: str,
-    item: str,
-    method_id: int,
-    base_datetime: datetime
-) -> list:
-    """
-    ゴールド層から週単位データを取得（日曜〜土曜）
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
+@require_auth
+def gadget_bar_chart_data(gadget_uuid):
+    """棒グラフガジェットデータ取得（AJAX）"""
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
-    Args:
-        device_id: デバイスID
-        item: センサーカラム名（summary_item）
-        method_id: 集計方法ID
-        base_datetime: 基準日時
+    # ① ガジェット設定取得
+    gadget = get_gadget_by_uuid(gadget_uuid)
+    if not gadget:
+        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
 
-    Returns:
-        [{'time_label': '2/1(日)', 'value': 120.5}, ...]
+    # データスコープ制限チェック
+    if not check_gadget_access(gadget, accessible_org_ids):
+        return jsonify({'error': 'アクセス権限がありません'}), 404
 
-    表示例（base_datetime=2026/02/06（金曜日））:
-        2/1(日), 2/2(月), 2/3(火), 2/4(水), 2/5(木), 2/6(金), 2/7(土)（7本）
-    """
-    base_date = base_datetime.date()
+    # リクエストパラメータ取得・バリデーション
+    params = request.get_json() or {}
+    display_unit = params.get('display_unit', 'hour')
+    interval = params.get('interval', '10min')
+    base_datetime_str = params.get('base_datetime')
 
-    # 週の開始日（日曜日）を計算
-    # weekday(): 月曜=0, 日曜=6
-    days_since_sunday = (base_date.weekday() + 1) % 7
-    week_start = base_date - timedelta(days=days_since_sunday)
-    week_end = week_start + timedelta(days=6)
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
+        return jsonify({'error': 'パラメータが不正です'}), 400
 
-    # 曜日ラベル
-    weekday_labels = ['日', '月', '火', '水', '木', '金', '土']
+    try:
+        base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
-    query = """
-        SELECT
-            collection_date,
-            summary_value AS value
-        FROM iot_catalog.gold.gold_sensor_data_daily_summary
-        WHERE device_id = :device_id
-          AND summary_item = :item
-          AND summary_method_id = :method_id
-          AND collection_date >= :week_start
-          AND collection_date <= :week_end
-        ORDER BY collection_date
-    """
+        # ② デバイスID決定
+        data_source_config = json.loads(gadget.data_source_config)
+        device_id = data_source_config.get('device_id')
+        if not device_id:
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
+            device_id = user_setting.device_id if user_setting else None
 
-    with get_databricks_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    'device_id': device_id,
-                    'item': item,
-                    'method_id': method_id,
-                    'week_start': week_start.isoformat(),
-                    'week_end': week_end.isoformat()
-                }
-            )
-            columns = [desc[0] for desc in cursor.description]
-            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        chart_config = json.loads(gadget.chart_config)
 
-    # 曜日ラベルを付与
-    result = []
-    for row in rows:
-        date = row['collection_date']
-        weekday_index = (date.weekday() + 1) % 7  # 日曜=0
-        time_label = f"{date.month}/{date.day}({weekday_labels[weekday_index]})"
-        result.append({
-            'time_label': time_label,
-            'value': row['value']
+        # ③ 表示単位別センサーデータ取得
+        rows = fetch_bar_chart_data(
+            device_id=device_id,
+            display_unit=display_unit,
+            interval=interval,
+            base_datetime=base_datetime,
+            measurement_item_id=chart_config['measurement_item_id'],
+            summary_method_id=chart_config['summary_method_id']
+        )
+
+        # ④ データ整形
+        chart_data = format_bar_chart_data(
+            rows, display_unit, interval, chart_config['summary_method_id']
+        )
+
+        return jsonify({
+            'gadget_uuid': gadget_uuid,
+            'chart_data': chart_data,
+            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         })
 
-    return result
-```
-
-### ゴールド層クエリ（月単位）
-
-```python
-# =============================================================================
-# ゴールド層データ取得（月単位）
-# =============================================================================
-def fetch_gold_monthly_data(
-    device_id: str,
-    item: str,
-    method_id: int,
-    base_datetime: datetime
-) -> list:
-    """
-    ゴールド層から月単位データを取得（全日分）
-
-    Args:
-        device_id: デバイスID
-        item: センサーカラム名（summary_item）
-        method_id: 集計方法ID
-        base_datetime: 基準日時
-
-    Returns:
-        [{'time_label': '1日', 'value': 120.5}, ...]
-
-    データ取得:
-        月の全日分（1日〜月末日）
-
-    表示目盛り:
-        2日飛ばし（奇数日: 1日, 3日, 5日, ..., 月末奇数日）
-        ※目盛り表示はフロント側で制御
-    """
-    base_date = base_datetime.date()
-    year = base_date.year
-    month = base_date.month
-
-    # 月の日数を取得
-    _, last_day = monthrange(year, month)
-
-    # 月の開始日と終了日
-    month_start = base_date.replace(day=1)
-    month_end = base_date.replace(day=last_day)
-
-    query = """
-        SELECT
-            collection_date,
-            DAY(collection_date) AS day_of_month,
-            summary_value AS value
-        FROM iot_catalog.gold.gold_sensor_data_daily_summary
-        WHERE device_id = :device_id
-          AND summary_item = :item
-          AND summary_method_id = :method_id
-          AND collection_date >= :month_start
-          AND collection_date <= :month_end
-        ORDER BY collection_date
-    """
-
-    with get_databricks_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    'device_id': device_id,
-                    'item': item,
-                    'method_id': method_id,
-                    'month_start': month_start.isoformat(),
-                    'month_end': month_end.isoformat()
-                }
-            )
-            columns = [desc[0] for desc in cursor.description]
-            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    # ラベルを付与
-    result = []
-    for row in rows:
-        time_label = f"{row['day_of_month']}日"
-        result.append({
-            'time_label': time_label,
-            'value': row['value']
-        })
-
-    return result
+    except Exception as e:
+        logger.error(f'棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
 
 ---
 
-## CSV出力ワークフロー
+### ガジェット登録モーダル表示
 
-### 処理フロー図
+**トリガー:** ガジェット追加モーダルの登録画面ボタンクリック
+
+**前提条件:**
+- ガジェット追加モーダルが表示されている
+- ガジェット種別が選択されている
+
+**注:** ガジェット追加モーダルのUI仕様は [共通UI仕様書](../common/ui-specification.md) を参照してください。
+
+#### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([API呼び出し]) --> Validate{パラメータ<br>バリデーション}
+    Start([登録画面ボタンクリック]) --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Validate[バリデーション<br>ガジェット種別]
 
-    Validate -->|エラー| Return400[400エラー返却]
-    Return400 --> End1([終了])
+    Validate --> CheckValidate{バリデーションOK?}
+    CheckValidate -->|NG| Error400[400エラーモーダル表示]
+    CheckValidate -->|OK| Scope[データスコープ制限適用<br>organization_closureテーブルから<br>下位組織IDリスト取得]
+    
+    Scope --> UserSettingQuery[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
+    UserSettingQuery --> CheckUserSettingQuery{DBクエリ結果}
+    CheckUserSettingQuery -->|失敗| Error500[500エラーページ表示]
+    CheckUserSettingQuery -->|成功| CheckUserSetting{ユーザー設定あり?}
 
-    Validate -->|OK| FetchData[データ取得<br>get_chart_data呼び出し]
+    CheckUserSetting -->|なし| Error404[404エラーモーダル表示]
+    CheckUserSetting -->|あり| DashboardQuery[選択中ダッシュボード情報取得<br>DB dashboard_master]
 
-    FetchData --> GenerateCSV[CSV生成<br>ヘッダー+データ行]
+    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
+    CheckDashboardQuery -->|失敗| Error500
+    CheckDashboardQuery -->|成功| CheckDashboard{ダッシュボードあり?}
 
-    GenerateCSV --> SetHeaders[レスポンスヘッダー設定<br>Content-Disposition]
+    CheckDashboard -->|なし| Error404[404エラーモーダル表示]
+    CheckDashboard -->|あり| GroupQuery[ダッシュボードグループ一覧取得<br>DB dashboard_group_master]
 
-    SetHeaders --> Download[CSVファイル<br>ダウンロード]
-    Download --> End2([終了])
+    GroupQuery --> CheckGroupQuery{DBクエリ結果}
+    CheckGroupQuery -->|失敗| Error500
+    CheckGroupQuery -->|成功| DisplayItemsQuery[表示項目一覧取得<br>DB measurement_item_master]
+
+    DisplayItemsQuery --> CheckDisplayItemsQuery{DBクエリ結果}
+    CheckDisplayItemsQuery -->|失敗| Error500
+    CheckDisplayItemsQuery -->|成功| OrganizationQuery[組織一覧取得<br>DB organization_master]
+
+    OrganizationQuery --> CheckOrganizationQuery{DBクエリ結果}
+    CheckOrganizationQuery -->|失敗| Error500
+    CheckOrganizationQuery -->|成功| DeviceQuery[デバイス一覧取得<br>DB device_master]
+
+    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
+    CheckDeviceQuery -->|失敗| Error500
+    CheckDeviceQuery -->|成功| SummaryMethodQuery[集約方法一覧取得<br>DB gold_summary_method_master]
+
+    SummaryMethodQuery --> CheckSummaryMethodQuery{DBクエリ結果}
+    CheckSummaryMethodQuery -->|失敗| Error500
+    CheckSummaryMethodQuery -->|成功| Template[棒グラフガジェット登録モーダル表示]
+
+    Template --> Response[HTMLレスポンス返却]
+
+    LoginRedirect --> End([処理完了])
+    Error400 --> End
+    Error404 --> End
+    Error500 --> End   
+    Response --> End
 ```
 
-### CSV出力実装
+#### Flaskルート
 
-```python
-# =============================================================================
-# CSV生成処理
-# =============================================================================
-def generate_csv(data: dict) -> str:
-    """
-    グラフデータをCSV形式に変換
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 棒グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/bar-chart/create` | パラメータ: なし |
 
-    Args:
-        data: get_chart_dataの戻り値
+#### バリデーション
 
-    Returns:
-        CSV文字列（UTF-8 BOM付き）
-    """
-    output = io.StringIO()
+**実行タイミング:** 登録画面ボタン押下時
 
-    # UTF-8 BOM付き（Excel対応）
-    output.write('\ufeff')
+**バリデーションルール:**
 
-    writer = csv.writer(output)
+| 項目 | ルール | エラーメッセージ |
+|------|--------|-----------------|
+| ガジェット種別 | 必須 | ガジェットを選択してください |
 
-    # ヘッダー行
-    header = ['日時', f'{data["item_name"]} ({data["unit"]})']
-    writer.writerow(header)
+#### 処理詳細（サーバーサイド）
 
-    # データ行
-    for label, value in zip(data['labels'], data['values']):
-        writer.writerow([label, value if value is not None else ''])
+**① ダッシュボードユーザー設定取得**
 
-    return output.getvalue()
+**使用テーブル:** dashboard_user_setting
+
+```sql
+SELECT
+  dashboard_id,
+  organization_id,
+  device_id
+FROM
+  dashboard_user_setting
+WHERE
+  user_id = :current_user_id
+  AND delete_flag = FALSE
 ```
 
 ---
 
-## ガジェット登録ワークフロー
+**② ダッシュボード情報取得**
 
-### 処理フロー図
+**使用テーブル:** dashboard_master
+
+```sql
+SELECT
+  dashboard_id,
+  dashboard_uuid,
+  dashboard_name
+FROM
+  dashboard_master
+WHERE
+  dashboard_id = :dashboard_id
+  AND organization_id IN (:accessible_org_ids)
+  AND delete_flag = FALSE
+```
+
+---
+
+**③ ダッシュボードグループ一覧取得**
+
+**使用テーブル:** dashboard_group_master
+
+```sql
+SELECT
+  dashboard_group_id,
+  dashboard_group_uuid,
+  dashboard_group_name
+FROM
+  dashboard_group_master
+WHERE
+  dashboard_id = :dashboard_id
+  AND delete_flag = FALSE
+ORDER BY
+  display_order ASC
+```
+
+---
+
+**④ 表示項目一覧取得**
+
+**使用テーブル:** measurement_item_master
+
+```sql
+SELECT
+  measurement_item_id,
+  display_name,
+  unit_name
+FROM
+  measurement_item_master
+WHERE
+  delete_flag = FALSE
+ORDER BY
+  measurement_item_id ASC
+```
+
+---
+
+**⑤ 組織一覧取得**
+
+**使用テーブル:** organization_master
+
+```sql
+SELECT
+  organization_id,
+  organization_name
+FROM
+  organization_master
+WHERE
+  organization_id IN (:accessible_org_ids)
+  AND delete_flag = FALSE
+ORDER BY
+  organization_id ASC
+```
+
+---
+
+**⑥ デバイス一覧取得（デバイス固定モード用）**
+
+**使用テーブル:** device_master
+
+```sql
+SELECT
+  device_id,
+  device_name,
+  organization_id
+FROM
+  device_master
+WHERE
+  organization_id IN (:accessible_org_ids)
+  AND delete_flag = FALSE
+ORDER BY
+  device_id ASC
+```
+
+---
+
+**⑦ 集約方法一覧取得**
+
+**使用テーブル:** gold_summary_method_master
+
+```sql
+SELECT
+  summary_method_id,
+  summary_method_name
+FROM
+  gold_summary_method_master
+WHERE
+  delete_flag = FALSE
+ORDER BY
+  summary_method_id ASC
+```
+
+---
+
+**⑧ 実装例**
+
+```python
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/create', methods=['GET'])
+@require_auth
+def gadget_bar_chart_create():
+    """棒グラフガジェット登録モーダル表示"""
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+
+    # ① ユーザー設定取得
+    user_setting = get_dashboard_user_setting(g.current_user.user_id)
+    if not user_setting:
+        abort(404)
+
+    # ② ダッシュボード情報取得
+    dashboard = get_dashboard_by_id(user_setting.dashboard_id, accessible_org_ids)
+    if not dashboard:
+        abort(404)
+
+    # ③ ダッシュボードグループ一覧取得
+    groups = get_dashboard_groups(dashboard.dashboard_id)
+
+    # ④ 表示項目一覧取得
+    measurement_items = get_measurement_items()
+
+    # ⑤ 組織一覧取得
+    organizations = get_organizations(accessible_org_ids)
+
+    # ⑥ デバイス一覧取得
+    devices = get_all_devices_in_scope(accessible_org_ids)
+
+    # ⑦ 集約方法一覧取得
+    aggregation_methods = get_aggregation_methods()
+
+    form = BarChartGadgetForm()
+    return render_template(
+        'customer_dashboard/modals/gadget_register/bar_chart.html',
+        form=form,
+        dashboard=dashboard,
+        groups=groups,
+        measurement_items=measurement_items,
+        organizations=organizations,
+        devices=devices,
+        aggregation_methods=aggregation_methods
+    )
+```
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
+|--------------|-----------|---------|---------|
+| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
+| 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 404 | リソース不存在 | 404エラーモーダル表示 | ダッシュボードが見つかりません |
+| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+
+---
+
+### ガジェット登録
+
+**トリガー:** ガジェット登録モーダルの登録ボタンクリック
+
+**前提条件:** ガジェット登録モーダルが表示されている
+
+#### 処理フロー
 
 ```mermaid
 flowchart TD
-    A[登録リクエスト受信] --> B{認証チェック}
-    B -->|NG| C[401エラー]
-    B -->|OK| D{権限チェック}
-    D -->|NG| E[403エラー]
-    D -->|OK| F{バリデーション}
-    F -->|NG| G[400エラー]
-    F -->|OK| H{デバイスモード}
-    H -->|指定デバイス| I[デバイス存在チェック]
-    H -->|ツリー連動| J[device_id未設定として登録]
-    I --> K{デバイス存在?}
-    K -->|なし| L[400エラー]
-    K -->|あり| M[データスコープチェック]
-    J --> M
-    M --> N{アクセス権限?}
-    N -->|なし| O[403エラー]
-    N -->|あり| P[集約方法マスタ検証]
-    P --> Q{有効な集約方法?}
-    Q -->|なし| R[400エラー]
-    Q -->|あり| S[最小値/最大値検証]
-    S --> T{min < max?}
-    T -->|NG| U[400エラー]
-    T -->|OK or 未入力| V[ガジェット登録]
-    V --> W{登録結果}
-    W -->|失敗| X[500エラー]
-    W -->|成功| Y[201 Created返却]
+    Start([登録ボタンクリック]) --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Validate[バリデーション]
+
+    Validate --> CheckValidate{バリデーションOK?}
+    CheckValidate -->|NG| Error400[400エラーモーダル表示]
+    CheckValidate -->|OK| ChekcDeviceMode{表示デバイス選択?}
+
+    ChekcDeviceMode -->|デバイス固定| DeviceQuery[デバイス存在&データスコープチェック]
+    ChekcDeviceMode -->|デバイス可変| NotSetDeviceId[データソース設定のデバイスIDは未設定]
+
+    NotSetDeviceId --> Insert[ガジェット登録<br> DB dashboard_gadget_master INSERT]
+
+    DeviceQuery --> CheckDeviceQuery{デバイス存在&データスコープOK?}
+    CheckDeviceQuery -->|NG| Error404[404エラーモーダル表示]
+    CheckDeviceQuery -->|OK| Insert
+
+    Insert --> CheckInsert{DB操作結果}
+    CheckInsert -->|失敗| Error500[500エラーページ表示]
+    CheckInsert -->|成功| Commit[トランザクションコミット]
+
+    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
+    Redirect --> 200OK[成功モーダル表示]
+
+    LoginRedirect --> End([処理完了])
+    Error400 --> End
+    Error404 --> End
+    Error500 --> End
+    200OK --> End
 ```
 
-### 登録処理の流れ
+#### Flaskルート
 
-1. **認証・権限チェック**: ログインユーザーの認証状態とロールを確認
-2. **バリデーション**: 必須項目、文字数、形式をチェック
-3. **デバイスモード分岐**:
-   - 指定デバイス: デバイスの存在確認とデータスコープチェック
-   - ツリー連動: device_id未設定として登録（表示時にツリー上で選択したデバイスのデータを取得）
-4. **集約方法検証**: gold_summary_method_masterで有効性を確認
-5. **最小値/最大値検証**: 両方入力時は最小値 < 最大値をチェック
-6. **ガジェット登録**: **TODO** 登録先DBにガジェット情報を保存
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| 棒グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/bar-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` |
+
+#### バリデーション
+
+**実行タイミング:** フォーム送信時（サーバーサイド）
+
+| 項目 | ルール | エラーメッセージ |
+|------|--------|-----------------|
+| タイトル | 必須 | タイトルを入力してください |
+| タイトル | 最大20文字 | タイトルは20文字以内で入力してください |
+| 表示デバイス | 必須 | 表示デバイスを選択してください |
+| デバイス（デバイス固定時のみ） | 必須 | デバイスを選択してください |
+| グループ | 必須 | グループを選択してください |
+| 集約方法 | 必須 | 集約方法を選択してください |
+| 表示項目 | 必須 | 表示項目を選択してください |
+| 最小値 | 数値、最大値未満 | 最小値は最大値より小さい値を入力してください |
+| 最大値 | 数値、最小値超過 | 最大値は最小値より大きい値を入力してください |
+| 部品サイズ | 必須 | 部品サイズを選択してください |
+
+#### 処理詳細（サーバーサイド）
+
+**① デバイス存在&データスコープチェック（デバイス固定モード時のみ）**
+
+**使用テーブル:** device_master
+
+```sql
+SELECT
+  device_id,
+  device_name,
+  organization_id
+FROM
+  device_master
+WHERE
+  device_id = :device_id
+  AND organization_id IN (:accessible_org_ids)
+  AND delete_flag = FALSE
+```
 
 ---
 
-## 集約方法一覧取得ワークフロー
+**② chart_config / data_source_config JSONスキーマ**
 
-### 処理フロー図
-
-```mermaid
-flowchart TD
-    A[リクエスト受信] --> B{認証チェック}
-    B -->|NG| C[401エラー]
-    B -->|OK| D[集約方法マスタ取得]
-    D --> E[delete_flag=FALSEでフィルタ]
-    E --> F[summary_method_idでソート]
-    F --> G[JSONレスポンス返却]
-```
-
-### 取得処理の流れ
-
-1. **認証チェック**: ログイン状態を確認（権限チェックは不要）
-2. **マスタ取得**: gold_summary_method_masterから有効な集約方法を取得
-3. **レスポンス**: ID、コード、名称のリストを返却
-
----
-
-## バリデーション仕様
-
-### リクエストパラメータ定義（データ取得API）
-
-| パラメータ | 型 | 必須 | 説明 | 例 |
-| ---------- | -- | ---- | ---- | -- |
-| device_id | string | ○ | デバイスID | "DEV001" |
-| display_unit | string | ○ | 表示単位 | "hour" |
-| interval | string | △ | 集計間隔（時単位のみ必須） | "10min" |
-| item | string | ○ | 表示項目 | "communication_power_time" |
-| method_id | integer | ○ | 集計方法ID | 1 |
-| base_datetime | string | ○ | 基準日時（YYYY/MM/DD HH:mm:ss形式） | "2026-02-05 15:32:42" |
-
-### リクエストパラメータ定義（ガジェット登録API）
-
-| パラメータ | 型 | 必須 | 説明 |
-| ---------- | -- | ---- | ---- |
-| title | string | ○ | ガジェットタイトル（1-20文字） |
-| device_mode | string | ○ | 表示デバイス選択（'specified' / 'tree_linked'） |
-| device_id | string | △ | デバイスID（device_mode='specified'時必須） |
-| group_id | string | ○ | グループID |
-| aggregation_method_id | integer | ○ | 集約方法ID（1-8） |
-| item | string | ○ | 表示項目（1つのみ） |
-| min_value | number | - | Y軸最小値（任意） |
-| max_value | number | - | Y軸最大値（任意） |
-| gadget_size | string | ○ | 部品サイズ（'2x2' / '2x4'） |
-
-### バリデーション実装
-
-```python
-from datetime import datetime
-
-# =============================================================================
-# 許可値定義
-# =============================================================================
-VALID_DISPLAY_UNITS = ['hour', 'day', 'week', 'month']
-
-VALID_INTERVALS = {
-    'hour': ['1min', '2min', '3min', '5min', '10min', '15min']
+```json
+// chart_config
+{
+  "measurement_item_id": 1,
+  "summary_method_id": 1,
+  "min_value": 0.0,
+  "max_value": 100.0
 }
 
-VALID_ITEMS = [
-    'external_temp',                      # 外気温度
-    'set_temp_freezer_1',                 # 第1冷凍 設定温度
-    'internal_sensor_temp_freezer_1',     # 第1冷凍 庫内センサー温度
-    'internal_temp_freezer_1',            # 第1冷凍 庫内温度
-    'df_temp_freezer_1',                  # 第1冷凍 DF温度
-    'condensing_temp_freezer_1',          # 第1冷凍 凝縮温度
-    'adjusted_internal_temp_freezer_1',   # 第1冷凍 微調整後庫内温度
-    'set_temp_freezer_2',                 # 第2冷凍 設定温度
-    'internal_sensor_temp_freezer_2',     # 第2冷凍 庫内センサー温度
-    'internal_temp_freezer_2',            # 第2冷凍 庫内温度
-    'df_temp_freezer_2',                  # 第2冷凍 DF温度
-    'condensing_temp_freezer_2',          # 第2冷凍 凝縮温度
-    'adjusted_internal_temp_freezer_2',   # 第2冷凍 微調整後庫内温度
-    'compressor_freezer_1',               # 第1冷凍 圧縮機
-    'compressor_freezer_2',               # 第2冷凍 圧縮機
-    'fan_motor_1',                        # 第1ファンモータ回転数
-    'fan_motor_2',                        # 第2ファンモータ回転数
-    'fan_motor_3',                        # 第3ファンモータ回転数
-    'fan_motor_4',                        # 第4ファンモータ回転数
-    'fan_motor_5',                        # 第5ファンモータ回転数
-    'defrost_heater_output_1',            # 防露ヒータ出力(1)
-    'defrost_heater_output_2'             # 防露ヒータ出力(2)
-]
+// data_source_config（デバイス固定モード）
+{"device_id": 12345}
 
-VALID_METHOD_IDS = [1, 2, 3, 4, 5, 6, 7, 8]
-
-
-# =============================================================================
-# バリデーション処理
-# =============================================================================
-def validate_chart_params(params: dict) -> list:
-    """
-    チャートパラメータのバリデーション
-
-    Args:
-        params: リクエストパラメータ辞書
-
-    Returns:
-        エラーメッセージのリスト（空リストは正常）
-    """
-    errors = []
-
-    # 必須チェック
-    if not params.get('device_id'):
-        errors.append('デバイスIDは必須です')
-
-    if not params.get('display_unit'):
-        errors.append('表示単位は必須です')
-    elif params['display_unit'] not in VALID_DISPLAY_UNITS:
-        errors.append('表示単位が不正です')
-
-    # 集計間隔チェック（時単位のみ必須）
-    if params.get('display_unit') == 'hour':
-        if not params.get('interval'):
-            errors.append('集計間隔は必須です')
-        elif params['interval'] not in VALID_INTERVALS['hour']:
-            errors.append('集計間隔が不正です')
-
-    if not params.get('item'):
-        errors.append('表示項目は必須です')
-    elif params['item'] not in VALID_ITEMS:
-        errors.append('表示項目が不正です')
-
-    if params.get('method_id') is None:
-        errors.append('集計方法は必須です')
-    elif params['method_id'] not in VALID_METHOD_IDS:
-        errors.append('集計方法が不正です')
-
-    if not params.get('base_datetime'):
-        errors.append('基準日時は必須です')
-    else:
-        try:
-            datetime.fromisoformat(params['base_datetime'])
-        except ValueError:
-            errors.append('基準日時の形式が不正です')
-
-    return errors
+// data_source_config（デバイス可変モード）
+{"device_id": null}
 ```
-
-### 許可値一覧
-
-**表示単位（display_unit）:**
-
-| 値 | ラベル | データソース |
-| -- | ------ | ------------ |
-| hour | 時 | シルバー層 |
-| day | 日 | ゴールド層（hourly_summary） |
-| week | 週 | ゴールド層（daily_summary） |
-| month | 月 | ゴールド層（daily_summary） |
-
-**集計間隔（interval）:**
-
-| 表示単位 | 集計間隔 | 分換算 | 選択可否 | 表示本数 |
-| -------- | -------- | ------ | -------- | -------- |
-| hour | 1min, 2min, 3min, 5min, 10min, 15min | 1〜15分 | 選択可能 | 可変 |
-| day | 1時間 | 60分 | 固定（非表示） | 24本 |
-| week | 1日 | 1440分 | 固定（非表示） | 7本 |
-| month | 1日 | 1440分 | 固定（非表示） | 28〜31本 |
-
-**集計方法（method_id）:**
-
-| ID | 方法 | 説明 |
-| -- | ---- | ---- |
-| 1 | AVG | 平均値 |
-| 2 | MAX | 最大値 |
-| 3 | MIN | 最小値 |
-| 4 | P25 | 25パーセンタイル |
-| 5 | MEDIAN | 中央値 |
-| 6 | P75 | 75パーセンタイル |
-| 7 | STDDEV | 標準偏差 |
-| 8 | P95 | 95パーセンタイル |
 
 ---
 
-## エラーハンドリング
+**③ ガジェット登録**
 
-### エラー分類
+**使用テーブル:** dashboard_gadget_master
 
-| エラー種別 | HTTPステータス | 対応 | ログ出力 |
-| ---------- | -------------- | ---- | -------- |
-| 認証エラー | 401 | エラーJSON返却 | なし |
-| 権限エラー | 403 | エラーJSON返却 | WARN |
-| パラメータエラー | 400 | エラーJSON返却 | INFO |
-| データなし | 200 | 空データJSON返却 | なし |
-| DB接続エラー | 500 | エラーJSON返却 | ERROR |
-| 予期せぬエラー | 500 | エラーJSON返却 | ERROR |
+```sql
+INSERT INTO dashboard_gadget_master (
+  gadget_uuid,
+  gadget_name,
+  dashboard_group_id,
+  gadget_type_id,
+  chart_config,
+  data_source_config,
+  position_x,
+  position_y,
+  gadget_size,
+  display_order,
+  create_date,
+  creator,
+  update_date,
+  modifier,
+  delete_flag
+) VALUES (
+  :gadget_uuid,
+  :gadget_name,
+  :dashboard_group_id,
+  :gadget_type_id,
+  :chart_config,
+  :data_source_config,
+  0,
+  (
+    SELECT COALESCE(MAX(position_y), 0) + 1
+    FROM dashboard_gadget_master
+    WHERE dashboard_group_id = :dashboard_group_id
+    AND delete_flag = FALSE
+  ),
+  :gadget_size,
+  (
+    SELECT COALESCE(MAX(display_order), 0) + 1
+    FROM dashboard_gadget_master
+    WHERE dashboard_group_id = :dashboard_group_id
+    AND delete_flag = FALSE
+  ),
+  NOW(),
+  :current_user_id,
+  NOW(),
+  :current_user_id,
+  FALSE
+)
+```
 
-### エラーハンドリング実装
+---
 
+**④ 実装例**
+
+```python
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/register', methods=['POST'])
+@require_auth
+def gadget_bar_chart_register():
+    """棒グラフガジェット登録実行"""
+    form = BarChartGadgetForm()
+    if not form.validate_on_submit():
+        return render_template(
+            'customer_dashboard/modals/gadget_register/bar_chart.html',
+            form=form
+        ), 400
+
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+
+    # ① デバイス固定モードの場合: デバイス存在&データスコープチェック
+    device_id = None
+    if form.device_mode.data == 'fixed':
+        device = check_device_access(form.device_id.data, accessible_org_ids)
+        if not device:
+            abort(404)
+        device_id = form.device_id.data
+
+    try:
+        # ② chart_config / data_source_config 生成
+        chart_config = json.dumps({
+            'measurement_item_id': form.measurement_item_id.data,
+            'summary_method_id': form.summary_method_id.data,
+            'min_value': form.min_value.data,
+            'max_value': form.max_value.data
+        })
+        data_source_config = json.dumps({'device_id': device_id})
+
+        # position_y と display_order を別々に取得する
+        max_position_y = db.session.query(
+            func.max(DashboardGadgetMaster.position_y)
+        ).filter(
+            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
+            DashboardGadgetMaster.delete_flag == False
+        ).scalar() or 0
+
+        max_order = db.session.query(
+            func.max(DashboardGadgetMaster.display_order)
+        ).filter(
+            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
+            DashboardGadgetMaster.delete_flag == False
+        ).scalar() or 0
+
+        # 棒グラフのgadget_type_idを事前に取得する
+        gadget_type = db.session.query(GadgetTypeMaster).filter_by(
+            gadget_type_name='棒グラフ',
+            delete_flag=False
+        ).first()
+        gadget_type_id = gadget_type.gadget_type_id
+
+        # ③ ガジェット登録
+        gadget = DashboardGadgetMaster(
+            gadget_uuid=str(uuid.uuid4()),
+            gadget_name=form.title.data,
+            gadget_type_id=gadget_type_id,
+            dashboard_group_id=form.group_id.data,
+            chart_config=chart_config,
+            data_source_config=data_source_config,
+            position_x=0,
+            position_y=max_position_y + 1,
+            gadget_size=form.gadget_size.data,
+            display_order=max_order + 1,
+            creator=g.current_user.user_id,
+            modifier=g.current_user.user_id
+        )
+        db.session.add(gadget)
+        db.session.commit()
+        modal('ガジェットを登録しました', 'success')
+        return redirect(url_for('customer_dashboard.customer_dashboard'))
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'棒グラフガジェット登録エラー: {str(e)}')
+        abort(500)
+```
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
+|--------------|-----------|---------|---------|
+| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
+| 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+
+---
+
+### CSVエクスポート
+
+**トリガー:** CSVエクスポートボタンクリック
+
+**前提条件:**
+- ガジェットが表示されている
+- データが存在する
+
+#### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([CSVエクスポートボタンクリック]) --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>ガジェットがアクセス可能な組織に属するか確認]
+
+    Scope --> CheckScope{スコープOK?}
+    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckScope -->|スコープOK| Validate[バリデーション<br>リクエストパラメータ]
+
+    Validate --> CheckValidate{バリデーションOK?}
+    CheckValidate -->|NG| Error400[400エラーモーダル表示]
+    CheckValidate -->|OK| GetConfig[ガジェット設定取得<br>DB dashboard_gadget_master]
+
+    GetConfig --> CheckGetConfig{DBクエリ結果}
+    CheckGetConfig -->|失敗| Error500[500エラーモーダル表示]
+    CheckGetConfig -->|成功| CheckDeviceId[データソース設定に<br>デバイスIDが設定されているかを確認]
+
+    CheckDeviceId --> ExistDeviceId{デバイスID設定あり?}
+    ExistDeviceId -->|設定なし| GetUserSetting[ユーザー設定から選択中デバイスIDを取得]
+    ExistDeviceId -->|設定あり| UnitCheck{表示単位<br>判定}
+
+    GetUserSetting --> UnitCheck
+
+    UnitCheck -->|時| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
+    QuerySilver --> AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
+
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
+    QueryGoldDay --> AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
+
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldWeek --> AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
+
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldMonth --> AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
+
+    AggregateSilver --> FormatCSV[CSVフォーマット変換]
+    AggregateDay --> FormatCSV
+    AggregateWeek --> FormatCSV
+    AggregateMonth --> FormatCSV
+
+    FormatCSV --> Response[CSVダウンロードレスポンス]
+
+    LoginRedirect --> End([処理完了])
+    Error404 --> End
+    Error400 --> End
+    Error500 --> End
+    Response --> End
+```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| CSVエクスポート | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
+
+#### バリデーション
+
+**実行タイミング:** CSVエクスポートボタン押下時（サーバーサイド）
+
+| 項目 | ルール | エラーメッセージ |
+|------|--------|-----------------|
+| 表示単位 | 許容値（hour/day/week/month） | 表示単位が不正です |
+| 集計間隔（時単位のみ） | 許容値（1min, 2min, 3min, 5min, 10min, 15min） | 集計間隔が不正です |
+| 基準日時 | 形式（YYYY/MM/DD HH:mm:ss） | 日付形式が不正です |
+
+
+#### 処理詳細（サーバーサイド）
+
+**① ガジェット設定取得**
+
+[ガジェットデータ取得 ①](#ガジェットデータ取得) と同様のSQL（dashboard_gadget_master）を実行します。
+
+---
+
+**② デバイスID決定**
+
+[ガジェットデータ取得 ②](#ガジェットデータ取得) と同様のロジックを適用します。
+
+---
+
+**③ 表示単位別センサーデータ取得**
+
+[ガジェットデータ取得 ③](#ガジェットデータ取得) と同様のSQL（Silver/Gold層）を実行します。
+
+**グラフ表示との差異:**
+
+| 項目 | ガジェットデータ取得 | CSVエクスポート |
+|------|----------------|--------------|
+| 最大取得件数 | 100件 | 100,000件 |
+| レスポンス形式 | JSON | CSV |
+
+---
+
+**④ CSVカラム定義**
+
+| カラム名 | 内容 | 形式 |
+|---------|------|------|
+| timestamp | 日時ラベル | 表示単位に応じた形式（HH:mm / HH:00 / MM/DD） |
+| value | センサー値 | float（小数点2桁） |
+
+---
+
+**⑤ 実装例**
+
+```python
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
+@require_auth
+def gadget_csv_export(gadget_uuid):
+    """棒グラフガジェット CSVエクスポート"""
+    if request.args.get('export') != 'csv':
+        abort(404)
+
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+
+    # ① ガジェット設定取得・スコープチェック
+    gadget = get_gadget_by_uuid(gadget_uuid)
+    if not gadget or not check_gadget_access(gadget, accessible_org_ids):
+        abort(404)
+
+    # リクエストパラメータ取得・バリデーション
+    display_unit = request.args.get('display_unit', 'hour')
+    interval = request.args.get('interval', '10min')
+    base_datetime_str = request.args.get('base_datetime')
+
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
+        abort(400)
+
+    try:
+        base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
+
+        # ② デバイスID決定
+        data_source_config = json.loads(gadget.data_source_config)
+        device_id = data_source_config.get('device_id')
+        if not device_id:
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
+            device_id = user_setting.device_id if user_setting else None
+
+        chart_config = json.loads(gadget.chart_config)
+
+        # ③ センサーデータ取得（最大10万件）
+        rows = fetch_bar_chart_data(
+            device_id=device_id,
+            display_unit=display_unit,
+            interval=interval,
+            base_datetime=base_datetime,
+            measurement_item_id=chart_config['measurement_item_id'],
+            summary_method_id=chart_config['summary_method_id'],
+            limit=100000
+        )
+        chart_data = format_bar_chart_data(
+            rows, display_unit, interval, chart_config['summary_method_id']
+        )
+
+        # ④ CSV生成
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['timestamp', 'value'])
+        for label, value in zip(chart_data['labels'], chart_data['values']):
+            writer.writerow([label, value])
+
+        # ⑤ CSVダウンロードレスポンス
+        output.seek(0)
+        filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+
+    except Exception as e:
+        logger.error(f'棒グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        abort(500)
+```
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
+|--------------|-----------|---------|---------|
+| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
+| 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+
+---
+
+## セキュリティ実装
+
+### 認証・認可実装
+
+**認証方式:**
+- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
+
+**認可ロジック:**
+
+組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
+
+**処理内容:**
+- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
+  - ユーザーの `organization_id` を親組織IDとして検索
+  - 下位組織リスト（`subsidiary_organization_id`）を取得
+  - そのリストに該当する組織のダッシュボード・ガジェットデータのみアクセス可能
+  - **ロールによる条件分岐は一切行わない**
+
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
+
+**実装例:**
+```python
+def apply_dashboard_data_scope_filter(query, current_user):
+    """組織階層に基づいたダッシュボードデータのスコープ制限を適用"""
+    accessible_org_ids = db.session.query(
+        OrganizationClosure.subsidiary_organization_id
+    ).filter(
+        OrganizationClosure.parent_organization_id == current_user.organization_id
+    ).all()
+
+    org_ids = [org_id[0] for org_id in accessible_org_ids]
+
+    if not org_ids:
+        return query.filter(DashboardMaster.organization_id.in_([]))
+
+    return query.filter(DashboardMaster.organization_id.in_(org_ids))
+```
+
+### ログ出力ルール
+
+**出力する情報:**
+- リクエストID
+- ユーザーID（操作者）
+- 操作種別（ダッシュボード登録、更新、削除、ガジェット登録、レイアウト保存等）
+- 対象リソースID（dashboard_id、group_id、gadget_id）
+- 処理結果（成功/失敗）
+- エラー種別（バリデーションエラー、DBエラー等）
+- タイムスタンプ（UTC）
+
+**出力しない情報（機密情報）:**
+- 認証トークン
+- センサーデータの具体値
+
+**実装例:**
 ```python
 import logging
-from flask import jsonify
-from functools import wraps
 
 logger = logging.getLogger(__name__)
 
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
+@require_auth
+def dashboard_register():
+    logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
 
-# =============================================================================
-# エラーハンドラー
-# =============================================================================
-@bp.errorhandler(400)
-def handle_bad_request(error):
-    """400 Bad Request"""
-    return jsonify({'status': 'error', 'message': str(error)}), 400
-
-
-@bp.errorhandler(401)
-def handle_unauthorized(error):
-    """401 Unauthorized"""
-    return jsonify({'status': 'error', 'message': '認証が必要です'}), 401
-
-
-@bp.errorhandler(403)
-def handle_forbidden(error):
-    """403 Forbidden"""
-    logger.warning(f'Access denied: user={g.current_user.user_id}, path={request.path}')
-    return jsonify({'status': 'error', 'message': 'アクセス権限がありません'}), 403
-
-
-@bp.errorhandler(500)
-def handle_internal_error(error):
-    """500 Internal Server Error"""
-    logger.error(f'Internal error: {error}', exc_info=True)
-    return jsonify({'status': 'error', 'message': 'サーバーエラーが発生しました'}), 500
-
-
-# =============================================================================
-# 共通例外処理デコレータ
-# =============================================================================
-def handle_exceptions(f):
-    """API用例外処理デコレータ"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except ValidationError as e:
-            logger.info(f'Validation error: {e}')
-            return jsonify({'status': 'error', 'message': str(e)}), 400
-        except PermissionError as e:
-            logger.warning(f'Permission error: {e}')
-            return jsonify({'status': 'error', 'message': 'アクセス権限がありません'}), 403
-        except DatabaseError as e:
-            logger.error(f'Database error: {e}', exc_info=True)
-            return jsonify({'status': 'error', 'message': 'データベースエラーが発生しました'}), 500
-        except Exception as e:
-            logger.error(f'Unexpected error: {e}', exc_info=True)
-            return jsonify({'status': 'error', 'message': 'サーバーエラーが発生しました'}), 500
-    return decorated_function
+    try:
+        # ... 処理 ...
+        logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
+        return response
+    except Exception as e:
+        logger.error(f'ダッシュボード登録エラー: error={str(e)}')
+        abort(500)
 ```
-
----
-
-## セキュリティ設計
-
-### 入力検証
-
-| 項目 | 実装 |
-| ---- | ---- |
-| パラメータ検証 | 独自バリデータ（validate_chart_params） |
-| 型チェック | 厳格な型チェック |
-| 許可値チェック | ホワイトリスト方式 |
-| SQLインジェクション対策 | パラメータバインディング使用 |
-
----
-
-## パフォーマンス設計
-
-### 性能目標
-
-| 項目 | 目標値 |
-| ---- | ------ |
-| APIレスポンス | 500ms以内 |
-| CSV出力 | 5秒以内（10万件まで） |
-
-### 最適化方針
-
-| 項目 | 方針 |
-| ---- | ---- |
-| クエリ最適化 | クラスタリングキー（device_id, collection_date）活用 |
-| データ件数制限 | グラフ表示は最大100件、CSV出力は最大10万件 |
-| マスタキャッシュ | センサー項目、集計方法マスタをアプリケーションキャッシュ |
-| 接続プーリング | Databricks SQL Connectorのコネクションプール使用 |
-
----
-
-## テスト仕様
-
-### 単体テスト
-
-| テスト項目 | 内容 |
-| ---------- | ---- |
-| validate_chart_params | 各パラメータの境界値、不正値テスト |
-| fetch_silver_data | 時単位データ取得・集計処理（各interval） |
-| fetch_gold_daily_data | 日単位データ取得（2時間間隔） |
-| fetch_gold_weekly_data | 週単位データ取得（日曜〜土曜） |
-| fetch_gold_monthly_data | 月単位データ取得（奇数日、各月日数考慮） |
-| generate_csv | CSV形式変換処理 |
-
-### 統合テスト
-
-| テスト項目 | 内容 |
-| ---------- | ---- |
-| データ取得API | 各表示単位・集計間隔でのデータ取得 |
-| CSV出力 | ファイルダウンロード・内容確認 |
-| エラーハンドリング | 各エラーパターンでの動作確認 |
-| 月末処理 | 2月（28/29日）、30日の月、31日の月 |
 
 ---
 
@@ -1331,17 +1351,3 @@ def handle_exceptions(f):
 - [シルバー層仕様](../../ldp-pipeline/silver-layer/README.md) - センサーデータスキーマ
 - [ゴールド層仕様](../../ldp-pipeline/gold_layer/README.md) - 集計データスキーマ
 - [共通仕様](../../common/common-specification.md) - 認証・セキュリティ共通仕様
-
----
-
-## 変更履歴
-
-| 日付 | 版数 | 変更内容 | 担当者 |
-| ---- | ---- | -------- | ------ |
-| 2026-02-05 | 1.0 | 初版作成 | - |
-| 2026-02-06 | 1.1 | 集計時間幅を1/2/3/5/10/15分に変更（時単位のみ選択可能） | - |
-| 2026-02-06 | 2.0 | データ取得ワークフローに特化、表示単位別集計仕様を詳細化 | - |
-| 2026-02-09 | 2.1 | 日単位:TODO（新規テーブル）、月単位:全日取得に変更、Apache ECharts使用を明記 | - |
-| 2026-02-10 | 2.2 | 処理フロー全体図のmermaid構文をシンプル化して修正 | - |
-| 2026-02-13 | 2.3 | ガジェット登録API、集約方法一覧取得API追加 | - |
-| 2026-02-13 | 2.4 | ガジェット登録ワークフロー（mermaidフロー図）追加 | - |
