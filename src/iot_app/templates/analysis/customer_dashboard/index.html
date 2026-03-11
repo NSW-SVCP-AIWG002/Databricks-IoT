@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/bar_chart.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {% endblock %}
 
 {% block content %}
@@ -93,8 +94,11 @@
               </div>
               <div class="bar-chart__datetime-selector">
                 <span class="bar-chart__label bar-chart__datetime-label">時間帯：</span>
-                <input class="form__input bar-chart__datetime-input" type="text"
-                       placeholder="YYYY/MM/DD HH:mm:ss">
+                <div class="bar-chart__datetime-input-wrapper">
+                  <input class="form__input bar-chart__datetime-input" type="text"
+                         placeholder="YYYY/MM/DD HH:mm:ss">
+                  <button class="bar-chart__calendar-btn" type="button" title="カレンダーを開く">📅</button>
+                </div>
                 <button class="bar-chart__refresh-btn" type="button" title="現在日時に更新">🔄</button>
               </div>
             </div>
@@ -116,5 +120,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
 {% endblock %}

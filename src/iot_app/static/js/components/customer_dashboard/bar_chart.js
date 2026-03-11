@@ -37,6 +37,7 @@
       displayUnit: DEFAULT_UNIT,
       interval:    DEFAULT_INTERVAL,
       baseDatetime: nowString(),
+      fp:          null,
     };
 
     bindControls(el, state);
@@ -57,6 +58,12 @@
         state.displayUnit = btn.dataset.unit;
         updateDatetimeLabel(el, state.displayUnit);
         toggleIntervalSelector(el, state.displayUnit);
+        // flatpickr を単位に合わせて再初期化
+        const datetimeInput = el.querySelector('.bar-chart__datetime-input');
+        if (datetimeInput && state.fp) {
+          state.fp.destroy();
+          state.fp = createFlatpickr(datetimeInput, state);
+        }
         fetchAndRender(state);
       });
     });
@@ -70,13 +77,17 @@
       });
     }
 
-    // 時間帯 DateTimePicker
+    // 時間帯 DateTimePicker (flatpickr)
     const datetimeInput = el.querySelector('.bar-chart__datetime-input');
     if (datetimeInput) {
-      datetimeInput.value = state.baseDatetime;
-      datetimeInput.addEventListener('change', function () {
-        state.baseDatetime = datetimeInput.value;
-        fetchAndRender(state);
+      state.fp = createFlatpickr(datetimeInput, state);
+    }
+
+    // カレンダーアイコンボタン
+    const calendarBtn = el.querySelector('.bar-chart__calendar-btn');
+    if (calendarBtn) {
+      calendarBtn.addEventListener('click', function () {
+        if (state.fp) state.fp.open();
       });
     }
 
@@ -84,8 +95,9 @@
     const refreshBtn = el.querySelector('.bar-chart__refresh-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', function () {
-        state.baseDatetime = nowString();
-        if (datetimeInput) datetimeInput.value = state.baseDatetime;
+        const config = getUnitConfig(state.displayUnit);
+        state.baseDatetime = config.defaultDate;
+        if (state.fp) state.fp.setDate(state.baseDatetime, false);
         fetchAndRender(state);
       });
     }
@@ -113,7 +125,7 @@
       body:    JSON.stringify({
         display_unit:  state.displayUnit,
         interval:      state.interval,
-        base_datetime: state.baseDatetime,
+        base_datetime: toFullDatetime(state.baseDatetime, state.displayUnit),
       }),
     })
       .then(function (res) {
@@ -133,22 +145,27 @@
   // ECharts 描画
   // ============================================================
   function renderChart(chart, chartData, displayUnit) {
-    const labels = chartData.labels || [];
-    const values = chartData.values || [];
+    const labels      = chartData.labels       || [];
+    const values      = chartData.values       || [];
+    const legendLabel = chartData.legend_label || '';
 
     chart.setOption({
       tooltip: { trigger: 'axis' },
+      legend: {
+        bottom: 0,
+        data:   [legendLabel],
+      },
       xAxis: {
         type: 'category',
         data: labels,
       },
       yAxis: { type: 'value' },
       series: [{
+        name:      legendLabel,
         type:      'bar',
         data:      values,
         itemStyle: { color: '#2272B4' },
       }],
-      legend: { bottom: 0 },
     });
   }
 
@@ -168,7 +185,7 @@
       export:        'csv',
       display_unit:  state.displayUnit,
       interval:      state.interval,
-      base_datetime: state.baseDatetime,
+      base_datetime: toFullDatetime(state.baseDatetime, state.displayUnit),
     });
     const url = CSV_ENDPOINT.replace('{uuid}', state.uuid) + '?' + params.toString();
     window.location.href = url;
@@ -186,6 +203,61 @@
       pad(now.getHours()) + ':' +
       pad(now.getMinutes()) + ':' +
       pad(now.getSeconds());
+  }
+
+  function yesterdayString() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate());
+  }
+
+  function prevMonthString() {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '/' + pad(d.getMonth() + 1);
+  }
+
+  function toFullDatetime(baseDatetime, displayUnit) {
+    if (displayUnit === 'day' || displayUnit === 'week') {
+      return baseDatetime + ' 00:00:00';
+    }
+    if (displayUnit === 'month') {
+      return baseDatetime + '/01 00:00:00';
+    }
+    return baseDatetime;
+  }
+
+  function getUnitConfig(displayUnit) {
+    switch (displayUnit) {
+      case 'day':
+        return { dateFormat: 'Y/m/d', enableTime: false, enableSeconds: false, defaultDate: yesterdayString() };
+      case 'week':
+        return { dateFormat: 'Y/m/d', enableTime: false, enableSeconds: false, defaultDate: yesterdayString() };
+      case 'month':
+        return { dateFormat: 'Y/m', enableTime: false, enableSeconds: false, defaultDate: prevMonthString() };
+      default: // hour
+        return { dateFormat: 'Y/m/d H:i:S', enableTime: true, enableSeconds: true, defaultDate: nowString() };
+    }
+  }
+
+  function createFlatpickr(datetimeInput, state) {
+    const config = getUnitConfig(state.displayUnit);
+    state.baseDatetime = config.defaultDate;
+    return flatpickr(datetimeInput, {
+      locale:        'ja',
+      enableTime:    config.enableTime,
+      enableSeconds: config.enableSeconds,
+      time_24hr:     true,
+      dateFormat:    config.dateFormat,
+      defaultDate:   config.defaultDate,
+      onChange: function (_selectedDates, dateStr) {
+        state.baseDatetime = dateStr;
+        fetchAndRender(state);
+      },
+    });
   }
 
   function updateDatetimeLabel(el, displayUnit) {
