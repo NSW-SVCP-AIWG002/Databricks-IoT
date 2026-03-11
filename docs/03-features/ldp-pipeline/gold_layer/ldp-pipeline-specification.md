@@ -234,6 +234,8 @@ flowchart TD
     Alert --> EndError([処理終了<br>異常終了])
 ```
 
+> **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
+
 #### 処理詳細
 
 月次集計処理は[共通集計処理](#共通集計処理の実装)を使用して実行します。
@@ -311,6 +313,8 @@ flowchart TD
     Retry -->|3回以上| Alert[エラー通知]
     Alert --> EndError([処理終了<br>異常終了])
 ```
+
+> **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
 
 #### 処理詳細
 
@@ -661,6 +665,9 @@ def merge_to_gold(aggregated_df: DataFrame, config: AggregationConfig):
 #### 集計処理の実行
 
 ```python
+import logging
+logger = logging.getLogger(__name__)
+
 def run_aggregation(period: AggregationPeriod, target_filter: str):
     """
     集計処理の実行
@@ -687,7 +694,7 @@ def run_aggregation(period: AggregationPeriod, target_filter: str):
     silver_df = None
     for attempt in range(1, MAX_READ_RETRY + 1):
         try:
-            silver_df = dlt.read("silver_sensor_data") \
+            silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
                 .filter(target_filter)
             break  # 読込成功
         except (AnalysisException, PermissionError) as e:
@@ -1108,26 +1115,28 @@ def notify_error(error_code: str, error_message: str, pipeline_name: str, target
 #### パイプラインへの組み込み例
 
 ```python
-@dlt.table(name="gold_sensor_data_daily_summary")
-def gold_sensor_data_daily_summary():
+from datetime import date, timedelta
+
+def run_daily_aggregation():
     """日次集計処理（Teams通知付き）"""
-    target_date = date_sub(current_date(), 1)
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
         # シルバー層からデータ読込
-        silver_df = dlt.read("silver_sensor_data")
+        silver_df = spark.table("iot_catalog.silver.silver_sensor_data")
         daily_data = silver_df.filter(
             col("event_date") == target_date
         )
 
         if daily_data.isEmpty():
             logger.warning("GOLD_WARN_001: 対象期間のデータが存在しません")
-            return spark.createDataFrame([], schema)
+            return
 
         # 集計処理
-        aggregated = perform_daily_aggregation(daily_data)
+        config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+        aggregated = aggregate_sensor_data(daily_data, config)
+        merge_to_gold(aggregated, config)
         logger.info(f"日次集計完了: {aggregated.count()} レコード")
-        return aggregated
 
     except Exception as e:
         # エラー通知をTeamsに送信
@@ -1135,7 +1144,7 @@ def gold_sensor_data_daily_summary():
             error_code="GOLD_ERR_002",
             error_message=f"データ変換中にエラーが発生しました: {str(e)}",
             pipeline_name="gold_sensor_data_daily_summary",
-            target_date=str(target_date)
+            target_date=target_date
         )
         raise
 ```
@@ -1143,37 +1152,21 @@ def gold_sensor_data_daily_summary():
 ### 例外処理実装例（Python）
 
 ```python
-import dlt
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
+from datetime import date, timedelta
+from pyspark.sql.functions import col
 import logging
 
 logger = logging.getLogger(__name__)
 
-@dlt.table(
-    name="gold_sensor_data_daily_summary",
-    comment="日次センサーデータサマリ",
-    table_properties={
-        "quality": "gold",
-        "pipelines.autoOptimize.managed": "true"
-    }
-)
-@dlt.expect_all({
-    "valid_device_id": "device_id IS NOT NULL",
-    "valid_organization_id": "organization_id IS NOT NULL",
-    "valid_collection_date": "collection_date IS NOT NULL",
-    "valid_summary_item": "summary_item BETWEEN 1 AND 22"
-    # summary_method_idはマスタテーブル結合により自動的に有効な値のみ出力
-})
-def gold_sensor_data_daily_summary():
+def run_daily_aggregation():
     """日次集計処理"""
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
     try:
         # シルバー層からデータ読込
-        silver_df = dlt.read("silver_sensor_data")
+        silver_df = spark.table("iot_catalog.silver.silver_sensor_data")
 
         # 対象日のデータをフィルタ
-        target_date = date_sub(current_date(), 1)
         daily_data = silver_df.filter(
             col("event_date") == target_date
         )
@@ -1181,15 +1174,14 @@ def gold_sensor_data_daily_summary():
         # データが存在しない場合
         if daily_data.isEmpty():
             logger.warning("GOLD_WARN_001: 対象期間のデータが存在しません")
-            return spark.createDataFrame([], schema)
+            return
 
         # バリデーション前後の件数差分を取得してスキップ数をログ出力
         count_before = daily_data.count()
         validated_data = daily_data.filter(
             "device_id IS NOT NULL "
             "AND organization_id IS NOT NULL "
-            "AND collection_date IS NOT NULL "
-            "AND summary_item BETWEEN 1 AND 22"
+            "AND event_date IS NOT NULL"
         )
         count_after = validated_data.count()
         skip_count = count_before - count_after
@@ -1204,14 +1196,15 @@ def gold_sensor_data_daily_summary():
                     error_code="GOLD_WARN_002",
                     error_message=f"バリデーション失敗により {skip_count} 件をスキップしました",
                     pipeline_name="gold_sensor_data_daily_summary",
-                    target_date=str(target_date)
+                    target_date=target_date
                 )
 
         # 集計処理（バリデーション済みデータのみ使用）
-        aggregated = perform_daily_aggregation(validated_data)
+        config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+        aggregated = aggregate_sensor_data(validated_data, config)
+        merge_to_gold(aggregated, config)
 
         logger.info(f"日次集計完了: {aggregated.count()} レコード")
-        return aggregated
 
     except Exception as e:
         logger.error(f"GOLD_ERR_002: データ変換中にエラーが発生しました: {str(e)}")
@@ -1290,18 +1283,17 @@ CLUSTER BY (collection_year, device_id);
 
 ```python
 # インクリメンタル処理の実装例（バッチ処理）
-@dlt.table(
-    name="gold_sensor_data_daily_summary"
-)
-def gold_sensor_data_daily_summary():
-    # 前日のデータのみを対象
-    target_date = date_sub(current_date(), 1)
+from datetime import date, timedelta
 
-    return (
-        dlt.read("silver_sensor_data")
+def run_daily_aggregation():
+    # 前日のデータのみを対象
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+
+    silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
         .filter(col("event_date") == target_date)
-        .transform(perform_daily_aggregation)
-    )
+    aggregated = aggregate_sensor_data(silver_df, config)
+    merge_to_gold(aggregated, config)
 ```
 
 ### 並列処理最適化
