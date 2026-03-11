@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 import pymysql
 
-from iot_app.ldp_pipeline.constants import (
+from functions.constants import (
     MYSQL_CONFIG,
     OLTP_MAX_RETRIES,
     OLTP_RETRY_INTERVALS,

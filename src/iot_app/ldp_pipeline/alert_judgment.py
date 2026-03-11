@@ -1,16 +1,21 @@
 from pyspark.sql import functions as F
 
-from iot_app.ldp_pipeline.mysql_connector import get_mysql_connection
+from functions.mysql_connector import get_mysql_connection
 
+
+host = dbutils.secrets.get("my_sql_secrets", "host")
+database = "iot_app_db"
+port = 3306
 
 def get_alert_abnormal_state():
     """異常状態テーブルをOLTP DBから取得"""
+    
     return spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
-        driver="com.mysql.cj.jdbc.Driver",
+        url=f"jdbc:mysql://{host}:{port}/{database}?useSSL=true&requireSSL=true&verifyServerCertificate=true",
+        # driver="com.mysql.cj.jdbc.Driver",
         dbtable="alert_abnormal_state",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password"),
+        user=dbutils.secrets.get("my_sql_secrets", "username"),
+        password=dbutils.secrets.get("my_sql_secrets", "password"),
     ).load()
 
 # =============================================================================
@@ -293,19 +298,19 @@ def enqueue_email_notification(batch_df, batch_id, spark):
         return
 
     mail_settings = spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
-        driver="com.mysql.cj.jdbc.Driver",
+        url=f"jdbc:mysql://{host}:{port}/{database}?useSSL=true&requireSSL=true&verifyServerCertificate=true",
+        # driver="com.mysql.cj.jdbc.Driver",
         dbtable="mail_setting",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password"),
+        user=dbutils.secrets.get("my_sql_secrets", "username"),
+        password=dbutils.secrets.get("my_sql_secrets", "password"),
     ).load().filter("is_active = TRUE")
 
     measurement_items = spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
+        url=f"jdbc:mysql://{host}:{port}/{database}?useSSL=true&requireSSL=true&verifyServerCertificate=true",
         driver="com.mysql.cj.jdbc.Driver",
         dbtable="measurement_item_master",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password"),
+        user=dbutils.secrets.get("my_sql_secrets", "username"),
+        password=dbutils.secrets.get("my_sql_secrets", "password"),
     ).load()
 
     current_time = F.current_timestamp()

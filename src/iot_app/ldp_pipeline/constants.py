@@ -45,10 +45,10 @@ SENSOR_FIELDS = [
 # =============================================================================
 
 MYSQL_CONFIG = {
-    "host": "",           # dbutils.secrets.get("scope", "mysql-host") で設定
+    "host": "",           # dbutils.secrets.get("my_sql_secrets", "host") で設定
     "port": 3306,
-    "user": "",           # dbutils.secrets.get("scope", "mysql-user") で設定
-    "password": "",       # dbutils.secrets.get("scope", "mysql-password") で設定
+    "user": "",           # dbutils.secrets.get("my_sql_secrets", "username") で設定
+    "password": "",       # dbutils.secrets.get("my_sql_secrets", "password") で設定
     "database": "iot_app",
     "charset": "utf8mb4",
     "connect_timeout": 10,

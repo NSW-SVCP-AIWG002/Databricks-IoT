@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
 
-from iot_app.ldp_pipeline.constants import BINARY_DATA_SIZE, BINARY_STRUCT_FORMAT, SENSOR_FIELDS
+from functions.constants import BINARY_DATA_SIZE, BINARY_STRUCT_FORMAT, SENSOR_FIELDS
 
 
 def is_valid_json(data: str) -> bool:
