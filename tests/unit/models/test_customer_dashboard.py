@@ -202,49 +202,6 @@ class TestDashboardGadgetMaster:
         # Assert
         assert gadget.delete_flag is False
 
-    def test_gadget_size_0_is_small(self):
-        """gadget_size=0 は 2×2（480×480px）サイズを表す"""
-        # Arrange / Act
-        from iot_app.models.customer_dashboard import DashboardGadgetMaster
-
-        gadget = DashboardGadgetMaster(
-            gadget_uuid='gadget-uuid-001',
-            gadget_name='小ガジェット',
-            dashboard_group_id=1,
-            gadget_type_id=1,
-            chart_config={},
-            data_source_config={},
-            position_x=0,
-            position_y=0,
-            gadget_size=0,
-            display_order=0,
-            creator=1,
-            modifier=1,
-        )
-
-        # Assert
-        assert gadget.gadget_size == 0
-
-    def test_gadget_size_1_is_wide(self):
-        """gadget_size=1 は 2×4（960×480px）サイズを表す"""
-        # Arrange / Act
-        from iot_app.models.customer_dashboard import DashboardGadgetMaster
-
-        gadget = DashboardGadgetMaster(
-            gadget_uuid='gadget-uuid-002',
-            gadget_name='横長ガジェット',
-            dashboard_group_id=1,
-            gadget_type_id=1,
-            chart_config={},
-            data_source_config={},
-            position_x=0,
-            position_y=0,
-            gadget_size=1,
-            display_order=1,
-            creator=1,
-            modifier=1,
-        )
-
         # Assert
         assert gadget.gadget_size == 1
 
@@ -287,8 +244,8 @@ class TestGadgetTypeMaster:
     data_source_type: 0=組織、1=デバイス
     """
 
-    def test_instantiate_with_org_data_source(self):
-        """data_source_type=0 は組織スコープを表す"""
+    def test_instantiate_with_required_fields(self):
+        """必須フィールドを指定してインスタンスを生成できる"""
         # Arrange / Act
         from iot_app.models.customer_dashboard import GadgetTypeMaster
 
@@ -303,25 +260,9 @@ class TestGadgetTypeMaster:
         )
 
         # Assert
+        assert gadget_type.gadget_type_name == '棒グラフ'
         assert gadget_type.data_source_type == 0
-
-    def test_instantiate_with_device_data_source(self):
-        """data_source_type=1 はデバイススコープを表す"""
-        # Arrange / Act
-        from iot_app.models.customer_dashboard import GadgetTypeMaster
-
-        gadget_type = GadgetTypeMaster(
-            gadget_type_name='時系列グラフ',
-            data_source_type=1,
-            gadget_image_path='static/images/time_series.png',
-            gadget_description='時系列グラフガジェット',
-            display_order=2,
-            creator=1,
-            modifier=1,
-        )
-
-        # Assert
-        assert gadget_type.data_source_type == 1
+        assert gadget_type.display_order == 1
 
     def test_delete_flag_default_is_false(self):
         """delete_flag のデフォルト値は False"""
@@ -371,40 +312,6 @@ class TestDashboardUserSetting:
         # Assert
         assert setting.user_id == 1
         assert setting.dashboard_id == 1
-
-    def test_organization_id_zero_means_not_selected(self):
-        """organization_id=0 は未選択を表す"""
-        # Arrange / Act
-        from iot_app.models.customer_dashboard import DashboardUserSetting
-
-        setting = DashboardUserSetting(
-            user_id=1,
-            dashboard_id=1,
-            organization_id=0,
-            device_id=0,
-            creator=1,
-            modifier=1,
-        )
-
-        # Assert
-        assert setting.organization_id == 0
-
-    def test_device_id_zero_means_not_selected(self):
-        """device_id=0 は未選択を表す"""
-        # Arrange / Act
-        from iot_app.models.customer_dashboard import DashboardUserSetting
-
-        setting = DashboardUserSetting(
-            user_id=1,
-            dashboard_id=1,
-            organization_id=1,
-            device_id=0,
-            creator=1,
-            modifier=1,
-        )
-
-        # Assert
-        assert setting.device_id == 0
 
     def test_delete_flag_default_is_false(self):
         """delete_flag のデフォルト値は False"""

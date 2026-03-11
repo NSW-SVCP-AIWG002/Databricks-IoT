@@ -66,7 +66,7 @@ class TestGetAccessibleOrganizations:
         get_accessible_organizations(3)
 
         # Assert
-        mock_db.session.query.assert_called_once()
+        mock_db.session.query.assert_called_once_with(OrganizationClosure.subsidiary_organization_id)
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +134,9 @@ class TestUpsertDashboardUserSetting:
 
         # Assert
         mock_db.session.add.assert_called_once()
+        added_obj = mock_db.session.add.call_args[0][0]
+        assert added_obj.organization_id == 0
+        assert added_obj.device_id == 0
 
     @patch(f'{MODULE}.db')
     def test_updates_when_existing_setting(self, mock_db):
@@ -343,12 +346,10 @@ class TestCreateDashboard:
         # Assert
         mock_db.session.add.assert_called_once()
 
-    @patch(f'{MODULE}.uuid')
     @patch(f'{MODULE}.db')
-    def test_sets_uuid_automatically(self, mock_db, mock_uuid):
-        """3.2.2.1 dashboard_uuid が自動生成される"""
+    def test_sets_uuid_automatically(self, mock_db):
+        """3.2.2.1 dashboard_uuid が自動生成される（UUID形式・36文字）"""
         # Arrange
-        mock_uuid.uuid4.return_value = MagicMock(__str__=lambda self: 'generated-uuid')
         from iot_app.services.customer_dashboard_service import create_dashboard
 
         # Act
@@ -357,6 +358,7 @@ class TestCreateDashboard:
 
         # Assert
         assert added_obj.dashboard_uuid is not None
+        assert len(str(added_obj.dashboard_uuid)) == 36
 
     @patch(f'{MODULE}.db')
     def test_sets_creator_and_modifier(self, mock_db):
@@ -465,6 +467,20 @@ class TestCreateDashboardGroup:
         assert added_obj.creator == 'user-001'
         assert added_obj.modifier == 'user-001'
 
+    @patch(f'{MODULE}.db')
+    def test_sets_uuid_automatically(self, mock_db):
+        """3.2.2.1 dashboard_group_uuid が自動生成される（UUID形式・36文字）"""
+        # Arrange
+        from iot_app.services.customer_dashboard_service import create_dashboard_group
+
+        # Act
+        create_dashboard_group('グループA', dashboard_id=1, user_id='user-001')
+        added_obj = mock_db.session.add.call_args[0][0]
+
+        # Assert
+        assert added_obj.dashboard_group_uuid is not None
+        assert len(str(added_obj.dashboard_group_uuid)) == 36
+
 
 # ---------------------------------------------------------------------------
 # get_gadgets_by_groups
@@ -530,6 +546,7 @@ class TestGetGadgetTypes:
         mock_types = [MagicMock() for _ in range(22)]  # 仕様上22種
         (
             mock_db.session.query.return_value
+            .filter.return_value
             .order_by.return_value
             .all.return_value
         ) = mock_types
@@ -547,6 +564,7 @@ class TestGetGadgetTypes:
         # Arrange
         (
             mock_db.session.query.return_value
+            .filter.return_value
             .order_by.return_value
             .all.return_value
         ) = []
@@ -647,13 +665,15 @@ class TestSaveLayout:
         assert mock_gadget.position_x == 0
         assert mock_gadget.position_y == 1
         assert mock_gadget.display_order == 0
+        assert mock_gadget.modifier == 'user-001'
+        # TODO: freezegun導入後に update_date を検証する
 
     @patch(f'{MODULE}.db')
     def test_does_not_change_gadget_size(self, mock_db):
         """3.3.1.1 gadget_size は変更しない（登録時固定）"""
         # Arrange
         mock_gadget = MagicMock()
-        original_size = mock_gadget.gadget_size
+        mock_gadget.gadget_size = 0
         mock_db.session.query.return_value.filter.return_value.first.return_value = mock_gadget
         layout_data = [
             {'gadget_uuid': 'g-001', 'position_x': 1, 'position_y': 2, 'display_order': 1}
@@ -664,7 +684,7 @@ class TestSaveLayout:
         save_layout(layout_data, modifier='user-001')
 
         # Assert
-        assert mock_gadget.gadget_size == original_size
+        assert mock_gadget.gadget_size == 0
 
     @patch(f'{MODULE}.db')
     def test_rollbacks_on_exception(self, mock_db):
