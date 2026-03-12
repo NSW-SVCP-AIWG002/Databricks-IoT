@@ -22,6 +22,10 @@ def create_app():
     def health():
         return jsonify(status='ok'), 200
 
+    # Analysis Blueprint
+    from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
+    app.register_blueprint(customer_dashboard_bp)
+
     # 開発環境専用 Blueprint
     if config_name == "development":
         from iot_app.views.dev import dev_bp

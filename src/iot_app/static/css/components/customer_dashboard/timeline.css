@@ -1,0 +1,406 @@
+/* ==========================================================================
+   顧客作成ダッシュボード + 時系列グラフガジェット CSS
+   参照設計書:
+     docs/03-features/flask-app/customer-dashboard/timeline/ui-specification.md
+     docs/03-features/flask-app/customer-dashboard/common/ui-specification.md
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   customer-dashboard: ページ全体レイアウト
+   -------------------------------------------------------------------------- */
+
+.customer-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+}
+
+/* ツールバー（タイトル + アクションボタン群） */
+.customer-dashboard__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.customer-dashboard__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  margin: 0;
+}
+
+.customer-dashboard__toolbar-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+/* データソース選択フォーム */
+.customer-dashboard__datasource {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+.customer-dashboard__datasource-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  min-width: 160px;
+}
+
+/* ガジェットエリア */
+.customer-dashboard__content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  align-items: flex-start;
+}
+
+/* ガジェット未登録メッセージ */
+.customer-dashboard__empty {
+  width: 100%;
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--color-secondary);
+  font-size: var(--font-size-base);
+}
+
+/* --------------------------------------------------------------------------
+   gadget: ガジェット共通
+   -------------------------------------------------------------------------- */
+
+.gadget {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* 2x2: 標準サイズ（約400px × 340px） */
+.gadget--2x2 {
+  width: 400px;
+  min-height: 340px;
+}
+
+/* 2x4: 横長サイズ（約832px × 340px）*/
+.gadget--2x4 {
+  width: 832px;
+  min-height: 340px;
+}
+
+/* ガジェットヘッダー */
+.gadget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.gadget__title {
+  flex: 1;
+  text-align: center;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gadget__setting-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 var(--spacing-1);
+  line-height: 1;
+}
+
+.gadget__setting-btn:hover {
+  opacity: 0.8;
+}
+
+/* ガジェット共通ツールバー（デバイス名 + CSVボタン） */
+.gadget__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-1) var(--spacing-3);
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  font-size: var(--font-size-sm);
+}
+
+.gadget__device-name {
+  color: var(--color-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ガジェットボディ */
+.gadget__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-2);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   timeline: 時系列グラフガジェット固有
+   -------------------------------------------------------------------------- */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--spacing-2);
+}
+
+/* グラフキャンバスラッパー */
+.timeline__canvas-wrapper {
+  flex: 1;
+  min-height: 160px;
+}
+
+.timeline__canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+}
+
+/* 凡例エリア */
+.timeline__legends {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2) var(--spacing-4);
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-1) 0;
+}
+
+.timeline__legend-item {
+  white-space: nowrap;
+}
+
+/* 日時コントロールエリア */
+.timeline__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2) var(--spacing-4);
+  padding-top: var(--spacing-1);
+  border-top: 1px solid #eee;
+}
+
+.timeline__datetime-block {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.timeline__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+/* 日時入力ラッパー（入力欄 + カレンダーアイコン） */
+.timeline__datetime-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.timeline__datetime-input {
+  width: 160px;
+  font-size: var(--font-size-sm);
+  padding-right: 24px;
+}
+
+/* カレンダーアイコン（装飾のみ・クリック不可） */
+.timeline__calendar-icon {
+  position: absolute;
+  right: 4px;
+  font-size: 13px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.timeline__refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  color: var(--color-secondary);
+  margin-left: var(--spacing-1);
+}
+
+.timeline__refresh-btn:hover {
+  color: var(--color-primary);
+}
+
+/* ツールバー内デバイス名（timeline固有） */
+.timeline__device-name {
+  color: var(--color-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   gadget-register: 登録モーダル レイアウト
+   -------------------------------------------------------------------------- */
+
+/* ボディ（左カラム + 右カラム） */
+.gadget-register__body {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-4);
+}
+
+.gadget-register__left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  flex: 0 0 220px;
+}
+
+.gadget-register__right {
+  display: flex;
+  gap: var(--spacing-4);
+  flex: 1;
+}
+
+/* ガジェットプレビュー（SVGイメージ） */
+.gadget-register__preview {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f9f9f9;
+  padding: var(--spacing-2);
+}
+
+.gadget-register__preview-timeline {
+  width: 100%;
+}
+
+.gadget-register__preview-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   timeline-register: 登録フォーム固有
+   -------------------------------------------------------------------------- */
+
+/* デバイスモード切替ボタン群 */
+.timeline-register__device-mode-buttons {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.timeline-register__device-mode-btn {
+  flex: 1;
+  padding: var(--spacing-1) var(--spacing-3);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-primary);
+  background: #fff;
+  color: var(--color-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.timeline-register__device-mode-btn--active,
+.timeline-register__device-mode-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* デバイス名表示エリア */
+.timeline-register__device-name-area {
+  min-height: 24px;
+  padding: var(--spacing-1) 0;
+}
+
+.timeline-register__device-name {
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+/* デバイス選択エリア（固定モード時） */
+.timeline-register__device-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+/* 測定項目選択リスト */
+.timeline-register__measurement-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: var(--spacing-2);
+  background: #fafafa;
+}
+
+.timeline-register__measurement-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  cursor: pointer;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 3px;
+  font-size: var(--font-size-sm);
+  transition: background 0.1s;
+}
+
+.timeline-register__measurement-item:hover {
+  background: #eef4fb;
+}
+
+.timeline-register__unit {
+  margin-left: auto;
+  color: var(--color-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+/* 最小値/最大値 行 */
+.timeline-register__minmax-row {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-3);
+}
+
+.timeline-register__minmax-row .form__group {
+  flex: 1;
+}
+
+.timeline-register__minmax-input {
+  width: 100%;
+}
+
+/* グループ選択 / 部品サイズ 行 */
+.timeline-register__bottom-row {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-3);
+}
+
+.timeline-register__bottom-row .form__group {
+  flex: 1;
+}
