@@ -28,14 +28,14 @@
 
 ## セルフレビュー進捗
 
-| 観点                         | 状態   | 確認結果 |
-| ---------------------------- | ------ | -------- |
-| 機能: 設計書との差分         | 完了   | create_date/update_date の自動セット対応済み。gadget_type_id=1 ハードコードは許容（設計書に動的取得仕様なし） |
-| 機能: テスト仕様カバレッジ   | 完了   | 全85テスト通過（services:69, models:16） |
-| 機能: インターフェース整合性 | 完了   | 引数・戻り値・例外が設計書と一致 |
-| 非機能: セキュリティ         | 完了   | ORM使用・Jinja2自動エスケープ・Flask-WTF CSRF保護 |
-| 非機能: ログ準拠             | 完了   | get_logger(__name__) に変更済み（timeline_service.py・customer_dashboard.py） |
-| 非機能: エラーハンドリング   | 完了   | 例外は適切に捕捉・再raiseまたは変換済み |
+| 観点                         | 状態     | 確認結果 |
+| ---------------------------- | -------- | -------- |
+| 機能: 設計書との差分         | 完了     | A: `_check_gadget_access()` ヘルパー追加、`gadget_timeline_data` / `gadget_csv_export` にデータスコープチェック実装済み。B: `gadget_timeline_create` にグループ一覧取得・テンプレート渡し追加済み（`DashboardGroupMaster`・`DashboardMaster` を `dashboard.py` に追加）。C: `register_gadget` の `position_y` / `display_order` を MAX+1 動的計算に修正済み |
+| 機能: テスト仕様カバレッジ   | 完了     | 全85テスト通過（services:69, models:16）。修正後も全通過確認済み |
+| 機能: インターフェース整合性 | 完了     | 引数・戻り値・例外が設計書と一致 |
+| 非機能: セキュリティ         | 完了     | ORM使用・Jinja2自動エスケープ・Flask-WTF CSRF保護・organization_closure によるデータスコープチェック実装済み |
+| 非機能: ログ準拠             | 完了     | 全エラーログに `exc_info=True` 追加済み（timeline_service.py・customer_dashboard.py）。logging-specification.md §7 準拠 |
+| 非機能: エラーハンドリング   | 完了     | `gadget_timeline_register` に `except AppValidationError` を追加し 400 で処理。ValidationError の握りつぶし解消済み |
 
 ---
 

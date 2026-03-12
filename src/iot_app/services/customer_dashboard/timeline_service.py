@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 
+from sqlalchemy import func
+
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
@@ -268,7 +270,8 @@ def fetch_timeline_data(gadget_uuid, start_datetime, end_datetime, limit=100, cu
         return rows
     except Exception as e:
         logger.error(
-            f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}'
+            f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}',
+            exc_info=True,
         )
         raise
 
@@ -310,18 +313,34 @@ def register_gadget(params, current_user_id=0):
     })
     data_source_config = json.dumps({'device_id': device_id})
 
+    group_id = params.get('group_id')
+
+    max_position_y = db.session.query(
+        func.max(DashboardGadgetMaster.position_y)
+    ).filter(
+        DashboardGadgetMaster.dashboard_group_id == group_id,
+        DashboardGadgetMaster.delete_flag == False,
+    ).scalar() or 0
+
+    max_display_order = db.session.query(
+        func.max(DashboardGadgetMaster.display_order)
+    ).filter(
+        DashboardGadgetMaster.dashboard_group_id == group_id,
+        DashboardGadgetMaster.delete_flag == False,
+    ).scalar() or 0
+
     now = datetime.now()
     gadget = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name=params.get('title'),
         gadget_type_id=1,
-        dashboard_group_id=params.get('group_id'),
+        dashboard_group_id=group_id,
         chart_config=chart_config,
         data_source_config=data_source_config,
         position_x=0,
-        position_y=0,
+        position_y=max_position_y + 1,
         gadget_size=params.get('gadget_size'),
-        display_order=0,
+        display_order=max_display_order + 1,
         create_date=now,
         update_date=now,
         creator=current_user_id,
@@ -429,6 +448,7 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
         raise
     except Exception as e:
         logger.error(
-            f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}'
+            f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}',
+            exc_info=True,
         )
         raise
