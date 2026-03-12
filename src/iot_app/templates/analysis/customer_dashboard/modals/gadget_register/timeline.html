@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}時系列グラフガジェット登録{% endblock %}
+
+{% block content %}
+<div class="modal-overlay">
+  <div class="modal-content modal-content--lg">
+
+    <!-- モーダルヘッダー -->
+    <div class="modal-header">
+      <h2 class="modal-header__title">折れ線</h2>
+    </div>
+
+    <!-- モーダルボディ -->
+    <form method="POST"
+          action="{{ url_for('customer_dashboard.gadget_timeline_register') }}"
+          id="timeline-register-form">
+      {{ form.hidden_tag() }}
+
+      <div class="modal-body">
+
+        <!-- (1) タイトル -->
+        <div class="form__group">
+          <label class="form__label form__label--required" for="title">タイトル</label>
+          {{ form.title(class="form__input", id="title", placeholder="時系列", maxlength=20) }}
+          {% if form.title.errors %}
+            <span class="form__error">{{ form.title.errors[0] }}</span>
+          {% endif %}
+        </div>
+
+        <div class="gadget-register__body">
+
+          <!-- 左カラム：ガジェットイメージ + デバイス選択 -->
+          <div class="gadget-register__left">
+
+            <!-- (2) 表示デバイス選択 -->
+            <div class="form__group">
+              <div class="timeline-register__device-mode-buttons">
+                <button type="button"
+                        class="button timeline-register__device-mode-btn timeline-register__device-mode-btn--active"
+                        data-mode="fixed">デバイス固定</button>
+                <button type="button"
+                        class="button timeline-register__device-mode-btn"
+                        data-mode="variable">デバイス可変</button>
+              </div>
+              <input type="hidden" name="device_mode" id="device_mode" value="fixed">
+            </div>
+
+            <!-- (6) デバイス名表示 -->
+            <div class="form__group timeline-register__device-name-area" id="device-name-area">
+              <span class="timeline-register__device-name" id="selected-device-name">-</span>
+            </div>
+
+            <!-- (7) ガジェットイメージ -->
+            <div class="gadget-register__preview">
+              <div class="gadget-register__preview-timeline">
+                <svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg" class="gadget-register__preview-svg">
+                  <polyline points="10,80 40,50 70,60 100,30 130,45 160,20 190,35"
+                            fill="none" stroke="var(--color-primary)" stroke-width="2"/>
+                  <polyline points="10,70 40,75 70,45 100,55 130,35 160,50 190,25"
+                            fill="none" stroke="#F5A623" stroke-width="2"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- (5) 表示デバイス指定（デバイス固定モード時のみ） -->
+            <div class="timeline-register__device-area" id="device-fixed-area">
+              <div class="form__group">
+                <label class="form__label">組織フィルター</label>
+                <select class="form__select" id="organization-filter">
+                  <option value="">選択してください</option>
+                  {% for org in organizations %}
+                  <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form__group">
+                <label class="form__label form__label--required">デバイス選択</label>
+                <select class="form__select" name="device_id" id="device-select">
+                  <option value="">選択してください</option>
+                  {% for device in devices %}
+                  <option value="{{ device.device_id }}"
+                          data-org="{{ device.organization_id }}"
+                          data-name="{{ device.device_name }}">
+                    {{ device.device_name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                {% if form.device_id.errors %}
+                  <span class="form__error">{{ form.device_id.errors[0] }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 右カラム：表示項目選択（左・右） -->
+          <div class="gadget-register__right">
+
+            <!-- (3) 左表示項目選択 -->
+            <div class="form__group">
+              <label class="form__label form__label--required">左表示項目選択</label>
+              <div class="timeline-register__measurement-list">
+                {% for item in measurement_items %}
+                <label class="timeline-register__measurement-item">
+                  <input type="radio" name="left_item_id" value="{{ item.measurement_item_id }}">
+                  <span>{{ item.display_name }}</span>
+                  <span class="timeline-register__unit">{{ item.unit_name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              {% if form.left_item_id.errors %}
+                <span class="form__error">{{ form.left_item_id.errors[0] }}</span>
+              {% endif %}
+            </div>
+
+            <!-- (4) 右表示項目選択 -->
+            <div class="form__group">
+              <label class="form__label form__label--required">右表示項目選択</label>
+              <div class="timeline-register__measurement-list">
+                {% for item in measurement_items %}
+                <label class="timeline-register__measurement-item">
+                  <input type="radio" name="right_item_id" value="{{ item.measurement_item_id }}">
+                  <span>{{ item.display_name }}</span>
+                  <span class="timeline-register__unit">{{ item.unit_name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              {% if form.right_item_id.errors %}
+                <span class="form__error">{{ form.right_item_id.errors[0] }}</span>
+              {% endif %}
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- (8) 左表示項目 最小値/最大値 -->
+        <div class="timeline-register__minmax-row">
+          <div class="form__group">
+            <label class="form__label">左表示項目 最小値</label>
+            {{ form.left_min_value(class="form__input timeline-register__minmax-input",
+               id="left_min_value", placeholder="未入力時は自動スケール") }}
+            {% if form.left_min_value.errors %}
+              <span class="form__error">{{ form.left_min_value.errors[0] }}</span>
+            {% endif %}
+          </div>
+          <div class="form__group">
+            <label class="form__label">左表示項目 最大値</label>
+            {{ form.left_max_value(class="form__input timeline-register__minmax-input",
+               id="left_max_value", placeholder="未入力時は自動スケール") }}
+            {% if form.left_max_value.errors %}
+              <span class="form__error">{{ form.left_max_value.errors[0] }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- (9) 右表示項目 最小値/最大値 -->
+        <div class="timeline-register__minmax-row">
+          <div class="form__group">
+            <label class="form__label">右表示項目 最小値</label>
+            {{ form.right_min_value(class="form__input timeline-register__minmax-input",
+               id="right_min_value", placeholder="未入力時は自動スケール") }}
+            {% if form.right_min_value.errors %}
+              <span class="form__error">{{ form.right_min_value.errors[0] }}</span>
+            {% endif %}
+          </div>
+          <div class="form__group">
+            <label class="form__label">右表示項目 最大値</label>
+            {{ form.right_max_value(class="form__input timeline-register__minmax-input",
+               id="right_max_value", placeholder="未入力時は自動スケール") }}
+            {% if form.right_max_value.errors %}
+              <span class="form__error">{{ form.right_max_value.errors[0] }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- (10) グループ選択 / (11) 部品サイズ -->
+        <div class="timeline-register__bottom-row">
+          <div class="form__group">
+            <label class="form__label form__label--required">グループ選択</label>
+            {{ form.group_id(class="form__select", id="group_id") }}
+            {% if form.group_id.errors %}
+              <span class="form__error">{{ form.group_id.errors[0] }}</span>
+            {% endif %}
+          </div>
+          <div class="form__group">
+            <label class="form__label form__label--required">部品サイズ</label>
+            {{ form.gadget_size(class="form__select", id="gadget_size") }}
+            {% if form.gadget_size.errors %}
+              <span class="form__error">{{ form.gadget_size.errors[0] }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- モーダルフッター：登録/キャンセル -->
+      <div class="modal-footer">
+        <button type="submit" class="button button--primary" id="register-btn">登録</button>
+        <a href="{{ url_for('customer_dashboard.customer_dashboard') }}"
+           class="button button--secondary">キャンセル</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
+{% endblock %}

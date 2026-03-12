@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}顧客作成ダッシュボード{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/timeline.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="customer-dashboard">
+
+  <!-- ツールバー -->
+  <div class="customer-dashboard__toolbar">
+    <h1 class="customer-dashboard__title">顧客作成ダッシュボード</h1>
+    <div class="customer-dashboard__toolbar-actions">
+      <button class="button button--secondary" id="edit-mode-btn" type="button">編集モード</button>
+      <button class="button button--primary" id="save-layout-btn" type="button" disabled>レイアウト保存</button>
+      <button class="button button--primary" id="dashboard-manage-btn" type="button">ダッシュボード管理</button>
+    </div>
+  </div>
+
+  <!-- データソース選択フォーム -->
+  <div class="customer-dashboard__datasource">
+    <div class="customer-dashboard__datasource-field">
+      <label class="form__label">組織</label>
+      <select class="form__select" id="select-organization">
+        <option value="">選択してください</option>
+      </select>
+    </div>
+    <div class="customer-dashboard__datasource-field">
+      <label class="form__label">デバイス</label>
+      <select class="form__select" id="select-device" disabled>
+        <option value="">選択してください</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ガジェットエリア -->
+  <div class="customer-dashboard__content" id="dashboard-content">
+
+    {% if gadgets %}
+      {% for gadget in gadgets %}
+      <div class="gadget gadget--{{ gadget.gadget_size }}"
+           data-gadget-uuid="{{ gadget.gadget_uuid }}"
+           data-gadget-size="{{ gadget.gadget_size }}">
+
+        <!-- ガジェットヘッダー -->
+        <div class="gadget__header">
+          <span class="gadget__title">{{ gadget.gadget_name }}</span>
+          <button class="gadget__setting-btn" type="button" title="設定">⚙</button>
+        </div>
+
+        <!-- ガジェット共通ツールバー -->
+        <div class="gadget__toolbar">
+          <span class="gadget__device-name timeline__device-name">-</span>
+          <button class="button button--primary button--sm gadget__csv-btn" type="button"
+                  data-gadget-uuid="{{ gadget.gadget_uuid }}">
+            CSVエクスポート
+          </button>
+        </div>
+
+        <!-- 時系列グラフガジェット固有UI -->
+        <div class="gadget__body">
+          <div class="timeline" data-gadget-uuid="{{ gadget.gadget_uuid }}">
+
+            <!-- グラフエリア -->
+            <div class="timeline__canvas-wrapper">
+              <div class="timeline__canvas" id="chart-{{ gadget.gadget_uuid }}"></div>
+            </div>
+
+            <!-- 凡例エリア -->
+            <div class="timeline__legends" id="legends-{{ gadget.gadget_uuid }}"></div>
+
+            <!-- 日時選択エリア -->
+            <div class="timeline__controls">
+              <div class="timeline__datetime-block">
+                <span class="timeline__label">開始日時：</span>
+                <div class="timeline__datetime-input-wrap">
+                  <input class="form__input timeline__datetime-input" type="text"
+                         id="start-datetime-{{ gadget.gadget_uuid }}"
+                         placeholder="YYYY/MM/DD HH:mm:ss">
+                  <span class="timeline__calendar-icon">📅</span>
+                </div>
+                <button class="timeline__refresh-btn" type="button" title="現在日時-1時間に更新">🔄</button>
+              </div>
+              <div class="timeline__datetime-block">
+                <span class="timeline__label">終了日時：</span>
+                <div class="timeline__datetime-input-wrap">
+                  <input class="form__input timeline__datetime-input" type="text"
+                         id="end-datetime-{{ gadget.gadget_uuid }}"
+                         placeholder="YYYY/MM/DD HH:mm:ss">
+                  <span class="timeline__calendar-icon">📅</span>
+                </div>
+                <button class="timeline__refresh-btn" type="button" title="現在日時に更新">🔄</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="customer-dashboard__empty">
+        <p>ガジェットが登録されていません。グループ設定メニューからガジェットを追加してください。</p>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
+{% endblock %}
