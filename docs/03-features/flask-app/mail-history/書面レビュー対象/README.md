@@ -109,7 +109,7 @@ erDiagram
 | No | カラム名 | 論理名 | データ型 | NULL | デフォルト値 | 説明 |
 |----|---------|--------|---------|------|-------------|------|
 | 1 | mail_history_id | メール送信履歴ID | INT | NOT NULL | - | 主キー |
-| 2 | mail_history_uuid | メール送信履歴UUID | VARCHAR(32) | NOT NULL | - | UUID（外部公開用一意識別子） |
+| 2 | mail_history_uuid | メール送信履歴UUID | VARCHAR(36) | NOT NULL | - | UUID（外部公開用一意識別子） |
 | 3 | mail_type | メール種別ID | INT | NOT NULL | - | メール種別マスタのID（外部キー、mail_type_master.mail_type_id参照）<br>1:アラート通知, 2:招待メール, 3:パスワードリセット, 4:システム通知 |
 | 4 | sender_email | 送信元メールアドレス | VARCHAR(254) | NOT NULL | - | 送信元のメールアドレス |
 | 5 | recipients | 送信先メールアドレス | JSON | NOT NULL | - | 送信先のメールアドレス（JSON形式） |
