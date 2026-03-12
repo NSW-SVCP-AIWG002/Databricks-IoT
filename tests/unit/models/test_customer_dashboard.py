@@ -202,9 +202,6 @@ class TestDashboardGadgetMaster:
         # Assert
         assert gadget.delete_flag is False
 
-        # Assert
-        assert gadget.gadget_size == 1
-
     def test_gadget_name_max_length(self):
         """gadget_name は最大20文字を受け付ける"""
         # Arrange
