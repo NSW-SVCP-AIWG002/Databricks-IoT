@@ -186,6 +186,8 @@
 | 23 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
 | 24 | レイアウト保存 | `/analysis/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) | 非同期通信 |
 | 25 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
+| 26 | デバイス一覧取得 | `/analysis/customer-dashboard/organizations/<org_id>/devices` | GET | 組織選択変更時のデバイス選択肢取得 | JSON (AJAX) | 非同期通信 |
+| 27 | データソース設定保存 | `/analysis/customer-dashboard/datasource/save` | POST | データソース選択状態を `dashboard_user_setting` に永続化 | JSON (AJAX) | 非同期通信 |
 
 **注:**
 - **レスポンス形式**:
@@ -210,8 +212,8 @@
 | カスタムボタン押下（適用） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
 | 日時初期化ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
 | 自動更新ON | チェックボックス変更 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid`（各ガジェット） | JSON | エラーモーダル表示 |
-| 組織選択変更 | セレクト変更 | なし（クライアントサイド処理） | - | - | - |
-| デバイス選択変更 | セレクト変更 | なし（クライアントサイド処理） | - | - | - |
+| 組織選択変更 | セレクト変更 | `GET /analysis/customer-dashboard/organizations/<org_id>/devices` | `org_id` | JSON（デバイス一覧） | エラーモーダル表示 |
+| デバイス選択変更 | セレクト変更 | `POST /analysis/customer-dashboard/datasource/save` | `organization_id`, `device_id`（JSON） | JSON | エラーモーダル表示 |
 | 編集モード切替 | トグル変更 | なし（クライアントサイド処理） | - | - | - |
 | レイアウト保存ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/layout/save` | レイアウト情報（JSON） | JSON | エラーモーダル表示 |
 | CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
@@ -2368,6 +2370,56 @@ ORDER BY
   device_id ASC
 ```
 
+**Flaskルート実装例（No.26 デバイス一覧取得）:**
+
+```python
+@customer_dashboard_bp.route('/analysis/customer-dashboard/organizations/<int:org_id>/devices', methods=['GET'])
+@require_auth
+def get_devices(org_id):
+    """デバイス一覧取得（AJAX）"""
+    try:
+        devices = get_devices_by_organization(db, org_id)
+        return jsonify({
+            'devices': [
+                {'device_id': d.device_id, 'device_name': d.device_name}
+                for d in devices
+            ]
+        })
+    except Exception as e:
+        logger.error(f'デバイス一覧取得エラー: {str(e)}')
+        return jsonify({'error': 'デバイス一覧の取得に失敗しました'}), 500
+```
+
+**Flaskルート実装例（No.27 データソース設定保存）:**
+
+```python
+@customer_dashboard_bp.route('/analysis/customer-dashboard/datasource/save', methods=['POST'])
+@require_auth
+def datasource_save():
+    """データソース設定保存（AJAX）"""
+    try:
+        data = request.get_json()
+        organization_id = data.get('organization_id')  # None の場合は service 側で 0 に正規化
+        device_id = data.get('device_id')              # None の場合は service 側で 0 に正規化
+        current_user_id = session.get('user_id')
+        update_datasource_setting(db, current_user_id, organization_id, device_id, current_user_id)
+        db.session.commit()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'データソース設定保存エラー: {str(e)}')
+        return jsonify({'error': 'データソース設定の保存に失敗しました'}), 500
+```
+
+**`update_datasource_setting` サービス関数の正規化ロジック（実装時の注意）:**
+
+```python
+def update_datasource_setting(db, user_id, organization_id, device_id, modifier):
+    organization_id = organization_id if organization_id is not None else 0
+    device_id = device_id if device_id is not None else 0
+    # UPDATE処理...
+```
+
 ---
 
 ### CSVエクスポート
@@ -2435,6 +2487,7 @@ ORDER BY
 | ダッシュボード削除 | dashboard_gadget_master, dashboard_group_master, dashboard_master, dashboard_user_setting | 必要 | 4テーブルへの書き込み（カスケード削除） |
 | ダッシュボードグループ削除 | dashboard_gadget_master, dashboard_group_master | 必要 | 2テーブルへの書き込み（カスケード削除） |
 | レイアウト保存 | dashboard_gadget_master | 必要 | 複数レコードへの一括更新 |
+| データソース設定保存 | dashboard_user_setting | 必要 | 1レコードへの更新 |
 
 **読み取り専用ワークフロー（トランザクション不要）:**
 - ダッシュボード初期表示
@@ -2442,6 +2495,7 @@ ORDER BY
 - ガジェット追加モーダル表示
 - ガジェットデータ取得
 - CSVエクスポート
+- デバイス一覧取得
 
 ---
 
