@@ -15,7 +15,7 @@ from flask import Blueprint, Response, abort, g, jsonify, redirect, render_templ
 from iot_app import db
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard import TimelineGadgetForm
-from iot_app.models.dashboard import DashboardGadgetMaster, GadgetTypeMaster
+from iot_app.models.dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster
 from iot_app.services.customer_dashboard.timeline_service import (
     export_timeline_csv,
     fetch_timeline_data,
@@ -51,6 +51,30 @@ def _get_accessible_org_ids():
     return [r[0] for r in rows]
 
 
+def _check_gadget_access(gadget_uuid, accessible_org_ids):
+    """ガジェットがアクセス可能な組織に属するか確認する
+
+    DashboardGadgetMaster → DashboardGroupMaster → DashboardMaster → organization_id の
+    経路でスコープチェックを行う。
+
+    Returns:
+        DashboardGadgetMaster | None: アクセス可能なガジェット、または None
+    """
+    return db.session.query(DashboardGadgetMaster).join(
+        DashboardGroupMaster,
+        DashboardGadgetMaster.dashboard_group_id == DashboardGroupMaster.dashboard_group_id,
+    ).join(
+        DashboardMaster,
+        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
+    ).filter(
+        DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+        DashboardGadgetMaster.delete_flag == False,
+        DashboardGroupMaster.delete_flag == False,
+        DashboardMaster.delete_flag == False,
+        DashboardMaster.organization_id.in_(accessible_org_ids),
+    ).first()
+
+
 # ---------------------------------------------------------------------------
 # 1. 顧客作成ダッシュボード初期表示
 # GET /analysis/customer-dashboard
@@ -80,6 +104,11 @@ def customer_dashboard():
 )
 def gadget_timeline_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
+    accessible_org_ids = _get_accessible_org_ids()
+    gadget = _check_gadget_access(gadget_uuid, accessible_org_ids)
+    if gadget is None:
+        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+
     params = request.get_json() or {}
     start_datetime_str = params.get('start_datetime')
     end_datetime_str   = params.get('end_datetime')
@@ -97,9 +126,6 @@ def gadget_timeline_data(gadget_uuid):
             end_datetime=end_datetime,
             current_user_id=current_user_id,
         )
-        gadget = DashboardGadgetMaster.query.filter_by(
-            gadget_uuid=gadget_uuid, delete_flag=False
-        ).first()
         chart_config = json.loads(gadget.chart_config)
         from iot_app.models.measurement import MeasurementItem
         left_item  = db.session.get(MeasurementItem, chart_config['left_item_id'])
@@ -115,7 +141,7 @@ def gadget_timeline_data(gadget_uuid):
             'updated_at':  datetime.now().strftime(_DATETIME_FORMAT),
         })
     except Exception as e:
-        logger.error(f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}')
+        logger.error(f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}', exc_info=True)
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 
 
@@ -145,6 +171,14 @@ def gadget_timeline_create():
         DeviceMaster.organization_id.in_(accessible_org_ids),
         DeviceMaster.delete_flag == False,
     ).order_by(DeviceMaster.device_id.asc()).all()
+    groups = db.session.query(DashboardGroupMaster).join(
+        DashboardMaster,
+        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
+    ).filter(
+        DashboardGroupMaster.delete_flag == False,
+        DashboardMaster.delete_flag == False,
+        DashboardMaster.organization_id.in_(accessible_org_ids),
+    ).order_by(DashboardGroupMaster.display_order.asc()).all()
 
     form = TimelineGadgetForm()
     return render_template(
@@ -153,6 +187,7 @@ def gadget_timeline_create():
         measurement_items=measurement_items,
         organizations=organizations,
         devices=devices,
+        groups=groups,
     )
 
 
@@ -191,14 +226,21 @@ def gadget_timeline_register():
         'gadget_size':     form.gadget_size.data,
     }
 
+    from iot_app.common.exceptions import ValidationError as AppValidationError
+
     try:
         register_gadget(params, current_user_id=current_user_id)
         logger.info(f'時系列グラフガジェット登録成功: user_id={current_user_id}')
         return redirect(url_for('customer_dashboard.customer_dashboard'))
 
+    except AppValidationError as e:
+        db.session.rollback()
+        logger.warning(f'時系列グラフガジェット登録バリデーションエラー: {str(e)}')
+        abort(400)
+
     except Exception as e:
         db.session.rollback()
-        logger.error(f'時系列グラフガジェット登録エラー: {str(e)}')
+        logger.error(f'時系列グラフガジェット登録エラー: {str(e)}', exc_info=True)
         abort(500)
 
 
@@ -216,6 +258,10 @@ def gadget_csv_export(gadget_uuid):
     from iot_app.common.exceptions import ValidationError, NotFoundError
 
     if request.args.get('export') != 'csv':
+        abort(404)
+
+    accessible_org_ids = _get_accessible_org_ids()
+    if _check_gadget_access(gadget_uuid, accessible_org_ids) is None:
         abort(404)
 
     start_datetime_str = request.args.get('start_datetime')
@@ -238,12 +284,12 @@ def gadget_csv_export(gadget_uuid):
         )
 
     except ValidationError as e:
-        logger.error(f'時系列グラフCSVエクスポート バリデーションエラー: {str(e)}')
+        logger.warning(f'時系列グラフCSVエクスポート バリデーションエラー: {str(e)}')
         abort(400)
 
     except NotFoundError:
         abort(404)
 
     except Exception:
-        logger.error(f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}')
+        logger.error(f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}', exc_info=True)
         abort(500)
