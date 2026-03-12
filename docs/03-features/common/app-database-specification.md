@@ -38,6 +38,14 @@
     - [26. パスワードリセットトークン (password\_reset\_token)](#26-パスワードリセットトークン-password_reset_token)
     - [27. ログイン履歴 (login\_history)](#27-ログイン履歴-login_history)
     - [28. アカウントロック管理 (account\_lock)](#28-アカウントロック管理-account_lock)
+  - [VIEW定義](#view定義)
+    - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
+    - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
+    - [3. 組織一覧用VIEW (v\_organization\_master\_by\_user)](#3-組織一覧用view-v_organization_master_by_user)
+    - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
+    - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
+    - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
+    - [7. メール通知履歴一覧用VIEW (v\_mail\_history\_by\_user)](#7-メール通知履歴一覧用view-v_mail_history_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -680,7 +688,7 @@
 | #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                      |
 | --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------- |
 | 1   | mail_history_id   | メール送信履歴ID     | INT          | NOT NULL | ○   | -   | -                 | メール送信履歴の一意識別子                |
-| 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(32)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
+| 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(36)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
 | 3   | mail_type         | メール種別ID         | INT          | NOT NULL | -   | ○   | -                 | メール種別ID（mail_type_master参照）      |
 | 4   | sender_email      | 送信元メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 送信元のメールアドレス                    |
 | 5   | recipients        | 送信先メールアドレス | JSON         | NOT NULL | -   | -   | -                 | 送信先のメールアドレス（JSON形式）        |
