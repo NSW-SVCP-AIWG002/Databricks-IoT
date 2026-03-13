@@ -6,8 +6,6 @@
   - docs/03-features/flask-app/customer-dashboard/timeline/ui-specification.md
 """
 
-import io
-import json
 from datetime import datetime
 
 from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
@@ -15,12 +13,16 @@ from flask import Blueprint, Response, abort, g, jsonify, redirect, render_templ
 from iot_app import db
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard import TimelineGadgetForm
-from iot_app.models.dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster
 from iot_app.services.customer_dashboard.timeline_service import (
+    check_device_in_scope,
     export_timeline_csv,
     fetch_timeline_data,
     format_timeline_data,
-    generate_timeline_csv,
+    get_accessible_org_ids,
+    get_active_gadgets_in_scope,
+    get_chart_column_names,
+    get_gadget_in_scope,
+    get_timeline_create_context,
     register_gadget,
     validate_chart_params,
 )
@@ -37,45 +39,6 @@ _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 
 
 # ---------------------------------------------------------------------------
-# ヘルパー
-# ---------------------------------------------------------------------------
-
-def _get_accessible_org_ids():
-    """アクセス可能な組織IDリストを返す（organization_closure 経由）"""
-    from iot_app.models.organization import OrganizationClosure
-    rows = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == g.current_user.organization_id
-    ).all()
-    return [r[0] for r in rows]
-
-
-def _check_gadget_access(gadget_uuid, accessible_org_ids):
-    """ガジェットがアクセス可能な組織に属するか確認する
-
-    DashboardGadgetMaster → DashboardGroupMaster → DashboardMaster → organization_id の
-    経路でスコープチェックを行う。
-
-    Returns:
-        DashboardGadgetMaster | None: アクセス可能なガジェット、または None
-    """
-    return db.session.query(DashboardGadgetMaster).join(
-        DashboardGroupMaster,
-        DashboardGadgetMaster.dashboard_group_id == DashboardGroupMaster.dashboard_group_id,
-    ).join(
-        DashboardMaster,
-        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
-    ).filter(
-        DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-        DashboardGadgetMaster.delete_flag == False,
-        DashboardGroupMaster.delete_flag == False,
-        DashboardMaster.delete_flag == False,
-        DashboardMaster.organization_id.in_(accessible_org_ids),
-    ).first()
-
-
-# ---------------------------------------------------------------------------
 # 1. 顧客作成ダッシュボード初期表示
 # GET /analysis/customer-dashboard
 # ---------------------------------------------------------------------------
@@ -83,10 +46,8 @@ def _check_gadget_access(gadget_uuid, accessible_org_ids):
 @customer_dashboard_bp.route('/customer-dashboard', methods=['GET'])
 def customer_dashboard():
     """顧客作成ダッシュボード画面 初期表示"""
-    gadgets = db.session.query(DashboardGadgetMaster).filter_by(
-        delete_flag=False
-    ).order_by(DashboardGadgetMaster.display_order.asc()).all()
-
+    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+    gadgets = get_active_gadgets_in_scope(accessible_org_ids)
     return render_template(
         'analysis/customer_dashboard/index.html',
         gadgets=gadgets,
@@ -104,8 +65,8 @@ def customer_dashboard():
 )
 def gadget_timeline_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
-    accessible_org_ids = _get_accessible_org_ids()
-    gadget = _check_gadget_access(gadget_uuid, accessible_org_ids)
+    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+    gadget = get_gadget_in_scope(gadget_uuid, accessible_org_ids)
     if gadget is None:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
 
@@ -126,15 +87,8 @@ def gadget_timeline_data(gadget_uuid):
             end_datetime=end_datetime,
             current_user_id=current_user_id,
         )
-        chart_config = json.loads(gadget.chart_config)
-        from iot_app.models.measurement import MeasurementItem
-        left_item  = db.session.get(MeasurementItem, chart_config['left_item_id'])
-        right_item = db.session.get(MeasurementItem, chart_config['right_item_id'])
-        chart_data = format_timeline_data(
-            rows,
-            left_item.silver_data_column_name,
-            right_item.silver_data_column_name,
-        )
+        left_col, right_col = get_chart_column_names(gadget)
+        chart_data = format_timeline_data(rows, left_col, right_col)
         return jsonify({
             'gadget_uuid': gadget_uuid,
             'chart_data':  chart_data,
@@ -156,38 +110,18 @@ def gadget_timeline_data(gadget_uuid):
 )
 def gadget_timeline_create():
     """時系列グラフガジェット 登録モーダル表示"""
-    from iot_app.models.measurement import MeasurementItem
-    from iot_app.models.organization import OrganizationMaster
-    from iot_app.models.device import DeviceMaster
-    accessible_org_ids = _get_accessible_org_ids()
-    measurement_items = db.session.query(MeasurementItem).filter_by(
-        delete_flag=False
-    ).order_by(MeasurementItem.measurement_item_id.asc()).all()
-    organizations = db.session.query(OrganizationMaster).filter(
-        OrganizationMaster.organization_id.in_(accessible_org_ids),
-        OrganizationMaster.delete_flag == False,
-    ).order_by(OrganizationMaster.organization_id.asc()).all()
-    devices = db.session.query(DeviceMaster).filter(
-        DeviceMaster.organization_id.in_(accessible_org_ids),
-        DeviceMaster.delete_flag == False,
-    ).order_by(DeviceMaster.device_id.asc()).all()
-    groups = db.session.query(DashboardGroupMaster).join(
-        DashboardMaster,
-        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
-    ).filter(
-        DashboardGroupMaster.delete_flag == False,
-        DashboardMaster.delete_flag == False,
-        DashboardMaster.organization_id.in_(accessible_org_ids),
-    ).order_by(DashboardGroupMaster.display_order.asc()).all()
-
+    from iot_app.common.exceptions import NotFoundError
+    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+    current_user_id = getattr(getattr(g, 'current_user', None), 'user_id', None)
+    try:
+        context = get_timeline_create_context(accessible_org_ids, current_user_id)
+    except NotFoundError:
+        abort(404)
     form = TimelineGadgetForm()
     return render_template(
         'analysis/customer_dashboard/modals/gadget_register/timeline.html',
         form=form,
-        measurement_items=measurement_items,
-        organizations=organizations,
-        devices=devices,
-        groups=groups,
+        **context,
     )
 
 
@@ -211,6 +145,12 @@ def gadget_timeline_register():
         ), 400
 
     current_user_id = getattr(getattr(g, 'current_user', None), 'user_id', 0)
+
+    # デバイス固定モード時: デバイス存在&データスコープチェック
+    if form.device_mode.data == 'fixed':
+        accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+        if check_device_in_scope(form.device_id.data, accessible_org_ids) is None:
+            abort(404)
 
     params = {
         'title':           form.title.data,
@@ -260,8 +200,8 @@ def gadget_csv_export(gadget_uuid):
     if request.args.get('export') != 'csv':
         abort(404)
 
-    accessible_org_ids = _get_accessible_org_ids()
-    if _check_gadget_access(gadget_uuid, accessible_org_ids) is None:
+    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+    if get_gadget_in_scope(gadget_uuid, accessible_org_ids) is None:
         abort(404)
 
     start_datetime_str = request.args.get('start_datetime')

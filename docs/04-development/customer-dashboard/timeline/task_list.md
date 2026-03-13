@@ -5,9 +5,9 @@
 | #  | タスク名                          | 対象ファイル                                                                                   | 対応テスト                                                                 | 実装フロー状態 | 備考 |
 |----|-----------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|----------------|------|
 | 1  | データ定義層: モデル実装           | `src/iot_app/models/dashboard.py`                                                             | `tests/unit/models/test_customer_dashboard/timeline.py`                    | 完了           | `DashboardGadgetMaster`, `GadgetTypeMaster` |
-| 2  | ビジネスロジック層: サービス実装   | `src/iot_app/services/customer_dashboard/timeline_service.py`                                 | `tests/unit/services/test_customer_dashboard/timeline_service.py`          | 完了           | `validate_chart_params`, `validate_gadget_registration`, `format_timeline_data`, `generate_timeline_csv`, `fetch_timeline_data`, `register_gadget` |
+| 2  | ビジネスロジック層: サービス実装   | `src/iot_app/services/customer_dashboard/timeline_service.py`                                 | `tests/unit/services/test_customer_dashboard/timeline_service.py`          | 完了           | `validate_chart_params`, `validate_gadget_registration`, `format_timeline_data`, `generate_timeline_csv`, `fetch_timeline_data`, `register_gadget`, `get_accessible_org_ids`, `get_gadget_in_scope`, `get_active_gadgets_in_scope`, `get_chart_column_names`, `check_device_in_scope`, `get_timeline_create_context`（①②ステップ追加・グループ取得修正） |
 | 3  | インターフェース層: フォーム実装   | `src/iot_app/forms/customer_dashboard.py`                                                     | -                                                                          | 完了           | `TimelineGadgetForm` (Flask-WTF) |
-| 4  | インターフェース層: ビュー実装     | `src/iot_app/views/analysis/customer_dashboard.py`                                            | -                                                                          | 完了           | 5ルート（初期表示・データ取得・登録モーダル・登録実行・CSVエクスポート） |
+| 4  | インターフェース層: ビュー実装     | `src/iot_app/views/analysis/customer_dashboard.py`                                            | -                                                                          | 完了           | 5ルート（初期表示・データ取得・登録モーダル・登録実行・CSVエクスポート）。デバイス固定モード時スコープチェック追加、`gadget_timeline_create` NotFoundError → 404対応、未使用インポート（`generate_timeline_csv`）削除 |
 | 5  | インターフェース層: テンプレート実装 | `src/iot_app/templates/analysis/customer_dashboard/index.html`<br>`src/iot_app/templates/analysis/customer_dashboard/modals/gadget_register/timeline.html` | -                                                                          | 完了           | ガジェット埋め込み・登録モーダル |
 | 6  | インターフェース層: JS実装         | `src/iot_app/static/js/components/customer_dashboard/timeline.js`                             | -                                                                          | 完了           | ECharts 時系列グラフ描画・AJAX・CSV エクスポート |
 | 7  | インターフェース層: CSS実装        | `src/iot_app/static/css/components/customer_dashboard/timeline.css`                           | -                                                                          | 完了           | customer-dashboard・gadget・timeline・gadget-register・timeline-register |
@@ -30,10 +30,10 @@
 
 | 観点                         | 状態     | 確認結果 |
 | ---------------------------- | -------- | -------- |
-| 機能: 設計書との差分         | 完了     | A: `_check_gadget_access()` ヘルパー追加、`gadget_timeline_data` / `gadget_csv_export` にデータスコープチェック実装済み。B: `gadget_timeline_create` にグループ一覧取得・テンプレート渡し追加済み（`DashboardGroupMaster`・`DashboardMaster` を `dashboard.py` に追加）。C: `register_gadget` の `position_y` / `display_order` を MAX+1 動的計算に修正済み |
-| 機能: テスト仕様カバレッジ   | 完了     | 全85テスト通過（services:69, models:16）。修正後も全通過確認済み |
-| 機能: インターフェース整合性 | 完了     | 引数・戻り値・例外が設計書と一致 |
-| 非機能: セキュリティ         | 完了     | ORM使用・Jinja2自動エスケープ・Flask-WTF CSRF保護・organization_closure によるデータスコープチェック実装済み |
+| 機能: 設計書との差分         | 完了     | A〜C: 前回セッション修正済み。追加修正: ①デバイス固定モードのスコープチェック欠落（`check_device_in_scope` 追加・view で `abort(404)` 対応）②`get_timeline_create_context` の①②ステップ（ユーザー設定取得・ダッシュボード取得・404チェック）追加、グループ取得を `dashboard_id` 限定に修正③未使用インポート（`generate_timeline_csv`）削除 |
+| 機能: テスト仕様カバレッジ   | 完了     | 80テスト通過（services: 新関数4クラス11件追加）。全通過確認済み |
+| 機能: インターフェース整合性 | 完了     | 引数・戻り値・例外が設計書と一致。`get_timeline_create_context` に `current_user_id` 引数追加 |
+| 非機能: セキュリティ         | 完了     | ORM使用・Jinja2自動エスケープ・Flask-WTF CSRF保護・organization_closure によるデータスコープチェック実装済み。デバイス固定モード時のスコープチェック追加済み |
 | 非機能: ログ準拠             | 完了     | 全エラーログに `exc_info=True` 追加済み（timeline_service.py・customer_dashboard.py）。logging-specification.md §7 準拠 |
 | 非機能: エラーハンドリング   | 完了     | `gadget_timeline_register` に `except AppValidationError` を追加し 400 で処理。ValidationError の握りつぶし解消済み |
 
