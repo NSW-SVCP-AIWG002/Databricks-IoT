@@ -1053,7 +1053,7 @@ class TestBarChartCsvGeneration:
         csv_text = generate_bar_chart_csv(chart_data)
 
         # Assert
-        reader = csv.reader(io.StringIO(csv_text))
+        reader = csv.reader(io.StringIO(csv_text.lstrip('\ufeff')))
         header = next(reader)
         assert "timestamp" in header
         assert "value" in header
@@ -1108,7 +1108,7 @@ class TestBarChartCsvGeneration:
         csv_text = generate_bar_chart_csv(chart_data)
 
         # Assert
-        reader = csv.reader(io.StringIO(csv_text))
+        reader = csv.reader(io.StringIO(csv_text.lstrip('\ufeff')))
         header = next(reader)
         assert header[0] == "timestamp"
         assert header[1] == "value"
