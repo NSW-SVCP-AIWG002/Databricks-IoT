@@ -1,0 +1,689 @@
+/* =========================================================
+   顧客作成ダッシュボード コンポーネントCSS
+   ========================================================= */
+
+/* ── ページ全体コンテナ ─────────────────────────── */
+.customer-dashboard {
+  padding: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+/* ── ツールバー行1 ─────────────────────────────── */
+.customer-dashboard__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: var(--color-primary);
+  border-radius: 4px;
+}
+
+.customer-dashboard__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: #fff;
+  margin: 0;
+}
+
+/* 編集モード中はヘッダー色をオレンジに */
+.customer-dashboard--edit-mode .customer-dashboard__toolbar {
+  background-color: #e67e22;
+}
+
+.dashboard-mgmt-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+/* ── ツールバー行2 ─────────────────────────────── */
+.customer-dashboard__subbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+/* ── データソース選択フォーム ───────────────────── */
+.datasource-form {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.datasource-form__label {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.datasource-form__select {
+  min-width: 160px;
+  padding: var(--spacing-1) var(--spacing-2);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+}
+
+.datasource-form__select:disabled {
+  background-color: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* ── 日時設定ツール ─────────────────────────────── */
+.datetime-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  margin-left: auto;
+}
+
+.datetime-tools__last-updated {
+  font-size: var(--font-size-sm);
+  color: #666;
+  white-space: nowrap;
+}
+
+.custom-datetime-wrapper {
+  position: relative;
+}
+
+.custom-datetime-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: var(--spacing-4);
+  z-index: 100;
+  min-width: 280px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.custom-datetime-dropdown__row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.custom-datetime-dropdown__row label {
+  width: 60px;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.custom-datetime-dropdown__row input {
+  flex: 1;
+  padding: var(--spacing-1);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: var(--font-size-sm);
+}
+
+.custom-datetime-dropdown__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+}
+
+/* ── トグルボタン ───────────────────────────────── */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  cursor: pointer;
+}
+
+.toggle__input {
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle__label {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  color: inherit;
+}
+
+/* ── 編集モードバナー ───────────────────────────── */
+.edit-mode-banner {
+  background-color: #e67e22;
+  color: #fff;
+  text-align: center;
+  padding: var(--spacing-1) var(--spacing-4);
+  font-weight: bold;
+}
+
+/* ── 空状態 ─────────────────────────────────────── */
+.customer-dashboard__empty,
+.customer-dashboard__no-groups,
+.dashboard-content__empty {
+  padding: var(--spacing-6);
+  text-align: center;
+  color: #666;
+  background-color: #f9f9f9;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+}
+
+/* ── ダッシュボードヘッダー (5) ─────────────────── */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  position: relative;
+}
+
+.dashboard-header__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: #fff;
+  margin: 0;
+  text-align: center;
+  flex: 1;
+}
+
+/* ── ダッシュボードグループ (6) ─────────────────── */
+.dashboard-group {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dashboard-group__header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: #e8f0f8;
+  border-bottom: 1px solid #ddd;
+}
+
+.dashboard-group__collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  padding: 0 var(--spacing-2);
+  color: #555;
+  line-height: 1;
+}
+
+.dashboard-group__title {
+  flex: 1;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  margin: 0;
+  text-align: center;
+}
+
+/* ── ダッシュボードコンテンツエリア (7) ─────────── */
+.dashboard-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: var(--spacing-4);
+  min-height: 100px;
+  background-color: #fff;
+  position: relative;
+}
+
+/* ── ガジェット (8) ─────────────────────────────── */
+.gadget {
+  width: 480px;
+  height: 480px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.gadget--wide {
+  width: 968px; /* 480 + 8(gap) + 480 */
+}
+
+/* 編集モード中のガジェットスタイル */
+.customer-dashboard--edit-mode .gadget {
+  border: 2px dashed var(--color-primary);
+  cursor: grab;
+}
+
+.customer-dashboard--edit-mode .gadget:active {
+  cursor: grabbing;
+}
+
+.customer-dashboard--edit-mode .gadget.gadget--dragging {
+  opacity: 0.5;
+}
+
+.customer-dashboard--edit-mode .dashboard-content.gadget--drag-over {
+  background-color: #e8f0f8;
+}
+
+.gadget__header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.gadget__drag-handle {
+  color: #aaa;
+  padding-right: var(--spacing-2);
+  display: none; /* 編集モード時のみ表示 */
+  cursor: grab;
+}
+
+.customer-dashboard--edit-mode .gadget__drag-handle {
+  display: inline;
+}
+
+.gadget__title {
+  flex: 1;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  text-align: center;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gadget__subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-bottom: 1px solid #eee;
+  font-size: var(--font-size-sm);
+}
+
+.gadget__datasource-name {
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gadget__chart {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── 設定メニュー（⚙ドロップダウン） ───────────── */
+.setting-menu {
+  position: relative;
+}
+
+.button--icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 2px var(--spacing-1);
+  color: #fff;
+  line-height: 1;
+}
+
+.dashboard-group__header .button--icon,
+.gadget__header .button--icon {
+  color: #555;
+}
+
+.setting-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-1) 0;
+  min-width: 180px;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.setting-menu__item {
+  display: block;
+  padding: var(--spacing-2) var(--spacing-4);
+  color: #333;
+  text-decoration: none;
+  font-size: var(--font-size-base);
+  white-space: nowrap;
+}
+
+.setting-menu__item:hover {
+  background-color: #f0f0f0;
+}
+
+.setting-menu__item--danger {
+  color: var(--color-danger);
+}
+
+.setting-menu__item--danger:hover {
+  background-color: #fdecea;
+}
+
+/* ── モーダル ─────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 4px;
+  min-width: 400px;
+  max-width: 680px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content__header {
+  padding: var(--spacing-4) var(--spacing-6);
+  border-bottom: 1px solid #ddd;
+  background-color: var(--color-primary);
+  border-radius: 4px 4px 0 0;
+}
+
+.modal-content__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: #fff;
+  margin: 0;
+}
+
+.modal-content__body {
+  padding: var(--spacing-6);
+}
+
+.modal-content__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid #ddd;
+}
+
+.modal-content__actions {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.modal-content__warning {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-2);
+}
+
+/* ── フォームスタイル ───────────────────────────── */
+.form__group {
+  margin-bottom: var(--spacing-4);
+}
+
+.form__label {
+  display: block;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  margin-bottom: var(--spacing-1);
+}
+
+.form__label--required::after {
+  content: ' *';
+  color: var(--color-danger);
+}
+
+.form__input {
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  box-sizing: border-box;
+}
+
+.form__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(34, 114, 180, 0.2);
+}
+
+.form__errors {
+  list-style: none;
+  margin: var(--spacing-1) 0 0;
+  padding: 0;
+}
+
+.form__error {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+/* ── ボタン共通 ─────────────────────────────────── */
+.button {
+  padding: var(--spacing-1) var(--spacing-4);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.button--primary {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.button--primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.button--primary:disabled {
+  background-color: #99c0e0;
+  cursor: not-allowed;
+}
+
+.button--secondary {
+  background-color: var(--color-secondary);
+  color: #fff;
+}
+
+.button--secondary:hover {
+  background-color: var(--color-secondary-hover);
+}
+
+.button--danger {
+  background-color: var(--color-danger);
+  color: #fff;
+}
+
+.button--danger:hover {
+  background-color: var(--color-danger-hover);
+}
+
+/* ── ガジェット追加モーダル ─────────────────────── */
+.gadget-add__layout {
+  display: flex;
+  gap: var(--spacing-4);
+  min-height: 320px;
+}
+
+.gadget-add__list-wrapper {
+  flex: 0 0 220px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-add__tabs {
+  display: flex;
+}
+
+.gadget-add__tab {
+  flex: 1;
+  padding: var(--spacing-2);
+  border: none;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  border-bottom: 2px solid transparent;
+}
+
+.gadget-add__tab--active {
+  background: #fff;
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.gadget-add__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.gadget-add__item {
+  padding: var(--spacing-2) var(--spacing-3);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid #eee;
+}
+
+.gadget-add__item:hover,
+.gadget-add__item--selected {
+  background-color: #e8f0f8;
+  color: var(--color-primary);
+}
+
+.gadget-add__preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2);
+}
+
+.gadget-add__preview-image-wrapper {
+  flex: 1;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gadget-add__preview-image-wrapper img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+
+.gadget-add__preview-placeholder {
+  color: #aaa;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.gadget-add__preview-description {
+  font-size: var(--font-size-sm);
+  color: #555;
+  margin: 0;
+}
+
+/* ── ダッシュボード管理モーダル テーブル ─────────── */
+.modal-content .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-base);
+}
+
+.modal-content .table__th {
+  background-color: #f0f0f0;
+  padding: var(--spacing-2) var(--spacing-3);
+  text-align: left;
+  border-bottom: 2px solid #ddd;
+  font-weight: bold;
+}
+
+.modal-content .table__td {
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: 1px solid #eee;
+}
+
+.modal-content .table__td--empty {
+  text-align: center;
+  color: #aaa;
+}
+
+.modal-content .table__row:hover {
+  background-color: #f9f9f9;
+}
+
+/* ── フラッシュメッセージ ───────────────────────── */
+.flash-messages {
+  margin-bottom: var(--spacing-4);
+}
+
+.flash {
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: 4px;
+  margin-bottom: var(--spacing-2);
+  font-size: var(--font-size-base);
+}
+
+.flash--success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.flash--error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}

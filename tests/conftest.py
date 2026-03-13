@@ -3,7 +3,7 @@ import pytest
 
 os.environ["FLASK_ENV"] = "testing"
 
-from src import create_app, db as _db
+from iot_app import create_app, db as _db
 
 
 @pytest.fixture(scope="session")

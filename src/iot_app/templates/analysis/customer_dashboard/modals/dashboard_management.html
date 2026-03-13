@@ -1,0 +1,67 @@
+<div class="modal-content__header">
+  <h2 class="modal-content__title">ダッシュボード管理</h2>
+</div>
+
+<div class="modal-content__body">
+  <div class="modal-content__actions">
+    <button
+      type="button"
+      class="button button--primary"
+      id="mgmt-register-btn"
+      data-modal-url="{{ url_for('customer_dashboard.dashboard_create') }}"
+    >登録</button>
+    <button
+      type="button"
+      class="button button--danger"
+      id="mgmt-delete-btn"
+      data-base-url="/analysis/customer-dashboard/dashboards/"
+    >削除</button>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th class="table__th"></th>
+        <th class="table__th">ダッシュボードタイトル</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if dashboards %}
+        {% for dashboard in dashboards %}
+          <tr class="table__row">
+            <td class="table__td">
+              <input
+                type="radio"
+                name="dashboard_uuid"
+                id="radio-{{ dashboard.dashboard_uuid }}"
+                value="{{ dashboard.dashboard_uuid }}"
+                data-switch-url="{{ url_for('customer_dashboard.dashboard_switch', dashboard_uuid=dashboard.dashboard_uuid) }}"
+                data-delete-url="{{ url_for('customer_dashboard.dashboard_delete_confirm', dashboard_uuid=dashboard.dashboard_uuid) }}"
+              >
+            </td>
+            <td class="table__td">
+              <label for="radio-{{ dashboard.dashboard_uuid }}">{{ dashboard.dashboard_name }}</label>
+            </td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr class="table__row">
+          <td class="table__td table__td--empty" colspan="2">ダッシュボードが登録されていません</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-content__footer">
+  <button
+    type="button"
+    class="button button--primary"
+    id="mgmt-change-btn"
+  >変更</button>
+  <button
+    type="button"
+    class="button button--secondary"
+    id="modal-close-btn"
+  >キャンセル</button>
+</div>

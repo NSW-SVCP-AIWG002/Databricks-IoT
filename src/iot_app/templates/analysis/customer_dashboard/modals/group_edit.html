@@ -1,0 +1,33 @@
+<div class="modal-content__header">
+  <h2 class="modal-content__title">ダッシュボードグループタイトル更新</h2>
+</div>
+
+<form
+  method="POST"
+  action="{{ url_for('customer_dashboard.group_update', dashboard_group_uuid=group.dashboard_group_uuid) }}"
+  class="modal-form"
+  data-ajax-submit
+>
+  {{ form.hidden_tag() }}
+
+  <div class="modal-content__body">
+    <div class="form__group">
+      <label class="form__label form__label--required" for="{{ form.dashboard_group_name.id }}">
+        ダッシュボードグループタイトル
+      </label>
+      {{ form.dashboard_group_name(class="form__input") }}
+      {% if form.dashboard_group_name.errors %}
+        <ul class="form__errors">
+          {% for error in form.dashboard_group_name.errors %}
+            <li class="form__error">{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="modal-content__footer">
+    <button type="submit" class="button button--primary">更新</button>
+    <button type="button" class="button button--secondary" id="modal-close-btn">キャンセル</button>
+  </div>
+</form>
