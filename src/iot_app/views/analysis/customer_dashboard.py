@@ -3,16 +3,19 @@ from datetime import datetime
 
 from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
 
-from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard import BarChartGadgetForm
-from iot_app.models.dashboard import DashboardGadgetMaster
 from iot_app.services.customer_dashboard.bar_chart_service import (
     check_device_access,
     fetch_bar_chart_data,
     format_bar_chart_data,
     generate_bar_chart_csv,
+    get_accessible_org_ids,
+    get_all_active_gadgets,
+    get_bar_chart_create_context,
+    get_gadget_by_uuid,
+    get_measurement_item_column_name,
     register_bar_chart_gadget,
     validate_chart_params,
 )
@@ -27,51 +30,13 @@ customer_dashboard_bp = Blueprint(
 
 
 # ============================================================
-# ヘルパー
-# ============================================================
-
-def _get_accessible_org_ids(current_user_id):
-    """アクセス可能な組織IDリストを取得する"""
-    from iot_app.models.organization import OrganizationClosure
-    rows = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == getattr(g, 'current_user_organization_id', None)
-    ).all()
-    return [r[0] for r in rows]
-
-
-def _get_gadget_by_uuid(gadget_uuid):
-    """ガジェットをUUIDで取得する"""
-    return (
-        db.session.query(DashboardGadgetMaster)
-        .filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        )
-        .first()
-    )
-
-
-def _check_gadget_access(gadget, accessible_org_ids):
-    """ガジェットがアクセス可能な組織に属するかチェックする（スタブ: 常にTrue）"""
-    # TODO: dashboard_master → organization_id 経由でスコープチェックを実装する
-    return True
-
-
-# ============================================================
 # ルート定義
 # ============================================================
 
 @customer_dashboard_bp.route('', methods=['GET'])
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
-    gadgets = (
-        db.session.query(DashboardGadgetMaster)
-        .filter(DashboardGadgetMaster.delete_flag == False)
-        .order_by(DashboardGadgetMaster.display_order.asc())
-        .all()
-    )
+    gadgets = get_all_active_gadgets()
     return render_template(
         'analysis/customer_dashboard/index.html',
         gadgets=gadgets,
@@ -81,7 +46,7 @@ def customer_dashboard():
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
 def gadget_bar_chart_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
-    gadget = _get_gadget_by_uuid(gadget_uuid)
+    gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
 
@@ -94,8 +59,6 @@ def gadget_bar_chart_data(gadget_uuid):
         return jsonify({'error': 'パラメータが不正です'}), 400
 
     try:
-        from iot_app.models.measurement import MeasurementItemMaster
-
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
@@ -107,12 +70,9 @@ def gadget_bar_chart_data(gadget_uuid):
         # display_unit=hour の場合はシルバー層カラム名を事前取得
         column_name = None
         if display_unit == 'hour':
-            item = db.session.query(MeasurementItemMaster).filter_by(
-                measurement_item_id=measurement_item_id
-            ).first()
-            if item is None:
+            column_name = get_measurement_item_column_name(measurement_item_id)
+            if column_name is None:
                 return jsonify({'error': '測定項目が見つかりません'}), 500
-            column_name = item.silver_data_column_name
 
         rows = fetch_bar_chart_data(
             device_id=device_id,
@@ -121,6 +81,7 @@ def gadget_bar_chart_data(gadget_uuid):
             base_datetime=base_datetime,
             measurement_item_id=measurement_item_id,
             summary_method_id=summary_method_id,
+            limit=100,
         )
         chart_data = format_bar_chart_data(
             rows, display_unit, interval, summary_method_id, column_name=column_name
@@ -139,65 +100,70 @@ def gadget_bar_chart_data(gadget_uuid):
 @customer_dashboard_bp.route('/gadgets/bar-chart/create', methods=['GET'])
 def gadget_bar_chart_create():
     """棒グラフガジェット登録モーダル表示"""
-    from iot_app.models.device import DeviceMaster
-    from iot_app.models.measurement import MeasurementItemMaster
-    from iot_app.models.organization import OrganizationMaster
-
     try:
-        measurement_items = (
-            db.session.query(MeasurementItemMaster)
-            .filter(MeasurementItemMaster.delete_flag == False)
-            .order_by(MeasurementItemMaster.measurement_item_id.asc())
-            .all()
-        )
-        organizations = (
-            db.session.query(OrganizationMaster)
-            .filter(OrganizationMaster.delete_flag == False)
-            .order_by(OrganizationMaster.organization_id.asc())
-            .all()
-        )
-        devices = (
-            db.session.query(DeviceMaster)
-            .filter(DeviceMaster.delete_flag == False)
-            .order_by(DeviceMaster.device_id.asc())
-            .all()
-        )
+        context = get_bar_chart_create_context()
     except Exception as e:
         logger.error(f'棒グラフ登録モーダル表示エラー: {str(e)}')
         abort(500)
 
     form = BarChartGadgetForm()
-    form.device_id.choices = [(0, '選択してください')] + [(d.device_id, d.device_name) for d in devices]
+    form.device_id.choices = [(0, '選択してください')] + [
+        (d.device_id, d.device_name) for d in context['devices']
+    ]
     form.group_id.choices = [(0, '選択してください')]
     form.summary_method_id.choices = [(0, '選択してください')]
     form.measurement_item_id.choices = [(0, '選択してください')] + [
-        (m.measurement_item_id, m.display_name) for m in measurement_items
+        (m.measurement_item_id, m.display_name) for m in context['measurement_items']
     ]
 
     return render_template(
         'analysis/customer_dashboard/modals/gadget_register/bar_chart.html',
         form=form,
-        measurement_items=measurement_items,
-        organizations=organizations,
-        devices=devices,
+        **context,
     )
 
 
 @customer_dashboard_bp.route('/gadgets/bar-chart/register', methods=['POST'])
 def gadget_bar_chart_register():
     """棒グラフガジェット登録実行"""
-    accessible_org_ids = _get_accessible_org_ids(getattr(g, 'current_user_id', None))
+    try:
+        context = get_bar_chart_create_context()
+    except Exception as e:
+        logger.error(f'棒グラフガジェット登録コンテキスト取得エラー: {str(e)}')
+        abort(500)
+
+    form = BarChartGadgetForm()
+    form.device_id.choices = [(0, '選択してください')] + [
+        (d.device_id, d.device_name) for d in context['devices']
+    ]
+    form.measurement_item_id.choices = [(0, '選択してください')] + [
+        (m.measurement_item_id, m.display_name) for m in context['measurement_items']
+    ]
+    # group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
+    submitted_group_id = request.form.get('group_id', type=int) or 0
+    submitted_summary_method_id = request.form.get('summary_method_id', type=int) or 0
+    form.group_id.choices = [(submitted_group_id, '')]
+    form.summary_method_id.choices = [(submitted_summary_method_id, '')]
+
+    if not form.validate_on_submit():
+        return render_template(
+            'analysis/customer_dashboard/modals/gadget_register/bar_chart.html',
+            form=form,
+            **context,
+        ), 422
+
+    accessible_org_ids = get_accessible_org_ids(getattr(g, 'current_user_organization_id', None))
 
     params = {
-        'title': request.form.get('title'),
-        'device_mode': request.form.get('device_mode'),
-        'device_id': request.form.get('device_id', type=int),
-        'group_id': request.form.get('group_id', type=int),
-        'summary_method_id': request.form.get('summary_method_id', type=int),
-        'measurement_item_id': request.form.get('measurement_item_id', type=int),
-        'min_value': request.form.get('min_value') or None,
-        'max_value': request.form.get('max_value') or None,
-        'gadget_size': request.form.get('gadget_size'),
+        'title': form.title.data,
+        'device_mode': form.device_mode.data,
+        'device_id': form.device_id.data,
+        'group_id': form.group_id.data,
+        'summary_method_id': form.summary_method_id.data,
+        'measurement_item_id': form.measurement_item_id.data,
+        'min_value': form.min_value.data,
+        'max_value': form.max_value.data,
+        'gadget_size': form.gadget_size.data,
     }
 
     try:
@@ -223,7 +189,7 @@ def gadget_csv_export(gadget_uuid):
     if request.args.get('export') != 'csv':
         abort(404)
 
-    gadget = _get_gadget_by_uuid(gadget_uuid)
+    gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
         abort(404)
 
@@ -235,8 +201,6 @@ def gadget_csv_export(gadget_uuid):
         abort(400)
 
     try:
-        from iot_app.models.measurement import MeasurementItemMaster
-
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
         chart_config = json.loads(gadget.chart_config or '{}')
@@ -248,12 +212,9 @@ def gadget_csv_export(gadget_uuid):
         # display_unit=hour の場合はシルバー層カラム名を事前取得
         column_name = None
         if display_unit == 'hour':
-            item = db.session.query(MeasurementItemMaster).filter_by(
-                measurement_item_id=measurement_item_id
-            ).first()
-            if item is None:
+            column_name = get_measurement_item_column_name(measurement_item_id)
+            if column_name is None:
                 abort(500)
-            column_name = item.silver_data_column_name
 
         rows = fetch_bar_chart_data(
             device_id=device_id,
@@ -262,6 +223,7 @@ def gadget_csv_export(gadget_uuid):
             base_datetime=base_datetime,
             measurement_item_id=measurement_item_id,
             summary_method_id=summary_method_id,
+            limit=100_000,
         )
         chart_data = format_bar_chart_data(
             rows, display_unit, interval, summary_method_id, column_name=column_name

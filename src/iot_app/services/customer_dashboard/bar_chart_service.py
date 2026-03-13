@@ -230,14 +230,14 @@ def generate_bar_chart_csv(chart_data):
     writer.writerow(["timestamp", "value"])
     for label, value in zip(chart_data["labels"], chart_data["values"]):
         writer.writerow([label, value])
-    return output.getvalue()
+    return '\ufeff' + output.getvalue()
 
 
 # ============================================================
 # Unity Catalog クエリ（スタブ：テストでモック差替え）
 # ============================================================
 
-def execute_silver_query(device_id, start_datetime, end_datetime):
+def execute_silver_query(device_id, start_datetime, end_datetime, limit=100):
     """シルバー層 sensor_data_view クエリ実行（Unity Catalog）
 
     Returns:
@@ -260,16 +260,18 @@ def execute_silver_query(device_id, start_datetime, end_datetime):
         WHERE device_id = :device_id
           AND event_timestamp BETWEEN :start_datetime AND :end_datetime
         ORDER BY event_timestamp ASC
+        LIMIT :limit
     """
     return connector.execute(sql, {
         "device_id": device_id,
         "start_datetime": start_datetime,
         "end_datetime": end_datetime,
+        "limit": limit,
     })
 
 
 def execute_gold_query(device_id, display_unit, measurement_item_id, summary_method_id,
-                       start_date=None, end_date=None, target_date=None):
+                       start_date=None, end_date=None, target_date=None, limit=100):
     """ゴールド層クエリ実行（Unity Catalog）
 
     Returns:
@@ -287,12 +289,14 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
               AND summary_method_id = :summary_method_id
               AND collection_date = :target_date
             ORDER BY collection_hour ASC
+            LIMIT :limit
         """
         return connector.execute(sql, {
             "device_id": device_id,
             "measurement_item_id": measurement_item_id,
             "summary_method_id": summary_method_id,
             "target_date": target_date,
+            "limit": limit,
         })
     else:
         sql = """
@@ -303,6 +307,7 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
               AND summary_method_id = :summary_method_id
               AND collection_date BETWEEN :start_date AND :end_date
             ORDER BY collection_date ASC
+            LIMIT :limit
         """
         return connector.execute(sql, {
             "device_id": device_id,
@@ -310,6 +315,7 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
             "summary_method_id": summary_method_id,
             "start_date": start_date,
             "end_date": end_date,
+            "limit": limit,
         })
 
 
@@ -318,7 +324,7 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
 # ============================================================
 
 def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
-                         measurement_item_id, summary_method_id):
+                         measurement_item_id, summary_method_id, limit=100):
     """表示単位に応じたセンサーデータを取得する
 
     Args:
@@ -328,6 +334,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
         base_datetime (datetime): 基準日時
         measurement_item_id (int): 表示項目ID
         summary_method_id (int): 集約方法ID
+        limit (int): 最大取得件数（デフォルト100）
 
     Returns:
         list[dict]: クエリ結果行のリスト
@@ -339,7 +346,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
         if display_unit == "hour":
             start_datetime = base_datetime.replace(minute=0, second=0, microsecond=0)
             end_datetime = start_datetime + timedelta(hours=1)
-            return execute_silver_query(device_id, start_datetime, end_datetime)
+            return execute_silver_query(device_id, start_datetime, end_datetime, limit=limit)
 
         elif display_unit == "day":
             target_date = base_datetime.date()
@@ -349,6 +356,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
                 measurement_item_id=measurement_item_id,
                 summary_method_id=summary_method_id,
                 target_date=target_date,
+                limit=limit,
             )
 
         elif display_unit == "week":
@@ -364,6 +372,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
                 summary_method_id=summary_method_id,
                 start_date=start_date,
                 end_date=end_date,
+                limit=limit,
             )
 
         elif display_unit == "month":
@@ -378,6 +387,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
                 summary_method_id=summary_method_id,
                 start_date=start_date,
                 end_date=end_date,
+                limit=limit,
             )
 
         return []
@@ -455,6 +465,90 @@ def export_bar_chart_csv(gadget_uuid, device_id, display_unit, interval,
     except Exception as e:
         logger.error(f"棒グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}")
         raise
+
+
+# ============================================================
+# ガジェット・マスターデータ取得
+# ============================================================
+
+def get_accessible_org_ids(org_id):
+    """アクセス可能な組織IDリストを取得する"""
+    from iot_app.models.organization import OrganizationClosure
+    rows = db.session.query(
+        OrganizationClosure.subsidiary_organization_id
+    ).filter(
+        OrganizationClosure.parent_organization_id == org_id
+    ).all()
+    return [r[0] for r in rows]
+
+
+def get_gadget_by_uuid(gadget_uuid):
+    """ガジェットをUUIDで取得する"""
+    return (
+        db.session.query(DashboardGadgetMaster)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .first()
+    )
+
+
+def get_all_active_gadgets():
+    """有効なガジェット一覧を表示順で取得する"""
+    return (
+        db.session.query(DashboardGadgetMaster)
+        .filter(DashboardGadgetMaster.delete_flag == False)
+        .order_by(DashboardGadgetMaster.display_order.asc())
+        .all()
+    )
+
+
+def get_bar_chart_create_context():
+    """棒グラフ登録モーダル用データを取得する
+
+    Returns:
+        dict: measurement_items, organizations, devices をキーに持つ dict
+    """
+    from iot_app.models.device import DeviceMaster
+    from iot_app.models.measurement import MeasurementItemMaster
+    from iot_app.models.organization import OrganizationMaster
+    measurement_items = (
+        db.session.query(MeasurementItemMaster)
+        .filter(MeasurementItemMaster.delete_flag == False)
+        .order_by(MeasurementItemMaster.measurement_item_id.asc())
+        .all()
+    )
+    organizations = (
+        db.session.query(OrganizationMaster)
+        .filter(OrganizationMaster.delete_flag == False)
+        .order_by(OrganizationMaster.organization_id.asc())
+        .all()
+    )
+    devices = (
+        db.session.query(DeviceMaster)
+        .filter(DeviceMaster.delete_flag == False)
+        .order_by(DeviceMaster.device_id.asc())
+        .all()
+    )
+    return {
+        'measurement_items': measurement_items,
+        'organizations': organizations,
+        'devices': devices,
+    }
+
+
+def get_measurement_item_column_name(measurement_item_id):
+    """測定項目のシルバー層カラム名を取得する
+
+    Returns:
+        str or None: silver_data_column_name。測定項目が存在しない場合は None
+    """
+    from iot_app.models.measurement import MeasurementItemMaster
+    item = db.session.query(MeasurementItemMaster).filter_by(
+        measurement_item_id=measurement_item_id
+    ).first()
+    return item.silver_data_column_name if item else None
 
 
 # ============================================================
