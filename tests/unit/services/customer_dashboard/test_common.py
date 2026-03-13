@@ -310,9 +310,9 @@ class TestGetDashboards:
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == DashboardMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -407,9 +407,9 @@ class TestGetFirstDashboard:
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == DashboardMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -557,9 +557,9 @@ class TestCheckDashboardAccess:
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == DashboardMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -1056,9 +1056,9 @@ class TestCheckGroupAccess:
 
         # Assert
         filter_args = mock_db.session.query.return_value.join.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == DashboardMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -1299,9 +1299,9 @@ class TestCheckGadgetAccess:
             .join.return_value
             .filter.call_args[0]
         )
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == DashboardMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -1936,9 +1936,9 @@ class TestGetOrganizations:
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
         assert in_expr.left == OrganizationMaster.organization_id
-        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+        assert in_expr.right.value == [1, 2]
 
 
 # ---------------------------------------------------------------------------

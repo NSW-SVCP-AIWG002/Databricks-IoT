@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField
+from wtforms import HiddenField, StringField
 from wtforms.validators import DataRequired, Length
 
 
@@ -14,6 +14,7 @@ class DashboardForm(FlaskForm):
 
 
 class DashboardGroupForm(FlaskForm):
+    dashboard_uuid = HiddenField('dashboard_uuid')
     dashboard_group_name = StringField(
         'ダッシュボードグループ名',
         validators=[
