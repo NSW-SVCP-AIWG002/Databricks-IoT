@@ -12,6 +12,7 @@
 import csv
 import io
 import logging
+import sys
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -20,6 +21,10 @@ import pytest
 from iot_app.services.customer_dashboard.timeline_service import (
     format_timeline_data,
     generate_timeline_csv,
+    get_accessible_org_ids,
+    get_active_gadgets_in_scope,
+    get_chart_column_names,
+    get_gadget_in_scope,
     validate_chart_params,
     validate_gadget_registration,
 )
@@ -1173,3 +1178,274 @@ class TestTimelineServiceLogging:
         # ログメッセージ本文にセンサーの具体値が埋め込まれていないことを確認
         # TODO: 設計書に「エラーメッセージにセンサー値を含めない」の明示はないため要確認
         assert secret_value not in log_text
+
+
+# ============================================================
+# TestGetAccessibleOrgIds
+# 観点: 2.1.1 正常取得、2.1.2 結果なし（空リスト）
+# ============================================================
+
+@pytest.mark.unit
+class TestGetAccessibleOrgIds:
+    """organization_closure からアクセス可能な組織IDリスト取得
+    観点: 2.1.1 正常取得、2.1.2 結果なし
+    仕様: workflow-specification.md > データスコープ制御
+    """
+
+    def _patch_org_module(self):
+        """OrganizationClosure を持つモック組織モジュールを返すヘルパー"""
+        mock_org_module = MagicMock()
+        mock_org_module.OrganizationClosure = MagicMock()
+        return mock_org_module
+
+    def test_returns_subsidiary_org_ids(self):
+        """2.1.1: organization_closure に配下組織が存在する場合、IDリストが返る"""
+        # Arrange
+        mock_org_module = self._patch_org_module()
+        with patch.dict(sys.modules, {'iot_app.models.organization': mock_org_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.query.return_value.filter.return_value.all.return_value = [
+                    (10,), (20,), (30,),
+                ]
+
+                # Act
+                result = get_accessible_org_ids(org_id=1)
+
+        # Assert
+        assert result == [10, 20, 30]
+
+    def test_returns_empty_list_when_no_subsidiaries(self):
+        """2.1.2: 配下組織が存在しない場合、空リストが返る"""
+        # Arrange
+        mock_org_module = self._patch_org_module()
+        with patch.dict(sys.modules, {'iot_app.models.organization': mock_org_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
+
+                # Act
+                result = get_accessible_org_ids(org_id=99)
+
+        # Assert
+        assert result == []
+
+    def test_query_uses_given_org_id(self):
+        """2.1.3: 指定した org_id が DB クエリに渡される"""
+        # Arrange
+        mock_org_module = self._patch_org_module()
+        with patch.dict(sys.modules, {'iot_app.models.organization': mock_org_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.query.return_value.filter.return_value.all.return_value = [(5,)]
+
+                # Act
+                get_accessible_org_ids(org_id=42)
+
+        # Assert: db.session.query が呼ばれたことを確認（内部で filter/all が呼ばれる）
+        mock_db.session.query.assert_called_once()
+
+
+# ============================================================
+# TestGetGadgetInScope
+# 観点: 2.2.1 スコープ内取得、2.2.2 スコープ外はNone、2.2.3 論理削除除外
+# ============================================================
+
+@pytest.mark.unit
+class TestGetGadgetInScope:
+    """スコープチェック込みガジェット取得
+    観点: 2.2.1 スコープ内取得、2.2.2 スコープ外はNone、2.2.3 論理削除除外
+    仕様: workflow-specification.md > データスコープ制御
+    """
+
+    def test_returns_gadget_when_in_scope(self):
+        """2.2.1: アクセス可能な組織に属するガジェットが存在する場合、ガジェットが返る"""
+        # Arrange
+        mock_gadget = MagicMock()
+        mock_gadget.gadget_uuid = 'aaaaaaaa-0000-0000-0000-000000000001'
+
+        with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+            (mock_db.session.query.return_value
+             .join.return_value
+             .join.return_value
+             .filter.return_value
+             .first.return_value) = mock_gadget
+
+            # Act
+            result = get_gadget_in_scope(
+                gadget_uuid='aaaaaaaa-0000-0000-0000-000000000001',
+                accessible_org_ids=[1, 2, 3],
+            )
+
+        # Assert
+        assert result is mock_gadget
+
+    def test_returns_none_when_out_of_scope(self):
+        """2.2.2: アクセス可能な組織に属さない場合（スコープ外）、None が返る"""
+        # Arrange
+        with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+            (mock_db.session.query.return_value
+             .join.return_value
+             .join.return_value
+             .filter.return_value
+             .first.return_value) = None
+
+            # Act
+            result = get_gadget_in_scope(
+                gadget_uuid='ffffffff-0000-0000-0000-000000000000',
+                accessible_org_ids=[1, 2],
+            )
+
+        # Assert
+        assert result is None
+
+    def test_returns_none_for_empty_accessible_org_ids(self):
+        """2.2.3: アクセス可能な組織IDリストが空の場合、None が返る"""
+        # Arrange
+        with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+            (mock_db.session.query.return_value
+             .join.return_value
+             .join.return_value
+             .filter.return_value
+             .first.return_value) = None
+
+            # Act
+            result = get_gadget_in_scope(
+                gadget_uuid='aaaaaaaa-0000-0000-0000-000000000001',
+                accessible_org_ids=[],
+            )
+
+        # Assert
+        assert result is None
+
+
+# ============================================================
+# TestGetActiveGadgetsInScope
+# 観点: 2.3.1 一覧取得・display_order順、2.3.2 スコープ外は含まない
+# ============================================================
+
+@pytest.mark.unit
+class TestGetActiveGadgetsInScope:
+    """アクティブなガジェット一覧取得（スコープ制限付き）
+    観点: 2.3.1 一覧取得・display_order順、2.3.2 スコープ外は含まない
+    仕様: workflow-specification.md > ダッシュボード初期表示
+    """
+
+    def test_returns_gadgets_ordered_by_display_order(self):
+        """2.3.1: ガジェット一覧が display_order 昇順で返る"""
+        # Arrange
+        mock_gadget_1 = MagicMock()
+        mock_gadget_1.display_order = 1
+        mock_gadget_2 = MagicMock()
+        mock_gadget_2.display_order = 2
+
+        with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+            (mock_db.session.query.return_value
+             .join.return_value
+             .join.return_value
+             .filter.return_value
+             .order_by.return_value
+             .all.return_value) = [mock_gadget_1, mock_gadget_2]
+
+            # Act
+            result = get_active_gadgets_in_scope(accessible_org_ids=[1, 2])
+
+        # Assert
+        assert result == [mock_gadget_1, mock_gadget_2]
+        assert result[0].display_order == 1
+        assert result[1].display_order == 2
+
+    def test_returns_empty_list_when_no_gadgets_in_scope(self):
+        """2.3.2: スコープ内にガジェットが存在しない場合、空リストが返る"""
+        # Arrange
+        with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+            (mock_db.session.query.return_value
+             .join.return_value
+             .join.return_value
+             .filter.return_value
+             .order_by.return_value
+             .all.return_value) = []
+
+            # Act
+            result = get_active_gadgets_in_scope(accessible_org_ids=[99])
+
+        # Assert
+        assert result == []
+
+
+# ============================================================
+# TestGetChartColumnNames
+# 観点: 2.4.1 正常取得、2.4.2 測定項目未検出→NotFoundError
+# ============================================================
+
+@pytest.mark.unit
+class TestGetChartColumnNames:
+    """chart_config から左右シルバー層カラム名取得
+    観点: 2.4.1 正常取得、2.4.2 測定項目未検出→NotFoundError
+    仕様: workflow-specification.md > ガジェットデータ取得 > 処理詳細
+    """
+
+    def _patch_measurement_module(self):
+        """MeasurementItem を持つモック測定モジュールを返すヘルパー"""
+        mock_measurement_module = MagicMock()
+        mock_measurement_module.MeasurementItem = MagicMock()
+        return mock_measurement_module
+
+    def _make_gadget(self, left_item_id=1, right_item_id=2):
+        """chart_config を持つモックガジェットを返すヘルパー"""
+        import json
+        mock_gadget = MagicMock()
+        mock_gadget.chart_config = json.dumps({
+            'left_item_id': left_item_id,
+            'right_item_id': right_item_id,
+        })
+        return mock_gadget
+
+    def test_returns_left_and_right_column_names(self):
+        """2.4.1: 両方の測定項目が存在する場合、(left_col, right_col) のタプルが返る"""
+        # Arrange
+        mock_left_item = MagicMock()
+        mock_left_item.silver_data_column_name = 'external_temp'
+        mock_right_item = MagicMock()
+        mock_right_item.silver_data_column_name = 'compressor_freezer_1'
+
+        gadget = self._make_gadget(left_item_id=1, right_item_id=2)
+
+        mock_measurement_module = self._patch_measurement_module()
+        with patch.dict(sys.modules, {'iot_app.models.measurement': mock_measurement_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.get.side_effect = [mock_left_item, mock_right_item]
+
+                # Act
+                left_col, right_col = get_chart_column_names(gadget)
+
+        # Assert
+        assert left_col == 'external_temp'
+        assert right_col == 'compressor_freezer_1'
+
+    def test_raises_not_found_error_when_left_item_missing(self):
+        """2.4.2: 左表示項目の MeasurementItem が存在しない場合、NotFoundError が発生する"""
+        from iot_app.common.exceptions import NotFoundError
+
+        gadget = self._make_gadget(left_item_id=999, right_item_id=2)
+
+        mock_measurement_module = self._patch_measurement_module()
+        with patch.dict(sys.modules, {'iot_app.models.measurement': mock_measurement_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.get.side_effect = [None, MagicMock()]
+
+                # Act / Assert
+                with pytest.raises(NotFoundError):
+                    get_chart_column_names(gadget)
+
+    def test_raises_not_found_error_when_right_item_missing(self):
+        """2.4.3: 右表示項目の MeasurementItem が存在しない場合、NotFoundError が発生する"""
+        from iot_app.common.exceptions import NotFoundError
+
+        gadget = self._make_gadget(left_item_id=1, right_item_id=999)
+
+        mock_measurement_module = self._patch_measurement_module()
+        with patch.dict(sys.modules, {'iot_app.models.measurement': mock_measurement_module}):
+            with patch('iot_app.services.customer_dashboard.timeline_service.db') as mock_db:
+                mock_db.session.get.side_effect = [MagicMock(), None]
+
+                # Act / Assert
+                with pytest.raises(NotFoundError):
+                    get_chart_column_names(gadget)

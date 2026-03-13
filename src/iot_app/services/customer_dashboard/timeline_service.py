@@ -19,12 +19,124 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.models.dashboard import DashboardGadgetMaster
+from iot_app.models.dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster
 
 logger = get_logger(__name__)
 
 _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 _ALLOWED_GADGET_SIZES = {'2x2', '2x4'}
+
+
+# ---------------------------------------------------------------------------
+# データスコープ・ガジェット取得
+# ---------------------------------------------------------------------------
+
+def get_accessible_org_ids(org_id):
+    """organization_closure からアクセス可能な組織IDリストを取得する
+
+    Args:
+        org_id: 親組織ID（current_user.organization_id）
+
+    Returns:
+        list[int]: アクセス可能な組織IDリスト
+    """
+    from iot_app.models.organization import OrganizationClosure
+    rows = db.session.query(
+        OrganizationClosure.subsidiary_organization_id
+    ).filter(
+        OrganizationClosure.parent_organization_id == org_id
+    ).all()
+    return [r[0] for r in rows]
+
+
+def get_gadget_in_scope(gadget_uuid, accessible_org_ids):
+    """スコープチェック込みでガジェットを取得する
+
+    DashboardGadgetMaster → DashboardGroupMaster → DashboardMaster → organization_id の
+    経路でアクセス可能な組織に属するガジェットのみ返す。
+
+    Args:
+        gadget_uuid (str): ガジェット UUID
+        accessible_org_ids (list[int]): アクセス可能な組織IDリスト
+
+    Returns:
+        DashboardGadgetMaster | None: アクセス可能なガジェット、または None
+    """
+    return db.session.query(DashboardGadgetMaster).join(
+        DashboardGroupMaster,
+        DashboardGadgetMaster.dashboard_group_id == DashboardGroupMaster.dashboard_group_id,
+    ).join(
+        DashboardMaster,
+        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
+    ).filter(
+        DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+        DashboardGadgetMaster.delete_flag == False,
+        DashboardGroupMaster.delete_flag == False,
+        DashboardMaster.delete_flag == False,
+        DashboardMaster.organization_id.in_(accessible_org_ids),
+    ).first()
+
+
+def get_active_gadgets_in_scope(accessible_org_ids):
+    """アクセス可能な組織に属するガジェット一覧を表示順で取得する
+
+    Args:
+        accessible_org_ids (list[int]): アクセス可能な組織IDリスト
+
+    Returns:
+        list[DashboardGadgetMaster]: ガジェット一覧（display_order昇順）
+    """
+    return db.session.query(DashboardGadgetMaster).join(
+        DashboardGroupMaster,
+        DashboardGadgetMaster.dashboard_group_id == DashboardGroupMaster.dashboard_group_id,
+    ).join(
+        DashboardMaster,
+        DashboardGroupMaster.dashboard_id == DashboardMaster.dashboard_id,
+    ).filter(
+        DashboardGadgetMaster.delete_flag == False,
+        DashboardGroupMaster.delete_flag == False,
+        DashboardMaster.delete_flag == False,
+        DashboardMaster.organization_id.in_(accessible_org_ids),
+    ).order_by(DashboardGadgetMaster.display_order.asc()).all()
+
+
+def get_chart_column_names(gadget):
+    """ガジェットの chart_config から左右のシルバー層カラム名を取得する
+
+    Args:
+        gadget (DashboardGadgetMaster): ガジェットオブジェクト
+
+    Returns:
+        tuple[str, str]: (left_column_name, right_column_name)
+
+    Raises:
+        NotFoundError: 測定項目が存在しない場合
+    """
+    from iot_app.models.measurement import MeasurementItem
+    chart_config = json.loads(gadget.chart_config)
+    left_item  = db.session.get(MeasurementItem, chart_config['left_item_id'])
+    right_item = db.session.get(MeasurementItem, chart_config['right_item_id'])
+    if left_item is None or right_item is None:
+        raise NotFoundError('測定項目が見つかりません')
+    return left_item.silver_data_column_name, right_item.silver_data_column_name
+
+
+def check_device_in_scope(device_id, accessible_org_ids):
+    """デバイスがスコープ内に存在するか確認する
+
+    Args:
+        device_id (int): デバイスID
+        accessible_org_ids (list[int]): アクセス可能な組織IDリスト
+
+    Returns:
+        DeviceMaster | None: スコープ内のデバイス、または None
+    """
+    from iot_app.models.device import DeviceMaster
+    return db.session.query(DeviceMaster).filter(
+        DeviceMaster.device_id == device_id,
+        DeviceMaster.organization_id.in_(accessible_org_ids),
+        DeviceMaster.delete_flag == False,
+    ).first()
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +467,77 @@ def register_gadget(params, current_user_id=0):
         raise
 
     return gadget.gadget_id
+
+
+# ---------------------------------------------------------------------------
+# get_timeline_create_context
+# ---------------------------------------------------------------------------
+
+def get_timeline_create_context(accessible_org_ids, current_user_id):
+    """時系列グラフガジェット登録モーダル用データを取得する
+
+    Args:
+        accessible_org_ids (list): アクセス可能な組織IDリスト
+        current_user_id (int): 現在のユーザーID
+
+    Returns:
+        dict: measurement_items, organizations, devices, groups をキーに持つ dict
+
+    Raises:
+        NotFoundError: ユーザー設定またはダッシュボードが存在しない場合
+    """
+    from sqlalchemy import text
+    from iot_app.models.measurement import MeasurementItem
+    from iot_app.models.organization import OrganizationMaster
+    from iot_app.models.device import DeviceMaster
+
+    # ① ダッシュボードユーザー設定取得
+    user_setting_row = db.session.execute(
+        text('SELECT dashboard_id FROM dashboard_user_setting WHERE user_id = :uid AND delete_flag = FALSE'),
+        {'uid': current_user_id},
+    ).first()
+    if user_setting_row is None:
+        raise NotFoundError('ダッシュボードユーザー設定が見つかりません')
+    dashboard_id = user_setting_row[0]
+
+    # ② ダッシュボード情報取得（スコープ確認）
+    dashboard = db.session.query(DashboardMaster).filter(
+        DashboardMaster.dashboard_id == dashboard_id,
+        DashboardMaster.organization_id.in_(accessible_org_ids),
+        DashboardMaster.delete_flag == False,
+    ).first()
+    if dashboard is None:
+        raise NotFoundError('ダッシュボードが見つかりません')
+
+    # ③ 表示項目一覧取得
+    measurement_items = db.session.query(MeasurementItem).filter_by(
+        delete_flag=False
+    ).order_by(MeasurementItem.measurement_item_id.asc()).all()
+
+    # ④ 組織一覧取得
+    organizations = db.session.query(OrganizationMaster).filter(
+        OrganizationMaster.organization_id.in_(accessible_org_ids),
+        OrganizationMaster.delete_flag == False,
+    ).order_by(OrganizationMaster.organization_id.asc()).all()
+
+    # ⑤ デバイス一覧取得
+    devices = db.session.query(DeviceMaster).filter(
+        DeviceMaster.organization_id.in_(accessible_org_ids),
+        DeviceMaster.delete_flag == False,
+    ).order_by(DeviceMaster.device_id.asc()).all()
+
+    # ⑥ ダッシュボードグループ一覧取得（ユーザーのダッシュボードのみ）
+    groups = db.session.query(DashboardGroupMaster).filter(
+        DashboardGroupMaster.dashboard_id == dashboard_id,
+        DashboardGroupMaster.delete_flag == False,
+    ).order_by(DashboardGroupMaster.display_order.asc()).all()
+
+    return {
+        'measurement_items': measurement_items,
+        'organizations': organizations,
+        'devices': devices,
+        'groups': groups,
+    }
 
 
 # ---------------------------------------------------------------------------
