@@ -4,7 +4,7 @@
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 MODULE = 'iot_app.services.customer_dashboard.common'
 
@@ -16,6 +16,18 @@ MODULE = 'iot_app.services.customer_dashboard.common'
 @pytest.mark.unit
 class TestGetAccessibleOrganizations:
     """観点: 3.1.1（フィルタ条件）, 3.1.4（件数）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+        GET  /analysis/customer-dashboard/dashboards（管理モーダル）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/switch
+        POST /analysis/customer-dashboard/dashboards/<uuid>/update
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete
+        POST /analysis/customer-dashboard/groups/register
+        POST /analysis/customer-dashboard/groups/<uuid>/update
+        POST /analysis/customer-dashboard/groups/<uuid>/delete
+        POST /analysis/customer-dashboard/gadgets/<uuid>/update
+        POST /analysis/customer-dashboard/gadgets/<uuid>/delete
 
     ワークフロー仕様書 § ダッシュボード初期表示 ② データスコープ制限の適用
     organization_closure テーブルから subsidiary_organization_id を取得する
@@ -67,6 +79,9 @@ class TestGetAccessibleOrganizations:
 
         # Assert
         mock_db.session.query.assert_called_once_with(OrganizationClosure.subsidiary_organization_id)
+        filter_expr = mock_db.session.query.return_value.filter.call_args[0][0]
+        assert filter_expr.left == OrganizationClosure.parent_organization_id
+        assert filter_expr.right.value == 3
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +91,9 @@ class TestGetAccessibleOrganizations:
 @pytest.mark.unit
 class TestGetDashboardUserSetting:
     """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ③ ダッシュボードユーザー設定取得
     user_id に一致する dashboard_user_setting レコードを返す
@@ -91,7 +109,7 @@ class TestGetDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import get_dashboard_user_setting
 
         # Act
-        result = get_dashboard_user_setting('user-001')
+        result = get_dashboard_user_setting(1)
 
         # Assert
         assert result is mock_setting
@@ -104,7 +122,51 @@ class TestGetDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import get_dashboard_user_setting
 
         # Act
-        result = get_dashboard_user_setting('user-not-exist')
+        result = get_dashboard_user_setting(999)
+
+        # Assert
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_dashboard_by_id
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetDashboardById:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+
+    ワークフロー仕様書 § ダッシュボード初期表示 ④ ダッシュボード情報取得
+    dashboard_id に一致する dashboard_master レコードを返す（PKルックアップ、スコープ制限なし）
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_dashboard_when_found(self, mock_db):
+        """2.2.1 dashboard_id に一致するレコードを返す"""
+        # Arrange
+        mock_dashboard = MagicMock()
+        mock_dashboard.dashboard_id = 1
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_dashboard
+        from iot_app.services.customer_dashboard.common import get_dashboard_by_id
+
+        # Act
+        result = get_dashboard_by_id(1)
+
+        # Assert
+        assert result is mock_dashboard
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """2.2.2 存在しない dashboard_id の場合: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_dashboard_by_id
+
+        # Act
+        result = get_dashboard_by_id(999)
 
         # Assert
         assert result is None
@@ -118,6 +180,11 @@ class TestGetDashboardUserSetting:
 class TestUpsertDashboardUserSetting:
     """観点: 3.2.1.1（新規登録）, 3.3.1.1（更新）
 
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/register（登録後のユーザー設定更新）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/switch（表示切替）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（次ダッシュボードあり時）
+
     ワークフロー仕様書 § ダッシュボード登録 ② ユーザー設定更新
     INSERT ON DUPLICATE KEY UPDATE パターン（UPSERT）
     """
@@ -130,15 +197,16 @@ class TestUpsertDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import upsert_dashboard_user_setting
 
         # Act
-        upsert_dashboard_user_setting('user-001', 1)
+        upsert_dashboard_user_setting(1, 1)
 
         # Assert
         mock_db.session.add.assert_called_once()
         added_obj = mock_db.session.add.call_args[0][0]
+        assert added_obj.dashboard_id == 1
         assert added_obj.organization_id == 0
         assert added_obj.device_id == 0
-        assert added_obj.creator == 'user-001'
-        assert added_obj.modifier == 'user-001'
+        assert added_obj.creator == 1
+        assert added_obj.modifier == 1
 
     @patch(f'{MODULE}.db')
     def test_updates_when_existing_setting(self, mock_db):
@@ -150,7 +218,7 @@ class TestUpsertDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import upsert_dashboard_user_setting
 
         # Act
-        upsert_dashboard_user_setting('user-001', 99)
+        upsert_dashboard_user_setting(1, 99)
 
         # Assert
         assert mock_setting.dashboard_id == 99
@@ -164,6 +232,10 @@ class TestUpsertDashboardUserSetting:
 @pytest.mark.unit
 class TestGetDashboards:
     """観点: 3.1.1.1（フィルタ条件）, 3.1.4.1/3.1.4.2（件数）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+        GET  /analysis/customer-dashboard/dashboards（管理モーダル）
 
     ワークフロー仕様書 § ダッシュボード管理モーダル表示 ① ダッシュボード一覧取得
     accessible_org_ids でスコープ制限し dashboard_id 昇順に返す
@@ -220,6 +292,28 @@ class TestGetDashboards:
         assert result == []
         mock_db.session.query.assert_not_called()
 
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+        # Arrange
+        (
+            mock_db.session.query.return_value
+            .filter.return_value
+            .order_by.return_value
+            .all.return_value
+        ) = []
+        from iot_app.services.customer_dashboard.common import get_dashboards
+        from iot_app.models.customer_dashboard import DashboardMaster
+
+        # Act
+        get_dashboards([1, 2])
+
+        # Assert
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == DashboardMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+
 
 # ---------------------------------------------------------------------------
 # get_first_dashboard
@@ -228,6 +322,10 @@ class TestGetDashboards:
 @pytest.mark.unit
 class TestGetFirstDashboard:
     """観点: 3.1.4.1/3.1.4.2（件数）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示・ユーザー設定なし時）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（削除後の次ダッシュボード取得）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ④
     ユーザー設定なし時に dashboard_id 昇順の先頭ダッシュボードを返す
@@ -291,6 +389,28 @@ class TestGetFirstDashboard:
         assert result is mock_dash
         assert mock_db.session.query.return_value.filter.return_value.filter.called
 
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+        # Arrange
+        (
+            mock_db.session.query.return_value
+            .filter.return_value
+            .order_by.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import get_first_dashboard
+        from iot_app.models.customer_dashboard import DashboardMaster
+
+        # Act
+        get_first_dashboard([1, 2])
+
+        # Assert
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == DashboardMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+
 
 # ---------------------------------------------------------------------------
 # get_active_dashboard
@@ -299,6 +419,9 @@ class TestGetFirstDashboard:
 @pytest.mark.unit
 class TestGetActiveDashboard:
     """観点: 2.2.1/2.2.2/2.2.3（ユーザー設定の有無・ダッシュボードの有無）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 アクティブダッシュボード決定
     ユーザー設定あり→設定値を返す、なし→先頭ダッシュボードを返す、どちらもなし→None
@@ -356,6 +479,12 @@ class TestGetActiveDashboard:
 @pytest.mark.unit
 class TestCheckDashboardAccess:
     """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/switch（スコープチェック）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/update（スコープチェック）
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（スコープチェック）
+        POST /analysis/customer-dashboard/groups/register（スコープチェック）
 
     ワークフロー仕様書 § ダッシュボード表示切替 データスコープ制限チェック
     dashboard_uuid と accessible_org_ids が一致するレコードを返す
@@ -415,6 +544,23 @@ class TestCheckDashboardAccess:
         # Assert
         assert result is None
 
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import check_dashboard_access
+        from iot_app.models.customer_dashboard import DashboardMaster
+
+        # Act
+        check_dashboard_access('dash-uuid-001', [1, 2])
+
+        # Assert
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == DashboardMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+
 
 # ---------------------------------------------------------------------------
 # create_dashboard
@@ -423,6 +569,9 @@ class TestCheckDashboardAccess:
 @pytest.mark.unit
 class TestCreateDashboard:
     """観点: 3.2.1.1（登録）, 3.2.2.1（uuid・監査項目の自動設定）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/register
 
     ワークフロー仕様書 § ダッシュボード登録 ① ダッシュボード登録
     dashboard_uuid, creator, modifier を自動付与して INSERT する
@@ -435,7 +584,7 @@ class TestCreateDashboard:
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id='user-001')
+        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
 
         # Assert
         mock_db.session.add.assert_called_once()
@@ -447,7 +596,7 @@ class TestCreateDashboard:
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id='user-001')
+        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
@@ -461,12 +610,12 @@ class TestCreateDashboard:
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id='user-001')
+        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
-        assert added_obj.creator == 'user-001'
-        assert added_obj.modifier == 'user-001'
+        assert added_obj.creator == 1
+        assert added_obj.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +625,9 @@ class TestCreateDashboard:
 @pytest.mark.unit
 class TestUpdateDashboardTitle:
     """観点: 3.3.1.1（更新）, 3.3.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/update
 
     ワークフロー仕様書 § ダッシュボードタイトル更新
     ダッシュボード名と modifier を更新する（楽観ロック検証はView層で実施）
@@ -488,7 +640,7 @@ class TestUpdateDashboardTitle:
         from iot_app.services.customer_dashboard.common import update_dashboard_title
 
         # Act
-        update_dashboard_title(mock_dashboard, name='新しいタイトル', modifier='user-001')
+        update_dashboard_title(mock_dashboard, name='新しいタイトル', modifier=1)
 
         # Assert
         assert mock_dashboard.dashboard_name == '新しいタイトル'
@@ -500,10 +652,10 @@ class TestUpdateDashboardTitle:
         from iot_app.services.customer_dashboard.common import update_dashboard_title
 
         # Act
-        update_dashboard_title(mock_dashboard, name='タイトル', modifier='user-001')
+        update_dashboard_title(mock_dashboard, name='タイトル', modifier=1)
 
         # Assert
-        assert mock_dashboard.modifier == 'user-001'
+        assert mock_dashboard.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +665,9 @@ class TestUpdateDashboardTitle:
 @pytest.mark.unit
 class TestDeleteDashboardUserSetting:
     """観点: 3.4.1.1（論理削除）, 3.4.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（次ダッシュボードなし時）
 
     ワークフロー仕様書 § ダッシュボード削除 ユーザー設定削除
     dashboard_user_setting を論理削除する（delete_flag = True）
@@ -527,7 +682,7 @@ class TestDeleteDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import delete_dashboard_user_setting
 
         # Act
-        delete_dashboard_user_setting(user_id='user-001', modifier='user-001')
+        delete_dashboard_user_setting(user_id=1, modifier=1)
 
         # Assert
         assert mock_setting.delete_flag is True
@@ -541,10 +696,10 @@ class TestDeleteDashboardUserSetting:
         from iot_app.services.customer_dashboard.common import delete_dashboard_user_setting
 
         # Act
-        delete_dashboard_user_setting(user_id='user-001', modifier='user-001')
+        delete_dashboard_user_setting(user_id=1, modifier=1)
 
         # Assert
-        assert mock_setting.modifier == 'user-001'
+        assert mock_setting.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -554,6 +709,9 @@ class TestDeleteDashboardUserSetting:
 @pytest.mark.unit
 class TestDeleteDashboardWithCascade:
     """観点: 3.4.1.1（論理削除）, 3.4.4（次ダッシュボードへの切替）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete
 
     ワークフロー仕様書 § ダッシュボード削除
     配下のガジェット・グループを論理削除後、ダッシュボードを論理削除する。
@@ -566,7 +724,7 @@ class TestDeleteDashboardWithCascade:
     @patch(f'{MODULE}.upsert_dashboard_user_setting')
     @patch(f'{MODULE}.delete_dashboard_user_setting')
     def test_cascade_deletes_gadgets_and_groups(
-        self, mock_del_setting, mock_upsert, mock_get_first, mock_del_groups, mock_del_gadgets
+        self, _mock_del_setting, _mock_upsert, mock_get_first, mock_del_groups, mock_del_gadgets
     ):
         """3.4.1.1 配下のガジェット・グループを論理削除する"""
         # Arrange
@@ -576,11 +734,11 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id='user-001')
+        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
 
         # Assert
-        mock_del_gadgets.assert_called_once_with(dashboard_id=1, modifier='user-001')
-        mock_del_groups.assert_called_once_with(dashboard_id=1, modifier='user-001')
+        mock_del_gadgets.assert_called_once_with(dashboard_id=1, modifier=1)
+        mock_del_groups.assert_called_once_with(dashboard_id=1, modifier=1)
         mock_get_first.assert_called_once_with([1], exclude_id=1)
 
     @patch(f'{MODULE}.delete_gadgets_by_dashboard')
@@ -589,7 +747,7 @@ class TestDeleteDashboardWithCascade:
     @patch(f'{MODULE}.upsert_dashboard_user_setting')
     @patch(f'{MODULE}.delete_dashboard_user_setting')
     def test_sets_delete_flag_on_dashboard(
-        self, mock_del_setting, mock_upsert, mock_get_first, mock_del_groups, mock_del_gadgets
+        self, _mock_del_setting, _mock_upsert, mock_get_first, _mock_del_groups, _mock_del_gadgets
     ):
         """3.4.1.1 ダッシュボードの delete_flag を True に設定する"""
         # Arrange
@@ -599,11 +757,11 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id='user-001')
+        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
 
         # Assert
         assert mock_dashboard.delete_flag is True
-        assert mock_dashboard.modifier == 'user-001'
+        assert mock_dashboard.modifier == 1
         mock_get_first.assert_called_once_with([1], exclude_id=1)
 
     @patch(f'{MODULE}.delete_gadgets_by_dashboard')
@@ -612,7 +770,7 @@ class TestDeleteDashboardWithCascade:
     @patch(f'{MODULE}.upsert_dashboard_user_setting')
     @patch(f'{MODULE}.delete_dashboard_user_setting')
     def test_switches_to_next_dashboard_when_exists(
-        self, mock_del_setting, mock_upsert, mock_get_first, mock_del_groups, mock_del_gadgets
+        self, mock_del_setting, mock_upsert, mock_get_first, _mock_del_groups, _mock_del_gadgets
     ):
         """3.4.4 次のダッシュボードがある場合: ユーザー設定を更新する"""
         # Arrange
@@ -624,11 +782,11 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id='user-001')
+        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
 
         # Assert
         mock_get_first.assert_called_once_with([1], exclude_id=1)
-        mock_upsert.assert_called_once_with('user-001', 2)
+        mock_upsert.assert_called_once_with(1, 2)
         mock_del_setting.assert_not_called()
 
     @patch(f'{MODULE}.delete_gadgets_by_dashboard')
@@ -637,7 +795,7 @@ class TestDeleteDashboardWithCascade:
     @patch(f'{MODULE}.upsert_dashboard_user_setting')
     @patch(f'{MODULE}.delete_dashboard_user_setting')
     def test_deletes_user_setting_when_no_next_dashboard(
-        self, mock_del_setting, mock_upsert, mock_get_first, mock_del_groups, mock_del_gadgets
+        self, mock_del_setting, mock_upsert, mock_get_first, _mock_del_groups, _mock_del_gadgets
     ):
         """3.4.4 次のダッシュボードがない場合: ユーザー設定を論理削除する"""
         # Arrange
@@ -647,11 +805,11 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id='user-001')
+        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
 
         # Assert
         mock_get_first.assert_called_once_with([1], exclude_id=1)
-        mock_del_setting.assert_called_once_with(user_id='user-001', modifier='user-001')
+        mock_del_setting.assert_called_once_with(user_id=1, modifier=1)
         mock_upsert.assert_not_called()
 
 
@@ -662,6 +820,9 @@ class TestDeleteDashboardWithCascade:
 @pytest.mark.unit
 class TestGetDashboardGroups:
     """観点: 3.1.1.1（フィルタ条件）, 3.1.4.1/3.1.4.2（件数）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ⑤ ダッシュボードグループ一覧取得
     dashboard_id に紐づくグループを display_order 昇順で返す
@@ -734,6 +895,9 @@ class TestGetDashboardGroups:
 class TestCreateDashboardGroup:
     """観点: 3.2.1.1（登録）, 3.2.2.1（uuid・監査項目の自動設定）
 
+    使用ルート:
+        POST /analysis/customer-dashboard/groups/register
+
     ワークフロー仕様書 § ダッシュボードグループ登録 ① ダッシュボードグループ登録
     """
 
@@ -747,7 +911,7 @@ class TestCreateDashboardGroup:
         create_dashboard_group(
             group_name='グループA',
             dashboard_id=1,
-            user_id='user-001',
+            user_id=1,
         )
 
         # Assert
@@ -760,12 +924,12 @@ class TestCreateDashboardGroup:
         from iot_app.services.customer_dashboard.common import create_dashboard_group
 
         # Act
-        create_dashboard_group('グループA', dashboard_id=1, user_id='user-001')
+        create_dashboard_group('グループA', dashboard_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
-        assert added_obj.creator == 'user-001'
-        assert added_obj.modifier == 'user-001'
+        assert added_obj.creator == 1
+        assert added_obj.modifier == 1
 
     @patch(f'{MODULE}.db')
     def test_sets_uuid_automatically(self, mock_db):
@@ -774,7 +938,7 @@ class TestCreateDashboardGroup:
         from iot_app.services.customer_dashboard.common import create_dashboard_group
 
         # Act
-        create_dashboard_group('グループA', dashboard_id=1, user_id='user-001')
+        create_dashboard_group('グループA', dashboard_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
@@ -789,7 +953,7 @@ class TestCreateDashboardGroup:
         from iot_app.services.customer_dashboard.common import create_dashboard_group
 
         # Act
-        create_dashboard_group('グループA', dashboard_id=1, user_id='user-001')
+        create_dashboard_group('グループA', dashboard_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
@@ -799,15 +963,102 @@ class TestCreateDashboardGroup:
     def test_sets_display_order_to_one_when_no_groups_exist(self, mock_db):
         """3.2.2.1 グループが存在しない場合: display_order を 1 に設定する"""
         # Arrange
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 0
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
         from iot_app.services.customer_dashboard.common import create_dashboard_group
 
         # Act
-        create_dashboard_group('グループA', dashboard_id=1, user_id='user-001')
+        create_dashboard_group('グループA', dashboard_id=1, user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
         assert added_obj.display_order == 1
+
+
+# ---------------------------------------------------------------------------
+# check_group_access
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestCheckGroupAccess:
+    """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/groups/<uuid>/update（スコープチェック）
+        POST /analysis/customer-dashboard/groups/<uuid>/delete（スコープチェック）
+
+    ワークフロー仕様書 § ダッシュボードグループタイトル更新 ③ データスコープ制限チェック
+    dashboard_group_uuid と accessible_org_ids が一致するレコードを返す
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_group_when_accessible(self, mock_db):
+        """2.2.1 / 1.2.1 スコープ内グループ: レコードを返す"""
+        # Arrange
+        mock_group = MagicMock()
+        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = mock_group
+        from iot_app.services.customer_dashboard.common import check_group_access
+
+        # Act
+        result = check_group_access('group-uuid-001', [1, 2])
+
+        # Assert
+        assert result is mock_group
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """2.2.2 グループが存在しない場合: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import check_group_access
+
+        # Act
+        result = check_group_access('no-such-uuid', [1, 2])
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_out_of_scope(self, mock_db):
+        """1.2.2 アクセス可能スコープ外（organization_id 不一致）: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import check_group_access
+
+        # Act
+        result = check_group_access('group-uuid-001', [99])
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_logically_deleted(self, mock_db):
+        """2.2.3 論理削除済み（delete_flag=True）: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import check_group_access
+
+        # Act
+        result = check_group_access('deleted-group-uuid', [1])
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む（JOIN経由）"""
+        # Arrange
+        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import check_group_access
+        from iot_app.models.customer_dashboard import DashboardMaster
+
+        # Act
+        check_group_access('group-uuid-001', [1, 2])
+
+        # Assert
+        filter_args = mock_db.session.query.return_value.join.return_value.filter.call_args[0]
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == DashboardMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -817,6 +1068,9 @@ class TestCreateDashboardGroup:
 @pytest.mark.unit
 class TestUpdateGroupTitle:
     """観点: 3.3.1.1（更新）, 3.3.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/groups/<uuid>/update
 
     ワークフロー仕様書 § グループタイトル更新
     グループ名と modifier を更新する（楽観ロック検証はView層で実施）
@@ -829,7 +1083,7 @@ class TestUpdateGroupTitle:
         from iot_app.services.customer_dashboard.common import update_group_title
 
         # Act
-        update_group_title(mock_group, name='新グループ名', modifier='user-001')
+        update_group_title(mock_group, name='新グループ名', modifier=1)
 
         # Assert
         assert mock_group.dashboard_group_name == '新グループ名'
@@ -841,10 +1095,10 @@ class TestUpdateGroupTitle:
         from iot_app.services.customer_dashboard.common import update_group_title
 
         # Act
-        update_group_title(mock_group, name='グループ名', modifier='user-001')
+        update_group_title(mock_group, name='グループ名', modifier=1)
 
         # Assert
-        assert mock_group.modifier == 'user-001'
+        assert mock_group.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -854,6 +1108,9 @@ class TestUpdateGroupTitle:
 @pytest.mark.unit
 class TestGetGadgetsByGroups:
     """観点: 3.1.4.1（件数）, 3.1.2.1（空入力時の早期リターン）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ⑥ ガジェット一覧取得
     group_ids が空のとき DB アクセスを行わず空リストを返す
@@ -899,6 +1156,9 @@ class TestGetGadgetsByGroups:
 @pytest.mark.unit
 class TestGetGadgetTypes:
     """観点: 3.1.4.1/3.1.4.2（件数）, 3.1.1.1（ソート）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard/gadgets/add（ガジェット追加モーダル）
 
     ワークフロー仕様書 § ガジェット追加モーダル表示
     gadget_type_master から全ガジェット種別を取得する
@@ -950,6 +1210,10 @@ class TestGetGadgetTypes:
 class TestCheckGadgetAccess:
     """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
 
+    使用ルート:
+        POST /analysis/customer-dashboard/gadgets/<uuid>/update（スコープチェック）
+        POST /analysis/customer-dashboard/gadgets/<uuid>/delete（スコープチェック）
+
     ワークフロー仕様書 § ガジェット削除 / ガジェットタイトル更新 スコープチェック
     gadget_uuid → group → dashboard → organization の間接参照でスコープを確認する
 
@@ -962,7 +1226,7 @@ class TestCheckGadgetAccess:
         """2.2.1 / 1.2.1 スコープ内ガジェット: レコードを返す"""
         # Arrange
         mock_gadget = MagicMock()
-        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_gadget
+        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = mock_gadget
         from iot_app.services.customer_dashboard.common import check_gadget_access
 
         # Act
@@ -975,7 +1239,7 @@ class TestCheckGadgetAccess:
     def test_returns_none_when_not_found(self, mock_db):
         """2.2.2 ガジェットが存在しない場合: None を返す"""
         # Arrange
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
         from iot_app.services.customer_dashboard.common import check_gadget_access
 
         # Act
@@ -988,7 +1252,7 @@ class TestCheckGadgetAccess:
     def test_returns_none_when_out_of_scope(self, mock_db):
         """1.2.2 アクセス可能スコープ外（organization_id 不一致）: None を返す"""
         # Arrange
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
         from iot_app.services.customer_dashboard.common import check_gadget_access
 
         # Act
@@ -1002,7 +1266,7 @@ class TestCheckGadgetAccess:
         """2.2.3 論理削除済み（delete_flag=True）: None を返す"""
         # Arrange
         # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
         from iot_app.services.customer_dashboard.common import check_gadget_access
 
         # Act
@@ -1010,6 +1274,34 @@ class TestCheckGadgetAccess:
 
         # Assert
         assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む（JOIN経由）"""
+        # Arrange
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import check_gadget_access
+        from iot_app.models.customer_dashboard import DashboardMaster
+
+        # Act
+        check_gadget_access('gadget-uuid-001', [1, 2])
+
+        # Assert
+        filter_args = (
+            mock_db.session.query.return_value
+            .join.return_value
+            .join.return_value
+            .filter.call_args[0]
+        )
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == DashboardMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
 
 
 # ---------------------------------------------------------------------------
@@ -1019,6 +1311,9 @@ class TestCheckGadgetAccess:
 @pytest.mark.unit
 class TestUpdateGadgetTitle:
     """観点: 3.3.1.1（更新）, 3.3.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/gadgets/<uuid>/update
 
     ワークフロー仕様書 § ガジェットタイトル更新
     ガジェット名と modifier を更新する（楽観ロック検証はView層で実施）
@@ -1031,7 +1326,7 @@ class TestUpdateGadgetTitle:
         from iot_app.services.customer_dashboard.common import update_gadget_title
 
         # Act
-        update_gadget_title(mock_gadget, name='新ガジェット名', modifier='user-001')
+        update_gadget_title(mock_gadget, name='新ガジェット名', modifier=1)
 
         # Assert
         assert mock_gadget.gadget_name == '新ガジェット名'
@@ -1043,10 +1338,10 @@ class TestUpdateGadgetTitle:
         from iot_app.services.customer_dashboard.common import update_gadget_title
 
         # Act
-        update_gadget_title(mock_gadget, name='ガジェット名', modifier='user-001')
+        update_gadget_title(mock_gadget, name='ガジェット名', modifier=1)
 
         # Assert
-        assert mock_gadget.modifier == 'user-001'
+        assert mock_gadget.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1056,6 +1351,9 @@ class TestUpdateGadgetTitle:
 @pytest.mark.unit
 class TestDeleteGadget:
     """観点: 3.4.1.1（論理削除）, 3.4.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/gadgets/<uuid>/delete
 
     ワークフロー仕様書 § ガジェット削除
     ガジェットを論理削除する（delete_flag = True）
@@ -1068,7 +1366,7 @@ class TestDeleteGadget:
         from iot_app.services.customer_dashboard.common import delete_gadget
 
         # Act
-        delete_gadget(mock_gadget, modifier='user-001')
+        delete_gadget(mock_gadget, modifier=1)
 
         # Assert
         assert mock_gadget.delete_flag is True
@@ -1080,10 +1378,10 @@ class TestDeleteGadget:
         from iot_app.services.customer_dashboard.common import delete_gadget
 
         # Act
-        delete_gadget(mock_gadget, modifier='user-001')
+        delete_gadget(mock_gadget, modifier=1)
 
         # Assert
-        assert mock_gadget.modifier == 'user-001'
+        assert mock_gadget.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1093,6 +1391,9 @@ class TestDeleteGadget:
 @pytest.mark.unit
 class TestSaveLayout:
     """観点: 2.2.2（対象なし時スキップ）, 3.3.1.1（更新）, 2.3.2（エラー時ロールバック）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/layout/save
 
     ワークフロー仕様書 § レイアウト保存
     各ガジェットの position_x/y, display_order を更新する。
@@ -1113,13 +1414,13 @@ class TestSaveLayout:
         from iot_app.services.customer_dashboard.common import save_layout
 
         # Act
-        save_layout(layout_data, modifier='user-001')
+        save_layout(layout_data, modifier=1)
 
         # Assert
         assert mock_gadget.position_x == 0
         assert mock_gadget.position_y == 1
         assert mock_gadget.display_order == 0
-        assert mock_gadget.modifier == 'user-001'
+        assert mock_gadget.modifier == 1
         # TODO: freezegun導入後に update_date を検証する
 
     @patch(f'{MODULE}.db')
@@ -1135,7 +1436,7 @@ class TestSaveLayout:
         from iot_app.services.customer_dashboard.common import save_layout
 
         # Act
-        save_layout(layout_data, modifier='user-001')
+        save_layout(layout_data, modifier=1)
 
         # Assert
         assert mock_gadget.gadget_size == 0
@@ -1151,7 +1452,7 @@ class TestSaveLayout:
         from iot_app.services.customer_dashboard.common import save_layout
 
         # Act / Assert（例外が発生しないこと）
-        save_layout(layout_data, modifier='user-001')
+        save_layout(layout_data, modifier=1)
 
     @patch(f'{MODULE}.db')
     def test_rollbacks_on_exception(self, mock_db):
@@ -1165,7 +1466,7 @@ class TestSaveLayout:
 
         # Act
         with pytest.raises(Exception):
-            save_layout(layout_data, modifier='user-001')
+            save_layout(layout_data, modifier=1)
 
         # Assert
         mock_db.session.rollback.assert_called_once()
@@ -1178,6 +1479,9 @@ class TestSaveLayout:
 @pytest.mark.unit
 class TestDeleteGadgetsByDashboard:
     """観点: 3.4.1.1（論理削除）, 3.4.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（カスケード削除）
 
     ワークフロー仕様書 § ダッシュボード削除 カスケード削除
     dashboard_id に紐づく全ガジェットを論理削除する
@@ -1198,7 +1502,7 @@ class TestDeleteGadgetsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_dashboard
 
         # Act
-        delete_gadgets_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_gadgets_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
         assert mock_gadget1.delete_flag is True
@@ -1218,10 +1522,10 @@ class TestDeleteGadgetsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_dashboard
 
         # Act
-        delete_gadgets_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_gadgets_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
-        assert mock_gadget.modifier == 'user-001'
+        assert mock_gadget.modifier == 1
         mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
@@ -1237,7 +1541,7 @@ class TestDeleteGadgetsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_dashboard
 
         # Act
-        delete_gadgets_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_gadgets_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
         mock_db.session.commit.assert_called_once()
@@ -1250,6 +1554,9 @@ class TestDeleteGadgetsByDashboard:
 @pytest.mark.unit
 class TestDeleteGroupsByDashboard:
     """観点: 3.4.1.1（論理削除）, 3.4.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/dashboards/<uuid>/delete（カスケード削除）
 
     ワークフロー仕様書 § ダッシュボード削除 カスケード削除
     dashboard_id に紐づく全グループを論理削除する
@@ -1269,7 +1576,7 @@ class TestDeleteGroupsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_groups_by_dashboard
 
         # Act
-        delete_groups_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_groups_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
         assert mock_group1.delete_flag is True
@@ -1288,10 +1595,10 @@ class TestDeleteGroupsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_groups_by_dashboard
 
         # Act
-        delete_groups_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_groups_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
-        assert mock_group.modifier == 'user-001'
+        assert mock_group.modifier == 1
         mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
@@ -1306,7 +1613,7 @@ class TestDeleteGroupsByDashboard:
         from iot_app.services.customer_dashboard.common import delete_groups_by_dashboard
 
         # Act
-        delete_groups_by_dashboard(dashboard_id=1, modifier='user-001')
+        delete_groups_by_dashboard(dashboard_id=1, modifier=1)
 
         # Assert
         mock_db.session.commit.assert_called_once()
@@ -1319,6 +1626,9 @@ class TestDeleteGroupsByDashboard:
 @pytest.mark.unit
 class TestDeleteGadgetsByGroup:
     """観点: 3.4.1.1（論理削除）, 3.4.2.1（監査項目更新）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/groups/<uuid>/delete（カスケード削除）
 
     ワークフロー仕様書 § ダッシュボードグループ削除 カスケード削除
     group_id に紐づく全ガジェットを論理削除する
@@ -1338,7 +1648,7 @@ class TestDeleteGadgetsByGroup:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_group
 
         # Act
-        delete_gadgets_by_group(group_id=10, modifier='user-001')
+        delete_gadgets_by_group(group_id=10, modifier=1)
 
         # Assert
         assert mock_gadget1.delete_flag is True
@@ -1357,10 +1667,10 @@ class TestDeleteGadgetsByGroup:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_group
 
         # Act
-        delete_gadgets_by_group(group_id=10, modifier='user-001')
+        delete_gadgets_by_group(group_id=10, modifier=1)
 
         # Assert
-        assert mock_gadget.modifier == 'user-001'
+        assert mock_gadget.modifier == 1
         mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
@@ -1375,7 +1685,7 @@ class TestDeleteGadgetsByGroup:
         from iot_app.services.customer_dashboard.common import delete_gadgets_by_group
 
         # Act
-        delete_gadgets_by_group(group_id=10, modifier='user-001')
+        delete_gadgets_by_group(group_id=10, modifier=1)
 
         # Assert
         mock_db.session.commit.assert_called_once()
@@ -1388,6 +1698,9 @@ class TestDeleteGadgetsByGroup:
 @pytest.mark.unit
 class TestDeleteGroupWithCascade:
     """観点: 3.4.1.1（論理削除）
+
+    使用ルート:
+        POST /analysis/customer-dashboard/groups/<uuid>/delete
 
     ワークフロー仕様書 § ダッシュボードグループ削除
     配下のガジェットを論理削除後、グループを論理削除する。
@@ -1402,13 +1715,13 @@ class TestDeleteGroupWithCascade:
         from iot_app.services.customer_dashboard.common import delete_group_with_cascade
 
         # Act
-        delete_group_with_cascade(mock_group, user_id='user-001')
+        delete_group_with_cascade(mock_group, user_id=1)
 
         # Assert
-        mock_del_gadgets.assert_called_once_with(group_id=10, modifier='user-001')
+        mock_del_gadgets.assert_called_once_with(group_id=10, modifier=1)
 
     @patch(f'{MODULE}.delete_gadgets_by_group')
-    def test_sets_delete_flag_on_group(self, _mock_del_gadgets):
+    def test_sets_delete_flag_on_group(self, _):
         """3.4.1.1 グループの delete_flag を True に設定する"""
         # Arrange
         mock_group = MagicMock()
@@ -1416,13 +1729,13 @@ class TestDeleteGroupWithCascade:
         from iot_app.services.customer_dashboard.common import delete_group_with_cascade
 
         # Act
-        delete_group_with_cascade(mock_group, user_id='user-001')
+        delete_group_with_cascade(mock_group, user_id=1)
 
         # Assert
         assert mock_group.delete_flag is True
 
     @patch(f'{MODULE}.delete_gadgets_by_group')
-    def test_sets_modifier_on_group(self, _mock_del_gadgets):
+    def test_sets_modifier_on_group(self, _):
         """3.4.2.1 グループの modifier を更新する"""
         # Arrange
         mock_group = MagicMock()
@@ -1430,10 +1743,10 @@ class TestDeleteGroupWithCascade:
         from iot_app.services.customer_dashboard.common import delete_group_with_cascade
 
         # Act
-        delete_group_with_cascade(mock_group, user_id='user-001')
+        delete_group_with_cascade(mock_group, user_id=1)
 
         # Assert
-        assert mock_group.modifier == 'user-001'
+        assert mock_group.modifier == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1443,6 +1756,9 @@ class TestDeleteGroupWithCascade:
 @pytest.mark.unit
 class TestGetDevicesByOrganization:
     """観点: 3.1.4.1/3.1.4.2（件数）, 3.1.1.1（フィルタ条件）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard/organizations/<org_id>/devices（AJAX）
 
     ワークフロー仕様書 § データソース選択 No.26
     organization_id に紐づくデバイス一覧を device_id 昇順で返す。
@@ -1496,6 +1812,9 @@ class TestGetDevicesByOrganization:
 class TestUpdateDatasourceSetting:
     """観点: 3.3.1.1（更新）, 3.3.2.1（監査項目更新）, 3.1.2（デフォルト値正規化）
 
+    使用ルート:
+        POST /analysis/customer-dashboard/datasource/save（AJAX）
+
     ワークフロー仕様書 § データソース選択 No.27
     dashboard_user_setting の organization_id / device_id を更新する。
     None の場合は 0 に正規化する（DB設計: 未選択=0）。
@@ -1510,7 +1829,7 @@ class TestUpdateDatasourceSetting:
         from iot_app.services.customer_dashboard.common import update_datasource_setting
 
         # Act
-        update_datasource_setting(user_id='user-001', organization_id=5, device_id=10, modifier='user-001')
+        update_datasource_setting(user_id=1, organization_id=5, device_id=10, modifier=1)
 
         # Assert
         assert mock_setting.organization_id == 5
@@ -1525,7 +1844,7 @@ class TestUpdateDatasourceSetting:
         from iot_app.services.customer_dashboard.common import update_datasource_setting
 
         # Act
-        update_datasource_setting(user_id='user-001', organization_id=None, device_id=10, modifier='user-001')
+        update_datasource_setting(user_id=1, organization_id=None, device_id=10, modifier=1)
 
         # Assert
         assert mock_setting.organization_id == 0
@@ -1539,7 +1858,7 @@ class TestUpdateDatasourceSetting:
         from iot_app.services.customer_dashboard.common import update_datasource_setting
 
         # Act
-        update_datasource_setting(user_id='user-001', organization_id=5, device_id=None, modifier='user-001')
+        update_datasource_setting(user_id=1, organization_id=5, device_id=None, modifier=1)
 
         # Assert
         assert mock_setting.device_id == 0
@@ -1553,7 +1872,117 @@ class TestUpdateDatasourceSetting:
         from iot_app.services.customer_dashboard.common import update_datasource_setting
 
         # Act
-        update_datasource_setting(user_id='user-001', organization_id=5, device_id=10, modifier='user-001')
+        update_datasource_setting(user_id=1, organization_id=5, device_id=10, modifier=1)
 
         # Assert
-        assert mock_setting.modifier == 'user-001'
+        assert mock_setting.modifier == 1
+
+
+# ---------------------------------------------------------------------------
+# get_organizations
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetOrganizations:
+    """観点: 3.1.4（件数）, 2.2.2（存在なし）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+
+    ワークフロー仕様書 § ダッシュボード初期表示 ⑦ 組織選択肢取得
+    accessible_org_ids に含まれる organization_master レコードを返す（プルダウン用）
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_organizations_in_scope(self, mock_db):
+        """3.1.4.1 accessible_org_ids に一致する組織リストを返す"""
+        # Arrange
+        mock_org1 = MagicMock()
+        mock_org2 = MagicMock()
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            mock_org1, mock_org2
+        ]
+        from iot_app.services.customer_dashboard.common import get_organizations
+
+        # Act
+        result = get_organizations([1, 2])
+
+        # Assert
+        assert result == [mock_org1, mock_org2]
+
+    @patch(f'{MODULE}.db')
+    def test_returns_empty_list_when_no_orgs(self, mock_db):
+        """2.2.2 accessible_org_ids に一致する組織が存在しない場合: 空リストを返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.customer_dashboard.common import get_organizations
+
+        # Act
+        result = get_organizations([])
+
+        # Assert
+        assert result == []
+
+    @patch(f'{MODULE}.db')
+    def test_filters_by_accessible_org_ids(self, mock_db):
+        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.customer_dashboard.common import get_organizations
+        from iot_app.models.organization import OrganizationMaster
+
+        # Act
+        get_organizations([1, 2])
+
+        # Assert
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        in_expr = next(f for f in filter_args if hasattr(f, 'right') and hasattr(f.right, 'clauses'))
+        assert in_expr.left == OrganizationMaster.organization_id
+        assert [c.value for c in in_expr.right.clauses] == [1, 2]
+
+
+# ---------------------------------------------------------------------------
+# get_devices
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetDevices:
+    """観点: 3.1.4（件数）, 2.2.2（存在なし）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+
+    ワークフロー仕様書 § ダッシュボード初期表示 ⑧ デバイス選択肢取得
+    organization_id に紐づく device_master レコードを返す（プルダウン用）
+    ユーザー設定の organization_id が 0 以外の場合のみ呼ばれる
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_devices_for_organization(self, mock_db):
+        """3.1.4.1 organization_id に一致するデバイスリストを返す"""
+        # Arrange
+        mock_device1 = MagicMock()
+        mock_device2 = MagicMock()
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            mock_device1, mock_device2
+        ]
+        from iot_app.services.customer_dashboard.common import get_devices
+
+        # Act
+        result = get_devices(1)
+
+        # Assert
+        assert result == [mock_device1, mock_device2]
+
+    @patch(f'{MODULE}.db')
+    def test_returns_empty_list_when_no_devices(self, mock_db):
+        """2.2.2 organization_id に一致するデバイスが存在しない場合: 空リストを返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.customer_dashboard.common import get_devices
+
+        # Act
+        result = get_devices(999)
+
+        # Assert
+        assert result == []
