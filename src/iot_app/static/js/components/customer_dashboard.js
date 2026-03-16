@@ -38,7 +38,7 @@ const CustomerDashboard = (function () {
     const content = document.getElementById('ajax-modal-content');
 
     content.innerHTML = '<div style="padding:24px;text-align:center;">読み込み中...</div>';
-    overlay.removeAttribute('hidden');
+    overlay.classList.add('active');
 
     try {
       const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -58,7 +58,7 @@ const CustomerDashboard = (function () {
    */
   function _closeModal() {
     const overlay = document.getElementById('ajax-modal-overlay');
-    overlay.setAttribute('hidden', '');
+    overlay.classList.remove('active');
     document.getElementById('ajax-modal-content').innerHTML = '';
   }
 
@@ -620,7 +620,7 @@ const CustomerDashboard = (function () {
     const resetModal = document.getElementById('datetime-reset-modal');
     if (resetBtn && resetModal) {
       resetBtn.addEventListener('click', function () {
-        resetModal.removeAttribute('hidden');
+        resetModal.classList.add('active');
       });
 
       const confirmBtn = document.getElementById('datetime-reset-confirm-btn');
@@ -628,13 +628,13 @@ const CustomerDashboard = (function () {
 
       if (confirmBtn) {
         confirmBtn.addEventListener('click', function () {
-          resetModal.setAttribute('hidden', '');
+          resetModal.classList.remove('active');
           _fetchAllGadgetsData({ range: 'today' });
         });
       }
       if (cancelBtn2) {
         cancelBtn2.addEventListener('click', function () {
-          resetModal.setAttribute('hidden', '');
+          resetModal.classList.remove('active');
         });
       }
     }
