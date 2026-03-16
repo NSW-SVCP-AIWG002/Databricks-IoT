@@ -62,12 +62,10 @@ def gadget_bar_chart_data(gadget_uuid):
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
-
         chart_config = json.loads(gadget.chart_config or '{}')
         measurement_item_id = chart_config.get('measurement_item_id', 1)
         summary_method_id = chart_config.get('summary_method_id', 1)
 
-        # display_unit=hour の場合はシルバー層カラム名を事前取得
         column_name = None
         if display_unit == 'hour':
             column_name = get_measurement_item_column_name(measurement_item_id)
@@ -75,17 +73,12 @@ def gadget_bar_chart_data(gadget_uuid):
                 return jsonify({'error': '測定項目が見つかりません'}), 500
 
         rows = fetch_bar_chart_data(
-            device_id=device_id,
-            display_unit=display_unit,
-            interval=interval,
-            base_datetime=base_datetime,
+            device_id=device_id, display_unit=display_unit,
+            interval=interval, base_datetime=base_datetime,
             measurement_item_id=measurement_item_id,
-            summary_method_id=summary_method_id,
-            limit=100,
+            summary_method_id=summary_method_id, limit=100,
         )
-        chart_data = format_bar_chart_data(
-            rows, display_unit, interval, summary_method_id, column_name=column_name
-        )
+        chart_data = format_bar_chart_data(rows, display_unit, interval, summary_method_id, column_name=column_name)
         return jsonify({
             'gadget_uuid': gadget_uuid,
             'chart_data': chart_data,
@@ -206,10 +199,8 @@ def gadget_csv_export(gadget_uuid):
         chart_config = json.loads(gadget.chart_config or '{}')
         measurement_item_id = chart_config.get('measurement_item_id', 1)
         summary_method_id = chart_config.get('summary_method_id', 1)
-
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
-        # display_unit=hour の場合はシルバー層カラム名を事前取得
         column_name = None
         if display_unit == 'hour':
             column_name = get_measurement_item_column_name(measurement_item_id)
@@ -217,17 +208,11 @@ def gadget_csv_export(gadget_uuid):
                 abort(500)
 
         rows = fetch_bar_chart_data(
-            device_id=device_id,
-            display_unit=display_unit,
-            interval=interval,
-            base_datetime=base_datetime,
-            measurement_item_id=measurement_item_id,
-            summary_method_id=summary_method_id,
-            limit=100_000,
+            device_id=device_id, display_unit=display_unit, interval=interval,
+            base_datetime=base_datetime, measurement_item_id=measurement_item_id,
+            summary_method_id=summary_method_id, limit=100_000,
         )
-        chart_data = format_bar_chart_data(
-            rows, display_unit, interval, summary_method_id, column_name=column_name
-        )
+        chart_data = format_bar_chart_data(rows, display_unit, interval, summary_method_id, column_name=column_name)
         csv_content = generate_bar_chart_csv(chart_data)
 
         filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
