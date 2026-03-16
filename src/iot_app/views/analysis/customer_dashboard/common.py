@@ -34,7 +34,7 @@ from iot_app.services.customer_dashboard.common import (
     update_group_title,
     upsert_dashboard_user_setting,
 )
-from iot_app.views.analysis import customer_dashboard_bp
+from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
 

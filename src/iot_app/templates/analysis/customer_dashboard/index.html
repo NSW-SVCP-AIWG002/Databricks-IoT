@@ -3,7 +3,7 @@
 {% block title %}顧客作成ダッシュボード{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/common.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -290,7 +290,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/components/customer_dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id != 0 else none) | tojson }},
