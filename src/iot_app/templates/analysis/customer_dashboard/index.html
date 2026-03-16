@@ -124,14 +124,7 @@
   </div>{# /subbar #}
 
   {# ── ダッシュボード本体 ───────────────────────────────── #}
-  {% if not dashboard %}
-
-    {# ダッシュボード未登録時 #}
-    <div class="customer-dashboard__empty">
-      <p>ダッシュボードが登録されていません。<br>「ダッシュボード管理」からダッシュボードを登録してください。</p>
-    </div>
-
-  {% else %}
+  {% if dashboard %}
 
     {# (5) ダッシュボードヘッダー #}
     <div class="dashboard-header" data-dashboard-uuid="{{ dashboard.dashboard_uuid }}">
@@ -158,12 +151,7 @@
     </div>{# /dashboard-header #}
 
     {# グループ一覧 #}
-    {% if not groups %}
-      <div class="customer-dashboard__no-groups">
-        <p>グループが登録されていません。ダッシュボード設定（⚙）からグループを追加してください。</p>
-      </div>
-    {% else %}
-      {% for group in groups %}
+    {% for group in groups %}
         {# グループに属するガジェットを抽出 #}
         {% set group_gadgets = gadgets | selectattr('dashboard_group_id', 'equalto', group.dashboard_group_id) | list %}
 
@@ -212,10 +200,7 @@
             id="group-content-{{ group.dashboard_group_id }}"
             data-group-id="{{ group.dashboard_group_id }}"
           >
-            {% if not group_gadgets %}
-              <p class="dashboard-content__empty">ガジェットが登録されていません。グループ設定（⚙）からガジェットを追加してください。</p>
-            {% else %}
-              {% for gadget in group_gadgets %}
+            {% for gadget in group_gadgets %}
                 {# (8) ガジェット #}
                 <div
                   class="gadget{% if gadget.gadget_size == 1 %} gadget--wide{% endif %}"
@@ -268,13 +253,11 @@
                   <div class="gadget__chart" id="chart-{{ gadget.gadget_uuid }}"></div>
 
                 </div>{# /gadget #}
-              {% endfor %}
-            {% endif %}
+            {% endfor %}
           </div>{# /dashboard-content #}
 
         </div>{# /dashboard-group #}
       {% endfor %}
-    {% endif %}
 
   {% endif %}{# /dashboard exists #}
 
