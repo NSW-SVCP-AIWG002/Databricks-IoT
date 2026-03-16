@@ -310,9 +310,9 @@
 <script src="{{ url_for('static', filename='js/components/customer_dashboard.js') }}"></script>
 <script>
   CustomerDashboard.init({
-    selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id != 0 else 'null') }},
-    selectedDeviceId: {{ (user_setting.device_id if user_setting and user_setting.device_id != 0 else 'null') }},
-    dashboardUuid: {{ ('"' + dashboard.dashboard_uuid + '"') if dashboard else 'null' }}
+    selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id != 0 else none) | tojson }},
+    selectedDeviceId: {{ (user_setting.device_id if user_setting and user_setting.device_id != 0 else none) | tojson }},
+    dashboardUuid: {{ dashboard.dashboard_uuid | tojson if dashboard else 'null' }}
   });
 </script>
 {% endblock %}
