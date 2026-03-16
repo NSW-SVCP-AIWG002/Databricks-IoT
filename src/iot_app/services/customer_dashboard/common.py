@@ -12,11 +12,23 @@ from iot_app.models.customer_dashboard import (
 )
 from iot_app.models.device import DeviceMaster
 from iot_app.models.organization import OrganizationClosure, OrganizationMaster
+from iot_app.models.user import User
 
 
 # ---------------------------------------------------------------------------
 # データスコープ制御
 # ---------------------------------------------------------------------------
+
+def get_organization_id_by_user(user_id):
+    """ユーザーIDから所属組織IDを返す。
+    NOTE: get_accessible_organizations が不要になった際は呼び出し元ごと削除する。
+    """
+    return (
+        db.session.query(User.organization_id)
+        .filter(User.user_id == user_id, User.delete_flag == False)
+        .scalar()
+    )
+
 
 def get_accessible_organizations(parent_org_id):
     """ユーザーがアクセス可能な組織IDリストを返す"""
