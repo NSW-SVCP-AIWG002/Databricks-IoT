@@ -42,14 +42,22 @@ const CustomerDashboard = (function () {
 
     try {
       const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (res.status >= 500) {
+        // 500以上 → 500エラーページを表示
+        const html = await res.text();
+        document.documentElement.innerHTML = html;
+        return;
+      }
       if (!res.ok) {
+        // 4xx → モーダル内にエラー表示
         content.innerHTML = `<div style="padding:24px;color:red;">エラーが発生しました（${res.status}）</div>`;
         return;
       }
       content.innerHTML = await res.text();
       _bindModalEvents(content);
     } catch (e) {
-      content.innerHTML = '<div style="padding:24px;color:red;">通信エラーが発生しました</div>';
+      // ネットワーク断等の通信エラー → リロード
+      window.location.reload();
     }
   }
 
@@ -94,9 +102,10 @@ const CustomerDashboard = (function () {
   async function _handleFormSubmit(e) {
     e.preventDefault();
     const form = e.currentTarget;
-    const formData = new FormData(form);
 
-    try {
+    await withSubmitLock(form, async function () {
+      const formData = new FormData(form);
+
       const res = await fetch(form.action, {
         method: 'POST',
         body: formData,
@@ -125,14 +134,13 @@ const CustomerDashboard = (function () {
         return;
       }
 
-      // その他エラー
-      const content = document.getElementById('ajax-modal-content');
-      content.innerHTML = `<div style="padding:24px;color:red;">エラーが発生しました（${res.status}）</div>`;
-
-    } catch (err) {
-      const content = document.getElementById('ajax-modal-content');
-      content.innerHTML = '<div style="padding:24px;color:red;">通信エラーが発生しました</div>';
-    }
+      // 500以上 → 500エラーページを表示（仕様: 500エラーページ表示）
+      const html = await res.text();
+      document.documentElement.innerHTML = html;
+    }).catch(function () {
+      // ネットワーク断等の通信エラー → リロード（サーバー復旧で通常ページへ、未復旧でブラウザエラー画面）
+      window.location.reload();
+    });
   }
 
   /* =========================================================
@@ -225,12 +233,18 @@ const CustomerDashboard = (function () {
       });
     });
 
-    // 初期タブ: 組織
+    // 初期タブ: デバイス(1) ※ data_source_type: 0=組織, 1=デバイス（app-database-specification.md 32番テーブル参照）
     items.forEach(function (item) {
-      if (item.dataset.sourceType !== 'organization') {
+      if (item.dataset.sourceType !== '1') {
         item.style.display = 'none';
       }
     });
+
+    // 初期選択: デバイスタブの先頭アイテムを自動選択
+    const firstVisible = Array.from(items).find(function (item) {
+      return item.dataset.sourceType === '1';
+    });
+    if (firstVisible) firstVisible.click();
 
     // ガジェット種別選択
     items.forEach(function (item) {
