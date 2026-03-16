@@ -210,12 +210,12 @@
 .bar-chart__datetime-input {
   width: 160px;
   font-size: var(--font-size-sm);
-  padding: 2px 24px 2px var(--spacing-2);
+  padding: 2px var(--spacing-2) 2px 24px;
 }
 
 .bar-chart__calendar-btn {
   position: absolute;
-  right: 4px;
+  left: 4px;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -331,4 +331,9 @@
 
 .form__group--third {
   flex: 1;
+}
+
+/* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
+.gadget--2x2 .bar-chart__unit-selector {
+  width: 100%;
 }
