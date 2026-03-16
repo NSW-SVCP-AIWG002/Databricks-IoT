@@ -166,17 +166,6 @@
   font-weight: bold;
 }
 
-/* ── 空状態 ─────────────────────────────────────── */
-.customer-dashboard__empty,
-.customer-dashboard__no-groups,
-.dashboard-content__empty {
-  padding: var(--spacing-6);
-  text-align: center;
-  color: #666;
-  background-color: #f9f9f9;
-  border: 1px dashed #ccc;
-  border-radius: 4px;
-}
 
 /* ── ダッシュボードヘッダー (5) ─────────────────── */
 .dashboard-header {
