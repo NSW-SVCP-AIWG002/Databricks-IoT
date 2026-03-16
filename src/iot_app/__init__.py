@@ -74,14 +74,16 @@ def create_app():
     # 認証動作確認用エンドポイント（開発用）
     @app.route('/ping')
     def ping():
+        user = getattr(g, "current_user", None)
+
         return jsonify(
             status='ok',
             auth=dict(
                 email=session.get('email'),
-                user_id=getattr(g, 'current_user_id', None),
-                user_type_id=getattr(g, 'current_user_type_id', None),
+                user_id=getattr(user, "user_id", None),
+                user_type_id=getattr(user, "user_type_id", None),
             ),
-            databricks_token='present' if getattr(g, 'databricks_token', None) else 'missing',
+            databricks_token='present' if getattr(user, 'databricks_token', None) else 'missing',
         ), 200
 
     return app

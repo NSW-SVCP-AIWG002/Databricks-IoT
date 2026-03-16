@@ -56,8 +56,8 @@ def authenticate_request():
 
     _sync_session(idp_user_info, app_user)
 
-    g.current_user_id = session.get('user_id')
-    g.current_user_type_id = session.get('user_type_id')
+    g.current_user.user_id = session.get('user_id')
+    g.current_user.user_type_id = session.get('user_type_id')
 
     if auth_provider.requires_additional_setup():
         allowed_paths = ['/account/password/change', '/auth/logout']
@@ -71,12 +71,12 @@ def authenticate_request():
         if not dev_token:
             logger.error("DEV_DATABRICKS_TOKEN が設定されていません")
             abort(500)
-        g.databricks_token = dev_token
+        g.current_user.databricks_token = dev_token
     else:
         try:
             from iot_app.auth.token_exchange import TokenExchanger
             token_exchanger = TokenExchanger()
-            g.databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
+            g.current_user.databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
         except JWTRetrievalError:
             abort(500)
         except TokenExchangeError:

@@ -200,7 +200,7 @@ src/
     │
     ├── db/                        # データベース接続
     │   ├── __init__.py
-    │   └── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.databricks_token使用）
+    │   └── unity_catalog_connector.py # Unity Catalog接続（databricks-sql-connector、g.current_user.databricks_token使用）
     │
     ├── models/                    # SQLAlchemy ORMモデル（テーブル定義）
     │   ├── __init__.py
@@ -328,10 +328,10 @@ src/
 
 ### テストレベル
 
-| テストレベル | ツール                     | 対象                            | 実行方式       |
-| ------------ | -------------------------- | ------------------------------- | -------------- |
-| 単体テスト   | pytest + unittest.mock     | Service層、Model層、Utility関数 | 自動（pytest） |
-| 結合テスト   | pytest + Flask test_client | APIエンドポイント、DB連携       | 自動（pytest） |
+| テストレベル | ツール                      | 対象                            | 実行方式       |
+| ------------ | --------------------------- | ------------------------------- | -------------- |
+| 単体テスト   | pytest + unittest.mock      | Service層、Model層、Utility関数 | 自動（pytest） |
+| 結合テスト   | pytest + Flask test_client  | APIエンドポイント、DB連携       | 自動（pytest） |
 | E2Eテスト    | 手動 / Playwright（必要時） | ユーザー業務フロー（CUJ）       | 手動基本       |
 
 ### テストディレクトリ構成
