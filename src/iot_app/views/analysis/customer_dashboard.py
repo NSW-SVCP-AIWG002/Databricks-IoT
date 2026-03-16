@@ -25,6 +25,7 @@ from iot_app.services.customer_dashboard.common import (
     get_first_dashboard,
     get_gadget_types,
     get_gadgets_by_groups,
+    get_organization_id_by_user,
     get_organizations,
     save_layout,
     update_dashboard_title,
@@ -46,7 +47,7 @@ logger = get_logger(__name__)
 @require_auth
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
 
     user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
@@ -100,7 +101,7 @@ def customer_dashboard():
 @require_auth
 def dashboard_management():
     """ダッシュボード管理モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboards = get_dashboards(accessible_org_ids)
 
     return render_template(
@@ -144,7 +145,7 @@ def dashboard_register():
         logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
         dashboard = create_dashboard(
             name=form.dashboard_name.data,
-            organization_id=g.current_user.organization_id,
+            organization_id=get_organization_id_by_user(g.current_user.user_id),
             user_id=g.current_user.user_id,
         )
         db.session.flush()
@@ -167,7 +168,7 @@ def dashboard_register():
 @require_auth
 def dashboard_edit(dashboard_uuid):
     """ダッシュボードタイトル更新モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -209,7 +210,7 @@ def dashboard_update(dashboard_uuid):
             dashboard=dashboard,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -245,7 +246,7 @@ def dashboard_update(dashboard_uuid):
 @require_auth
 def dashboard_delete_confirm(dashboard_uuid):
     """ダッシュボード削除確認モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -272,7 +273,7 @@ def dashboard_delete(dashboard_uuid):
     except Exception as e:
         abort(500)
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -308,7 +309,7 @@ def dashboard_delete(dashboard_uuid):
 @require_auth
 def dashboard_switch(dashboard_uuid):
     """ダッシュボード表示切替"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -355,7 +356,7 @@ def group_register():
             form=form,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(form.dashboard_uuid.data, accessible_org_ids)
     if not dashboard:
         abort(404)
@@ -385,7 +386,7 @@ def group_register():
 @require_auth
 def group_edit(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
@@ -427,7 +428,7 @@ def group_update(dashboard_group_uuid):
             group=group,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
@@ -463,7 +464,7 @@ def group_update(dashboard_group_uuid):
 @require_auth
 def group_delete_confirm(dashboard_group_uuid):
     """ダッシュボードグループ削除確認モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
@@ -490,7 +491,7 @@ def group_delete(dashboard_group_uuid):
     except Exception as e:
         abort(500)
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
@@ -563,7 +564,7 @@ def gadget_register(gadget_type):
 @require_auth
 def gadget_edit(gadget_uuid):
     """ガジェットタイトル更新モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
@@ -605,7 +606,7 @@ def gadget_update(gadget_uuid):
             gadget=gadget,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
@@ -641,7 +642,7 @@ def gadget_update(gadget_uuid):
 @require_auth
 def gadget_delete_confirm(gadget_uuid):
     """ガジェット削除確認モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
@@ -668,7 +669,7 @@ def gadget_delete(gadget_uuid):
     except Exception as e:
         abort(500)
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)

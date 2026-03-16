@@ -10,6 +10,44 @@ MODULE = 'iot_app.services.customer_dashboard.common'
 
 
 # ---------------------------------------------------------------------------
+# get_organization_id_by_user
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetOrganizationIdByUser:
+    """ユーザーIDから所属組織IDを取得する
+
+    NOTE: get_accessible_organizations が不要になった際は呼び出し元ごと削除する。
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_organization_id(self, mock_db):
+        """ユーザーが存在する場合: organization_id を返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 5
+        from iot_app.services.customer_dashboard.common import get_organization_id_by_user
+
+        # Act
+        result = get_organization_id_by_user(1)
+
+        # Assert
+        assert result == 5
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """ユーザーが存在しない場合: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
+        from iot_app.services.customer_dashboard.common import get_organization_id_by_user
+
+        # Act
+        result = get_organization_id_by_user(999)
+
+        # Assert
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
 # get_accessible_organizations
 # ---------------------------------------------------------------------------
 
