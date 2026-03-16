@@ -237,17 +237,55 @@
    棒グラフガジェット登録モーダル
    ============================================================ */
 
+.gadget-register__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.gadget-register__title-row .form__input {
+  flex: 0 0 200px;
+}
+
+.gadget-register__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-2);
+}
+
+.gadget-register__device-name-row {
+  display: flex;
+  align-items: center;
+  min-height: var(--spacing-6);
+  margin-bottom: var(--spacing-2);
+}
+
 .gadget-register__body {
   display: flex;
-  gap: var(--spacing-4);
+  align-items: flex-start;
+  gap: var(--spacing-6);
   margin-top: var(--spacing-4);
 }
 
 .gadget-register__left {
-  flex: 0 0 300px;
+  flex: 0 0 220px;
+}
+
+.gadget-register__middle {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
+  gap: var(--spacing-4);
+  padding-left: var(--spacing-4);
+}
+
+.gadget-register__middle .form__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
 }
 
 .gadget-register__right {
@@ -307,8 +345,14 @@
 
 /* デバイス名表示 */
 .bar-chart-register__device-name {
-  font-size: var(--font-size-sm);
-  color: var(--color-secondary);
+  font-size: var(--font-size-base);
+}
+
+/* デバイスモードエリア（ラベル＋ボタン同一行） */
+.gadget-register__device-mode-area {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
 }
 
 /* 表示項目選択リスト */
@@ -319,10 +363,48 @@
   border-radius: 4px;
 }
 
+.bar-chart-register__measurement-list table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.bar-chart-register__measurement-list thead {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.bar-chart-register__measurement-list th,
+.bar-chart-register__measurement-list td {
+  border: 1px solid #ddd;
+}
+
+/* 表示デバイス指定セクション見出し */
+.gadget-register__section-title {
+  font-size: var(--font-size-base);
+  margin: 0 0 var(--spacing-1) 0;
+}
+
 /* フォーム行レイアウト */
 .form__row {
   display: flex;
   gap: var(--spacing-4);
+  align-items: center;
+  margin-top: var(--spacing-4);
+}
+
+/* インラインフォームグループ（ラベル＋コントロール同一行） */
+.form__group--inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: 0;
+}
+
+.form__group--inline .form__label {
+  white-space: nowrap;
+  margin-bottom: 0;
 }
 
 .form__group--half {

@@ -108,7 +108,6 @@ def gadget_bar_chart_create():
     form.measurement_item_id.choices = [(0, '選択してください')] + [
         (m.measurement_item_id, m.display_name) for m in context['measurement_items']
     ]
-
     return render_template(
         'analysis/customer_dashboard/modals/gadget_register/bar_chart.html',
         form=form,
