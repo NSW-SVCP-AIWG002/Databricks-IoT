@@ -87,15 +87,15 @@ CREATE TABLE IF NOT EXISTS device_type_master (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 11. 在庫状況マスタ
-CREATE TABLE IF NOT EXISTS stock_status_master (
-    stock_status_id   INT          NOT NULL,
-    stock_status_name VARCHAR(100) NOT NULL,
-    create_date       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator           INT          NOT NULL,
-    update_date       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    modifier          INT          NOT NULL,
-    delete_flag       BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (stock_status_id)
+CREATE TABLE IF NOT EXISTS inventory_status_master (
+    inventory_status_id   INT          NOT NULL,
+    inventory_status_name VARCHAR(100) NOT NULL,
+    create_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator               INT          NOT NULL,
+    update_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier              INT          NOT NULL,
+    delete_flag           BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (inventory_status_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 13. 測定項目マスタ
@@ -222,24 +222,27 @@ CREATE TABLE IF NOT EXISTS user_master (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 10. デバイス在庫情報マスタ
-CREATE TABLE IF NOT EXISTS device_stock_info_master (
-    device_stock_id                INT          NOT NULL,
-    stock_status_id                INT          NOT NULL,
-    purchase_date                  DATETIME     NOT NULL,
-    estimated_ship_date            DATETIME     NULL,
-    ship_date                      DATETIME     NULL,
-    manufacturer_warranty_end_date DATETIME     NOT NULL,
-    vendor_warranty_end_date       DATETIME     NOT NULL,
-    stock_location                 VARCHAR(100) NOT NULL,
-    create_date                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator                        INT          NOT NULL,
-    update_date                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    modifier                       INT          NOT NULL,
-    delete_flag                    BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (device_stock_id),
-    INDEX IX_device_stock_status_id (stock_status_id),
-    CONSTRAINT FK_device_stock_status FOREIGN KEY (stock_status_id)
-        REFERENCES stock_status_master (stock_status_id)
+CREATE TABLE IF NOT EXISTS device_inventory_master (
+    device_inventory_id             INT          NOT NULL AUTO_INCREMENT,
+    device_inventory_uuid           VARCHAR(36)  NOT NULL,
+    inventory_status_id             INT          NOT NULL,
+    device_model                    VARCHAR(100) NOT NULL,
+    mac_address                     VARCHAR(17)  NOT NULL,
+    purchase_date                   DATETIME     NOT NULL,
+    estimated_ship_date             DATETIME     NULL,
+    ship_date                       DATETIME     NULL,
+    manufacturer_warranty_end_date  DATETIME     NOT NULL,
+    inventory_location              VARCHAR(100) NOT NULL,
+    create_date                     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator                         INT          NOT NULL,
+    update_date                     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier                        INT          NOT NULL,
+    delete_flag                     BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (device_inventory_id),
+    UNIQUE INDEX UX_device_inventory_uuid (device_inventory_uuid),
+    INDEX IX_device_inventory_status_id (inventory_status_id),
+    CONSTRAINT FK_device_inventory_status FOREIGN KEY (inventory_status_id)
+        REFERENCES inventory_status_master (inventory_status_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 8. デバイスマスタ
@@ -250,7 +253,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     device_type_id              INT          NOT NULL,
     device_name                 VARCHAR(100) NOT NULL,
     device_model                VARCHAR(100) NOT NULL,
-    device_stock_id             INT          NOT NULL,
+    device_inventory_id         INT          NOT NULL,
     sim_id                      VARCHAR(100) NULL,
     mac_address                 VARCHAR(100) NULL,
     software_version            VARCHAR(100) NULL,
@@ -269,9 +272,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     CONSTRAINT FK_device_organization FOREIGN KEY (organization_id)
         REFERENCES organization_master (organization_id),
     CONSTRAINT FK_device_type FOREIGN KEY (device_type_id)
-        REFERENCES device_type_master (device_type_id),
-    CONSTRAINT FK_device_stock FOREIGN KEY (device_stock_id)
-        REFERENCES device_stock_info_master (device_stock_id)
+        REFERENCES device_type_master (device_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 12. アラート設定マスタ
@@ -495,11 +496,7 @@ CREATE TABLE IF NOT EXISTS dashboard_user_setting (
     CONSTRAINT FK_dashboard_user_setting_user FOREIGN KEY (user_id)
         REFERENCES user_master (user_id),
     CONSTRAINT FK_dashboard_user_setting_dashboard FOREIGN KEY (dashboard_id)
-        REFERENCES dashboard_master (dashboard_id),
-    CONSTRAINT FK_dashboard_user_setting_organization FOREIGN KEY (organization_id)
-        REFERENCES organization_master (organization_id),
-    CONSTRAINT FK_dashboard_user_setting_device FOREIGN KEY (device_id)
-        REFERENCES device_master (device_id)
+        REFERENCES dashboard_master (dashboard_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 34. サマリー計算手法マスタ
