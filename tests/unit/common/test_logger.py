@@ -9,7 +9,7 @@ common/logger.py の単体テスト
   - リクエストコンテキストから requestId / method / endpoint / ipAddress / userId が自動付与される
   - requestId は g.request_id 未設定時に "-" になる
   - ipAddress は X-Forwarded-For 優先、なければ remote_addr を使用する
-  - userId は g.current_user_id 未設定時は出力しない（ログ設計書 4章）
+  - userId は g.current.user_user_id 未設定時は出力しない（ログ設計書 4章）
   - リクエストコンテキスト外ではコンテキストフィールドを付与しない
   - email キーは自動マスキングされる（ローカル部先頭2文字以外を ****）
   - phone キーは自動マスキングされる（中間4桁を ****）
@@ -84,18 +84,18 @@ class TestAppLoggerAdapterProcess:
         assert kwargs["extra"]["ipAddress"] == "127.0.0.1"
 
     def test_adds_user_id_when_authenticated(self, app):
-        """1.4.2.5: g.current_user_id が設定されていれば userId が付与される"""
+        """1.4.2.5: g.current_user.user_id が設定されていれば userId が付与される"""
         from flask import g
         adapter = self._make_adapter()
 
         with app.test_request_context("/test"):
-            g.current_user_id = 42
+            g.current_user.user_id = 42
             _, kwargs = adapter.process("msg", {})
 
         assert kwargs["extra"]["userId"] == 42
 
     def test_omits_user_id_when_not_authenticated(self, app):
-        """1.4.2.5: g.current_user_id 未設定時は userId を出力しない（ログ設計書 4章）"""
+        """1.4.2.5: g.current_user.user_id 未設定時は userId を出力しない（ログ設計書 4章）"""
         adapter = self._make_adapter()
 
         with app.test_request_context("/test"):

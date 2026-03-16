@@ -645,8 +645,8 @@ def authenticate_request():
     _sync_session(idp_user_info, app_user)
 
     # 5. グローバルコンテキストに保存（セッションから取得）
-    g.current_user_id = session.get('user_id')
-    g.current_user_type_id = session.get('user_type_id')
+    g.current_user.user_id = session.get('user_id')
+    g.current_user.user_type_id = session.get('user_type_id')
 
     # 6. パスワード期限切れチェック（オンプレミス環境のみ）
     if auth_provider.requires_additional_setup():
@@ -665,7 +665,7 @@ def authenticate_request():
         from auth.token_exchange import TokenExchanger
         token_exchanger = TokenExchanger()
         databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
-        g.databricks_token = databricks_token
+        g.current_user.databricks_token = databricks_token
     except JWTRetrievalError:
         # JWT取得失敗 → IdPセッション切れと判断、Flaskセッションクリア
         session.clear()
@@ -707,14 +707,14 @@ def _sync_session(idp_user_info, app_user):
 
 #### 3.7.1 認証関連エラー分類
 
-| エラー種別         | HTTPステータス            | 対応                                             |
-| ------------------ | ------------------------- | ------------------------------------------------ |
-| 未認証             | 401 Unauthorized          | ログインページへリダイレクト                     |
+| エラー種別         | HTTPステータス            | 対応                                                   |
+| ------------------ | ------------------------- | ------------------------------------------------------ |
+| 未認証             | 401 Unauthorized          | ログインページへリダイレクト                           |
 | ユーザー未登録     | 403 Forbidden             | 403エラーページ表示（IdP認証済みだがアプリDB未登録）※1 |
-| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示（ロール不足）※2     |
-| Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                       |
-| セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                     |
-| パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ） |
+| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示（ロール不足）※2           |
+| Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                             |
+| セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                           |
+| パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ）       |
 
 #### 3.7.2 エラー通知（Teams）
 
@@ -996,7 +996,7 @@ class UnityCatalogConnector:
         """Unity Catalog接続を取得
 
         注意: access_tokenはAuthMiddlewareで事前に取得・検証済みの
-        g.databricks_tokenを使用する。これにより期限切れトークンの
+        g.current_user.databricks_tokenを使用する。これにより期限切れトークンの
         使用を防止する。
         """
         access_token = getattr(g, 'databricks_token', None)

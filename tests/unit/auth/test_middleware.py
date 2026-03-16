@@ -215,7 +215,7 @@ class TestAuthenticateRequest:
         assert result is None
 
     def test_databricks_token_set_to_g_on_success(self, app):
-        """2.1.1: Token Exchange 成功後、g.databricks_token に有効なトークンが設定される"""
+        """2.1.1: Token Exchange 成功後、g.current_user.databricks_token に有効なトークンが設定される"""
         from flask import g
 
         mock_provider = self._make_mock_provider(
@@ -232,10 +232,10 @@ class TestAuthenticateRequest:
                     with patch("iot_app.auth.token_exchange.TokenExchanger",
                                return_value=mock_exchanger):
                         authenticate_request()
-                        assert g.databricks_token == "valid-databricks-token"
+                        assert g.current_user.databricks_token == "valid-databricks-token"
 
     def test_user_context_set_to_g_from_session(self, app):
-        """2.1.1: IdP 認証成功後、g.current_user_id / g.current_user_type_id が
+        """2.1.1: IdP 認証成功後、g.current_user.user_id / g.current_user.user_type_id が
         _sync_session によりセッション経由で設定される（設計書3.1 ステップ5）"""
         from flask import g
 
@@ -254,12 +254,12 @@ class TestAuthenticateRequest:
                                return_value=mock_exchanger):
                         authenticate_request()
 
-                        assert g.current_user_id == 42
-                        assert g.current_user_type_id == 2
+                        assert g.current_user.user_id == 42
+                        assert g.current_user.user_type_id == 2
 
     def test_dev_mode_uses_dev_databricks_token(self, app, monkeypatch):
         """2.1.7: AUTH_TYPE=dev のとき Token Exchange をスキップし
-        DEV_DATABRICKS_TOKEN 環境変数の値が g.databricks_token に設定される
+        DEV_DATABRICKS_TOKEN 環境変数の値が g.current_user.databricks_token に設定される
         """
         from flask import g
 
@@ -275,7 +275,7 @@ class TestAuthenticateRequest:
                 with patch("iot_app.auth.middleware.find_user_by_email",
                            return_value=self._default_app_user()):
                     authenticate_request()
-                    assert g.databricks_token == "dev-token-xyz"
+                    assert g.current_user.databricks_token == "dev-token-xyz"
 
     def test_dev_mode_aborts_500_when_dev_token_not_set(self, app, monkeypatch):
         """1.3.7: AUTH_TYPE=dev かつ DEV_DATABRICKS_TOKEN 未設定時は 500 エラーになる"""
