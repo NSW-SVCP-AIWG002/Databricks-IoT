@@ -18,12 +18,12 @@
   padding: var(--spacing-2) var(--spacing-4);
   background-color: var(--color-primary);
   border-radius: 4px;
+  color: #fff;
 }
 
 .customer-dashboard__title {
   font-size: var(--font-size-lg);
   font-weight: bold;
-  color: #fff;
   margin: 0;
 }
 
@@ -141,13 +141,7 @@
 .toggle {
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);
-  cursor: pointer;
-}
-
-.toggle__input {
-  width: 36px;
-  height: 20px;
+  gap: var(--spacing-2);
   cursor: pointer;
 }
 
@@ -155,6 +149,44 @@
   font-size: var(--font-size-sm);
   white-space: nowrap;
   color: inherit;
+}
+
+.toggle__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.toggle__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.toggle__input:checked + .toggle__track {
+  background: var(--color-primary);
+}
+
+.toggle__input:checked + .toggle__track::after {
+  transform: translateX(16px);
 }
 
 /* ── 編集モードバナー ───────────────────────────── */
