@@ -392,6 +392,11 @@ const CustomerDashboard = (function () {
       _saveDataSource(orgId, deviceId);
       _updateGadgetDatasourceDisplay(orgId, deviceId);
     });
+
+    // 初期表示: user_setting に保存済みのデバイスがあればガジェットのデータソース名を反映
+    if (options.selectedDeviceId) {
+      _updateGadgetDatasourceDisplay(orgSelect.value || null, deviceSelect.value || null);
+    }
   }
 
   async function _saveDataSource(organizationId, deviceId) {
