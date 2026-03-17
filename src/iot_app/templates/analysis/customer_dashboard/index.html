@@ -270,14 +270,14 @@
 
 {# ── 日時初期化 確認モーダル（インライン） ─────────────── #}
 <div class="modal-overlay" id="datetime-reset-modal">
-  <div class="modal-content">
-    <div class="modal-content__header">
-      <h2 class="modal-content__title">日時初期化</h2>
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">日時初期化</h2>
     </div>
-    <div class="modal-content__body">
+    <div class="modal__body">
       <p>ガジェットの日時を最新時刻に更新します。よろしいですか？</p>
     </div>
-    <div class="modal-content__footer">
+    <div class="modal__footer">
       <button type="button" class="button button--primary" id="datetime-reset-confirm-btn">はい</button>
       <button type="button" class="button button--secondary" id="datetime-reset-cancel-btn">いいえ</button>
     </div>
@@ -286,7 +286,7 @@
 
 {# ── AJAXモーダルコンテナ ───────────────────────────── #}
 <div class="modal-overlay" id="ajax-modal-overlay">
-  <div class="modal-content" id="ajax-modal-content"></div>
+  <div class="modal" id="ajax-modal-content"></div>
 </div>
 
 {% endblock %}

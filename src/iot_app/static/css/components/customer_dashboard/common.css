@@ -406,55 +406,6 @@
   background-color: #fdecea;
 }
 
-/* ── モーダル ─────────────────────────────────── */
-.modal-content {
-  background: #fff;
-  border-radius: 4px;
-  min-width: 400px;
-  max-width: 680px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-.modal-content__header {
-  padding: var(--spacing-4) var(--spacing-6);
-  border-bottom: 1px solid #ddd;
-  background-color: var(--color-primary);
-  border-radius: 4px 4px 0 0;
-}
-
-.modal-content__title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  color: #fff;
-  margin: 0;
-}
-
-.modal-content__body {
-  padding: var(--spacing-6);
-}
-
-.modal-content__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-2);
-  padding: var(--spacing-4) var(--spacing-6);
-  border-top: 1px solid #ddd;
-}
-
-.modal-content__actions {
-  display: flex;
-  gap: var(--spacing-2);
-  margin-bottom: var(--spacing-4);
-}
-
-.modal-content__warning {
-  color: var(--color-danger);
-  font-size: var(--font-size-sm);
-  margin-top: var(--spacing-2);
-}
 
 /* ── フォームスタイル ───────────────────────────── */
 .form__group {
@@ -640,13 +591,13 @@
 }
 
 /* ── ダッシュボード管理モーダル テーブル ─────────── */
-.modal-content .table {
+.modal .table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--font-size-base);
 }
 
-.modal-content .table__th {
+.modal .table__th {
   background-color: #f0f0f0;
   padding: var(--spacing-2) var(--spacing-3);
   text-align: left;
@@ -654,17 +605,17 @@
   font-weight: bold;
 }
 
-.modal-content .table__td {
+.modal .table__td {
   padding: var(--spacing-2) var(--spacing-3);
   border-bottom: 1px solid #eee;
 }
 
-.modal-content .table__td--empty {
+.modal .table__td--empty {
   text-align: center;
   color: #aaa;
 }
 
-.modal-content .table__row:hover {
+.modal .table__row:hover {
   background-color: #f9f9f9;
 }
 
