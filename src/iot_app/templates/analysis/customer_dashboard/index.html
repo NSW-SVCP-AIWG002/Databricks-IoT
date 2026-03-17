@@ -26,8 +26,9 @@
     <h1 class="customer-dashboard__title">顧客作成ダッシュボード</h1>
     <div class="dashboard-mgmt-tools">
       <label class="toggle" id="edit-mode-toggle-label">
-        <input type="checkbox" id="edit-mode-toggle" class="toggle__input">
         <span class="toggle__label">編集モード</span>
+        <input type="checkbox" id="edit-mode-toggle" class="toggle__input">
+        <span class="toggle__track"></span>
       </label>
       <button
         type="button"
@@ -112,8 +113,9 @@
       <button type="button" class="button button--primary" id="datetime-reset-btn">日時初期化</button>
 
       <label class="toggle" id="auto-refresh-toggle-label">
-        <input type="checkbox" id="auto-refresh-toggle" class="toggle__input" checked>
         <span class="toggle__label">自動更新</span>
+        <input type="checkbox" id="auto-refresh-toggle" class="toggle__input" checked>
+        <span class="toggle__track"></span>
       </label>
 
       <span class="datetime-tools__last-updated">
@@ -122,6 +124,9 @@
     </div>
 
   </div>{# /subbar #}
+
+  {# ── 編集モード中バナー ───────────────────────────────── #}
+  <div class="edit-mode-banner" id="edit-mode-banner" hidden>編集モード中です</div>
 
   {# ── ダッシュボード本体 ───────────────────────────────── #}
   {% if dashboard %}
@@ -262,9 +267,6 @@
   {% endif %}{# /dashboard exists #}
 
 </div>{# /customer-dashboard #}
-
-{# ── 編集モード中バナー ───────────────────────────────── #}
-<div class="edit-mode-banner" id="edit-mode-banner" hidden>編集モード中です</div>
 
 {# ── 日時初期化 確認モーダル（インライン） ─────────────── #}
 <div class="modal-overlay" id="datetime-reset-modal">
