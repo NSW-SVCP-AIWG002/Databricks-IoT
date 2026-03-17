@@ -182,9 +182,10 @@
 .timeline__legends {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--spacing-2) var(--spacing-4);
   font-size: var(--font-size-sm);
-  padding: var(--spacing-1) 0;
+  padding: 0;
 }
 
 .timeline__legend-item {
@@ -193,19 +194,40 @@
 
 /* 日時コントロールエリア */
 .timeline__controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-2) var(--spacing-4);
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: var(--spacing-4);
+  row-gap: var(--spacing-1);
   padding-top: var(--spacing-1);
   border-top: 1px solid #eee;
 }
 
-.timeline__datetime-block {
+/* ラベル行・入力行：display: contents で子要素をグリッドアイテムに展開 */
+.timeline__controls-label-row,
+.timeline__controls-input-row {
+  display: contents;
+}
+
+/* 入力欄 + リフレッシュボタン */
+.timeline__datetime-input-group {
   display: flex;
   align-items: center;
   gap: var(--spacing-1);
 }
+
+/* --------------------------------------------------------------------------
+   2x4ガジェット: 開始/終了日時を1行に配置
+   -------------------------------------------------------------------------- */
+
+.gadget--2x4 .timeline__controls {
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+}
+
+.gadget--2x4 .timeline__controls-label-row > :nth-child(1) { grid-column: 1; grid-row: 1; }
+.gadget--2x4 .timeline__controls-label-row > :nth-child(2) { grid-column: 3; grid-row: 1; }
+.gadget--2x4 .timeline__controls-input-row > :nth-child(1) { grid-column: 2; grid-row: 1; }
+.gadget--2x4 .timeline__controls-input-row > :nth-child(2) { grid-column: 4; grid-row: 1; }
 
 .timeline__label {
   font-size: var(--font-size-sm);
@@ -221,15 +243,15 @@
 }
 
 .timeline__datetime-input {
-  width: 160px;
+  width: 130px;
   font-size: var(--font-size-sm);
-  padding-right: 24px;
+  padding-left: 24px;
 }
 
 /* カレンダーアイコン（装飾のみ・クリック不可） */
 .timeline__calendar-icon {
   position: absolute;
-  right: 4px;
+  left: 4px;
   font-size: 13px;
   pointer-events: none;
   line-height: 1;
