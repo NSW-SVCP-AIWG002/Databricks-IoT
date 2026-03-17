@@ -12,11 +12,11 @@ class ChatUI {
     constructor() {
         this.form            = document.getElementById('chat_form');
         this.input           = document.getElementById('question_input');
-        this.submitBtn       = document.getElementById('submit_btn');
+        this.submitBtn       = document.getElementById('submit_button');
         this.chatHistory     = document.getElementById('chat_history');
         this.loadingIndicator = document.getElementById('loading_indicator');
         this.charCount       = document.getElementById('char_count');
-        this.newConvBtn      = document.getElementById('new_conversation_btn');
+        this.newConvBtn      = document.getElementById('new_conversation_button');
 
         // SessionStorage から thread_id を復元、なければ新規生成
         this.threadId = sessionStorage.getItem(SS_THREAD_ID);
@@ -169,7 +169,7 @@ class ChatUI {
     }
 
     async _postQuestion(question, threadId) {
-        const resp = await fetch('/api/chat', {
+        const resp = await fetch('/api/analysis/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question, thread_id: threadId }),
@@ -255,13 +255,13 @@ class ChatUI {
 
         const yesBtn = document.createElement('button');
         yesBtn.textContent = 'はい';
-        yesBtn.className = 'btn btn--primary';
+        yesBtn.className = 'button button--primary';
         yesBtn.type = 'button';
         yesBtn.addEventListener('click', () => this._handleHITLResponse('はい', hitlView));
 
         const noBtn = document.createElement('button');
         noBtn.textContent = 'いいえ';
-        noBtn.className = 'btn btn--secondary';
+        noBtn.className = 'button button--secondary';
         noBtn.type = 'button';
         noBtn.addEventListener('click', () => this._handleHITLResponse('いいえ', hitlView));
 
@@ -410,7 +410,7 @@ class ChatUI {
         // リトライボタン（VALIDATION_ERROR 以外）
         if (!errorCode || !['VALIDATION_ERROR', 'AUTH_ERROR'].includes(errorCode)) {
             const retryBtn = document.createElement('button');
-            retryBtn.className = 'retry-btn';
+            retryBtn.className = 'retry-button';
             retryBtn.textContent = 'リトライ';
             retryBtn.type = 'button';
             retryBtn.addEventListener('click', () =>

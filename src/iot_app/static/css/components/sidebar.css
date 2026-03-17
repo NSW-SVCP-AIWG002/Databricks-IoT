@@ -1,0 +1,137 @@
+/* ===== グローバルメニュー（左サイドバー） ===== */
+
+/* (1) サイドバー本体 */
+.navigation {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 60px;            /* アイコンのみ状態 */
+  height: 100vh;
+  overflow: hidden;
+  transition: width 0.3s ease;
+  z-index: 1000;          /* メインコンテンツにオーバーレイ */
+  background-color: var(--nav-bkg-color-a);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.navigation:hover {
+  width: 240px;           /* ホバーで展開 */
+}
+
+/* メニューリスト共通 */
+.nav__menu,
+.nav__account {
+  list-style: none;       /* <ul> デフォルトのバレットポイントを除去 */
+  padding: 0;
+  margin: 0;
+}
+
+.nav__menu {
+  flex: 1;                /* 残余スペースを占有 → nav__account を最下部に押し出す */
+  overflow: hidden;       /* 折りたたみ時はスクロールバー非表示（両方向） */
+  padding: 10px 0;        /* 上下余白 */
+}
+
+.navigation:hover .nav__menu {
+  overflow-y: auto;       /* 展開時のみ縦スクロール有効 */
+}
+
+/* nav__link: アイコン・テキスト・矢印を横並びに整列 */
+.nav__link {
+  display: flex;
+  align-items: center;
+  padding: 15px 0 10px 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #ecf0f1;           /* 親・直接リンク共通テキスト色。子要素は .nav__item--child で上書き */
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+/* アイコン領域 */
+.nav__icon {
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 15px;     /* アイコンとテキストの間隔 */
+}
+
+/* テキスト・矢印は幅アニメーションと並走して opacity でフェードイン */
+.nav__link-text {
+  opacity: 0;
+  flex-grow: 1;           /* 矢印を右端に押し出す */
+  font-size: 16px;
+  transition: opacity 0.3s ease;
+}
+
+.nav__arrow {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  margin-left: 10px;
+  margin-right: 10px;     /* 右端の余白 */
+}
+
+.navigation:hover .nav__link-text,
+.navigation:hover .nav__arrow {
+  opacity: 1;
+}
+
+/* サブメニューの開閉アニメーション */
+.nav__submenu {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.nav__item--parent.is-open .nav__submenu {
+  max-height: 400px;      /* 実際の高さより大きければよい */
+}
+
+/* 開閉矢印: 展開時（.is-open）に ▼ → ▲ へ変化 */
+.nav__item--parent.is-open .nav__arrow {
+  transform: rotate(180deg);
+}
+
+/* 背景色：ホバー中（B色）
+   nav__link はホバーされた要素のみ変化（サブメニュー展開中の親全体には適用しない） */
+.nav__link:hover,
+.nav__item--child:hover {
+  background-color: var(--nav-bkg-color-b);
+}
+
+/* 背景色・テキスト色：現在地（C色） */
+.nav__item--child.nav__item--active {
+  background-color: var(--nav-bkg-color-c);
+  color: #ecf0f1;             /* C色(#596775)に対するコントラスト比4.9:1 → WCAG AA合格 */
+}
+
+/* テキスト色・インデント：子メニュー */
+.nav__item--child {
+  display: block;
+  padding: 12px 15px 12px 55px;  /* 縦12px・右15px・左55px（アイコン幅分） */
+  color: #bdc3c7;
+  text-decoration: none;
+  opacity: 0;                    /* 折りたたみ時は非表示（nav__link-text と同様） */
+  transition: opacity 0.3s ease, background-color 0.2s, color 0.2s, padding-left 0.2s;
+  white-space: nowrap;           /* テキスト折り返し防止 */
+  font-size: 14px;
+}
+
+.navigation:hover .nav__item--child {
+  opacity: 1;                    /* 展開時のみ表示 */
+}
+
+.nav__item--child:hover {
+  color: #ecf0f1;
+  padding-left: 60px;            /* +5px マイクロインタラクション */
+}
+
+/* (2) メインコンテンツエリア */
+.main-content {
+  margin-left: 60px;      /* 折りたたみ幅分のオフセット（固定） */
+}
