@@ -56,7 +56,7 @@
 
 /* --- (3.1.2) リトライボタン --- */
 
-.retry-btn {
+.retry-button {
     display: inline;
     background: none;
     border: none;
@@ -68,7 +68,7 @@
     margin-left: 8px;
 }
 
-.retry-btn:hover {
+.retry-button:hover {
     opacity: 0.8;
 }
 

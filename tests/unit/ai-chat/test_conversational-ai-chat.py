@@ -25,7 +25,7 @@
     # TODO: 実装値・設計書値の乖離を確認・修正すること
 
 注意 (sanitize_question):
-    Flask app (src/views/chat/) に sanitize_question() は未実装のため、
+    Flask app (src/views/analysis/chat/) に sanitize_question() は未実装のため、
     設計書記載の仕様をもとにリファレンス実装を本ファイル内に定義してテストする。
     # TODO: Flask app 実装後は src.views.chat.utils 等から import に変更すること
 """

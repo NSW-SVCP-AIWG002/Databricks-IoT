@@ -18,7 +18,7 @@ def create_app():
     db.init_app(app)
 
     # Blueprint 登録
-    from iot_app.views.chat.views import chat_bp
+    from iot_app.views.analysis.chat.views import chat_bp
     app.register_blueprint(chat_bp)
 
     # ヘルスチェックルート（認証除外パス）

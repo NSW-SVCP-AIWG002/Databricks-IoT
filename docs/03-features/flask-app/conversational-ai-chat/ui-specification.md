@@ -26,7 +26,7 @@
 | ------------ | -------------------------------------------------------------- |
 | 画面ID       | `CHT-001`                                                      |
 | 画面名       | 対話型AIチャット                                               |
-| 画面パス     | `/chat`                                                        |
+| 画面パス     | `/analysis/chat`                                                        |
 | アクセス権限 | システム保守者、管理者、販社ユーザ、サービス利用者（全ロール） |
 | 親画面       | なし（独立画面）                                               |
 | 子画面       | なし                                                           |
@@ -252,7 +252,7 @@
     2. エラー時に表示されたエラーメッセージ（AIレスポンス位置）を削除する
     3. ローディング表示を開始する
     4. 入力エリア・送信ボタンを無効化する
-    5. エラーとなったユーザーメッセージの質問テキストと同一の`thread_id`を使用して`POST /api/chat`を再送信する
+    5. エラーとなったユーザーメッセージの質問テキストと同一の`thread_id`を使用して`POST /api/analysis/chat`を再送信する
     6. 応答結果に応じて通常の回答表示処理またはエラー表示処理を実行する
 - リトライ回数の制限: なし（ユーザーが任意の回数リトライ可能）
 
@@ -655,7 +655,7 @@ class ChatUI {
     }
 
     async sendQuestion(question) {
-        const response = await fetch('/api/chat', {
+        const response = await fetch('/api/analysis/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

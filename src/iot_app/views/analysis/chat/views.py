@@ -6,13 +6,13 @@ import requests
 from flask import Blueprint, g, jsonify, render_template, request, session
 from markupsafe import escape
 
-from iot_app.common.logger import get_logger
+# from iot_app.common.logger import get_logger
 from iot_app.config import config as app_config
 
 chat_bp = Blueprint('chat', __name__)
 
 _config = app_config.get('default')
-logger = get_logger(__name__)
+# logger = get_logger(__name__)
 
 
 def _get_config():
@@ -56,10 +56,10 @@ def call_orchestrator_endpoint(
         f"/serving-endpoints/{cfg.DATABRICKS_SERVING_ENDPOINT_NAME}/invocations"
     )
 
-    logger.info("外部API呼び出し開始", extra={
-        "service": "ai_orchestrator",
-        "operation": "AIチャット質問送信",
-    })
+    # logger.info("外部API呼び出し開始", extra={
+    #     "service": "ai_orchestrator",
+    #     "operation": "AIチャット質問送信",
+    # })
     _start = time.time()
 
     response = requests.post(
@@ -80,11 +80,11 @@ def call_orchestrator_endpoint(
     response.raise_for_status()
     result = response.json()
 
-    logger.info("外部API完了", extra={
-        "service": "ai_orchestrator",
-        "operation": "AIチャット質問送信",
-        "duration_ms": int((time.time() - _start) * 1000),
-    })
+    # logger.info("外部API完了", extra={
+    #     "service": "ai_orchestrator",
+    #     "operation": "AIチャット質問送信",
+    #     "duration_ms": int((time.time() - _start) * 1000),
+    # })
 
     prediction = result.get("predictions", result)
 
@@ -97,7 +97,7 @@ def call_orchestrator_endpoint(
     }
 
 
-@chat_bp.route('/chat', methods=['GET'])
+@chat_bp.route('/analysis/chat', methods=['GET'])
 def show_chat():
     """チャット画面を表示（CHT-001）。
 
@@ -108,7 +108,7 @@ def show_chat():
                            user_email=session.get('email', ''))
 
 
-@chat_bp.route('/api/chat', methods=['POST'])
+@chat_bp.route('/api/analysis/chat', methods=['POST'])
 def send_question():
     """質問を送信してAIオーケストレータから回答を取得。
 
@@ -169,10 +169,10 @@ def send_question():
         })
 
     except requests.exceptions.Timeout:
-        logger.error("外部APIタイムアウト", exc_info=True, extra={
-            "service": "ai_orchestrator",
-            "error_type": "Timeout",
-        })
+        # logger.error("外部APIタイムアウト", exc_info=True, extra={
+        #     "service": "ai_orchestrator",
+        #     "error_type": "Timeout",
+        # })
         return jsonify({
             "success": False,
             "error_code": "GENIE_TIMEOUT",
@@ -180,10 +180,10 @@ def send_question():
         }), 500
 
     except requests.exceptions.ConnectionError:
-        logger.error("外部API接続エラー", exc_info=True, extra={
-            "service": "ai_orchestrator",
-            "error_type": "ConnectionError",
-        })
+        # logger.error("外部API接続エラー", exc_info=True, extra={
+        #     "service": "ai_orchestrator",
+        #     "error_type": "ConnectionError",
+        # })
         return jsonify({
             "success": False,
             "error_code": "NETWORK_ERROR",
@@ -191,10 +191,10 @@ def send_question():
         }), 500
 
     except Exception as e:
-        logger.error("外部API例外", exc_info=True, extra={
-            "service": "ai_orchestrator",
-            "error_type": type(e).__name__,
-        })
+        # logger.error("外部API例外", exc_info=True, extra={
+        #     "service": "ai_orchestrator",
+        #     "error_type": type(e).__name__,
+        # })
         return jsonify({
             "success": False,
             "error_code": "ORCHESTRATOR_ERROR",
