@@ -112,8 +112,9 @@ function buildChartOption(chartData) {
       type: 'category',
       data: labels,
       axisLabel: {
-        rotate: 30,
+        rotate: 0,
         fontSize: 10,
+        interval: (index) => index === 0 || index === labels.length - 1,
         formatter: (v) => v ? v.slice(5, 16) : '',
       },
     },
