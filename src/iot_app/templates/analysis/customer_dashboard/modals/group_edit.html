@@ -1,5 +1,5 @@
-<div class="modal-content__header">
-  <h2 class="modal-content__title">ダッシュボードグループタイトル更新</h2>
+<div class="modal__header">
+  <h2 class="modal__title">ダッシュボードグループタイトル更新</h2>
 </div>
 
 <form
@@ -10,7 +10,7 @@
 >
   {{ form.hidden_tag() }}
 
-  <div class="modal-content__body">
+  <div class="modal__body">
     <div class="form__group">
       <label class="form__label form__label--required" for="{{ form.dashboard_group_name.id }}">
         ダッシュボードグループタイトル
@@ -26,7 +26,7 @@
     </div>
   </div>
 
-  <div class="modal-content__footer">
+  <div class="modal__footer">
     <button type="submit" class="button button--primary">更新</button>
     <button type="button" class="button button--secondary" id="modal-close-btn">キャンセル</button>
   </div>
