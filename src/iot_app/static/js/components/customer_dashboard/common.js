@@ -240,12 +240,6 @@ const CustomerDashboard = (function () {
       }
     });
 
-    // 初期選択: デバイスタブの先頭アイテムを自動選択
-    const firstVisible = Array.from(items).find(function (item) {
-      return item.dataset.sourceType === '1';
-    });
-    if (firstVisible) firstVisible.click();
-
     // ガジェット種別選択
     items.forEach(function (item) {
       item.addEventListener('click', function () {
@@ -267,6 +261,12 @@ const CustomerDashboard = (function () {
         }
       });
     });
+
+    // 初期選択: デバイスタブの先頭アイテムを自動選択
+    const firstVisible = Array.from(items).find(function (item) {
+      return item.dataset.sourceType === '1';
+    });
+    if (firstVisible) firstVisible.click();
 
     // 登録画面ボタン
     if (registerBtn) {
