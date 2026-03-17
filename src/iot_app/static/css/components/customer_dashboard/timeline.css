@@ -278,45 +278,157 @@
 }
 
 /* --------------------------------------------------------------------------
-   gadget-register: 登録モーダル レイアウト
+   gadget-register: 登録モーダル レイアウト（bar_chart デザイン準拠）
    -------------------------------------------------------------------------- */
 
-/* ボディ（左カラム + 右カラム） */
+/* タイトル行（ラベル＋入力を横並び） */
+.gadget-register__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.gadget-register__title-row .form__input {
+  flex: 0 0 200px;
+}
+
+/* 上部行：デバイスモードエリア + 測定項目ラベル列 */
+.gadget-register__top-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+}
+
+/* デバイスモードエリア：左2列分を占有 */
+.gadget-register__device-mode-area {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.gadget-register__measurement-title {
+  grid-column: span 1;
+}
+
+/* デバイス名行 */
+.gadget-register__device-name-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  min-height: var(--spacing-6);
+  margin-bottom: var(--spacing-2);
+}
+
+/* メインボディ（左・中・右 3カラム） */
 .gadget-register__body {
   display: flex;
-  gap: var(--spacing-4);
+  align-items: flex-start;
+  gap: var(--spacing-6);
   margin-top: var(--spacing-4);
 }
 
 .gadget-register__left {
+  flex: 0 0 220px;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3);
-  flex: 0 0 220px;
 }
 
+/* 中カラム：デバイス選択（固定モード時） */
+.gadget-register__middle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-4);
+}
+
+.gadget-register__middle .form__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.gadget-register__middle .gadget-register__minmax-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.gadget-register__middle .gadget-register__minmax {
+  margin-top: calc(var(--spacing-8) + 4px);
+}
+
+/* 右カラム：左右測定項目リスト横並び */
 .gadget-register__right {
+  flex: 2;
+  min-width: 0;
   display: flex;
   gap: var(--spacing-4);
-  flex: 1;
 }
 
-/* ガジェットプレビュー（SVGイメージ） */
+/* ガジェットプレビュー */
 .gadget-register__preview {
+  width: 100%;
+  height: 164px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  background: #f9f9f9;
-  padding: var(--spacing-2);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .gadget-register__preview-timeline {
   width: 100%;
+  height: 100%;
 }
 
 .gadget-register__preview-svg {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
+}
+
+/* 最小値/最大値（左カラム内・プレビュー下・2行2列） */
+.gadget-register__minmax {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+}
+
+.gadget-register__minmax-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.gadget-register__minmax-row .form__group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.gadget-register__minmax-row .form__label {
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+.gadget-register__minmax-input {
+  width: 100px;
+}
+
+/* デバイス指定セクション見出し */
+.gadget-register__section-title {
+  font-size: 16px;
+  margin: 0 0 var(--spacing-1) 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -326,103 +438,79 @@
 /* デバイスモード切替ボタン群 */
 .timeline-register__device-mode-buttons {
   display: flex;
-  gap: var(--spacing-2);
+  gap: 2px;
 }
 
 .timeline-register__device-mode-btn {
-  flex: 1;
   padding: var(--spacing-1) var(--spacing-3);
-  font-size: var(--font-size-sm);
-  border: 1px solid var(--color-primary);
+  border: 1px solid #ccc;
   background: #fff;
-  color: var(--color-primary);
-  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  font-size: var(--font-size-sm);
 }
 
-.timeline-register__device-mode-btn--active,
-.timeline-register__device-mode-btn:hover {
+.timeline-register__device-mode-btn--active {
   background: var(--color-primary);
   color: #fff;
+  border-color: var(--color-primary);
 }
 
-/* デバイス名表示エリア */
-.timeline-register__device-name-area {
-  min-height: 24px;
-  padding: var(--spacing-1) 0;
-}
-
+/* デバイス名表示 */
 .timeline-register__device-name {
-  font-size: var(--font-size-sm);
-  font-weight: bold;
-  color: var(--color-primary);
+  font-size: var(--font-size-base);
 }
 
-/* デバイス選択エリア（固定モード時） */
-.timeline-register__device-area {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-}
-
-/* 測定項目選択リスト */
+/* 測定項目選択リスト（テーブル形式） */
 .timeline-register__measurement-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
-  max-height: 240px;
+  flex: 1;
+  min-width: 0;
+  max-height: 260px;
   overflow-y: auto;
   border: 1px solid #ddd;
   border-radius: 4px;
-  padding: var(--spacing-2);
-  background: #fafafa;
 }
 
-.timeline-register__measurement-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  cursor: pointer;
-  padding: var(--spacing-1) var(--spacing-2);
-  border-radius: 3px;
-  font-size: var(--font-size-sm);
-  transition: background 0.1s;
-}
-
-.timeline-register__measurement-item:hover {
-  background: #eef4fb;
-}
-
-.timeline-register__unit {
-  margin-left: auto;
-  color: var(--color-secondary);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
-}
-
-/* 最小値/最大値 行 */
-.timeline-register__minmax-row {
-  display: flex;
-  gap: var(--spacing-4);
-  margin-top: var(--spacing-3);
-}
-
-.timeline-register__minmax-row .form__group {
-  flex: 1;
-}
-
-.timeline-register__minmax-input {
+.timeline-register__measurement-list table {
+  border-collapse: collapse;
   width: 100%;
 }
 
-/* グループ選択 / 部品サイズ 行 */
-.timeline-register__bottom-row {
-  display: flex;
-  gap: var(--spacing-4);
-  margin-top: var(--spacing-3);
+.timeline-register__measurement-list thead {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
 }
 
-.timeline-register__bottom-row .form__group {
+.timeline-register__measurement-list th,
+.timeline-register__measurement-list td {
+  border: 1px solid #ddd;
+}
+
+/* 下部行（グループ選択・部品サイズ） */
+.form__row {
+  display: flex;
+  gap: var(--spacing-6);
+  align-items: center;
+  margin-top: var(--spacing-4);
+}
+
+.form__row .form__group--half:first-child {
+  flex: 0 0 220px;
+}
+
+.form__group--inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: 0;
+}
+
+.form__group--inline .form__label {
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+.form__group--half {
   flex: 1;
 }

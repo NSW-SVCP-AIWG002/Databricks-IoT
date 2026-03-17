@@ -112,12 +112,20 @@ def gadget_timeline_create():
     """時系列グラフガジェット 登録モーダル表示"""
     from iot_app.common.exceptions import NotFoundError
     accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
-    current_user_id = getattr(getattr(g, 'current_user', None), 'user_id', None)
+    current_user_id = g.current_user.user_id
+
     try:
         context = get_timeline_create_context(accessible_org_ids, current_user_id)
     except NotFoundError:
         abort(404)
+
     form = TimelineGadgetForm()
+    form.group_id.choices = [
+        (grp.dashboard_group_id, grp.dashboard_group_name) for grp in context['groups']
+    ]
+    if context['groups']:
+        form.group_id.data = context['groups'][0].dashboard_group_id
+
     return render_template(
         'analysis/customer_dashboard/modals/gadget_register/timeline.html',
         form=form,

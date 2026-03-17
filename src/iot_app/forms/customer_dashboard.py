@@ -38,8 +38,10 @@ class TimelineGadgetForm(FlaskForm):
         validators=[Optional()],
     )
 
-    group_id = IntegerField(
+    group_id = SelectField(
         'グループ選択',
+        coerce=int,
+        choices=[],
         validators=[DataRequired(message='グループを選択してください')],
     )
 
