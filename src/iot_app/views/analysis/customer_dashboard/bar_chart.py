@@ -5,8 +5,8 @@ from flask import Blueprint, Response, abort, g, jsonify, redirect, render_templ
 
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.forms.customer_dashboard import BarChartGadgetForm
-from iot_app.services.customer_dashboard.bar_chart_service import (
+from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
+from iot_app.services.customer_dashboard.bar_chart import (
     check_device_access,
     fetch_bar_chart_data,
     format_bar_chart_data,
