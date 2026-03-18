@@ -23,7 +23,7 @@ def create_app():
         return jsonify(status='ok'), 200
 
     # Analysis Blueprint
-    from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
+    from iot_app.views.analysis.customer_dashboard.timeline import customer_dashboard_bp
     app.register_blueprint(customer_dashboard_bp)
 
     # 開発環境専用 Blueprint
