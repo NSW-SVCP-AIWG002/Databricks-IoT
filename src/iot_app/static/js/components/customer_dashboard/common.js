@@ -21,7 +21,7 @@ const CustomerDashboard = (function () {
     _setupEditModeToggle();
     _setupSaveLayoutBtn();
     _setupDatetimeTools();
-    _setupAutoRefresh();
+    // _setupAutoRefresh();  // TODO: ガジェット個別設計（自動更新要否・パラメータ体系）確定後に有効化。UC接続コストリスクのためE2Eテスト前に保留。
     _setupGroupCollapseButtons();
     _updateLastUpdatedTime();
   }
