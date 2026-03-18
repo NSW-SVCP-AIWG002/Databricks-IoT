@@ -1,5 +1,5 @@
 """
-顧客作成ダッシュボード ビュー
+顧客作成ダッシュボード 時系列グラフ ビュー
 
 参照設計書:
   - docs/03-features/flask-app/customer-dashboard/timeline/workflow-specification.md
@@ -12,8 +12,8 @@ from flask import Blueprint, Response, abort, g, jsonify, redirect, render_templ
 
 from iot_app import db
 from iot_app.common.logger import get_logger
-from iot_app.forms.customer_dashboard import TimelineGadgetForm
-from iot_app.services.customer_dashboard.timeline_service import (
+from iot_app.forms.customer_dashboard.timeline import TimelineGadgetForm
+from iot_app.services.customer_dashboard.timeline import (
     check_device_in_scope,
     export_timeline_csv,
     fetch_timeline_data,
