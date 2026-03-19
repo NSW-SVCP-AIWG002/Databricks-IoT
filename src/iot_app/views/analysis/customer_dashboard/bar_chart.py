@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
 
-from iot_app.common.exceptions import NotFoundError, ValidationError
+from iot_app.common.exceptions import NotFoundError
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
 from iot_app.services.customer_dashboard.bar_chart import (
@@ -195,10 +195,8 @@ def gadget_bar_chart_register():
         )
         return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
 
-    except ValidationError as e:
-        return jsonify({'error': str(e)}), 400
-    except NotFoundError as e:
-        return jsonify({'error': str(e)}), 404
+    except NotFoundError:
+        abort(404)
     except Exception as e:
         logger.error(f'棒グラフガジェット登録エラー: {str(e)}')
         abort(500)
@@ -253,8 +251,6 @@ def gadget_csv_export(gadget_uuid):
             headers={'Content-Disposition': f'attachment; filename={filename}'},
         )
 
-    except ValidationError:
-        abort(400)
     except Exception as e:
         logger.error(f'棒グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         abort(500)
