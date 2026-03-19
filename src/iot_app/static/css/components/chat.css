@@ -7,7 +7,7 @@
 .chat-wrapper {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 64px); /* ページヘッダー分を除く */
+    height: calc(100vh - 100px); /* ページヘッダー分を除く */
     overflow: hidden;
 }
 
