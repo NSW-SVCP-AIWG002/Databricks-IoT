@@ -844,7 +844,7 @@ flowchart TD
     Start([リトライボタン押下]) --> HideRetry[リトライボタン非表示]
     HideRetry --> RemoveError[エラーメッセージ削除]
     RemoveError --> ShowLoading[ローディング表示]
-    ShowLoading --> DisableInput[入力エリア・送信ボタン無効化]
+    ShowLoading --> DisableInput[入力エリア・送信ボタン・リトライボタン・新しい会話を開始ボタン無効化]
     DisableInput --> Resend["同一質問テキストで再送信<br>POST /api/analysis/chat<br>{question: 元の質問, thread_id: 同一ID}"]
     Resend --> CheckResponse{レスポンス判定}
     CheckResponse -->|成功| DisplayAnswer[回答表示<br>SessionStorageに保存]
