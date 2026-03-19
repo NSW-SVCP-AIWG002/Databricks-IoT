@@ -67,8 +67,8 @@ def upsert_dashboard_user_setting(user_id, dashboard_id):
         new_setting = DashboardUserSetting(
             user_id=user_id,
             dashboard_id=dashboard_id,
-            organization_id=0,
-            device_id=0,
+            organization_id=None,
+            device_id=None,
             creator=user_id,
             modifier=user_id,
         )
@@ -90,15 +90,15 @@ def delete_dashboard_user_setting(user_id, modifier):
 
 
 def update_datasource_setting(user_id, organization_id, device_id, modifier):
-    """ユーザー設定の組織ID・デバイスIDを更新する。Noneは0に正規化する"""
+    """ユーザー設定の組織ID・デバイスIDを更新する。未選択はNULLで保持する"""
     setting = (
         db.session.query(DashboardUserSetting)
         .filter(DashboardUserSetting.user_id == user_id)
         .first()
     )
     if setting is not None:
-        setting.organization_id = organization_id if organization_id is not None else 0
-        setting.device_id = device_id if device_id is not None else 0
+        setting.organization_id = organization_id
+        setting.device_id = device_id
         setting.modifier = modifier
 
 

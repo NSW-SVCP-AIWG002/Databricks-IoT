@@ -241,8 +241,8 @@ class TestUpsertDashboardUserSetting:
         mock_db.session.add.assert_called_once()
         added_obj = mock_db.session.add.call_args[0][0]
         assert added_obj.dashboard_id == 1
-        assert added_obj.organization_id == 0
-        assert added_obj.device_id == 0
+        assert added_obj.organization_id is None
+        assert added_obj.device_id is None
         assert added_obj.creator == 1
         assert added_obj.modifier == 1
 
@@ -1874,8 +1874,8 @@ class TestUpdateDatasourceSetting:
         assert mock_setting.device_id == 10
 
     @patch(f'{MODULE}.db')
-    def test_normalizes_none_organization_id_to_zero(self, mock_db):
-        """3.1.2 organization_id が None の場合は 0 に正規化する"""
+    def test_passes_none_organization_id_as_none(self, mock_db):
+        """3.1.2 organization_id が None の場合は None のまま設定する（未選択はNULLで保持）"""
         # Arrange
         mock_setting = MagicMock()
         mock_db.session.query.return_value.filter.return_value.first.return_value = mock_setting
@@ -1885,11 +1885,11 @@ class TestUpdateDatasourceSetting:
         update_datasource_setting(user_id=1, organization_id=None, device_id=10, modifier=1)
 
         # Assert
-        assert mock_setting.organization_id == 0
+        assert mock_setting.organization_id is None
 
     @patch(f'{MODULE}.db')
-    def test_normalizes_none_device_id_to_zero(self, mock_db):
-        """3.1.2 device_id が None の場合は 0 に正規化する"""
+    def test_passes_none_device_id_as_none(self, mock_db):
+        """3.1.2 device_id が None の場合は None のまま設定する（未選択はNULLで保持）"""
         # Arrange
         mock_setting = MagicMock()
         mock_db.session.query.return_value.filter.return_value.first.return_value = mock_setting
@@ -1899,7 +1899,7 @@ class TestUpdateDatasourceSetting:
         update_datasource_setting(user_id=1, organization_id=5, device_id=None, modifier=1)
 
         # Assert
-        assert mock_setting.device_id == 0
+        assert mock_setting.device_id is None
 
     @patch(f'{MODULE}.db')
     def test_sets_modifier(self, mock_db):

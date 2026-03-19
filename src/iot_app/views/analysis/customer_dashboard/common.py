@@ -82,7 +82,7 @@ def customer_dashboard():
     gadgets = get_gadgets_by_groups(group_ids)
 
     devices = []
-    if user_setting and user_setting.organization_id != 0:
+    if user_setting and user_setting.organization_id is not None:
         devices = get_devices(user_setting.organization_id)
 
     return render_template(
