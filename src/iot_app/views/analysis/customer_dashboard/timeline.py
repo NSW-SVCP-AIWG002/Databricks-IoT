@@ -127,7 +127,7 @@ def gadget_timeline_create():
         form.group_id.data = context['groups'][0].dashboard_group_id
 
     return render_template(
-        'analysis/customer_dashboard/modals/gadget_register/timeline.html',
+        'analysis/customer_dashboard/gadgets/modals/timeline.html',
         form=form,
         **context,
     )
@@ -148,7 +148,7 @@ def gadget_timeline_register():
 
     if not form.validate_on_submit():
         return render_template(
-            'analysis/customer_dashboard/modals/gadget_register/timeline.html',
+            'analysis/customer_dashboard/gadgets/modals/timeline.html',
             form=form,
         ), 400
 
