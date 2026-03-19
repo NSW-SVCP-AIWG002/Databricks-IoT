@@ -60,51 +60,7 @@
           </button>
         </div>
 
-        <!-- 棒グラフガジェット固有UI -->
-        <div class="gadget__body">
-          <div class="bar-chart" data-gadget-uuid="{{ gadget.gadget_uuid }}">
-
-            <!-- グラフエリア -->
-            <div class="bar-chart__canvas-wrapper">
-              <div class="bar-chart__canvas" id="chart-{{ gadget.gadget_uuid }}"></div>
-            </div>
-
-            <!-- 操作エリア -->
-            <div class="bar-chart__controls">
-              <div class="bar-chart__unit-selector">
-                <span class="bar-chart__label">表示時間単位：</span>
-                <div class="bar-chart__unit-buttons">
-                  <button class="bar-chart__unit-btn bar-chart__unit-btn--active" data-unit="hour">時</button>
-                  <button class="bar-chart__unit-btn" data-unit="day">日</button>
-                  <button class="bar-chart__unit-btn" data-unit="week">週</button>
-                  <button class="bar-chart__unit-btn" data-unit="month">月</button>
-                </div>
-              </div>
-              <div class="bar-chart__interval-selector" id="interval-selector-{{ gadget.gadget_uuid }}">
-                <span class="bar-chart__label">集計時間幅：</span>
-                <select class="form__select bar-chart__interval-select">
-                  <option value="1min">1分</option>
-                  <option value="2min">2分</option>
-                  <option value="3min">3分</option>
-                  <option value="5min">5分</option>
-                  <option value="10min" selected>10分</option>
-                  <option value="15min">15分</option>
-                </select>
-                <span class="bar-chart__label">分</span>
-              </div>
-              <div class="bar-chart__datetime-selector">
-                <span class="bar-chart__label bar-chart__datetime-label">時間帯：</span>
-                <div class="bar-chart__datetime-input-wrapper">
-                  <input class="form__input bar-chart__datetime-input" type="text"
-                         placeholder="YYYY/MM/DD HH:mm:ss">
-                  <button class="bar-chart__calendar-btn" type="button" title="カレンダーを開く">📅</button>
-                </div>
-                <button class="bar-chart__refresh-btn" type="button" title="現在日時に更新">🔄</button>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        {% include 'analysis/customer_dashboard/gadgets/bar_chart.html' %}
 
       </div>
       {% endfor %}

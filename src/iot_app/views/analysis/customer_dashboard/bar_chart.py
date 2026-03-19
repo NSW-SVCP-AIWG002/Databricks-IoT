@@ -133,7 +133,7 @@ def gadget_bar_chart_create():
         (m.measurement_item_id, m.display_name) for m in context['measurement_items']
     ]
     return render_template(
-        'analysis/customer_dashboard/modals/gadget_register/bar_chart.html',
+        'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
         form=form,
         **context,
     )
@@ -168,7 +168,7 @@ def gadget_bar_chart_register():
 
     if not form.validate_on_submit():
         return render_template(
-            'analysis/customer_dashboard/modals/gadget_register/bar_chart.html',
+            'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
             form=form,
             **context,
         ), 400
