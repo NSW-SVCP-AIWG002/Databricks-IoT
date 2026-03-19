@@ -5,6 +5,7 @@ from iot_app.common.logger import get_logger
 from iot_app.decorators.auth import require_auth
 from iot_app.forms.customer_dashboard.common import DashboardForm, DashboardGroupForm, GadgetForm
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster
+
 from iot_app.services.customer_dashboard.common import (
     check_dashboard_access,
     check_gadget_access,
@@ -18,13 +19,16 @@ from iot_app.services.customer_dashboard.common import (
     get_accessible_organizations,
     get_dashboard_by_id,
     get_dashboard_groups,
+    get_dashboard_update_date,
     get_dashboard_user_setting,
     get_dashboards,
     get_devices,
     get_devices_by_organization,
     get_first_dashboard,
     get_gadget_types,
+    get_gadget_update_date,
     get_gadgets_by_groups,
+    get_group_update_date,
     get_organization_id_by_user,
     get_organizations,
     save_layout,
@@ -191,10 +195,7 @@ def dashboard_edit(dashboard_uuid):
 def dashboard_update(dashboard_uuid):
     """ダッシュボードタイトル更新実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
         abort(500)
 
@@ -216,10 +217,7 @@ def dashboard_update(dashboard_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
         abort(500)
 
@@ -266,10 +264,7 @@ def dashboard_delete_confirm(dashboard_uuid):
 def dashboard_delete(dashboard_uuid):
     """ダッシュボード削除実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
         abort(500)
 
@@ -279,10 +274,7 @@ def dashboard_delete(dashboard_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
         abort(500)
 
@@ -409,10 +401,7 @@ def group_edit(dashboard_group_uuid):
 def group_update(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
         abort(500)
 
@@ -434,10 +423,7 @@ def group_update(dashboard_group_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
         abort(500)
 
@@ -484,10 +470,7 @@ def group_delete_confirm(dashboard_group_uuid):
 def group_delete(dashboard_group_uuid):
     """ダッシュボードグループ削除実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
         abort(500)
 
@@ -497,10 +480,7 @@ def group_delete(dashboard_group_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
         abort(500)
 
@@ -587,10 +567,7 @@ def gadget_edit(gadget_uuid):
 def gadget_update(gadget_uuid):
     """ガジェットタイトル更新実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
         abort(500)
 
@@ -612,10 +589,7 @@ def gadget_update(gadget_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
         abort(500)
 
@@ -662,10 +636,7 @@ def gadget_delete_confirm(gadget_uuid):
 def gadget_delete(gadget_uuid):
     """ガジェット削除実行"""
     try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        ).scalar()
+        snapshot_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
         abort(500)
 
@@ -675,10 +646,7 @@ def gadget_delete(gadget_uuid):
         abort(404)
 
     try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        ).scalar()
+        current_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
         abort(500)
 
