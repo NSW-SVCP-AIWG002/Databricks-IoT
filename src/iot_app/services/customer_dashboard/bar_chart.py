@@ -10,7 +10,7 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.models.dashboard import DashboardGadgetMaster
+from iot_app.models.dashboard import DashboardGadgetMaster, GadgetTypeMaster
 
 logger = get_logger(__name__)
 
@@ -552,6 +552,48 @@ def get_measurement_item_column_name(measurement_item_id):
 
 
 # ============================================================
+# ダッシュボード関連取得
+# ============================================================
+
+def get_dashboard_user_setting(user_id):
+    """ユーザーIDでダッシュボードユーザー設定を取得する"""
+    from iot_app.models.dashboard import DashboardUserSetting
+    if user_id is None:
+        return None
+    return db.session.query(DashboardUserSetting).filter_by(user_id=user_id).first()
+
+
+def get_dashboard_by_id(dashboard_id, accessible_org_ids):
+    """ダッシュボードをIDで取得する
+
+    NOTE: accessible_org_ids によるフィルタは本実装で追加予定（仮実装では delete_flag のみ）
+    """
+    from iot_app.models.dashboard import DashboardMaster
+    return (
+        db.session.query(DashboardMaster)
+        .filter(
+            DashboardMaster.dashboard_id == dashboard_id,
+            DashboardMaster.delete_flag == False,
+        )
+        .first()
+    )
+
+
+def get_dashboard_groups(dashboard_id):
+    """ダッシュボードIDでグループ一覧を表示順で取得する"""
+    from iot_app.models.dashboard import DashboardGroupMaster
+    return (
+        db.session.query(DashboardGroupMaster)
+        .filter(
+            DashboardGroupMaster.dashboard_id == dashboard_id,
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .order_by(DashboardGroupMaster.display_order.asc())
+        .all()
+    )
+
+
+# ============================================================
 # デバイスアクセスチェック
 # ============================================================
 
@@ -633,10 +675,16 @@ def register_bar_chart_gadget(params, current_user_id, accessible_org_ids=None):
         DashboardGadgetMaster.delete_flag == False,
     ).scalar() or 0
 
+    gadget_type = db.session.query(GadgetTypeMaster).filter_by(
+        gadget_type_name='棒グラフ', delete_flag=False
+    ).first()
+    if not gadget_type:
+        raise NotFoundError("ガジェット種別が見つかりません")
+
     gadget = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name=params.get("title"),
-        gadget_type_id=1,
+        gadget_type_id=gadget_type.gadget_type_id,
         dashboard_group_id=params.get("group_id"),
         chart_config=chart_config,
         data_source_config=data_source_config,
