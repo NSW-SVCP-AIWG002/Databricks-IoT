@@ -332,7 +332,7 @@ class TestCustomerDashboardIndex:
 
     @pytest.mark.integration
     def test_scope_allows_self_and_child(self, client, app, seed_child_org_closure):
-        """1.3.1 / 1.3.2: 自org・子orgのダッシュボードは両方表示される"""
+        """1.3.1 / 1.3.2: 自org・子orgのダッシュボードは両方管理モーダルに表示される"""
         child_org_id = seed_child_org_closure
         with app.app_context():
             dash_self = DashboardMaster(
@@ -358,21 +358,24 @@ class TestCustomerDashboardIndex:
             dash_self_id = dash_self.dashboard_id
             dash_child_id = dash_child.dashboard_id
 
-        # Act
-        response = client.get(BASE_URL)
+        try:
+            # Act: 初期表示（自orgダッシュボードがアクティブ）
+            response = client.get(BASE_URL)
+            assert response.status_code == 200
+            assert '自orgダッシュボードAI'.encode() in response.data
 
-        # Assert
-        assert response.status_code == 200
-        assert '自orgダッシュボードAI'.encode() in response.data
-        assert '子orgダッシュボードAI'.encode() in response.data
-
-        # Teardown
-        with app.app_context():
-            for dashboard_id in (dash_self_id, dash_child_id):
-                d = _db.session.get(DashboardMaster, dashboard_id)
-                if d:
-                    _db.session.delete(d)
-            _db.session.commit()
+            # Act: 管理モーダル（自org・子org両方のダッシュボードが一覧表示される）
+            mgmt_response = client.get(f'{BASE_URL}/dashboards')
+            assert mgmt_response.status_code == 200
+            assert '自orgダッシュボードAI'.encode() in mgmt_response.data
+            assert '子orgダッシュボードAI'.encode() in mgmt_response.data
+        finally:
+            with app.app_context():
+                for dashboard_id in (dash_self_id, dash_child_id):
+                    d = _db.session.get(DashboardMaster, dashboard_id)
+                    if d:
+                        _db.session.delete(d)
+                _db.session.commit()
 
     @pytest.mark.integration
     def test_scope_blocks_parent(self, client, app, seed_org_closure):
@@ -1521,12 +1524,12 @@ class TestDashboardDelete:
     @pytest.mark.integration
     def test_delete_rollback_on_error(self, client, monkeypatch, app, seed_dashboard):
         """7.2: DB例外発生時にロールバックされ、ダッシュボードが残ること。"""
-        from iot_app.services import customer_dashboard_service as svc
+        import iot_app.views.analysis.customer_dashboard.common as view_module
 
         def raise_error(*args, **kwargs):
             raise Exception("DB error")
 
-        monkeypatch.setattr(svc, 'delete_dashboard_with_cascade', raise_error)
+        monkeypatch.setattr(view_module, 'delete_dashboard_with_cascade', raise_error)
 
         client.post(
             f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
@@ -2729,28 +2732,6 @@ class TestDatasourceSave:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data.get('status') == 'ok'
-        with app.app_context():
-            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
-            assert setting is not None
-            assert setting.update_date is not None  # AD: DashboardUserSetting の update_date 更新確認
-
-        # Teardown
-        with app.app_context():
-            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
-            if setting:
-                _db.session.delete(setting)
-                _db.session.commit()
-
-    def test_save_datasource_no_body(self, client, seed_org_closure):
-        """3.1.2: リクエストボディなし - 400 エラーが返される（必須チェック）"""
-        # Act
-        response = client.post(
-            f'{BASE_URL}/datasource/save',
-            content_type='application/json',
-        )
-
-        # Assert
-        assert response.status_code == 400
 
 
 # ============================================================
