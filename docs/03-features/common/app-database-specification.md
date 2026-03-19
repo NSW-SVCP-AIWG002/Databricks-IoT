@@ -1230,8 +1230,8 @@
 | --- | --------------- | ---------------- | -------- | -------- | --- | --- | ----------------- | ----------------------------------------------------- |
 | 1   | user_id         | ユーザーID       | INT      | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）              |
 | 2   | dashboard_id    | ダッシュボードID | INT      | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                  |
-| 3   | organization_id | 組織ID           | INT      | NOT NULL | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合は0を登録     |
-| 4   | device_id       | デバイスID       | INT      | NOT NULL | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合は0を登録 |
+| 3   | organization_id | 組織ID           | INT      | NULL     | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合はNULLを登録  |
+| 4   | device_id       | デバイスID       | INT      | NULL     | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合はNULLを登録 |
 | 5   | create_date     | 作成日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                      |
 | 6   | creator         | 作成者           | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                            |
 | 7   | update_date     | 更新日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                  |

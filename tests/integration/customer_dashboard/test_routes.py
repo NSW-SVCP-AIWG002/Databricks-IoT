@@ -303,8 +303,8 @@ class TestCustomerDashboardIndex:
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,
-                device_id=0,
+                organization_id=None,
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),
@@ -791,14 +791,14 @@ class TestCustomerDashboardIndex:
             _db.session.commit()
 
     @pytest.mark.integration
-    def test_devices_empty_when_organization_id_zero(self, client, app, seed_dashboard):
-        """⑧分岐(False): user_setting.organization_id == 0 の場合、デバイスは取得されない（select disabled）"""
+    def test_devices_empty_when_organization_id_is_none(self, client, app, seed_dashboard):
+        """⑧分岐(False): user_setting.organization_id is None の場合、デバイスは取得されない（select disabled）"""
         with app.app_context():
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,  # == 0 → デバイス取得されない
-                device_id=0,
+                organization_id=None,  # is None → デバイス取得されない
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),
@@ -1146,8 +1146,8 @@ class TestDashboardCreate:
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,
-                device_id=0,
+                organization_id=None,
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),
@@ -1431,8 +1431,8 @@ class TestDashboardDelete:
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,
-                device_id=0,
+                organization_id=None,
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),
@@ -1579,8 +1579,8 @@ class TestDashboardDelete:
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,
-                device_id=0,
+                organization_id=None,
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),
@@ -1705,8 +1705,8 @@ class TestDashboardSwitch:
             setting = DashboardUserSetting(
                 user_id=TEST_USER_ID,
                 dashboard_id=seed_dashboard,
-                organization_id=0,
-                device_id=0,
+                organization_id=None,
+                device_id=None,
                 create_date=datetime.now(),
                 creator=TEST_USER_ID,
                 update_date=datetime.now(),

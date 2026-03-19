@@ -95,8 +95,8 @@ class DashboardUserSetting(db.Model):
 
     user_id = db.Column(db.Integer, primary_key=True)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard_master.dashboard_id'), nullable=False)
-    organization_id = db.Column(db.Integer, nullable=False)
-    device_id = db.Column(db.Integer, nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization_master.organization_id'), nullable=True)
+    device_id = db.Column(db.Integer, db.ForeignKey('device_master.device_id'), nullable=True)
     create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     creator = db.Column(db.Integer, nullable=False)
     update_date = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

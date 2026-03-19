@@ -71,7 +71,7 @@
       <select
         id="select-device"
         class="datasource-form__select"
-        {% if not user_setting or user_setting.organization_id == 0 %}disabled{% endif %}
+        {% if not user_setting or user_setting.organization_id is none %}disabled{% endif %}
         data-save-url="{{ url_for('customer_dashboard.datasource_save') }}"
       >
         <option value="">-- 選択してください --</option>
@@ -295,8 +295,8 @@
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
 <script>
   CustomerDashboard.init({
-    selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id != 0 else none) | tojson }},
-    selectedDeviceId: {{ (user_setting.device_id if user_setting and user_setting.device_id != 0 else none) | tojson }},
+    selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},
+    selectedDeviceId: {{ (user_setting.device_id if user_setting and user_setting.device_id is not none else none) | tojson }},
     dashboardUuid: {{ dashboard.dashboard_uuid | tojson if dashboard else 'null' }}
   });
 </script>

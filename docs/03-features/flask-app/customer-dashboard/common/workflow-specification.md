@@ -552,9 +552,9 @@ def customer_dashboard():
     # 組織選択肢取得
     organizations = get_organizations(accessible_org_ids)
 
-    # ユーザー設定で選択組織IDが設定されている場合（0以外）
+    # ユーザー設定で選択組織IDが設定されている場合（NULLでない場合）
     devices = []
-    if user_setting.organization_id != 0:
+    if user_setting.organization_id is not None:
       # デバイス選択肢取得
       devices = get_devices(user_setting.organization_id)
 
@@ -2399,8 +2399,8 @@ def datasource_save():
     """データソース設定保存（AJAX）"""
     try:
         data = request.get_json()
-        organization_id = data.get('organization_id')  # None の場合は service 側で 0 に正規化
-        device_id = data.get('device_id')              # None の場合は service 側で 0 に正規化
+        organization_id = data.get('organization_id')  # 未選択の場合は None（NULLとして保存）
+        device_id = data.get('device_id')              # 未選択の場合は None（NULLとして保存）
         current_user_id = session.get('user_id')
         update_datasource_setting(db, current_user_id, organization_id, device_id, current_user_id)
         db.session.commit()
@@ -2411,12 +2411,11 @@ def datasource_save():
         return jsonify({'error': 'データソース設定の保存に失敗しました'}), 500
 ```
 
-**`update_datasource_setting` サービス関数の正規化ロジック（実装時の注意）:**
+**`update_datasource_setting` サービス関数（実装時の注意）:**
 
 ```python
 def update_datasource_setting(db, user_id, organization_id, device_id, modifier):
-    organization_id = organization_id if organization_id is not None else 0
-    device_id = device_id if device_id is not None else 0
+    # organization_id / device_id は None のまま渡す（未選択はNULLで保持）
     # UPDATE処理...
 ```
 

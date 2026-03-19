@@ -178,8 +178,8 @@
 |----------|-------|---------|------|------|
 | user_id | ユーザーID | INT | ○ | ユーザーの一意識別子（主キー、外部キー） |
 | dashboard_id | ダッシュボードID | INT | ○ | 選択中のダッシュボードID（外部キー） |
-| organization_id | 組織ID | INT | ○ | 選択中の組織ID（外部キー）、未選択の場合は0を登録 |
-| device_id | デバイスID | INT | ○ | 選択中のデバイスID（外部キー） 、未選択の場合は0を登録|
+| organization_id | 組織ID | INT | △ | 選択中の組織ID（外部キー）、未選択の場合はNULLを登録 |
+| device_id | デバイスID | INT | △ | 選択中のデバイスID（外部キー）、未選択の場合はNULLを登録 |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
 | creator | 作成者 | INT | ○ | レコード作成者のユーザーID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |

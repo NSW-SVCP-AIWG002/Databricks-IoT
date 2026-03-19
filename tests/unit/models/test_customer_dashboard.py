@@ -300,8 +300,8 @@ class TestDashboardUserSetting:
         setting = DashboardUserSetting(
             user_id=1,
             dashboard_id=1,
-            organization_id=0,
-            device_id=0,
+            organization_id=None,
+            device_id=None,
             creator=1,
             modifier=1,
         )
@@ -318,8 +318,8 @@ class TestDashboardUserSetting:
         setting = DashboardUserSetting(
             user_id=1,
             dashboard_id=1,
-            organization_id=0,
-            device_id=0,
+            organization_id=None,
+            device_id=None,
             creator=1,
             modifier=1,
         )
