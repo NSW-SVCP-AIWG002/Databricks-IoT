@@ -125,8 +125,8 @@ const CustomerDashboard = (function () {
         return;
       }
 
-      if (res.status === 400) {
-        // バリデーションエラー → モーダル内容を更新
+      if (res.status >= 400 && res.status < 500) {
+        // 4xx → モーダル内容を更新（400: フォームエラーHTML、403/404/409: エラーフラグメントHTML）
         const html = await res.text();
         const content = document.getElementById('ajax-modal-content');
         content.innerHTML = html;
