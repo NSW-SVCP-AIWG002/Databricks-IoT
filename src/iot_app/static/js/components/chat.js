@@ -431,6 +431,11 @@ class ChatUI {
         this._sending = sending;
         this.input.disabled = sending;
         this.submitBtn.disabled = sending;
+        const retryList = document.querySelectorAll(".retry-button")
+        retryList.forEach(function (btn) {
+            btn.disabled = sending;
+        });
+        this.newConvBtn.disabled = sending;
     }
 
     _showLoading() {
