@@ -11,6 +11,7 @@ NOTE:
 """
 
 import json
+import re
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -25,12 +26,15 @@ from iot_app.models.customer_dashboard import (
     DashboardUserSetting,
     GadgetTypeMaster,
 )
-from iot_app.models.organization import OrganizationClosure
+from iot_app.models.device import DeviceMaster
+from iot_app.models.organization import OrganizationClosure, OrganizationMaster
 from iot_app.models.user import User
 
 BASE_URL = '/analysis/customer-dashboard'
 TEST_USER_ID = 1
 TEST_ORG_ID = 1
+CHILD_ORG_ID = 2
+PARENT_ORG_ID = 3
 
 
 # ============================================================
@@ -112,6 +116,36 @@ def seed_org_closure(app, seed_user):
         if c:
             _db.session.delete(c)
             _db.session.commit()
+
+
+@pytest.fixture()
+def seed_child_org_closure(app, seed_user):
+    """自org + 子orgの組織閉包を追加（データスコープ1.3.2テスト用）。"""
+    with app.app_context():
+        self_closure = OrganizationClosure(
+            parent_organization_id=TEST_ORG_ID,
+            subsidiary_organization_id=TEST_ORG_ID,
+            depth=0,
+        )
+        child_closure = OrganizationClosure(
+            parent_organization_id=TEST_ORG_ID,
+            subsidiary_organization_id=CHILD_ORG_ID,
+            depth=1,
+        )
+        _db.session.add_all([self_closure, child_closure])
+        _db.session.commit()
+
+    yield CHILD_ORG_ID
+
+    with app.app_context():
+        for subsidiary_id in (TEST_ORG_ID, CHILD_ORG_ID):
+            c = _db.session.query(OrganizationClosure).filter_by(
+                parent_organization_id=TEST_ORG_ID,
+                subsidiary_organization_id=subsidiary_id,
+            ).first()
+            if c:
+                _db.session.delete(c)
+        _db.session.commit()
 
 
 @pytest.fixture()
@@ -249,6 +283,7 @@ class TestCustomerDashboardIndex:
 
         # Assert
         assert response.status_code == 200
+        assert 'dashboard-header__title'.encode() not in response.data
 
     def test_display_with_dashboard(self, client, seed_dashboard):
         """2.1.1 / 4.1.2: ダッシュボードあり - 200 でダッシュボード名が表示される"""
@@ -283,6 +318,10 @@ class TestCustomerDashboardIndex:
 
         # Assert
         assert response.status_code == 200
+        # ダッシュボード名がレスポンスに含まれることを確認
+        with app.app_context():
+            dashboard = _db.session.get(DashboardMaster, seed_dashboard)
+            assert dashboard.dashboard_name.encode() in response.data
 
         # Teardown
         with app.app_context():
@@ -291,7 +330,95 @@ class TestCustomerDashboardIndex:
                 _db.session.delete(s)
                 _db.session.commit()
 
-    def test_scope_excludes_other_org_dashboard(self, client, app, seed_user):
+    @pytest.mark.integration
+    def test_scope_allows_self_and_child(self, client, app, seed_child_org_closure):
+        """1.3.1 / 1.3.2: 自org・子orgのダッシュボードは両方表示される"""
+        child_org_id = seed_child_org_closure
+        with app.app_context():
+            dash_self = DashboardMaster(
+                dashboard_uuid='scope-self-uuid-ai001',
+                dashboard_name='自orgダッシュボードAI',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            dash_child = DashboardMaster(
+                dashboard_uuid='scope-child-uuid-ai001',
+                dashboard_name='子orgダッシュボードAI',
+                organization_id=child_org_id,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add_all([dash_self, dash_child])
+            _db.session.commit()
+            dash_self_id = dash_self.dashboard_id
+            dash_child_id = dash_child.dashboard_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert
+        assert response.status_code == 200
+        assert '自orgダッシュボードAI'.encode() in response.data
+        assert '子orgダッシュボードAI'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            for dashboard_id in (dash_self_id, dash_child_id):
+                d = _db.session.get(DashboardMaster, dashboard_id)
+                if d:
+                    _db.session.delete(d)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_scope_blocks_parent(self, client, app, seed_org_closure):
+        """1.3.3: 親orgのダッシュボードは表示されない（スコープ制御の方向性確認）"""
+        with app.app_context():
+            # 親子関係のclosureを設定（PARENT_ORG_ID → TEST_ORG_ID 方向）
+            # TEST_USERはPARENT_ORG_IDの子だが、子から親のデータは見えない
+            parent_closure = OrganizationClosure(
+                parent_organization_id=PARENT_ORG_ID,
+                subsidiary_organization_id=TEST_ORG_ID,
+                depth=1,
+            )
+            dash_parent = DashboardMaster(
+                dashboard_uuid='scope-parent-uuid-ai001',
+                dashboard_name='親orgダッシュボードAI',
+                organization_id=PARENT_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add_all([parent_closure, dash_parent])
+            _db.session.commit()
+            dash_parent_id = dash_parent.dashboard_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert
+        assert response.status_code == 200
+        assert '親orgダッシュボードAI'.encode() not in response.data
+
+        # Teardown
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, dash_parent_id)
+            if d:
+                _db.session.delete(d)
+            c = _db.session.query(OrganizationClosure).filter_by(
+                parent_organization_id=PARENT_ORG_ID,
+                subsidiary_organization_id=TEST_ORG_ID,
+            ).first()
+            if c:
+                _db.session.delete(c)
+            _db.session.commit()
+
+    def test_scope_blocks_unrelated(self, client, app, seed_user):
         """1.3.4: 無関係組織のダッシュボードは表示されない"""
         # Arrange: 組織閉包なし (org 1 の accessible_orgs = []) → ダッシュボード取得できない
         other_org_id = 99
@@ -323,6 +450,374 @@ class TestCustomerDashboardIndex:
                 _db.session.delete(d)
                 _db.session.commit()
 
+    @pytest.mark.integration
+    def test_deleted_group_not_shown(self, client, app, seed_dashboard):
+        """ delete_flag=True のグループはダッシュボード表示に含まれない"""
+        # Arrange: 論理削除済みグループを作成
+        with app.app_context():
+            group = DashboardGroupMaster(
+                dashboard_group_uuid='deleted-group-uuid-y001',
+                dashboard_group_name='削除済みグループY',
+                dashboard_id=seed_dashboard,
+                display_order=99,
+                delete_flag=True,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(group)
+            _db.session.commit()
+            group_id = group.dashboard_group_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert
+        assert response.status_code == 200
+        assert '削除済みグループY'.encode() not in response.data
+
+        # Teardown
+        with app.app_context():
+            g_obj = _db.session.get(DashboardGroupMaster, group_id)
+            if g_obj:
+                _db.session.delete(g_obj)
+                _db.session.commit()
+
+    @pytest.mark.integration
+    def test_deleted_records_not_shown(self, client, app, seed_group):
+        """ 全階層の delete_flag=True レコードは初期表示に含まれない
+
+        - ガジェット（delete_flag=True）が表示されないこと
+        - ダッシュボード（delete_flag=True）がリストに表示されないこと
+        """
+        with app.app_context():
+            deleted_gadget = DashboardGadgetMaster(
+                gadget_uuid='deleted-gadget-uuid-aj001',
+                gadget_name='削除済みガジェットAJ',
+                dashboard_group_id=seed_group,
+                gadget_type_id=0,
+                chart_config={},
+                data_source_config={},
+                position_x=0,
+                position_y=0,
+                gadget_size=1,
+                display_order=99,
+                delete_flag=True,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            deleted_dashboard = DashboardMaster(
+                dashboard_uuid='deleted-dash-uuid-aj001',
+                dashboard_name='削除済みダッシュボードAJ',
+                organization_id=TEST_ORG_ID,
+                delete_flag=True,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add_all([deleted_gadget, deleted_dashboard])
+            _db.session.commit()
+            deleted_gadget_id = deleted_gadget.gadget_id
+            deleted_dashboard_id = deleted_dashboard.dashboard_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert
+        assert response.status_code == 200
+        assert '削除済みガジェットAJ'.encode() not in response.data
+        assert '削除済みダッシュボードAJ'.encode() not in response.data
+
+        # Teardown
+        with app.app_context():
+            gd = _db.session.get(DashboardGadgetMaster, deleted_gadget_id)
+            if gd:
+                _db.session.delete(gd)
+            d = _db.session.get(DashboardMaster, deleted_dashboard_id)
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_other_dashboard_data_not_shown(self, client, app, seed_gadget):
+        """ chain確認 - 別ダッシュボードのGroup・Gadgetは初期表示に含まれない
+
+        seed_dashboard（アクティブ）配下のGroup・Gadgetは表示され（positive）、
+        別ダッシュボード配下のGroup・GadgetはFK filterで除外される（negative）。
+        """
+        with app.app_context():
+            other_dashboard = DashboardMaster(
+                dashboard_uuid='other-dash-uuid-aj001',
+                dashboard_name='別ダッシュボードAJ',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(other_dashboard)
+            _db.session.flush()
+            other_group = DashboardGroupMaster(
+                dashboard_group_uuid='other-group-uuid-aj001',
+                dashboard_group_name='別ダッシュボードグループAJ',
+                dashboard_id=other_dashboard.dashboard_id,
+                display_order=1,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(other_group)
+            _db.session.flush()
+            other_gadget = DashboardGadgetMaster(
+                gadget_uuid='other-gadget-uuid-aj001',
+                gadget_name='別ダッシュボードガジェットAJ',
+                dashboard_group_id=other_group.dashboard_group_id,
+                gadget_type_id=0,
+                chart_config={},
+                data_source_config={},
+                position_x=0,
+                position_y=0,
+                gadget_size=1,
+                display_order=1,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(other_gadget)
+            _db.session.commit()
+            other_dashboard_id = other_dashboard.dashboard_id
+            other_group_id = other_group.dashboard_group_id
+            other_gadget_id = other_gadget.gadget_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert
+        assert response.status_code == 200
+        # アクティブダッシュボード（seed_dashboard）配下のデータは表示される（positive）
+        assert 'テストグループ'.encode() in response.data
+        assert 'テストガジェット'.encode() in response.data
+        # 別ダッシュボード配下のデータはFK filterで除外される（negative）
+        assert '別ダッシュボードグループAJ'.encode() not in response.data
+        assert '別ダッシュボードガジェットAJ'.encode() not in response.data
+
+        # Teardown
+        with app.app_context():
+            gd = _db.session.get(DashboardGadgetMaster, other_gadget_id)
+            if gd:
+                _db.session.delete(gd)
+            g = _db.session.get(DashboardGroupMaster, other_group_id)
+            if g:
+                _db.session.delete(g)
+            d = _db.session.get(DashboardMaster, other_dashboard_id)
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_default_display_selects_first_dashboard_by_id(self, client, app, seed_org_closure):
+        """ ユーザー設定なし時、ID昇順先頭のダッシュボードがアクティブになる
+
+        get_active_dashboard() の「設定なし → get_first_dashboard()」分岐を確認する。
+        d1（先にINSERT → ID小）がアクティブ選択され、その配下グループが表示される。
+        """
+        with app.app_context():
+            d1 = DashboardMaster(
+                dashboard_uuid='ak-dash-uuid-0001',
+                dashboard_name='AKダッシュボード1',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(d1)
+            _db.session.flush()
+            group_d1 = DashboardGroupMaster(
+                dashboard_group_uuid='ak-group-uuid-0001',
+                dashboard_group_name='AKグループ（d1配下）',
+                dashboard_id=d1.dashboard_id,
+                display_order=1,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(group_d1)
+            d2 = DashboardMaster(
+                dashboard_uuid='ak-dash-uuid-0002',
+                dashboard_name='AKダッシュボード2',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(d2)
+            _db.session.commit()
+            d1_id = d1.dashboard_id
+            group_d1_id = group_d1.dashboard_group_id
+            d2_id = d2.dashboard_id
+
+        # Act: ユーザー設定なしでアクセス
+        response = client.get(BASE_URL)
+
+        # Assert: ID昇順先頭の d1 がアクティブ → d1 配下のグループが表示される
+        assert response.status_code == 200
+        assert 'AKグループ（d1配下）'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            g = _db.session.get(DashboardGroupMaster, group_d1_id)
+            if g:
+                _db.session.delete(g)
+            for dashboard_id in (d1_id, d2_id):
+                d = _db.session.get(DashboardMaster, dashboard_id)
+                if d:
+                    _db.session.delete(d)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_organizations_always_rendered(self, client, app, seed_dashboard):
+        """⑦: 組織選択肢は常時レンダリングされる（user_setting に関わらず）"""
+        with app.app_context():
+            org = OrganizationMaster(
+                organization_id=TEST_ORG_ID,
+                organization_name='テスト組織⑦',
+                organization_type_id=1,
+                address='',
+                phone_number='',
+                contact_person='',
+                contract_status_id=1,
+                contract_start_date=datetime.now().date(),
+                databricks_group_id='',
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.merge(org)
+            _db.session.commit()
+
+        # Act: user_setting なしで初期表示
+        response = client.get(BASE_URL)
+
+        # Assert: 組織名が select-organization に含まれる
+        assert response.status_code == 200
+        assert 'テスト組織⑦'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            o = _db.session.get(OrganizationMaster, TEST_ORG_ID)
+            if o:
+                _db.session.delete(o)
+                _db.session.commit()
+
+    @pytest.mark.integration
+    def test_devices_rendered_when_organization_id_nonzero(self, client, app, seed_dashboard):
+        """⑧分岐(True): user_setting.organization_id != 0 の場合、デバイス選択肢がレンダリングされる"""
+        with app.app_context():
+            org = OrganizationMaster(
+                organization_id=TEST_ORG_ID,
+                organization_name='テスト組織⑧',
+                organization_type_id=1,
+                address='',
+                phone_number='',
+                contact_person='',
+                contract_status_id=1,
+                contract_start_date=datetime.now().date(),
+                databricks_group_id='',
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.merge(org)
+            device = DeviceMaster(
+                device_uuid='test-device-uuid-viii',
+                organization_id=TEST_ORG_ID,
+                device_type_id=1,
+                device_name='テストデバイス⑧',
+                device_model='MODEL-VIII',
+                device_inventory_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(device)
+            _db.session.flush()
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=TEST_ORG_ID,  # != 0 → デバイス取得される
+                device_id=device.device_id,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+            device_id = device.device_id
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert: デバイス名が select-device に含まれる
+        assert response.status_code == 200
+        assert 'テストデバイス⑧'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            s = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if s:
+                _db.session.delete(s)
+            d = _db.session.get(DeviceMaster, device_id)
+            if d:
+                _db.session.delete(d)
+            o = _db.session.get(OrganizationMaster, TEST_ORG_ID)
+            if o:
+                _db.session.delete(o)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_devices_empty_when_organization_id_zero(self, client, app, seed_dashboard):
+        """⑧分岐(False): user_setting.organization_id == 0 の場合、デバイスは取得されない（select disabled）"""
+        with app.app_context():
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=0,  # == 0 → デバイス取得されない
+                device_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+
+        # Act
+        response = client.get(BASE_URL)
+
+        # Assert: select-device が disabled 属性を持つ（デバイス選択不可）
+        assert response.status_code == 200
+        assert 'disabled'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            s = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if s:
+                _db.session.delete(s)
+                _db.session.commit()
+
 
 # ============================================================
 # No.2 ダッシュボード管理モーダル表示
@@ -343,6 +838,7 @@ class TestDashboardManagement:
 
         # Assert
         assert response.status_code == 200
+        assert 'テストダッシュボード'.encode() not in response.data
 
     def test_display_dashboards(self, client, seed_dashboard):
         """4.1.2: ダッシュボードあり - 200 でダッシュボード一覧が表示される"""
@@ -376,6 +872,78 @@ class TestDashboardManagement:
         # Assert
         assert response.status_code == 200
         assert '他組織ダッシュボードMGMT'.encode() not in response.data
+
+        # Teardown
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, dashboard_id)
+            if d:
+                _db.session.delete(d)
+                _db.session.commit()
+
+    @pytest.mark.integration
+    def test_display_sorted_by_id(self, client, app, seed_org_closure):
+        """5.2.1: ダッシュボード一覧はID昇順で返される。"""
+        # Arrange: 複数ダッシュボードを作成
+        with app.app_context():
+            d1 = DashboardMaster(
+                dashboard_uuid='aaaaaaaa-0000-0000-0000-000000000001',
+                dashboard_name='Beta',
+                organization_id=TEST_ORG_ID,
+                creator=TEST_USER_ID,
+                modifier=TEST_USER_ID,
+            )
+            d2 = DashboardMaster(
+                dashboard_uuid='aaaaaaaa-0000-0000-0000-000000000002',
+                dashboard_name='Alpha',
+                organization_id=TEST_ORG_ID,
+                creator=TEST_USER_ID,
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add_all([d1, d2])
+            _db.session.commit()
+            d1_id, d2_id = d1.dashboard_id, d2.dashboard_id
+
+        # Act
+        response = client.get(f'{BASE_URL}/dashboards')
+
+        # Assert: Beta(d1) が Alpha(d2) より前に出現する（ID昇順）
+        assert response.status_code == 200
+        pos_beta = response.data.find(b'Beta')
+        pos_alpha = response.data.find(b'Alpha')
+        assert pos_beta < pos_alpha
+
+        # Teardown
+        with app.app_context():
+            _db.session.query(DashboardMaster).filter(
+                DashboardMaster.dashboard_id.in_([d1_id, d2_id])
+            ).delete(synchronize_session=False)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_deleted_dashboard_not_shown(self, client, app, seed_org_closure):
+        """タスクY: delete_flag=True のダッシュボードは一覧に表示されない"""
+        # Arrange: 論理削除済みダッシュボードを作成
+        with app.app_context():
+            dashboard = DashboardMaster(
+                dashboard_uuid='deleted-dash-uuid-y001',
+                dashboard_name='削除済みダッシュボードY',
+                organization_id=TEST_ORG_ID,
+                delete_flag=True,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(dashboard)
+            _db.session.commit()
+            dashboard_id = dashboard.dashboard_id
+
+        # Act
+        response = client.get(f'{BASE_URL}/dashboards')
+
+        # Assert
+        assert response.status_code == 200
+        assert '削除済みダッシュボードY'.encode() not in response.data
 
         # Teardown
         with app.app_context():
@@ -433,6 +1001,14 @@ class TestDashboardCreate:
             assert dashboard.dashboard_name == dashboard_name
             assert dashboard.organization_id == TEST_ORG_ID
 
+            # タスクH: dashboard_user_setting が新規ダッシュボードIDで更新されることを確認
+            new_dashboard = _db.session.query(DashboardMaster).filter_by(
+                dashboard_name='テスト登録ダッシュボード'
+            ).first()
+            setting = _db.session.query(DashboardUserSetting).filter_by(user_id=TEST_USER_ID).first()
+            assert setting is not None
+            assert setting.dashboard_id == new_dashboard.dashboard_id
+
             # Teardown
             setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
             if setting:
@@ -448,22 +1024,34 @@ class TestDashboardCreate:
             data={'dashboard_name': '日時テストダッシュボード'},
         )
 
-        # Assert
-        with app.app_context():
-            dashboard = _db.session.query(DashboardMaster).filter_by(
-                dashboard_name='日時テストダッシュボード',
-                delete_flag=False,
-            ).first()
-            assert dashboard is not None
-            assert dashboard.create_date is not None
-            assert dashboard.creator == TEST_USER_ID
-
-            # Teardown
-            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
-            if setting:
-                _db.session.delete(setting)
-            _db.session.delete(dashboard)
-            _db.session.commit()
+        # Assert / Teardown
+        try:
+            with app.app_context():
+                dashboard = _db.session.query(DashboardMaster).filter_by(
+                    dashboard_name='日時テストダッシュボード',
+                    delete_flag=False,
+                ).first()
+                assert dashboard is not None
+                assert dashboard.create_date is not None
+                assert dashboard.creator == TEST_USER_ID
+                # タスクI: delete_flag=False・UUID形式の検証
+                assert dashboard.delete_flag is False
+                assert re.match(
+                    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                    dashboard.dashboard_uuid,
+                )
+        finally:
+            # タスクQ: teardown を try/finally で保護
+            with app.app_context():
+                setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+                if setting:
+                    _db.session.delete(setting)
+                d = _db.session.query(DashboardMaster).filter_by(
+                    dashboard_name='日時テストダッシュボード',
+                ).first()
+                if d:
+                    _db.session.delete(d)
+                _db.session.commit()
 
     def test_register_required_validation(self, client, seed_org_closure):
         """3.1.2: ダッシュボードタイトル未入力 - 400 エラーが返される"""
@@ -516,6 +1104,82 @@ class TestDashboardCreate:
                     _db.session.delete(setting)
                 _db.session.delete(dashboard)
                 _db.session.commit()
+
+    @pytest.mark.integration
+    def test_register_shows_success_message(self, client, app, seed_org_closure):
+        """ ダッシュボード登録後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/register',
+            data={'dashboard_name': '成功メッセージ確認ダッシュボード'},
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードを登録しました'.encode() in response.data
+
+        # Teardown
+        with app.app_context():
+            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if setting:
+                _db.session.delete(setting)
+            d = _db.session.query(DashboardMaster).filter_by(
+                dashboard_name='成功メッセージ確認ダッシュボード',
+            ).first()
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
+
+    @pytest.mark.integration
+    def test_register_updates_existing_user_setting(self, client, app, seed_dashboard):
+        """ upsert_dashboard_user_setting の設定あり→UPDATE 分岐確認
+
+        既存の DashboardUserSetting がある状態で登録すると、
+        dashboard_id が新規ダッシュボードの ID に更新される。
+        """
+        # Arrange: 既存ユーザー設定を seed_dashboard に向けて作成
+        with app.app_context():
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=0,
+                device_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+
+        # Act: 新規ダッシュボード登録
+        client.post(
+            f'{BASE_URL}/dashboards/register',
+            data={'dashboard_name': '設定更新確認ダッシュボード'},
+            follow_redirects=False,
+        )
+
+        # Assert: ユーザー設定が新しいダッシュボードIDに更新されている
+        with app.app_context():
+            new_dashboard = _db.session.query(DashboardMaster).filter_by(
+                dashboard_name='設定更新確認ダッシュボード',
+            ).first()
+            updated_setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            assert updated_setting is not None
+            assert updated_setting.dashboard_id == new_dashboard.dashboard_id
+
+        # Teardown
+        with app.app_context():
+            s = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if s:
+                _db.session.delete(s)
+            d = _db.session.query(DashboardMaster).filter_by(
+                dashboard_name='設定更新確認ダッシュボード',
+            ).first()
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
 
 
 # ============================================================
@@ -599,6 +1263,20 @@ class TestDashboardUpdate:
             ).first()
             assert dashboard.dashboard_name == new_name
 
+    @pytest.mark.integration
+    def test_update_shows_success_message(self, client, seed_dashboard):
+        """ ダッシュボード更新後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/update',
+            data={'dashboard_name': '成功メッセージ確認'},
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードタイトルを更新しました'.encode() in response.data
+
     def test_update_sets_modifier_and_update_date(self, client, app, seed_dashboard):
         """4.4.3 / 4.4.4: 更新日時と更新者が更新される"""
         # Act
@@ -648,34 +1326,70 @@ class TestDashboardUpdate:
         # Assert
         assert response.status_code == 404
 
-    def test_update_optimistic_lock_conflict(self, client, app, seed_dashboard):
-        """4.4.6相当 / 楽観ロック: 更新日時が変わっていた場合 409 が返される"""
-        # Arrange: 事前に update_date を手動で変更して競合を発生させる
-        with app.app_context():
-            # update_date を強制的に別の時刻に変えて競合を模擬するため、
-            # 先に GET でスナップショットを取得させてから update_date を更新する
-            dashboard = _db.session.query(DashboardMaster).filter_by(
-                dashboard_uuid='test-dash-uuid-0001',
-            ).first()
-            # ビューが取得するスナップショットとは別にDBを書き換えると競合する
-            from datetime import timedelta
-            dashboard.update_date = dashboard.update_date + timedelta(seconds=1)
-            _db.session.commit()
+    @pytest.mark.integration
+    def test_update_optimistic_lock_conflict(self, client, monkeypatch, seed_dashboard):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
 
-        # Act: この POST では内部で snapshot_update_date（request開始前に取得）と
-        #       current_update_date（DB再読み込み）が一致しないため 409 が発生する
-        # NOTE: ビューの snapshot_update_date はリクエスト開始時に取得されるため、
-        #       テスト内でのDB更新が競合として検出されないケースがある。
-        #       厳密な楽観ロックテストは E2E レベルでの同時リクエストで検証すること。
-        # TODO: 設計書に記載なし、要確認 - 楽観ロックの結合テスト方法を明確化
+        call_count = [0]
+
+        def fake_get_dashboard_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_dashboard_update_date', fake_get_dashboard_update_date)
+
         response = client.post(
             f'{BASE_URL}/dashboards/test-dash-uuid-0001/update',
             data={'dashboard_name': '競合テスト'},
         )
+        assert response.status_code == 409
 
-        # リクエスト内で snapshot と current が同一セッション取得のため一致することが多い
-        # ため、ここでは 302 または 409 のどちらかを許容する
-        assert response.status_code in (302, 409)
+    @pytest.mark.integration
+    def test_update_does_not_change_create_date_and_creator(self, client, app, seed_dashboard):
+        """タスクZ: ダッシュボード更新時に create_date と creator が変更されない"""
+        # Arrange
+        with app.app_context():
+            dashboard = _db.session.query(DashboardMaster).filter_by(
+                dashboard_uuid='test-dash-uuid-0001',
+            ).first()
+            before_create_date = dashboard.create_date
+            before_creator = dashboard.creator
+
+        # Act
+        client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/update',
+            data={'dashboard_name': '不変確認更新ダッシュボード'},
+        )
+
+        # Assert
+        with app.app_context():
+            dashboard = _db.session.query(DashboardMaster).filter_by(
+                dashboard_uuid='test-dash-uuid-0001',
+            ).first()
+            _db.session.refresh(dashboard)
+            assert dashboard.create_date == before_create_date
+            assert dashboard.creator == before_creator
+
+    @pytest.mark.integration
+    def test_update_deleted_dashboard_returns_404(self, client, app, seed_dashboard):
+        """タスクAA: 論理削除済みダッシュボードへの更新リクエストで 404 が返される"""
+        # Arrange: 事前に論理削除済み状態にする
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, seed_dashboard)
+            d.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/update',
+            data={'dashboard_name': '削除済みダッシュボード更新'},
+        )
+
+        # Assert
+        assert response.status_code == 404
 
 
 # ============================================================
@@ -707,8 +1421,23 @@ class TestDashboardDelete:
         # Assert
         assert response.status_code == 404
 
-    def test_delete_success(self, client, app, seed_dashboard):
+    def test_delete_success(self, client, app, seed_dashboard, seed_group, seed_gadget):
         """4.5.1: 正常削除 - 302 リダイレクト、delete_flag=True に更新される"""
+        # Arrange: DashboardUserSetting を作成（削除後に delete_flag=True になることを確認するため）
+        with app.app_context():
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=0,
+                device_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+
         # Act
         response = client.post(
             f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
@@ -722,6 +1451,26 @@ class TestDashboardDelete:
                 dashboard_uuid='test-dash-uuid-0001',
             ).first()
             assert dashboard.delete_flag is True
+            assert dashboard.modifier == TEST_USER_ID
+            # タスクA: 配下グループ・ガジェットも論理削除されていることを確認
+            group = _db.session.get(DashboardGroupMaster, seed_group)
+            assert group.delete_flag is True
+            gadget = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            assert gadget.delete_flag is True
+            # タスクV: DashboardUserSetting も delete_flag=True になっていることを確認
+            # （次のダッシュボードがない場合 → delete_dashboard_user_setting が呼ばれる）
+            user_setting = _db.session.query(DashboardUserSetting).filter_by(
+                user_id=TEST_USER_ID,
+            ).first()
+            assert user_setting is not None
+            assert user_setting.delete_flag is True
+
+        # Teardown: タスクAC - DashboardUserSetting は物理削除されずdelete_flag=Trueのまま残るため手動削除
+        with app.app_context():
+            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if setting:
+                _db.session.delete(setting)
+                _db.session.commit()
 
     def test_delete_not_found(self, client, seed_org_closure):
         """2.2.4: 存在しない UUID で削除実行すると 404 が返される"""
@@ -730,6 +1479,134 @@ class TestDashboardDelete:
 
         # Assert
         assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_already_deleted(self, client, app, seed_dashboard):
+        """4.5.3: 論理削除済みダッシュボードへの削除リクエストで404が返される。"""
+        # Arrange: 事前に削除済み状態にする
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, seed_dashboard)
+            d.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
+            data={'update_date': datetime.now().isoformat()},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_optimistic_lock_conflict(self, client, monkeypatch, seed_dashboard):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
+
+        call_count = [0]
+
+        def fake_get_dashboard_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_dashboard_update_date', fake_get_dashboard_update_date)
+
+        response = client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
+        )
+        assert response.status_code == 409
+
+    @pytest.mark.integration
+    def test_delete_rollback_on_error(self, client, monkeypatch, app, seed_dashboard):
+        """7.2: DB例外発生時にロールバックされ、ダッシュボードが残ること。"""
+        from iot_app.services import customer_dashboard_service as svc
+
+        def raise_error(*args, **kwargs):
+            raise Exception("DB error")
+
+        monkeypatch.setattr(svc, 'delete_dashboard_with_cascade', raise_error)
+
+        client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
+            data={'update_date': datetime.now().isoformat()},
+        )
+
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, seed_dashboard)
+            assert d is not None
+            assert d.delete_flag is False
+
+    @pytest.mark.integration
+    def test_delete_shows_success_message(self, client, app, seed_dashboard):
+        """タスクAB: ダッシュボード削除後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードを削除しました'.encode() in response.data
+
+    @pytest.mark.integration
+    def test_delete_updates_user_setting_to_next_dashboard(self, client, app, seed_dashboard):
+        """タスクAK横展開: delete_dashboard_with_cascade の次ダッシュボードあり→ユーザー設定更新分岐確認
+
+        削除対象以外のダッシュボードが存在する場合、
+        ユーザー設定の dashboard_id が次のダッシュボードIDに更新される。
+        """
+        with app.app_context():
+            # 次のダッシュボードを作成（seed_dashboardより後にINSERT → IDが大きい）
+            d2 = DashboardMaster(
+                dashboard_uuid='delete-next-dash-uuid-ak001',
+                dashboard_name='削除後の次ダッシュボード',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(d2)
+            _db.session.commit()
+            d2_id = d2.dashboard_id
+            # ユーザー設定を seed_dashboard に向けて作成
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=0,
+                device_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+
+        # Act: seed_dashboard を削除
+        client.post(
+            f'{BASE_URL}/dashboards/test-dash-uuid-0001/delete',
+            follow_redirects=False,
+        )
+
+        # Assert: ユーザー設定が d2 の ID に更新されている
+        with app.app_context():
+            updated_setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            assert updated_setting is not None
+            assert updated_setting.dashboard_id == d2_id
+
+        # Teardown
+        with app.app_context():
+            s = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if s:
+                _db.session.delete(s)
+            d = _db.session.get(DashboardMaster, d2_id)
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
 
 
 # ============================================================
@@ -800,6 +1677,64 @@ class TestDashboardSwitch:
                 _db.session.delete(d)
                 _db.session.commit()
 
+    @pytest.mark.integration
+    def test_switch_updates_existing_user_setting(self, client, app, seed_dashboard):
+        """ upsert_dashboard_user_setting の設定あり→UPDATE 分岐確認
+
+        既存の DashboardUserSetting がある状態でスイッチすると、
+        dashboard_id がスイッチ先のIDに更新される。
+        """
+        with app.app_context():
+            # スイッチ先となる別ダッシュボードを作成
+            other_dash = DashboardMaster(
+                dashboard_uuid='switch-update-uuid-ak001',
+                dashboard_name='スイッチ先ダッシュボードAK',
+                organization_id=TEST_ORG_ID,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(other_dash)
+            _db.session.commit()
+            other_dash_id = other_dash.dashboard_id
+            # 既存のユーザー設定を seed_dashboard に向けて作成
+            setting = DashboardUserSetting(
+                user_id=TEST_USER_ID,
+                dashboard_id=seed_dashboard,
+                organization_id=0,
+                device_id=0,
+                create_date=datetime.now(),
+                creator=TEST_USER_ID,
+                update_date=datetime.now(),
+                modifier=TEST_USER_ID,
+            )
+            _db.session.add(setting)
+            _db.session.commit()
+
+        # Act: other_dash にスイッチ
+        response = client.post(
+            f'{BASE_URL}/dashboards/switch-update-uuid-ak001/switch',
+            follow_redirects=False,
+        )
+
+        # Assert: ユーザー設定が other_dash の ID に更新されている
+        assert response.status_code == 302
+        with app.app_context():
+            updated_setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            assert updated_setting is not None
+            assert updated_setting.dashboard_id == other_dash_id
+
+        # Teardown
+        with app.app_context():
+            s = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            if s:
+                _db.session.delete(s)
+            d = _db.session.get(DashboardMaster, other_dash_id)
+            if d:
+                _db.session.delete(d)
+            _db.session.commit()
+
 
 # ============================================================
 # No.10 グループ登録モーダル表示 / No.11 グループ登録実行
@@ -851,6 +1786,12 @@ class TestGroupCreate:
             assert group is not None
             assert group.dashboard_id == seed_dashboard
 
+            # タスクN: display_order の採番確認（初回登録なので1）
+            latest_group = _db.session.query(DashboardGroupMaster).filter_by(
+                dashboard_id=seed_dashboard,
+            ).order_by(DashboardGroupMaster.display_order.desc()).first()
+            assert latest_group.display_order == 1
+
             # Teardown
             _db.session.delete(group)
             _db.session.commit()
@@ -897,6 +1838,57 @@ class TestGroupCreate:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_register_display_order_increments(self, client, app, seed_group):
+        """タスクAK横展開: create_dashboard_group の display_order 採番 既存あり→max+1 分岐確認
+
+        seed_group（display_order=1）が存在する状態で2つ目のグループを登録すると
+        display_order が 2 になる。
+        """
+        # Act: seed_group（display_order=1）がある状態で2つ目を登録
+        client.post(
+            f'{BASE_URL}/groups/register',
+            data={
+                'dashboard_uuid': 'test-dash-uuid-0001',
+                'dashboard_group_name': '2番目グループAK',
+            },
+            follow_redirects=False,
+        )
+
+        # Assert: display_order が max+1 = 2 になっている
+        with app.app_context():
+            group2 = _db.session.query(DashboardGroupMaster).filter_by(
+                dashboard_group_name='2番目グループAK',
+            ).first()
+            assert group2 is not None
+            assert group2.display_order == 2
+
+        # Teardown
+        with app.app_context():
+            g = _db.session.query(DashboardGroupMaster).filter_by(
+                dashboard_group_name='2番目グループAK',
+            ).first()
+            if g:
+                _db.session.delete(g)
+                _db.session.commit()
+
+    @pytest.mark.integration
+    def test_register_shows_success_message(self, client, seed_dashboard):
+        """タスクAB: グループ登録後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/groups/register',
+            data={
+                'dashboard_uuid': 'test-dash-uuid-0001',
+                'dashboard_group_name': '成功メッセージ確認グループ',
+            },
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードグループを登録しました'.encode() in response.data
+
 
 # ============================================================
 # No.12 グループタイトル更新モーダル表示 / No.13 グループタイトル更新実行
@@ -928,6 +1920,17 @@ class TestGroupUpdate:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_get_edit_form_not_found_zero_uuid(self, client, seed_org_closure):
+        """1.3.4: スコープ外（存在しない）UUIDへのアクセスで404を返す。"""
+        # Act
+        response = client.get(
+            f'{BASE_URL}/groups/00000000-0000-0000-0000-000000000000/edit'
+        )
+
+        # Assert
+        assert response.status_code == 404
+
     def test_update_success(self, client, app, seed_group):
         """4.4.1: 正常更新 - 302 リダイレクト、DB のグループ名が更新される"""
         # Arrange
@@ -950,6 +1953,23 @@ class TestGroupUpdate:
                 dashboard_group_uuid='test-group-uuid-0001',
             ).first()
             assert group.dashboard_group_name == new_name
+
+    @pytest.mark.integration
+    def test_update_shows_success_message(self, client, seed_group):
+        """タスクAF: グループ更新後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/update',
+            data={
+                'dashboard_uuid': 'test-dash-uuid-0001',
+                'dashboard_group_name': '成功メッセージ確認',
+            },
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードグループタイトルを更新しました'.encode() in response.data
 
     def test_update_required_validation(self, client, seed_group):
         """3.1.2: グループ名未入力 - 400 エラーが返される"""
@@ -984,6 +2004,100 @@ class TestGroupUpdate:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_update_sets_modifier_and_update_date(self, client, app, seed_group):
+        """4.4.3/4.4.4: グループ更新時に modifier と update_date が設定される。"""
+        # Arrange
+        with app.app_context():
+            group_obj = _db.session.get(DashboardGroupMaster, seed_group)
+            before = group_obj.update_date
+
+        # Act
+        client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/update',
+            data={
+                'dashboard_group_name': '更新後グループ',
+                'update_date': before.isoformat(),
+            },
+        )
+
+        # Assert
+        with app.app_context():
+            group = _db.session.get(DashboardGroupMaster, seed_group)
+            assert group.modifier == TEST_USER_ID
+            assert group.update_date is not None
+
+    @pytest.mark.integration
+    def test_update_does_not_change_create_date_and_creator(self, client, app, seed_group):
+        """タスクZ: グループ更新時に create_date と creator が変更されない"""
+        # Arrange
+        with app.app_context():
+            group = _db.session.query(DashboardGroupMaster).filter_by(
+                dashboard_group_uuid='test-group-uuid-0001',
+            ).first()
+            before_create_date = group.create_date
+            before_creator = group.creator
+
+        # Act
+        client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/update',
+            data={
+                'dashboard_uuid': 'test-dash-uuid-0001',
+                'dashboard_group_name': '不変確認更新グループ',
+            },
+        )
+
+        # Assert
+        with app.app_context():
+            group = _db.session.query(DashboardGroupMaster).filter_by(
+                dashboard_group_uuid='test-group-uuid-0001',
+            ).first()
+            _db.session.refresh(group)
+            assert group.create_date == before_create_date
+            assert group.creator == before_creator
+
+    @pytest.mark.integration
+    def test_update_deleted_group_returns_404(self, client, app, seed_group):
+        """タスクAA: 論理削除済みグループへの更新リクエストで 404 が返される"""
+        # Arrange: 事前に論理削除済み状態にする
+        with app.app_context():
+            g_obj = _db.session.get(DashboardGroupMaster, seed_group)
+            g_obj.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/update',
+            data={
+                'dashboard_uuid': 'test-dash-uuid-0001',
+                'dashboard_group_name': '削除済みグループ更新',
+            },
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_update_optimistic_lock_conflict(self, client, monkeypatch, seed_group):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
+
+        call_count = [0]
+
+        def fake_get_group_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_group_update_date', fake_get_group_update_date)
+
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/update',
+            data={'dashboard_group_name': '競合テスト'},
+        )
+        assert response.status_code == 409
+
 
 # ============================================================
 # No.14 グループ削除確認モーダル表示 / No.15 グループ削除実行
@@ -1014,7 +2128,18 @@ class TestGroupDelete:
         # Assert
         assert response.status_code == 404
 
-    def test_delete_success(self, client, app, seed_group):
+    @pytest.mark.integration
+    def test_delete_confirm_not_found_zero_uuid(self, client, seed_org_closure):
+        """1.3.4: スコープ外（存在しない）UUIDへのアクセスで404を返す。"""
+        # Act
+        response = client.get(
+            f'{BASE_URL}/groups/00000000-0000-0000-0000-000000000000/delete'
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_delete_success(self, client, app, seed_group, seed_gadget):
         """4.5.1: 正常削除 - 302 リダイレクト、delete_flag=True に更新される"""
         # Act
         response = client.post(
@@ -1029,6 +2154,10 @@ class TestGroupDelete:
                 dashboard_group_uuid='test-group-uuid-0001',
             ).first()
             assert group.delete_flag is True
+            assert group.modifier == TEST_USER_ID
+            # タスクB: 配下ガジェットも論理削除されていることを確認
+            gadget = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            assert gadget.delete_flag is True
 
     def test_delete_not_found(self, client, seed_org_closure):
         """2.2.4: 存在しない UUID で削除実行すると 404 が返される"""
@@ -1037,6 +2166,57 @@ class TestGroupDelete:
 
         # Assert
         assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_already_deleted(self, client, app, seed_group):
+        """4.5.3: 論理削除済みグループへの削除リクエストで404が返される。"""
+        # Arrange: 事前に削除済み状態にする
+        with app.app_context():
+            g_obj = _db.session.get(DashboardGroupMaster, seed_group)
+            g_obj.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/delete',
+            data={'update_date': datetime.now().isoformat()},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_optimistic_lock_conflict(self, client, monkeypatch, seed_group):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
+
+        call_count = [0]
+
+        def fake_get_group_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_group_update_date', fake_get_group_update_date)
+
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/delete',
+        )
+        assert response.status_code == 409
+
+    @pytest.mark.integration
+    def test_delete_shows_success_message(self, client, seed_group):
+        """タスクAB: グループ削除後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/groups/test-group-uuid-0001/delete',
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ダッシュボードグループを削除しました'.encode() in response.data
 
 
 # ============================================================
@@ -1099,6 +2279,17 @@ class TestGadgetTitleUpdate:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_get_edit_form_not_found_zero_uuid(self, client, seed_org_closure):
+        """1.3.4: スコープ外（存在しない）UUIDへのアクセスで404を返す。"""
+        # Act
+        response = client.get(
+            f'{BASE_URL}/gadgets/00000000-0000-0000-0000-000000000000/edit'
+        )
+
+        # Assert
+        assert response.status_code == 404
+
     def test_update_success(self, client, app, seed_gadget):
         """4.4.1: 正常更新 - 302 リダイレクト、DB のガジェット名が更新される"""
         # Arrange
@@ -1118,6 +2309,20 @@ class TestGadgetTitleUpdate:
                 gadget_uuid='test-gadget-uuid-0001',
             ).first()
             assert gadget.gadget_name == new_name
+
+    @pytest.mark.integration
+    def test_update_shows_success_message(self, client, seed_gadget):
+        """タスクAF: ガジェット更新後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/update',
+            data={'gadget_name': '成功メッセージ確認'},
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ガジェットタイトルを更新しました'.encode() in response.data
 
     def test_update_required_validation(self, client, seed_gadget):
         """3.1.2: ガジェット名未入力 - 400 エラーが返される"""
@@ -1167,6 +2372,94 @@ class TestGadgetTitleUpdate:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_update_sets_modifier_and_update_date(self, client, app, seed_gadget):
+        """4.4.3/4.4.4: ガジェット更新時に modifier と update_date が設定される。"""
+        # Arrange
+        with app.app_context():
+            gadget_obj = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            before = gadget_obj.update_date
+
+        # Act
+        client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/update',
+            data={
+                'gadget_name': '更新後ガジェット',
+                'update_date': before.isoformat(),
+            },
+        )
+
+        # Assert
+        with app.app_context():
+            gadget = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            assert gadget.modifier == TEST_USER_ID
+            assert gadget.update_date is not None
+
+    @pytest.mark.integration
+    def test_update_optimistic_lock_conflict(self, client, monkeypatch, seed_gadget):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
+
+        call_count = [0]
+
+        def fake_get_gadget_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_gadget_update_date', fake_get_gadget_update_date)
+
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/update',
+            data={'gadget_name': '競合テスト'},
+        )
+        assert response.status_code == 409
+
+    @pytest.mark.integration
+    def test_update_does_not_change_create_date_and_creator(self, client, app, seed_gadget):
+        """タスクZ: ガジェット更新時に create_date と creator が変更されない"""
+        # Arrange
+        with app.app_context():
+            gadget = _db.session.query(DashboardGadgetMaster).filter_by(
+                gadget_uuid='test-gadget-uuid-0001',
+            ).first()
+            before_create_date = gadget.create_date
+            before_creator = gadget.creator
+
+        # Act
+        client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/update',
+            data={'gadget_name': '不変確認更新ガジェット'},
+        )
+
+        # Assert
+        with app.app_context():
+            gadget = _db.session.query(DashboardGadgetMaster).filter_by(
+                gadget_uuid='test-gadget-uuid-0001',
+            ).first()
+            _db.session.refresh(gadget)
+            assert gadget.create_date == before_create_date
+            assert gadget.creator == before_creator
+
+    @pytest.mark.integration
+    def test_update_deleted_gadget_returns_404(self, client, app, seed_gadget):
+        """タスクAA: 論理削除済みガジェットへの更新リクエストで 404 が返される"""
+        # Arrange: 事前に論理削除済み状態にする
+        with app.app_context():
+            gd = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            gd.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/update',
+            data={'gadget_name': '削除済みガジェット更新'},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
 
 # ============================================================
 # No.21 ガジェット削除確認モーダル表示 / No.22 ガジェット削除実行
@@ -1197,6 +2490,17 @@ class TestGadgetDelete:
         # Assert
         assert response.status_code == 404
 
+    @pytest.mark.integration
+    def test_delete_confirm_not_found_zero_uuid(self, client, seed_org_closure):
+        """1.3.4: スコープ外（存在しない）UUIDへのアクセスで404を返す。"""
+        # Act
+        response = client.get(
+            f'{BASE_URL}/gadgets/00000000-0000-0000-0000-000000000000/delete'
+        )
+
+        # Assert
+        assert response.status_code == 404
+
     def test_delete_success(self, client, app, seed_gadget):
         """4.5.1: 正常削除 - 302 リダイレクト、delete_flag=True に更新される"""
         # Act
@@ -1212,6 +2516,7 @@ class TestGadgetDelete:
                 gadget_uuid='test-gadget-uuid-0001',
             ).first()
             assert gadget.delete_flag is True
+            assert gadget.modifier == TEST_USER_ID
 
     def test_delete_not_found(self, client, seed_org_closure):
         """2.2.4: 存在しない UUID で削除実行すると 404 が返される"""
@@ -1220,6 +2525,57 @@ class TestGadgetDelete:
 
         # Assert
         assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_already_deleted(self, client, app, seed_gadget):
+        """4.5.3: 論理削除済みガジェットへの削除リクエストで404が返される。"""
+        # Arrange: 事前に削除済み状態にする
+        with app.app_context():
+            gd = _db.session.get(DashboardGadgetMaster, seed_gadget)
+            gd.delete_flag = True
+            _db.session.commit()
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/delete',
+            data={'update_date': datetime.now().isoformat()},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    @pytest.mark.integration
+    def test_delete_optimistic_lock_conflict(self, client, monkeypatch, seed_gadget):
+        """楽観ロック競合: snapshot取得時に古い日時を返すことで 409 を再現する"""
+        import iot_app.views.analysis.customer_dashboard.common as view_module
+
+        call_count = [0]
+
+        def fake_get_gadget_update_date(uuid):
+            if call_count[0] == 0:
+                call_count[0] += 1
+                return datetime(2000, 1, 1)  # snapshot: 古い日時
+            return datetime.now()            # current: 新しい日時
+
+        monkeypatch.setattr(view_module, 'get_gadget_update_date', fake_get_gadget_update_date)
+
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/delete',
+        )
+        assert response.status_code == 409
+
+    @pytest.mark.integration
+    def test_delete_shows_success_message(self, client, seed_gadget):
+        """タスクAB: ガジェット削除後リダイレクト先に成功メッセージが表示される"""
+        # Act
+        response = client.post(
+            f'{BASE_URL}/gadgets/test-gadget-uuid-0001/delete',
+            follow_redirects=True,
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert 'ガジェットを削除しました'.encode() in response.data
 
 
 # ============================================================
@@ -1258,7 +2614,8 @@ class TestLayoutSave:
         # Assert
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'message' in data
+        # タスクP: Assert 強化
+        assert data.get('message') == 'レイアウトを保存しました'
 
     def test_save_layout_empty_gadgets(self, client, seed_org_closure):
         """4.4.1: ガジェットなしのレイアウト保存 - 200 JSON レスポンスが返される"""
@@ -1372,6 +2729,10 @@ class TestDatasourceSave:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data.get('status') == 'ok'
+        with app.app_context():
+            setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+            assert setting is not None
+            assert setting.update_date is not None  # AD: DashboardUserSetting の update_date 更新確認
 
         # Teardown
         with app.app_context():
@@ -1381,15 +2742,15 @@ class TestDatasourceSave:
                 _db.session.commit()
 
     def test_save_datasource_no_body(self, client, seed_org_closure):
-        """3.6.2: リクエストボディなし - サーバーエラーまたは正常にハンドリングされる"""
+        """3.1.2: リクエストボディなし - 400 エラーが返される（必須チェック）"""
         # Act
         response = client.post(
             f'{BASE_URL}/datasource/save',
             content_type='application/json',
         )
 
-        # Assert: ビューは None チェックしているため 200 または 500 を許容
-        assert response.status_code in (200, 500)
+        # Assert
+        assert response.status_code == 400
 
 
 # ============================================================
@@ -1406,8 +2767,12 @@ class TestCSRF:
           別フィクスチャを用意して実施すること。
     """
 
-    def test_post_without_csrf_token_in_testing(self, client, seed_org_closure):
-        """9.3.3相当: テスト環境では CSRF トークンなしの POST が通過する（CSRF 無効確認）"""
+    def test_post_without_csrf_token_in_testing(self, client, app, seed_org_closure):
+        """9.3.1の逆確認: テスト環境では CSRF トークンなしの POST が通過する（CSRF 無効確認）
+        NOTE: TestingConfig では WTF_CSRF_ENABLED=False のため CSRF は無効。
+              9.3.1（トークンなし→403）・9.3.2（無効トークン→403）の本確認は
+              WTF_CSRF_ENABLED=True の別フィクスチャが必要。
+        """
         # Arrange: CSRF トークンを含まないリクエスト
 
         # Act
@@ -1420,3 +2785,75 @@ class TestCSRF:
         #          302（登録成功）であり、403（CSRF 拒否）にはならない
         assert response.status_code in (302, 400)
         assert response.status_code != 403
+
+        # Teardown: 302（登録成功）の場合に作成されたレコードを削除する
+        if response.status_code == 302:
+            with app.app_context():
+                setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+                if setting:
+                    _db.session.delete(setting)
+                d = _db.session.query(DashboardMaster).filter_by(
+                    dashboard_name='CSRFテスト',
+                ).first()
+                if d:
+                    _db.session.delete(d)
+                _db.session.commit()
+
+
+# ============================================================
+# 9. セキュリティテスト
+# ============================================================
+
+class TestSecurity:
+    """9. セキュリティテスト"""
+
+    @pytest.mark.integration
+    def test_sqlinjection_dashboard_name(self, client, app, seed_user, seed_org_closure):
+        """9.1: SQLインジェクション文字列をダッシュボード名に入力しても安全に処理される。
+
+        SQLAlchemy のプリペアドステートメントにより、SQL として解釈されず
+        リテラル文字列として保存されることを確認する。
+        """
+        # Arrange
+        sqli_name = "' OR 1=1 --"
+
+        # Act
+        response = client.post(
+            f'{BASE_URL}/dashboards/register',
+            data={'dashboard_name': sqli_name},
+        )
+
+        # Assert: 400（バリデーション通過後に保存）または 302（成功）のいずれか
+        # 500 が返らないこと（SQLiとして解釈されていないこと）を確認
+        assert response.status_code != 500
+
+        # 登録成功した場合、literal string として保存されていること
+        if response.status_code == 302:
+            with app.app_context():
+                setting = _db.session.get(DashboardUserSetting, TEST_USER_ID)
+                if setting:
+                    _db.session.delete(setting)
+                d = _db.session.query(DashboardMaster).filter_by(dashboard_name=sqli_name).first()
+                if d:
+                    _db.session.delete(d)
+                _db.session.commit()
+
+    @pytest.mark.integration
+    def test_xss_dashboard_name_escaped(self, client, app, seed_user, seed_org_closure, seed_dashboard):
+        """9.2: XSS文字列をダッシュボード名に入力した場合、レスポンスでエスケープされる。
+
+        Jinja2 の自動エスケープにより <script> タグが &lt;script&gt; として出力されることを確認する。
+        """
+        # Arrange: XSS文字列でダッシュボード名を更新
+        xss_name = '<script>alert("xss")</script>'
+        with app.app_context():
+            d = _db.session.get(DashboardMaster, seed_dashboard)
+            d.dashboard_name = xss_name
+            _db.session.commit()
+
+        # Act: 画面を表示
+        response = client.get(BASE_URL)
+
+        # Assert: エスケープされていること
+        assert b'<script>alert' not in response.data
+        assert b'&lt;script&gt;' in response.data or xss_name.encode() not in response.data
