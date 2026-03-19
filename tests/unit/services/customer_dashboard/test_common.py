@@ -2024,3 +2024,88 @@ class TestGetDevices:
 
         # Assert
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# get_dashboard_update_date / get_group_update_date / get_gadget_update_date
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetDashboardUpdateDate:
+    """楽観ロック用: ダッシュボードの update_date を返す"""
+
+    @patch(f'{MODULE}.db')
+    def test_returns_update_date(self, mock_db):
+        """update_date が返る"""
+        from datetime import datetime
+        expected = datetime(2024, 1, 1, 12, 0, 0)
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
+        from iot_app.services.customer_dashboard.common import get_dashboard_update_date
+
+        result = get_dashboard_update_date('test-uuid')
+
+        assert result == expected
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """存在しない UUID の場合: None を返す"""
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
+        from iot_app.services.customer_dashboard.common import get_dashboard_update_date
+
+        result = get_dashboard_update_date('nonexistent-uuid')
+
+        assert result is None
+
+
+@pytest.mark.unit
+class TestGetGroupUpdateDate:
+    """楽観ロック用: グループの update_date を返す"""
+
+    @patch(f'{MODULE}.db')
+    def test_returns_update_date(self, mock_db):
+        """update_date が返る"""
+        from datetime import datetime
+        expected = datetime(2024, 6, 1, 0, 0, 0)
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
+        from iot_app.services.customer_dashboard.common import get_group_update_date
+
+        result = get_group_update_date('test-group-uuid')
+
+        assert result == expected
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """存在しない UUID の場合: None を返す"""
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
+        from iot_app.services.customer_dashboard.common import get_group_update_date
+
+        result = get_group_update_date('nonexistent-uuid')
+
+        assert result is None
+
+
+@pytest.mark.unit
+class TestGetGadgetUpdateDate:
+    """楽観ロック用: ガジェットの update_date を返す"""
+
+    @patch(f'{MODULE}.db')
+    def test_returns_update_date(self, mock_db):
+        """update_date が返る"""
+        from datetime import datetime
+        expected = datetime(2024, 12, 31, 23, 59, 59)
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
+        from iot_app.services.customer_dashboard.common import get_gadget_update_date
+
+        result = get_gadget_update_date('test-gadget-uuid')
+
+        assert result == expected
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """存在しない UUID の場合: None を返す"""
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
+        from iot_app.services.customer_dashboard.common import get_gadget_update_date
+
+        result = get_gadget_update_date('nonexistent-uuid')
+
+        assert result is None

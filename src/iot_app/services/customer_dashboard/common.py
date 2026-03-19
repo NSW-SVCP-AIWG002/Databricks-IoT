@@ -167,6 +167,18 @@ def check_dashboard_access(dashboard_uuid, accessible_org_ids):
     )
 
 
+def get_dashboard_update_date(dashboard_uuid):
+    """楽観ロック用: ダッシュボードの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardMaster.update_date)
+        .filter(
+            DashboardMaster.dashboard_uuid == dashboard_uuid,
+            DashboardMaster.delete_flag == False,
+        )
+        .scalar()
+    )
+
+
 # ---------------------------------------------------------------------------
 # ダッシュボード操作
 # ---------------------------------------------------------------------------
@@ -235,6 +247,18 @@ def check_group_access(dashboard_group_uuid, accessible_org_ids):
             DashboardGroupMaster.delete_flag == False,
         )
         .first()
+    )
+
+
+def get_group_update_date(dashboard_group_uuid):
+    """楽観ロック用: グループの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardGroupMaster.update_date)
+        .filter(
+            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .scalar()
     )
 
 
@@ -317,6 +341,18 @@ def check_gadget_access(gadget_uuid, accessible_org_ids):
             DashboardGadgetMaster.delete_flag == False,
         )
         .first()
+    )
+
+
+def get_gadget_update_date(gadget_uuid):
+    """楽観ロック用: ガジェットの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardGadgetMaster.update_date)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .scalar()
     )
 
 
