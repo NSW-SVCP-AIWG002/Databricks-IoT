@@ -22,10 +22,20 @@ def handle_401(e):
     return redirect(url_for("auth.login"))
 
 
+_4XX_MESSAGES = {
+    403: '権限がありません',
+    404: 'リソースが見つかりません',
+    409: '競合が発生しました',
+}
+
+
 def handle_4xx(e):
     """400系例外ハンドラー（401以外）"""
     logger.warning("Client Error", extra={"httpStatus": e.code})
-    return '', e.code
+    return render_template(
+        'components/error_modal_fragment.html',
+        message=_4XX_MESSAGES.get(e.code, 'エラーが発生しました'),
+    ), e.code
 
 
 def register_error_handlers(app):
