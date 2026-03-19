@@ -93,26 +93,6 @@ def validate_gadget_registration(params):
     if gadget_size not in _VALID_GADGET_SIZES:
         raise ValidationError("部品サイズが不正です")
 
-    min_value = params.get("min_value")
-    max_value = params.get("max_value")
-
-    if min_value is not None:
-        try:
-            min_value = float(min_value)
-        except (TypeError, ValueError):
-            raise ValidationError("最小値は数値で入力してください")
-
-    if max_value is not None:
-        try:
-            max_value = float(max_value)
-        except (TypeError, ValueError):
-            raise ValidationError("最大値は数値で入力してください")
-
-    if min_value is not None and max_value is not None:
-        if min_value >= max_value:
-            raise ValidationError(
-                "最小値は最大値より小さい値を入力してください。最大値は最小値より大きい値を入力してください"
-            )
 
 
 # ============================================================
