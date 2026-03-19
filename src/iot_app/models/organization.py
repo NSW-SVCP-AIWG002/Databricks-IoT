@@ -3,6 +3,32 @@ from datetime import datetime
 from iot_app import db
 
 
+class OrganizationTypeMaster(db.Model):
+    """組織種別マスタ"""
+    __tablename__ = 'organization_type_master'
+
+    organization_type_id = db.Column(db.Integer, primary_key=True)
+    organization_type_name = db.Column(db.String(50), nullable=False)
+    create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    creator = db.Column(db.Integer, nullable=False)
+    update_date = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    modifier = db.Column(db.Integer, nullable=False)
+    delete_flag = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class ContractStatusMaster(db.Model):
+    """契約状態マスタ"""
+    __tablename__ = 'contract_status_master'
+
+    contract_status_id = db.Column(db.Integer, primary_key=True)
+    contract_status_name = db.Column(db.String(20), nullable=False)
+    create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    creator = db.Column(db.Integer, nullable=False)
+    update_date = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    modifier = db.Column(db.Integer, nullable=False)
+    delete_flag = db.Column(db.Boolean, nullable=False, default=False)
+
+
 class OrganizationMaster(db.Model):
     """組織マスタ"""
     __tablename__ = 'organization_master'
