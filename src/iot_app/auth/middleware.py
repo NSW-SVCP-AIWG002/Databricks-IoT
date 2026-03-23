@@ -7,6 +7,7 @@ from flask import g
 @dataclass
 class _MockUser:
     organization_id: int
+    user_id: str = "dev-user"
 
 
 def setup_middleware(app):

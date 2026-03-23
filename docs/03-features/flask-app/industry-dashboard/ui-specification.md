@@ -186,7 +186,7 @@
 | (5.2) | デバイス名 | device_name | Label | O | - | - | - | DB: `device_master.device_name` | |
 | (5.3) | デバイス種別 | device_type | Label | O | - | - | - | DB: `device_type_master.device_type_name` | |
 | (5.4) | モデル情報 | device_model | Label | O | - | - | - | DB: `device_master.device_model` | |
-| (5.5) | センサーデータ | sensor_data | Label | O | - | - | - | UnityCatalog: `sensor_data_view` | センサー情報表示ボタンを押下したデバイスのセンサーデータを表示 |
+| (5.5) | センサーデータ | sensor_data | Label | O | - | - | - | MySQL 優先、MySQL にデータがない場合（直近Nヶ月より古いデータ）は Unity Catalog から取得（詳細はワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」参照） | センサー情報表示ボタンを押下したデバイスのセンサーデータを表示 |
 | (6) | 画面タイトル | page_title | - | O | - | - | - | 固定値: 「デバイス詳細」 | 固定表示 |
 | (7) | デバイス変更ボタン | change_device_button | Button | I | - | - | - | 固定値: 「デバイス変更」 | プライマリボタン |
 | (8.1) | デバイス名 | device_name | Label | O | - | - | - | DB: `device_master.device_name` | |
@@ -204,9 +204,9 @@
 | (10.3) | 表示期間変更ボタン | display_period_change_button | Button | I | - | - | - | 固定値: 「表示期間変更」 | プライマリボタン |
 | (10.4) | 自動更新チェックボックス | automatic_update_checkbox | Checkbox | I/O | - | - | 選択 | 固定値: 「自動更新」 | |
 | (11) | CSVエクスポートボタン | export_button | Button | I | - | - | - | 固定値: 「CSVエクスポート」 | プライマリボタン |
-| (12.1) | 時系列グラフ | time_series_graph | Graph | O | - | - | - | UnityCatalog: `sensor_data_view` | 折れ線グラフ |
+| (12.1) | 時系列グラフ | time_series_graph | Graph | O | - | - | - | MySQL 優先、MySQL にデータがない場合（直近Nヶ月より古いデータ）は Unity Catalog から取得（詳細はワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」参照） | 折れ線グラフ |
 | (12.2) | 最終更新時刻表示 | last_updated_time | Label | O | - | - | - | 時系列グラフデータを更新した最終時刻を表示 | YYYY/MM/DD HH:mm:ss 形式 |
-| (13) | 凡例 | legend | Checkbox | I/O | - | - | 選択 | UnityCatalog: `sensor_data_view` | |
+| (13) | 凡例 | legend | Checkbox | I/O | - | - | 選択 | MySQL 優先、MySQL にデータがない場合（直近Nヶ月より古いデータ）は Unity Catalog から取得（詳細はワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」参照） | |
 
 ---
 
@@ -679,11 +679,11 @@
 - スタイル: 折れ線グラフ
 - 使用ライブラリ: Apache ECharts
 - 横軸:
-  - 値: UnityCatalog: `sensor_data_view.event_timestamp`
+  - 値: `event_timestamp`（MySQL または Unity Catalog から取得。詳細はワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」参照）
   - 表示形式: YYYY/MM/DD HH:mm
   - ラベル名: なし
-- 縦軸: 
-  - 値: UnityCatalog: `sensor_data_view（ダッシュボード内グラフ縦軸表示項目）`
+- 縦軸:
+  - 値: センサーデータ各カラム（MySQL または Unity Catalog から取得。詳細はワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」参照）
   - 表示形式: 値 + 単位（例: 10℃）
   - ラベル名: なし
   - 軸数: 複数軸対応

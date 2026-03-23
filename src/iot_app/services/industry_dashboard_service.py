@@ -9,6 +9,7 @@ import csv
 from datetime import datetime, timedelta
 from io import StringIO
 
+from dateutil.relativedelta import relativedelta
 from flask import Response
 
 from iot_app import db
@@ -19,12 +20,21 @@ from iot_app.models.alert import (
     AlertSettingMaster,
     AlertStatusMaster,
 )
-from iot_app.models.device import Device
+from iot_app.models.contract import ContractStatusMaster  # noqa: F401
+from iot_app.models.device import Device, DeviceTypeMaster
+from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData  # noqa: F401
 from iot_app.models.organization import OrganizationClosure, OrganizationMaster
 
 _ALERT_RECENT_DAYS = 30
-_ITEM_PER_PAGE = 10
+_ALERT_MAX_TOTAL = 30
+_ITEM_PER_PAGE = 5
 _SENSOR_DATA_VIEW = "iot_catalog.views.sensor_data_view"
+_SENSOR_DATA_CUTOFF_MONTHS = 2
+
+
+def _get_cutoff_datetime():
+    """センサーデータのカットオフ日時を返す（直近2ヶ月）。"""
+    return datetime.now() - relativedelta(months=_SENSOR_DATA_CUTOFF_MONTHS)
 
 
 # ---------------------------------------------------------------------------
@@ -74,8 +84,8 @@ def get_default_date_range():
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(hours=24)
     return {
-        "search_start_datetime": start_dt.strftime("%Y/%m/%dT%H:%M"),
-        "search_end_datetime": end_dt.strftime("%Y/%m/%dT%H:%M"),
+        "search_start_datetime": start_dt.strftime("%Y-%m-%dT%H:%M"),
+        "search_end_datetime": end_dt.strftime("%Y-%m-%dT%H:%M"),
     }
 
 
@@ -112,22 +122,46 @@ def get_accessible_organizations(current_user_organization_id):
 
 
 def check_device_access(device_uuid, accessible_org_ids):
-    """device_uuid がアクセス可能組織に属するかチェックし、Deviceを返す。
+    """device_uuid がアクセス可能組織に属するかチェックし、デバイス情報を返す。
 
     Args:
         device_uuid: デバイスUUID
         accessible_org_ids: アクセス可能な組織IDリスト
 
     Returns:
-        Device | None: アクセス可能な場合はDeviceオブジェクト、否の場合はNone
+        Row | None: アクセス可能な場合はデバイス情報の named tuple、否の場合はNone
     """
     if not accessible_org_ids:
         return None
-    return Device.query.filter(
-        Device.device_uuid == device_uuid,
-        Device.organization_id.in_(accessible_org_ids),
-        Device.delete_flag == False,  # noqa: E712
-    ).first()
+    return (
+        db.session.query(
+            Device.device_id,
+            Device.device_uuid,
+            Device.device_name,
+            Device.device_model,
+            Device.organization_id,
+            DeviceTypeMaster.device_type_name,
+            OrganizationMaster.organization_name,
+        )
+        .join(
+            DeviceTypeMaster,
+            (Device.device_type_id == DeviceTypeMaster.device_type_id)
+            & (DeviceTypeMaster.delete_flag == False),  # noqa: E712
+            isouter=True,
+        )
+        .join(
+            OrganizationMaster,
+            (Device.organization_id == OrganizationMaster.organization_id)
+            & (OrganizationMaster.delete_flag == False),  # noqa: E712
+            isouter=True,
+        )
+        .filter(
+            Device.device_uuid == device_uuid,
+            Device.organization_id.in_(accessible_org_ids),
+            Device.delete_flag == False,  # noqa: E712
+        )
+        .first()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -135,13 +169,14 @@ def check_device_access(device_uuid, accessible_org_ids):
 # ---------------------------------------------------------------------------
 
 
-def get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30):
+def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10):
     """過去30日以内のアラート履歴を取得する（店舗モニタリング用）。
 
     Args:
         search_params: 検索条件辞書 (organization_name, device_name)
         accessible_org_ids: アクセス可能な組織IDリスト
-        limit: 最大取得件数（デフォルト30）
+        page: ページ番号（1始まり）
+        per_page: 1ページあたりの件数（デフォルト10）
 
     Returns:
         tuple[list, int]: (アラートリスト, 総件数)
@@ -152,7 +187,15 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30):
     cutoff = datetime.now() - timedelta(days=_ALERT_RECENT_DAYS)
 
     q = (
-        db.session.query(AlertHistory)
+        db.session.query(
+            AlertHistory.alert_history_id,
+            AlertHistory.alert_occurrence_datetime,
+            Device.device_name,
+            AlertSettingMaster.alert_name,
+            AlertLevelMaster.alert_level_name,
+            AlertStatusMaster.alert_status_name,
+            OrganizationMaster.organization_name,
+        )
         .join(
             AlertStatusMaster,
             (AlertHistory.alert_status_id == AlertStatusMaster.alert_status_id)
@@ -201,8 +244,15 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30):
     if device_name:
         q = q.filter(Device.device_name.like(f"%{device_name}%"))
 
-    total = q.count()
-    results = q.order_by(AlertHistory.alert_history_id.desc()).limit(limit).all()
+    total = min(q.count(), _ALERT_MAX_TOTAL)
+    offset = (page - 1) * per_page
+    effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
+    results = (
+        q.order_by(AlertHistory.alert_history_id.desc())
+        .limit(effective_limit)
+        .offset(offset)
+        .all()
+    ) if effective_limit > 0 else []
 
     return results, total
 
@@ -227,7 +277,13 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
     if not accessible_org_ids:
         return [], 0
 
-    q = db.session.query(Device).join(
+    q = db.session.query(
+        Device.device_id,
+        Device.device_uuid,
+        Device.device_name,
+        Device.organization_id,
+        OrganizationMaster.organization_name,
+    ).join(
         OrganizationMaster,
         (Device.organization_id == OrganizationMaster.organization_id)
         & (OrganizationMaster.delete_flag == False),  # noqa: E712
@@ -278,7 +334,13 @@ def get_device_alerts_with_count(device_id, search_params):
     cutoff = datetime.now() - timedelta(days=_ALERT_RECENT_DAYS)
 
     q = (
-        db.session.query(AlertHistory)
+        db.session.query(
+            AlertHistory.alert_history_id,
+            AlertHistory.alert_occurrence_datetime,
+            AlertSettingMaster.alert_name,
+            AlertLevelMaster.alert_level_name,
+            AlertStatusMaster.alert_status_name,
+        )
         .join(
             AlertStatusMaster,
             (AlertHistory.alert_status_id == AlertStatusMaster.alert_status_id)
@@ -323,7 +385,7 @@ def get_device_alerts_with_count(device_id, search_params):
 
 
 def get_latest_sensor_data(device_id):
-    """Unity Catalog から最新センサーデータを1件取得する。
+    """最新センサーデータを1件取得する（MySQL優先、fallback: Unity Catalog）。
 
     Args:
         device_id: デバイスID
@@ -331,16 +393,30 @@ def get_latest_sensor_data(device_id):
     Returns:
         row | None: 最新センサーデータ行、データなしの場合はNone
     """
-    with get_databricks_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-            " WHERE device_id = ?"
-            " ORDER BY event_timestamp DESC"
-            " LIMIT 1",
-            [device_id],
-        )
-        return cursor.fetchone()
+    # MySQL から最新データを取得（直近2ヶ月以内）
+    mysql_result = (
+        db.session.query(SilverSensorData)
+        .filter(SilverSensorData.device_id == device_id)
+        .order_by(SilverSensorData.event_timestamp.desc())
+        .first()
+    )
+    if mysql_result:
+        return mysql_result
+
+    # fallback: Unity Catalog から最新データを取得
+    try:
+        with get_databricks_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM {_SENSOR_DATA_VIEW}"
+                " WHERE device_id = ?"
+                " ORDER BY event_timestamp DESC"
+                " LIMIT 1",
+                [device_id],
+            )
+            return cursor.fetchone()
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +425,12 @@ def get_latest_sensor_data(device_id):
 
 
 def get_graph_data(device_id, search_params):
-    """Unity Catalog から表示期間内のセンサーデータを全件取得する（グラフ用）。
+    """表示期間内のセンサーデータを全件取得する（グラフ用）。
+
+    データソース切り替えロジック:
+    - 終了日時 >= カットオフ かつ 開始日時 >= カットオフ → MySQL優先
+    - 終了日時 < カットオフ → Unity Catalogのみ
+    - 期間またがり → MySQL(直近部分) + Unity Catalog(古い部分) マージ
 
     Args:
         device_id: デバイスID
@@ -361,16 +442,87 @@ def get_graph_data(device_id, search_params):
     start_str = search_params.get("search_start_datetime", "")
     end_str = search_params.get("search_end_datetime", "")
 
-    with get_databricks_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-            " WHERE device_id = ?"
-            " AND event_timestamp BETWEEN ? AND ?"
-            " ORDER BY event_timestamp ASC",
-            [device_id, start_str, end_str],
+    try:
+        start_dt = datetime.strptime(start_str, "%Y-%m-%dT%H:%M")
+        end_dt = datetime.strptime(end_str, "%Y-%m-%dT%H:%M")
+    except (ValueError, TypeError):
+        return []
+
+    cutoff = _get_cutoff_datetime()
+
+    # 終了日時 < カットオフ → Unity Catalogのみ
+    if end_dt < cutoff:
+        return _fetch_graph_data_from_uc(device_id, start_str, end_str)
+
+    # 終了日時 >= カットオフ かつ 開始日時 >= カットオフ → MySQLのみ
+    if start_dt >= cutoff:
+        return _fetch_graph_data_from_mysql(device_id, start_dt, end_dt)
+
+    # 期間またがり → MySQL(直近部分) + UC(古い部分) マージ
+    mysql_rows = _fetch_graph_data_from_mysql(device_id, cutoff, end_dt)
+    uc_rows = _fetch_graph_data_from_uc(device_id, start_str, cutoff.strftime("%Y-%m-%dT%H:%M"))
+    return uc_rows + mysql_rows
+
+
+def _sensor_row_to_dict(row):
+    """SilverSensorData ORM オブジェクトを JSON シリアライズ可能な dict に変換する。"""
+    return {
+        "event_timestamp": row.event_timestamp.strftime("%Y-%m-%d %H:%M:%S") if row.event_timestamp else None,
+        "external_temp": row.external_temp,
+        "set_temp_freezer_1": row.set_temp_freezer_1,
+        "internal_sensor_temp_freezer_1": row.internal_sensor_temp_freezer_1,
+        "internal_temp_freezer_1": row.internal_temp_freezer_1,
+        "df_temp_freezer_1": row.df_temp_freezer_1,
+        "condensing_temp_freezer_1": row.condensing_temp_freezer_1,
+        "adjusted_internal_temp_freezer_1": row.adjusted_internal_temp_freezer_1,
+        "set_temp_freezer_2": row.set_temp_freezer_2,
+        "internal_sensor_temp_freezer_2": row.internal_sensor_temp_freezer_2,
+        "internal_temp_freezer_2": row.internal_temp_freezer_2,
+        "df_temp_freezer_2": row.df_temp_freezer_2,
+        "condensing_temp_freezer_2": row.condensing_temp_freezer_2,
+        "adjusted_internal_temp_freezer_2": row.adjusted_internal_temp_freezer_2,
+        "compressor_freezer_1": row.compressor_freezer_1,
+        "compressor_freezer_2": row.compressor_freezer_2,
+        "fan_motor_1": row.fan_motor_1,
+        "fan_motor_2": row.fan_motor_2,
+        "fan_motor_3": row.fan_motor_3,
+        "fan_motor_4": row.fan_motor_4,
+        "fan_motor_5": row.fan_motor_5,
+        "defrost_heater_output_1": row.defrost_heater_output_1,
+        "defrost_heater_output_2": row.defrost_heater_output_2,
+    }
+
+
+def _fetch_graph_data_from_mysql(device_id, start_dt, end_dt):
+    """MySQLからグラフ用センサーデータを取得する。"""
+    rows = (
+        db.session.query(SilverSensorData)
+        .filter(
+            SilverSensorData.device_id == device_id,
+            SilverSensorData.event_timestamp >= start_dt,
+            SilverSensorData.event_timestamp <= end_dt,
         )
-        return cursor.fetchall()
+        .order_by(SilverSensorData.event_timestamp.asc())
+        .all()
+    )
+    return [_sensor_row_to_dict(row) for row in rows]
+
+
+def _fetch_graph_data_from_uc(device_id, start_str, end_str):
+    """Unity Catalogからグラフ用センサーデータを取得する。"""
+    try:
+        with get_databricks_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM {_SENSOR_DATA_VIEW}"
+                " WHERE device_id = ?"
+                " AND event_timestamp BETWEEN ? AND ?"
+                " ORDER BY event_timestamp ASC",
+                [device_id, start_str, end_str],
+            )
+            return cursor.fetchall()
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -379,7 +531,9 @@ def get_graph_data(device_id, search_params):
 
 
 def get_all_sensor_data(device_id, search_params):
-    """Unity Catalog から表示期間内の全センサーデータを取得する（CSV出力用）。
+    """表示期間内の全センサーデータを取得する（CSV出力用）。
+
+    get_graph_data と同じデータソース切り替えロジックを適用する。
 
     Args:
         device_id: デバイスID
@@ -388,19 +542,7 @@ def get_all_sensor_data(device_id, search_params):
     Returns:
         list: センサーデータ行のリスト
     """
-    start_str = search_params.get("search_start_datetime", "")
-    end_str = search_params.get("search_end_datetime", "")
-
-    with get_databricks_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-            " WHERE device_id = ?"
-            " AND event_timestamp BETWEEN ? AND ?"
-            " ORDER BY event_timestamp ASC",
-            [device_id, start_str, end_str],
-        )
-        return cursor.fetchall()
+    return get_graph_data(device_id, search_params)
 
 
 # ---------------------------------------------------------------------------
@@ -458,31 +600,29 @@ def export_sensor_data_csv(device, search_params):
     for row in sensor_data_list:
         writer.writerow(
             [
-                row.event_timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                if row.event_timestamp is not None
-                else "",
-                _val(row.external_temp),
-                _val(row.set_temp_freezer_1),
-                _val(row.internal_sensor_temp_freezer_1),
-                _val(row.internal_temp_freezer_1),
-                _val(row.df_temp_freezer_1),
-                _val(row.condensing_temp_freezer_1),
-                _val(row.adjusted_internal_temp_freezer_1),
-                _val(row.set_temp_freezer_2),
-                _val(row.internal_sensor_temp_freezer_2),
-                _val(row.internal_temp_freezer_2),
-                _val(row.df_temp_freezer_2),
-                _val(row.condensing_temp_freezer_2),
-                _val(row.adjusted_internal_temp_freezer_2),
-                _val(row.compressor_freezer_1),
-                _val(row.compressor_freezer_2),
-                _val(row.fan_motor_1),
-                _val(row.fan_motor_2),
-                _val(row.fan_motor_3),
-                _val(row.fan_motor_4),
-                _val(row.fan_motor_5),
-                _val(row.defrost_heater_output_1),
-                _val(row.defrost_heater_output_2),
+                row["event_timestamp"] if row.get("event_timestamp") is not None else "",
+                _val(row.get("external_temp")),
+                _val(row.get("set_temp_freezer_1")),
+                _val(row.get("internal_sensor_temp_freezer_1")),
+                _val(row.get("internal_temp_freezer_1")),
+                _val(row.get("df_temp_freezer_1")),
+                _val(row.get("condensing_temp_freezer_1")),
+                _val(row.get("adjusted_internal_temp_freezer_1")),
+                _val(row.get("set_temp_freezer_2")),
+                _val(row.get("internal_sensor_temp_freezer_2")),
+                _val(row.get("internal_temp_freezer_2")),
+                _val(row.get("df_temp_freezer_2")),
+                _val(row.get("condensing_temp_freezer_2")),
+                _val(row.get("adjusted_internal_temp_freezer_2")),
+                _val(row.get("compressor_freezer_1")),
+                _val(row.get("compressor_freezer_2")),
+                _val(row.get("fan_motor_1")),
+                _val(row.get("fan_motor_2")),
+                _val(row.get("fan_motor_3")),
+                _val(row.get("fan_motor_4")),
+                _val(row.get("fan_motor_5")),
+                _val(row.get("defrost_heater_output_1")),
+                _val(row.get("defrost_heater_output_2")),
             ]
         )
 
