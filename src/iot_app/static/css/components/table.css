@@ -1,0 +1,135 @@
+/* ===== テーブル ===== */
+
+/* テーブルコンテナ */
+.table-container {
+  overflow-x: auto;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+}
+
+/* テーブル本体 */
+.table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  background-color: var(--color-white);
+}
+
+/* テーブルヘッダー */
+.table__head {
+  background-color: var(--color-table-header);
+}
+
+.table__head th {
+  padding: var(--spacing-3) var(--spacing-2);
+  text-align: left;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+/* テーブルボディ */
+.table__body tr {
+  height: 48px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  transition: background-color var(--transition-base);
+}
+
+.table__body tr:hover {
+  background-color: var(--color-table-header);
+}
+
+.table__body td {
+  padding: var(--spacing-2);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+}
+
+/* カラム幅指定 */
+.table colgroup col:nth-child(1) { width: 24px; }    /* チェックボックス */
+.table colgroup col:nth-child(2) { width: 80px; }    /* ID */
+.table colgroup col:nth-child(3) { width: 20%; }     /* 名前 */
+.table colgroup col:nth-child(4) { width: 25%; }     /* メール */
+.table colgroup col:nth-child(5) { width: 15%; }     /* ステータス */
+.table colgroup col:nth-child(6) { width: 120px; }   /* 日付 */
+.table colgroup col:nth-child(7) { width: 150px; }   /* アクション */
+
+/* チェックボックス */
+.table__checkbox {
+  text-align: center;
+}
+
+.table__checkbox-input {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+/* バッジ */
+.table__badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  font-size: var(--font-size-base);
+  border-radius: var(--border-radius-base);
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-700);
+}
+
+.table__badge--success {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.table__badge--danger {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.table__badge--warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning-dark);
+}
+
+.table__badge--info {
+  background-color: var(--color-info-light);
+  color: var(--color-info-dark);
+}
+
+.table__badge--inactive {
+  background-color: var(--color-secondary);
+  color: var(--color-white);
+}
+
+/* アクションボタン */
+.table__actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.table__action-btn {
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: var(--border-radius-base);
+  color: var(--color-white);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  text-decoration: none;
+  padding: var(--spacing-2) var(--spacing-3);
+  transition: all var(--transition-base);
+}
+
+.table__action-btn:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* テキストの切り詰め */
+.table__truncate {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

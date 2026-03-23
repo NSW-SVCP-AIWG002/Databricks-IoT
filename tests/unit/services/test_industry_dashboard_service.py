@@ -52,31 +52,31 @@ def _make_mock_device(device_uuid="uuid-001", device_id=1, organization_id=1):
 
 def _make_mock_sensor_row(**kwargs):
     """テスト用モックセンサーデータ行を生成（全カラムデフォルト値あり）"""
-    row = Mock()
-    row.event_timestamp                      = kwargs.get("event_timestamp",                      datetime(2026, 2, 27, 12, 0, 0))
-    row.external_temp                        = kwargs.get("external_temp",                        25.0)
-    row.set_temp_freezer_1                   = kwargs.get("set_temp_freezer_1",                   -15.0)
-    row.internal_sensor_temp_freezer_1       = kwargs.get("internal_sensor_temp_freezer_1",       -12.0)
-    row.internal_temp_freezer_1              = kwargs.get("internal_temp_freezer_1",              -11.0)
-    row.df_temp_freezer_1                    = kwargs.get("df_temp_freezer_1",                    -10.0)
-    row.condensing_temp_freezer_1            = kwargs.get("condensing_temp_freezer_1",            40.0)
-    row.adjusted_internal_temp_freezer_1     = kwargs.get("adjusted_internal_temp_freezer_1",     -12.5)
-    row.set_temp_freezer_2                   = kwargs.get("set_temp_freezer_2",                   -18.0)
-    row.internal_sensor_temp_freezer_2       = kwargs.get("internal_sensor_temp_freezer_2",       -17.0)
-    row.internal_temp_freezer_2              = kwargs.get("internal_temp_freezer_2",              -16.0)
-    row.df_temp_freezer_2                    = kwargs.get("df_temp_freezer_2",                    -15.0)
-    row.condensing_temp_freezer_2            = kwargs.get("condensing_temp_freezer_2",            42.0)
-    row.adjusted_internal_temp_freezer_2     = kwargs.get("adjusted_internal_temp_freezer_2",     -17.5)
-    row.compressor_freezer_1                 = kwargs.get("compressor_freezer_1",                 1)
-    row.compressor_freezer_2                 = kwargs.get("compressor_freezer_2",                 1)
-    row.fan_motor_1                          = kwargs.get("fan_motor_1",                          1)
-    row.fan_motor_2                          = kwargs.get("fan_motor_2",                          0)
-    row.fan_motor_3                          = kwargs.get("fan_motor_3",                          1)
-    row.fan_motor_4                          = kwargs.get("fan_motor_4",                          0)
-    row.fan_motor_5                          = kwargs.get("fan_motor_5",                          1)
-    row.defrost_heater_output_1              = kwargs.get("defrost_heater_output_1",              0)
-    row.defrost_heater_output_2              = kwargs.get("defrost_heater_output_2",              0)
-    return row
+    return {
+        "event_timestamp":                      kwargs.get("event_timestamp",                      datetime(2026, 2, 27, 12, 0, 0)),
+        "external_temp":                        kwargs.get("external_temp",                        25.0),
+        "set_temp_freezer_1":                   kwargs.get("set_temp_freezer_1",                   -15.0),
+        "internal_sensor_temp_freezer_1":       kwargs.get("internal_sensor_temp_freezer_1",       -12.0),
+        "internal_temp_freezer_1":              kwargs.get("internal_temp_freezer_1",              -11.0),
+        "df_temp_freezer_1":                    kwargs.get("df_temp_freezer_1",                    -10.0),
+        "condensing_temp_freezer_1":            kwargs.get("condensing_temp_freezer_1",            40.0),
+        "adjusted_internal_temp_freezer_1":     kwargs.get("adjusted_internal_temp_freezer_1",     -12.5),
+        "set_temp_freezer_2":                   kwargs.get("set_temp_freezer_2",                   -18.0),
+        "internal_sensor_temp_freezer_2":       kwargs.get("internal_sensor_temp_freezer_2",       -17.0),
+        "internal_temp_freezer_2":              kwargs.get("internal_temp_freezer_2",              -16.0),
+        "df_temp_freezer_2":                    kwargs.get("df_temp_freezer_2",                    -15.0),
+        "condensing_temp_freezer_2":            kwargs.get("condensing_temp_freezer_2",            42.0),
+        "adjusted_internal_temp_freezer_2":     kwargs.get("adjusted_internal_temp_freezer_2",     -17.5),
+        "compressor_freezer_1":                 kwargs.get("compressor_freezer_1",                 1),
+        "compressor_freezer_2":                 kwargs.get("compressor_freezer_2",                 1),
+        "fan_motor_1":                          kwargs.get("fan_motor_1",                          1),
+        "fan_motor_2":                          kwargs.get("fan_motor_2",                          0),
+        "fan_motor_3":                          kwargs.get("fan_motor_3",                          1),
+        "fan_motor_4":                          kwargs.get("fan_motor_4",                          0),
+        "fan_motor_5":                          kwargs.get("fan_motor_5",                          1),
+        "defrost_heater_output_1":              kwargs.get("defrost_heater_output_1",              0),
+        "defrost_heater_output_2":              kwargs.get("defrost_heater_output_2",              0),
+    }
 
 
 # =============================================================================
@@ -242,7 +242,7 @@ class TestGetDefaultDateRange:
         before = datetime.now()
         result = get_default_date_range()
         after = datetime.now()
-        end_dt = datetime.strptime(result["search_end_datetime"], "%Y/%m/%dT%H:%M")
+        end_dt = datetime.strptime(result["search_end_datetime"], "%Y-%m-%dT%H:%M")
         assert (
             before.replace(second=0, microsecond=0) - timedelta(seconds=30)
             <= end_dt
@@ -252,14 +252,14 @@ class TestGetDefaultDateRange:
     def test_start_datetime_is_24_hours_before_end(self):
         """2.1.2: search_start_datetime が search_end_datetime の24時間前"""
         result = get_default_date_range()
-        start_dt = datetime.strptime(result["search_start_datetime"], "%Y/%m/%dT%H:%M")
-        end_dt   = datetime.strptime(result["search_end_datetime"],   "%Y/%m/%dT%H:%M")
+        start_dt = datetime.strptime(result["search_start_datetime"], "%Y-%m-%dT%H:%M")
+        end_dt   = datetime.strptime(result["search_end_datetime"],   "%Y-%m-%dT%H:%M")
         assert end_dt - start_dt == timedelta(hours=24)
 
     def test_datetime_format_matches_specification(self):
         """2.1.3: 日時フォーマットが YYYY/MM/DDTHH:MM 形式（UI仕様書 10-1, 10-2 準拠）"""
         result = get_default_date_range()
-        pattern = r"^\d{4}/\d{2}/\d{2}T\d{2}:\d{2}$"
+        pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"
         assert re.match(pattern, result["search_start_datetime"]), \
             f"start_datetime format mismatch: {result['search_start_datetime']}"
         assert re.match(pattern, result["search_end_datetime"]), \
@@ -352,59 +352,66 @@ class TestCheckDeviceAccess:
         - それ以外は None を返す（→ 呼び出し元が abort(404) する）
     """
 
+    def _setup_mock_db(self, mocker, first_return=None):
+        """db.session.query チェーンのモックを構築するヘルパー"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        mock_q = MagicMock()
+        mock_db.session.query.return_value = mock_q
+        mock_q.join.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.first.return_value = first_return
+        return mock_db, mock_q
+
     def test_accessible_device_returns_device_object(self, mocker):
         """2.2.1: アクセス可能なデバイスが存在する場合、Deviceオブジェクトを返す"""
         mock_device = _make_mock_device(device_uuid="uuid-001")
-        mocker.patch(
-            "iot_app.services.industry_dashboard_service.Device"
-        ).query.filter.return_value.first.return_value = mock_device
+        self._setup_mock_db(mocker, first_return=mock_device)
         result = check_device_access("uuid-001", [1])
         assert result is mock_device
 
     def test_device_not_in_accessible_orgs_returns_none(self, mocker):
         """2.2.2: デバイスがアクセス可能組織に属さない場合、Noneを返す"""
-        mocker.patch(
-            "iot_app.services.industry_dashboard_service.Device"
-        ).query.filter.return_value.first.return_value = None
+        self._setup_mock_db(mocker, first_return=None)
         result = check_device_access("uuid-outside", [1])
         assert result is None
 
     def test_logically_deleted_device_returns_none(self, mocker):
         """2.2.3: 論理削除済みデバイス（delete_flag=True）はNoneを返す"""
-        mocker.patch(
-            "iot_app.services.industry_dashboard_service.Device"
-        ).query.filter.return_value.first.return_value = None
+        self._setup_mock_db(mocker, first_return=None)
         result = check_device_access("uuid-deleted", [1])
         assert result is None
 
     def test_empty_accessible_org_ids_returns_none(self, mocker):
         """2.2.2: accessible_org_ids が空リストの場合、Noneを返す"""
-        mocker.patch(
-            "iot_app.services.industry_dashboard_service.Device"
-        ).query.filter.return_value.first.return_value = None
         result = check_device_access("uuid-001", [])
         assert result is None
 
     def test_nonexistent_device_uuid_returns_none(self, mocker):
         """2.2.2: 存在しない device_uuid はNoneを返す"""
-        mocker.patch(
-            "iot_app.services.industry_dashboard_service.Device"
-        ).query.filter.return_value.first.return_value = None
+        self._setup_mock_db(mocker, first_return=None)
         result = check_device_access("uuid-nonexistent-9999", [1])
         assert result is None
 
     def test_returns_device_when_accessible(self):
         """アクセス可能デバイスのオブジェクトを返すこと"""
         mock_device = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.Device") as mock_device_cls:
-            mock_device_cls.query.filter.return_value.first.return_value = mock_device
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            mock_query = MagicMock()
+            mock_db.session.query.return_value = mock_query
+            mock_query.join.return_value = mock_query
+            mock_query.filter.return_value = mock_query
+            mock_query.first.return_value = mock_device
             result = check_device_access("test-uuid", [1, 2, 3])
         assert result == mock_device
 
     def test_returns_none_when_not_accessible(self):
         """アクセス不可の場合に None を返すこと"""
-        with patch("iot_app.services.industry_dashboard_service.Device") as mock_device_cls:
-            mock_device_cls.query.filter.return_value.first.return_value = None
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            mock_query = MagicMock()
+            mock_db.session.query.return_value = mock_query
+            mock_query.join.return_value = mock_query
+            mock_query.filter.return_value = mock_query
+            mock_query.first.return_value = None
             result = check_device_access("test-uuid", [1, 2, 3])
         assert result is None
 
@@ -442,7 +449,7 @@ class TestGetRecentAlertsWithCount:
         q.join.return_value = q
         q.filter.return_value = q
         q.count.return_value = total_count
-        q.order_by.return_value.limit.return_value.all.return_value = (
+        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
             return_list if return_list is not None else []
         )
         return mock_db, q
@@ -454,7 +461,7 @@ class TestGetRecentAlertsWithCount:
         q.join.return_value = q
         q.filter.return_value = q
         q.count.return_value = count
-        q.order_by.return_value.limit.return_value.all.return_value = alerts
+        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = alerts
         return q
 
     def test_returns_alert_list_and_count_tuple(self, mocker):
@@ -469,7 +476,6 @@ class TestGetRecentAlertsWithCount:
         alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
             accessible_org_ids=[1],
-            limit=30,
         )
         assert total == 1
         assert len(alerts) == 1
@@ -481,7 +487,6 @@ class TestGetRecentAlertsWithCount:
         alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
             accessible_org_ids=[1],
-            limit=30,
         )
         assert total == 0
         assert alerts == []
@@ -492,26 +497,17 @@ class TestGetRecentAlertsWithCount:
         get_recent_alerts_with_count(
             search_params={"organization_name": "店舗A", "device_name": "冷蔵庫"},
             accessible_org_ids=[1],
-            limit=30,
         )
         mock_db.session.query.assert_called()
 
-    def test_limit_applied_to_result(self, mocker):
-        """3.1.3.1: limit=30 がクエリに適用される"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = 0
-        mock_limit = q.order_by.return_value.limit
-        mock_limit.return_value.all.return_value = []
-        get_recent_alerts_with_count(
+    def test_max_total_30_applied(self, mocker):
+        """3.1.3.1: DBに100件あっても total が30件に制限される"""
+        self._setup_mock_db(mocker, return_list=[], total_count=100)
+        alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
             accessible_org_ids=[1],
-            limit=30,
         )
-        mock_limit.assert_called_with(30)
+        assert total == 30
 
     def test_organization_name_empty_string_treated_as_no_filter(self, mocker):
         """3.1.2.1: 店舗名が空文字の場合、フィルタなし相当でクエリが実行される"""
@@ -519,7 +515,6 @@ class TestGetRecentAlertsWithCount:
         alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
             accessible_org_ids=[1],
-            limit=30,
         )
         assert total == 0
 
@@ -823,7 +818,7 @@ class TestGetDeviceAlertsWithCount:
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
             q = self._make_base_query_mock(mock_db, [], 5)
             get_device_alerts_with_count(device_id=1, search_params={"page": 3})
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(20)
+        q.order_by.return_value.limit.return_value.offset.assert_called_with(10)
 
     def test_default_page_is_1(self):
         """page パラメータがない場合に page=1 として動作すること"""
@@ -852,19 +847,22 @@ class TestGetLatestSensorData:
         - 戻り値: センサーデータ行オブジェクト または None
     """
 
+    def _setup_mock_db(self, mocker, first_return=None):
+        """db.session.query(SilverSensorData) チェーンのモックを構築するヘルパー"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = first_return
+        return mock_db
+
     def test_returns_latest_sensor_row_when_exists(self, mocker):
         """3.1.4.1: センサーデータが存在する場合、最新の1行が返却される"""
-        mock_row = _make_mock_sensor_row()
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
-        )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchone.return_value = mock_row
+        mock_row = MagicMock()
+        self._setup_mock_db(mocker, first_return=mock_row)
         result = get_latest_sensor_data(device_id=1)
         assert result is mock_row
 
     def test_returns_none_when_no_sensor_data(self, mocker):
         """3.1.4.2: センサーデータが存在しない場合、Noneが返却される"""
+        self._setup_mock_db(mocker, first_return=None)
         mock_connector = mocker.patch(
             "iot_app.services.industry_dashboard_service.get_databricks_connection"
         )
@@ -874,7 +872,8 @@ class TestGetLatestSensorData:
         assert result is None
 
     def test_device_id_passed_to_query(self, mocker):
-        """3.1.1.1: device_id がSQLクエリに渡される"""
+        """3.1.1.1: device_id がUCのSQLクエリに渡される（MySQLにデータなしの場合）"""
+        self._setup_mock_db(mocker, first_return=None)
         mock_connector = mocker.patch(
             "iot_app.services.industry_dashboard_service.get_databricks_connection"
         )
@@ -891,15 +890,16 @@ class TestGetLatestSensorData:
     def test_returns_row_when_found(self):
         """センサーデータが存在する場合にRowオブジェクトを返すこと"""
         mock_row = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.get_databricks_connection") as mock_connector:
-            mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-            mock_cursor.fetchone.return_value = mock_row
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_row
             result = get_latest_sensor_data(device_id=1)
         assert result == mock_row
 
     def test_returns_none_when_not_found(self):
         """センサーデータが存在しない場合に None を返すこと"""
-        with patch("iot_app.services.industry_dashboard_service.get_databricks_connection") as mock_connector:
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db, \
+             patch("iot_app.services.industry_dashboard_service.get_databricks_connection") as mock_connector:
+            mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
             mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
             mock_cursor.fetchone.return_value = None
             result = get_latest_sensor_data(device_id=99)
@@ -927,43 +927,40 @@ class TestGetGraphData:
 
     def _default_search_params(self):
         return {
-            "search_start_datetime": "2026/02/26T12:00",
-            "search_end_datetime":   "2026/02/27T12:00",
+            "search_start_datetime": "2026-02-26T12:00",
+            "search_end_datetime":   "2026-02-27T12:00",
         }
 
     def test_returns_list_of_sensor_rows(self, mocker):
         """3.1.4.1: 期間内のセンサーデータリストが返却される"""
         mock_rows = [_make_mock_sensor_row() for _ in range(3)]
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
+        mocker.patch(
+            "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
+            return_value=mock_rows,
         )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = mock_rows
         result = get_graph_data(device_id=1, search_params=self._default_search_params())
         assert len(result) == 3
 
     def test_returns_empty_list_when_no_data_in_period(self, mocker):
         """3.1.4.2: 期間内にデータがない場合、空リストが返却される"""
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
+        mocker.patch(
+            "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
+            return_value=[],
         )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = []
         result = get_graph_data(device_id=1, search_params=self._default_search_params())
         assert result == []
 
     def test_search_start_and_end_datetime_passed_to_query(self, mocker):
-        """3.1.1.2: 表示期間（start/end）がSQLクエリに渡される"""
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
+        """3.1.1.2: 表示期間（start/end）が _fetch_graph_data_from_mysql に渡される"""
+        mock_fetch = mocker.patch(
+            "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
+            return_value=[],
         )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = []
         get_graph_data(device_id=1, search_params={
-            "search_start_datetime": "2026/02/01T00:00",
-            "search_end_datetime":   "2026/02/02T00:00",
+            "search_start_datetime": "2026-02-01T00:00",
+            "search_end_datetime":   "2026-02-02T00:00",
         })
-        mock_cursor.execute.assert_called_once()
+        mock_fetch.assert_called_once()
 
 
 # =============================================================================
@@ -1014,8 +1011,8 @@ class TestExportSensorDataCsv:
 
     def _default_search_params(self):
         return {
-            "search_start_datetime": "2026/02/26T12:00",
-            "search_end_datetime":   "2026/02/27T12:00",
+            "search_start_datetime": "2026-02-26T12:00",
+            "search_end_datetime":   "2026-02-27T12:00",
         }
 
     def _call_export(self, mocker, device=None, sensor_rows=None):

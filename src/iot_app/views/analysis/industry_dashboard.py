@@ -10,6 +10,7 @@
 """
 
 import json
+import logging
 
 from flask import Blueprint, abort, g, make_response, render_template, request
 
@@ -27,8 +28,9 @@ from iot_app.services.industry_dashboard_service import (
 )
 
 analysis_bp = Blueprint("analysis", __name__)
+logger = logging.getLogger(__name__)
 
-_ITEM_PER_PAGE = 10
+_ITEM_PER_PAGE = 5
 _STORE_MONITORING_COOKIE = "store_monitoring_search_params"
 _DEVICE_DETAILS_COOKIE = "device_details_search_params"
 _COOKIE_MAX_AGE = 86400
@@ -75,26 +77,42 @@ def _set_cookie(response, name, params):
 @analysis_bp.route("/analysis/industry-dashboard/store-monitoring", methods=["GET"])
 def store_monitoring():
     """店舗モニタリング初期表示・ページング"""
+    logger.info("店舗モニタリング表示開始: user_id=%s", g.current_user.user_id)
     try:
         accessible_org_ids = get_accessible_organizations(
             g.current_user.organization_id
         )
 
-        is_initial = "page" not in request.args
+        is_initial = "page" not in request.args and "alert_page" not in request.args
         if is_initial:
-            search_params = {"organization_name": "", "device_name": "", "page": 1}
+            search_params = {"organization_name": "", "device_name": "", "page": 1, "alert_page": 1}
         else:
             search_params = _get_store_monitoring_search_params()
-            search_params["page"] = request.args.get("page", 1, type=int)
+            search_params["page"] = request.args.get("page", search_params.get("page", 1), type=int)
+            search_params["alert_page"] = request.args.get("alert_page", search_params.get("alert_page", 1), type=int)
 
         page = search_params.get("page", 1)
+        alert_page = search_params.get("alert_page", 1)
 
+        logger.info("店舗モニタリング アラート一覧取得開始")
         alerts, alerts_total = get_recent_alerts_with_count(
-            search_params, accessible_org_ids, limit=30
+            search_params, accessible_org_ids, page=alert_page, per_page=_ITEM_PER_PAGE
         )
+        logger.info("店舗モニタリング アラート一覧取得完了")
+
+        logger.info("店舗モニタリング デバイス一覧取得開始")
         devices, devices_total = get_device_list_with_count(
             search_params, accessible_org_ids, page, _ITEM_PER_PAGE
         )
+        logger.info("店舗モニタリング デバイス一覧取得完了")
+
+        # 初期表示時: 先頭デバイスのセンサー情報を自動表示
+        selected_device = None
+        sensor_data = None
+        if is_initial and devices:
+            selected_device = check_device_access(devices[0].device_uuid, accessible_org_ids)
+            if selected_device:
+                sensor_data = get_latest_sensor_data(selected_device.device_id)
 
         response = make_response(
             render_template(
@@ -104,23 +122,31 @@ def store_monitoring():
                 devices=devices,
                 devices_total=devices_total,
                 page=page,
+                alert_page=alert_page,
                 per_page=_ITEM_PER_PAGE,
                 search_params=search_params,
+                selected_device=selected_device,
+                sensor_data=sensor_data,
+                show_sensor_info=selected_device is not None,
             )
         )
 
-        _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
+        if is_initial:
+            _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
+        logger.info("店舗モニタリング表示成功: user_id=%s", g.current_user.user_id)
         return response
 
     except Exception as e:
         if hasattr(e, "code"):
             raise
+        logger.error("店舗モニタリング表示エラー: user_id=%s, error=%s", g.current_user.user_id, str(e))
         abort(500)
 
 
 @analysis_bp.route("/analysis/industry-dashboard/store-monitoring", methods=["POST"])
 def store_monitoring_search():
     """店舗モニタリング検索"""
+    logger.info("店舗モニタリング検索開始: user_id=%s", g.current_user.user_id)
     try:
         accessible_org_ids = get_accessible_organizations(
             g.current_user.organization_id
@@ -130,14 +156,20 @@ def store_monitoring_search():
             "organization_name": request.form.get("organization_name", ""),
             "device_name": request.form.get("device_name", ""),
             "page": 1,
+            "alert_page": 1,
         }
 
+        logger.info("店舗モニタリング検索 アラート一覧取得開始")
         alerts, alerts_total = get_recent_alerts_with_count(
-            search_params, accessible_org_ids, limit=30
+            search_params, accessible_org_ids, page=1, per_page=_ITEM_PER_PAGE
         )
+        logger.info("店舗モニタリング検索 アラート一覧取得完了")
+
+        logger.info("店舗モニタリング検索 デバイス一覧取得開始")
         devices, devices_total = get_device_list_with_count(
             search_params, accessible_org_ids, 1, _ITEM_PER_PAGE
         )
+        logger.info("店舗モニタリング検索 デバイス一覧取得完了")
 
         response = make_response(
             render_template(
@@ -147,17 +179,20 @@ def store_monitoring_search():
                 devices=devices,
                 devices_total=devices_total,
                 page=1,
+                alert_page=1,
                 per_page=_ITEM_PER_PAGE,
                 search_params=search_params,
             )
         )
 
         _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
+        logger.info("店舗モニタリング検索成功: user_id=%s", g.current_user.user_id)
         return response
 
     except Exception as e:
         if hasattr(e, "code"):
             raise
+        logger.error("店舗モニタリング検索エラー: user_id=%s, error=%s", g.current_user.user_id, str(e))
         abort(500)
 
 
@@ -166,6 +201,7 @@ def store_monitoring_search():
 )
 def show_sensor_info(device_uuid):
     """センサー情報表示"""
+    logger.info("センサー情報表示開始: user_id=%s, device_uuid=%s", g.current_user.user_id, device_uuid)
     try:
         accessible_org_ids = get_accessible_organizations(
             g.current_user.organization_id
@@ -177,15 +213,25 @@ def show_sensor_info(device_uuid):
 
         search_params = _get_store_monitoring_search_params()
         page = search_params.get("page", 1)
+        alert_page = search_params.get("alert_page", 1)
 
+        logger.info("センサー情報表示 アラート一覧取得開始: device_uuid=%s", device_uuid)
         alerts, alerts_total = get_recent_alerts_with_count(
-            search_params, accessible_org_ids, limit=30
+            search_params, accessible_org_ids, page=alert_page, per_page=_ITEM_PER_PAGE
         )
+        logger.info("センサー情報表示 アラート一覧取得完了: device_uuid=%s", device_uuid)
+
+        logger.info("センサー情報表示 デバイス一覧取得開始: device_uuid=%s", device_uuid)
         devices, devices_total = get_device_list_with_count(
             search_params, accessible_org_ids, page, _ITEM_PER_PAGE
         )
-        sensor_data = get_latest_sensor_data(device.device_id)
+        logger.info("センサー情報表示 デバイス一覧取得完了: device_uuid=%s", device_uuid)
 
+        logger.info("センサー情報表示 最新センサーデータ取得開始: device_uuid=%s", device_uuid)
+        sensor_data = get_latest_sensor_data(device.device_id)
+        logger.info("センサー情報表示 最新センサーデータ取得完了: device_uuid=%s", device_uuid)
+
+        logger.info("センサー情報表示成功: device_uuid=%s", device_uuid)
         return render_template(
             "analysis/industry_dashboard/store_monitoring.html",
             alerts=alerts,
@@ -193,6 +239,7 @@ def show_sensor_info(device_uuid):
             devices=devices,
             devices_total=devices_total,
             page=page,
+            alert_page=alert_page,
             per_page=_ITEM_PER_PAGE,
             search_params=search_params,
             selected_device=device,
@@ -203,6 +250,7 @@ def show_sensor_info(device_uuid):
     except Exception as e:
         if hasattr(e, "code"):
             raise
+        logger.error("センサー情報表示エラー: device_uuid=%s, error=%s", device_uuid, str(e))
         abort(500)
 
 
@@ -216,6 +264,7 @@ def show_sensor_info(device_uuid):
 )
 def device_details(device_uuid):
     """デバイス詳細初期表示・ページング・CSVエクスポート"""
+    logger.info("デバイス詳細表示開始: user_id=%s, device_uuid=%s", g.current_user.user_id, device_uuid)
     try:
         accessible_org_ids = get_accessible_organizations(
             g.current_user.organization_id
@@ -235,15 +284,21 @@ def device_details(device_uuid):
 
         # CSVエクスポート
         if request.args.get("export") == "csv":
+            logger.info("デバイス詳細 CSVエクスポート開始: device_uuid=%s", device_uuid)
             csv_search_params = _get_device_details_search_params()
             return export_sensor_data_csv(device, csv_search_params)
 
         page = search_params.get("page", 1)
 
+        logger.info("デバイス詳細 アラート一覧取得開始: device_uuid=%s", device_uuid)
         alerts, alerts_total = get_device_alerts_with_count(
             device.device_id, search_params
         )
+        logger.info("デバイス詳細 アラート一覧取得完了: device_uuid=%s", device_uuid)
+
+        logger.info("デバイス詳細 グラフデータ取得開始: device_uuid=%s", device_uuid)
         graph_data = get_graph_data(device.device_id, search_params)
+        logger.info("デバイス詳細 グラフデータ取得完了: device_uuid=%s", device_uuid)
 
         response = make_response(
             render_template(
@@ -260,11 +315,13 @@ def device_details(device_uuid):
 
         if is_initial:
             _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
+        logger.info("デバイス詳細表示成功: device_uuid=%s", device_uuid)
         return response
 
     except Exception as e:
         if hasattr(e, "code"):
             raise
+        logger.error("デバイス詳細表示エラー: device_uuid=%s, error=%s", device_uuid, str(e))
         abort(500)
 
 
@@ -273,6 +330,7 @@ def device_details(device_uuid):
 )
 def device_details_search(device_uuid):
     """デバイス詳細検索（表示期間変更）"""
+    logger.info("デバイス詳細検索開始: user_id=%s, device_uuid=%s", g.current_user.user_id, device_uuid)
     try:
         accessible_org_ids = get_accessible_organizations(
             g.current_user.organization_id
@@ -295,10 +353,15 @@ def device_details_search(device_uuid):
             "page": 1,
         }
 
+        logger.info("デバイス詳細検索 アラート一覧取得開始: device_uuid=%s", device_uuid)
         alerts, alerts_total = get_device_alerts_with_count(
             device.device_id, search_params
         )
+        logger.info("デバイス詳細検索 アラート一覧取得完了: device_uuid=%s", device_uuid)
+
+        logger.info("デバイス詳細検索 グラフデータ取得開始: device_uuid=%s", device_uuid)
         graph_data = get_graph_data(device.device_id, search_params)
+        logger.info("デバイス詳細検索 グラフデータ取得完了: device_uuid=%s", device_uuid)
 
         response = make_response(
             render_template(
@@ -314,9 +377,11 @@ def device_details_search(device_uuid):
         )
 
         _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
+        logger.info("デバイス詳細検索成功: device_uuid=%s", device_uuid)
         return response
 
     except Exception as e:
         if hasattr(e, "code"):
             raise
+        logger.error("デバイス詳細検索エラー: device_uuid=%s, error=%s", device_uuid, str(e))
         abort(500)

@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     device_type_id              INT          NOT NULL,
     device_name                 VARCHAR(100) NOT NULL,
     device_model                VARCHAR(100) NOT NULL,
-    device_stock_id             INT          NOT NULL,
+    device_stock_id             INT          NULL,
     sim_id                      VARCHAR(100) NULL,
     mac_address                 VARCHAR(100) NULL,
     software_version            VARCHAR(100) NULL,
@@ -400,6 +400,39 @@ CREATE TABLE IF NOT EXISTS master_list (
     PRIMARY KEY (master_id),
     CONSTRAINT FK_master_list_user_type FOREIGN KEY (user_type_id)
         REFERENCES user_type_master (user_type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- センサーデータ（直近2ヶ月分をMySQLで保持、UCと重複保持）
+CREATE TABLE IF NOT EXISTS silver_sensor_data (
+    device_id                        INT            NOT NULL,
+    organization_id                  INT            NOT NULL,
+    event_timestamp                  DATETIME       NOT NULL,
+    event_date                       DATE           NOT NULL,
+    external_temp                    DOUBLE         NULL,
+    set_temp_freezer_1               DOUBLE         NULL,
+    internal_sensor_temp_freezer_1   DOUBLE         NULL,
+    internal_temp_freezer_1          DOUBLE         NULL,
+    df_temp_freezer_1                DOUBLE         NULL,
+    condensing_temp_freezer_1        DOUBLE         NULL,
+    adjusted_internal_temp_freezer_1 DOUBLE         NULL,
+    set_temp_freezer_2               DOUBLE         NULL,
+    internal_sensor_temp_freezer_2   DOUBLE         NULL,
+    internal_temp_freezer_2          DOUBLE         NULL,
+    df_temp_freezer_2                DOUBLE         NULL,
+    condensing_temp_freezer_2        DOUBLE         NULL,
+    adjusted_internal_temp_freezer_2 DOUBLE         NULL,
+    compressor_freezer_1             DOUBLE         NULL,
+    compressor_freezer_2             DOUBLE         NULL,
+    fan_motor_1                      DOUBLE         NULL,
+    fan_motor_2                      DOUBLE         NULL,
+    fan_motor_3                      DOUBLE         NULL,
+    fan_motor_4                      DOUBLE         NULL,
+    fan_motor_5                      DOUBLE         NULL,
+    defrost_heater_output_1          DOUBLE         NULL,
+    defrost_heater_output_2          DOUBLE         NULL,
+    sensor_data_json                 JSON           NULL,
+    create_time                      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_id, organization_id, event_timestamp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

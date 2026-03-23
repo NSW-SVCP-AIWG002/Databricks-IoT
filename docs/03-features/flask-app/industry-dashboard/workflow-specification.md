@@ -64,6 +64,7 @@
       - [エラーハンドリング](#エラーハンドリング-5)
   - [使用データベース詳細](#使用データベース詳細)
     - [使用テーブル一覧](#使用テーブル一覧)
+  - [センサーデータ取得のデータソース切り替えロジック](#センサーデータ取得のデータソース切り替えロジック)
   - [セキュリティ実装](#セキュリティ実装)
     - [認証・認可実装](#認証認可実装)
     - [ログ出力ルール](#ログ出力ルール)
@@ -712,7 +713,7 @@ flowchart TD
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
     CheckDeviceQuery -->|失敗| Error500[500エラーモーダル表示]
 
-    CheckDeviceQuery -->|成功| SensorQuery[最新センサーデータ取得<br>Unity Catalog sensor_data_view]
+    CheckDeviceQuery -->|成功| SensorQuery[最新センサーデータ取得<br>OLTP DB silver_sensor_data]
     SensorQuery --> CheckSensorQuery{DBクエリ結果}
     CheckSensorQuery -->|失敗| Error500
 
@@ -748,18 +749,33 @@ def check_device_access(device_uuid, accessible_org_ids):
 
 **② 最新センサーデータ取得**
 
-**使用テーブル:** sensor_data_view (Unity Catalog)
+**使用テーブル:** MySQL の `silver_sensor_data`（直近Nヶ月以内）または Unity Catalog の `silver_sensor_data`（Nヶ月より古い）
 
-**SQL詳細:**
+データソース切り替えロジック（MySQL優先・fallback: Unity Catalog）の詳細は「センサーデータ取得のデータソース切り替えロジック」セクションを参照してください。
+
+**SQL詳細（MySQL）:**
 ```sql
 SELECT
   *
 FROM
-  iot_catalog.views.sensor_data_view
+  silver_sensor_data
 WHERE
   device_id = :device_id
 ORDER BY
-    event_timestamp DESC
+  event_timestamp DESC
+LIMIT 1
+```
+
+**SQL詳細（Unity Catalog fallback）:**
+```sql
+SELECT
+  *
+FROM
+  silver_sensor_data  -- Unity Catalog ビュー
+WHERE
+  device_id = :device_id
+ORDER BY
+  event_timestamp DESC
 LIMIT 1
 ```
 
@@ -793,7 +809,7 @@ def show_sensor_info(device_uuid):
     # デバイス一覧取得
     devices, total = get_device_list(search_params, accessible_org_ids, page, ITEM_PER_PAGE)
 
-    # 最新センサーデータ取得（Unity Catalog）
+    # 最新センサーデータ取得（MySQL優先、fallback: Unity Catalog）
     sensor_data = get_latest_sensor_data(device.device_id)
 
     return render_template(
@@ -881,7 +897,7 @@ flowchart TD
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
     CheckAlertQuery -->|失敗| Error500
 
-    CheckAlertQuery -->|成功| GraphQuery[グラフ用データ取得<br>Unity Catalog sensor_data_view<br>表示期間を適用]
+    CheckAlertQuery -->|成功| GraphQuery[グラフ用データ取得<br>OLTP DB silver_sensor_data<br>表示期間を適用]
     GraphQuery --> CheckGraphQuery{DBクエリ結果}
     CheckGraphQuery -->|失敗| Error500
 
@@ -927,15 +943,31 @@ def get_default_date_range():
 
 時系列グラフ描画用に、表示期間内の全センサーデータを取得します。
 
-**SQL詳細:**
+検索期間とカットオフ日時を比較し、MySQL のみ / Unity Catalog のみ / 両方マージ のいずれかでデータを取得します。
+詳細は「センサーデータ取得のデータソース切り替えロジック」セクションを参照してください。
+
+**SQL詳細（MySQL側）:**
 ```sql
 SELECT
   *
 FROM
-  iot_catalog.views.sensor_data_view
+  silver_sensor_data
 WHERE
   device_id = :device_id
-  AND event_timestamp BETWEEN :search_start_datetime AND :search_end_datetime
+  AND event_timestamp BETWEEN :mysql_start AND :search_end_datetime
+ORDER BY
+  event_timestamp ASC
+```
+
+**SQL詳細（Unity Catalog側）:**
+```sql
+SELECT
+  *
+FROM
+  silver_sensor_data  -- Unity Catalog ビュー
+WHERE
+  device_id = :device_id
+  AND event_timestamp BETWEEN :search_start_datetime AND :uc_end
 ORDER BY
   event_timestamp ASC
 ```
@@ -979,7 +1011,7 @@ def device_details(device_uuid):
     # アラート一覧取得
     alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params)
 
-    # グラフ用データ取得
+    # グラフ用データ取得（MySQL / Unity Catalog 切り替えロジック適用）
     graph_data = get_graph_data(device.device_id, search_params)
 
     # レンダリング
@@ -1166,7 +1198,7 @@ def device_details_search(device_uuid):
     # アラート一覧取得
     alerts = get_device_alerts(device.device_id, search_params)
 
-    # グラフ用データ取得
+    # グラフ用データ取得（MySQL / Unity Catalog 切り替えロジック適用）
     graph_data = get_graph_data(device.device_id, search_params)
 
     # レンダリング
@@ -1271,7 +1303,7 @@ def export_sensor_data_csv(device, search_params):
     import csv
     from io import StringIO
 
-    # 表示期間内の全センサーデータを取得
+    # 表示期間内の全センサーデータを取得（MySQL / Unity Catalog 切り替えロジック適用）
     sensor_data_list = get_all_sensor_data(device.device_id, search_params)
 
     # CSV形式で出力
@@ -1366,7 +1398,160 @@ def export_sensor_data_csv(device, search_params):
 | 6 | alert_setting_master | アラート設定マスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラート名表示 |
 | 7 | alert_level_master | アラートレベルマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートレベル表示 |
 | 8 | alert_status_master | アラートステータスマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートステータス表示 |
-| 9 | sensor_data_view | センサーデータビュー | Unity Catalog | SELECT | センサー情報表示、デバイス詳細 | センサーデータ取得 |
+| 9 | silver_sensor_data (MySQL) | センサーデータ（直近Nヶ月以内・UCと重複保持） | MySQL | SELECT | センサー情報表示、デバイス詳細 | 直近センサーデータ取得（高速アクセス・プライマリ） |
+| 10 | silver_sensor_data (Unity Catalog) | センサーデータ（全期間：直近Nヶ月以内はMySQLと重複保持、Nヶ月より古いはUCのみ） | Unity Catalog (Delta Lake) | SELECT | センサー情報表示、デバイス詳細 | 全期間センサーデータ取得（長期保存・フォールバック） |
+
+---
+
+## センサーデータ取得のデータソース切り替えロジック
+
+### 概要
+
+センサーデータは保存期間に応じて以下の2つのデータソースに分散して保存されます。
+
+| データソース | 保存内容 | 用途 |
+|-----------|--------|------|
+| MySQL | 直近Nヶ月以内のデータ（Unity Catalogと重複保持） | 高速アクセス・プライマリソース |
+| Unity Catalog (Delta Lake) | 全データ（直近Nヶ月以内はMySQLと重複保持、Nヶ月より古いはUCのみ） | 長期保存・フォールバックソース |
+
+**注:** カットオフ期間Nの具体的な値は [共通仕様書](../../common/common-specification.md) に定義します。本書では `SENSOR_DATA_CUTOFF_MONTHS` として参照します。
+
+---
+
+### カットオフ日時の算出
+
+```python
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def get_sensor_data_cutoff_datetime():
+    """センサーデータのカットオフ日時を取得する。
+    カットオフ期間（SENSOR_DATA_CUTOFF_MONTHS）は共通仕様書に定義。
+    """
+    return datetime.now() - relativedelta(months=SENSOR_DATA_CUTOFF_MONTHS)
+```
+
+---
+
+### データソース選択ルール
+
+| 検索期間 | 使用するデータソース | 理由 |
+|---------|------------------|------|
+| 終了日時 ≥ カットオフ かつ 開始日時 ≥ カットオフ | MySQL 優先（UCにも保持） | MySQL が高速・プライマリ |
+| 終了日時 < カットオフ | Unity Catalog のみ | MySQL にデータなし（UCのみ保持） |
+| 開始日時 < カットオフ かつ 終了日時 ≥ カットオフ（期間またがり） | MySQL（直近部分）+ Unity Catalog（古い部分）マージ | MySQL は直近Nヶ月以内のみ保持 |
+
+---
+
+### get_latest_sensor_data の特別ルール（センサー情報表示用）
+
+最新センサーデータの取得は MySQL を優先します。Unity Catalog は全期間のデータを保持するため、MySQL にデータがない場合（直近Nヶ月より古いデータ）は必ず Unity Catalog にフォールバックできます。
+
+- MySQL にデータが存在する場合 → MySQL の最新1件を返す（直近Nヶ月以内のデータ）
+- MySQL にデータが存在しない場合 → Unity Catalog から最新1件を返す（Nヶ月より古いデータ、UCのみ保持）
+
+**実装例:**
+
+```python
+def get_latest_sensor_data(device_id):
+    """最新センサーデータを取得する（MySQL優先、fallback: Unity Catalog）。"""
+
+    # MySQL から最新データを取得
+    mysql_result = (
+        db.session.query(SilverSensorData)
+        .filter(SilverSensorData.device_id == device_id)
+        .order_by(SilverSensorData.event_timestamp.desc())
+        .first()
+    )
+    if mysql_result:
+        return mysql_result
+
+    # fallback: Unity Catalog から最新データを取得
+    with get_databricks_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM {SENSOR_DATA_VIEW}"
+            " WHERE device_id = ?"
+            " ORDER BY event_timestamp DESC"
+            " LIMIT 1",
+            [device_id],
+        )
+        return cursor.fetchone()
+```
+
+---
+
+### get_graph_data / get_all_sensor_data の切り替えロジック
+
+時系列グラフ表示・CSVエクスポート用のデータ取得では、MySQL を優先し、MySQL にデータがない期間（カットオフ以前、UCのみ保持）は Unity Catalog からフォールバック取得します。検索期間全体がカットオフ以降の場合は MySQL のみを使用し、カットオフをまたぐ場合は MySQL（直近部分）と Unity Catalog（古い部分）のデータをマージします。
+
+**実装例:**
+
+```python
+def get_sensor_data_from_dual_source(device_id, start_dt, end_dt):
+    """検索期間に応じてMySQL / Unity Catalogからセンサーデータを取得しマージする。"""
+    cutoff_dt = get_sensor_data_cutoff_datetime()
+    results = []
+
+    # MySQL にデータがない部分（カットオフ以前、UCのみ保持）を Unity Catalog から取得
+    if start_dt < cutoff_dt:
+        uc_end = min(end_dt, cutoff_dt)
+        with get_databricks_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM {SENSOR_DATA_VIEW}"
+                " WHERE device_id = ?"
+                " AND event_timestamp BETWEEN ? AND ?"
+                " ORDER BY event_timestamp ASC",
+                [device_id, start_dt.isoformat(), uc_end.isoformat()],
+            )
+            results.extend(cursor.fetchall())
+
+    # MySQL から新しいデータを取得（終了日時がカットオフ以降の場合）
+    if end_dt >= cutoff_dt:
+        mysql_start = max(start_dt, cutoff_dt)
+        mysql_results = (
+            db.session.query(SilverSensorData)
+            .filter(
+                SilverSensorData.device_id == device_id,
+                SilverSensorData.event_timestamp.between(mysql_start, end_dt),
+            )
+            .order_by(SilverSensorData.event_timestamp.asc())
+            .all()
+        )
+        results.extend(mysql_results)
+
+    # event_timestamp で昇順ソートしてマージ結果を返す
+    return sorted(results, key=lambda r: r.event_timestamp)
+```
+
+**SQL詳細（MySQL側）:**
+
+```sql
+SELECT
+  *
+FROM
+  silver_sensor_data
+WHERE
+  device_id = :device_id
+  AND event_timestamp BETWEEN :mysql_start AND :end_datetime
+ORDER BY
+  event_timestamp ASC
+```
+
+**SQL詳細（Unity Catalog側）:**
+
+```sql
+SELECT
+  *
+FROM
+  silver_sensor_data  -- Unity Catalog ビュー
+WHERE
+  device_id = :device_id
+  AND event_timestamp BETWEEN :start_datetime AND :uc_end
+ORDER BY
+  event_timestamp ASC
+```
 
 ---
 
