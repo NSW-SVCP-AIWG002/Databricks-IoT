@@ -100,13 +100,16 @@ CREATE TABLE IF NOT EXISTS inventory_status_master (
 
 -- 13. 測定項目マスタ
 CREATE TABLE IF NOT EXISTS measurement_item_master (
-    measurement_item_id   INT          NOT NULL AUTO_INCREMENT,
-    measurement_item_name VARCHAR(50)  NOT NULL,
-    create_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator               INT          NOT NULL,
-    update_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    modifier              INT          NOT NULL,
-    delete_flag           BOOLEAN      NOT NULL DEFAULT FALSE,
+    measurement_item_id     INT          NOT NULL AUTO_INCREMENT,
+    measurement_item_name   VARCHAR(50)  NOT NULL,
+    silver_data_column_name VARCHAR(50)  NOT NULL,
+    display_name            VARCHAR(50)  NOT NULL,
+    unit_name               VARCHAR(10)  NOT NULL,
+    create_date             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator                 INT          NOT NULL,
+    update_date             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier                INT          NOT NULL,
+    delete_flag             BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (measurement_item_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
