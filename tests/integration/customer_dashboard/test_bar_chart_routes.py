@@ -493,7 +493,7 @@ class TestGadgetBarChartRegister:
         assert response.status_code == 400
 
     def test_register_device_id_required_in_fixed_mode(self, client, measurement_item):
-        """3.1.2: device_mode=fixed でデバイスID未指定（0）は404（サービス層でデバイス不在チェック）"""
+        """3.1.2: device_mode=fixed でデバイスID未指定（0）は404（ビュー層でデバイス不在チェック）"""
         # Act
         response = client.post(self._URL, data=self._valid_form(device_mode='fixed', device_id='0'))
 
@@ -770,7 +770,7 @@ class TestGadgetBarChartRegister:
         """4.3.9: device_mode=fixed、device_id はDBに存在するが accessible_org_ids=[] のためアクセス不可 → 404
 
         認証未実装ブランチでは get_accessible_org_ids() が常に [] を返すため、
-        fixed モードのデバイスチェックは必ず NotFoundError になる。
+        fixed モードのデバイスチェック（ビュー層）は必ず abort(404) になる。
         """
         # Arrange: DeviceMaster にデバイスを登録するが、org スコープ外（accessible_org_ids=[]）
         with app.app_context():
@@ -800,7 +800,7 @@ class TestGadgetBarChartRegister:
 
     # TODO: 認証実装後に追加 - device_mode=fixed 成功ケース
     # 認証実装後は accessible_org_ids に device の organization_id が含まれる状態を作り、
-    # 正常登録（302リダイレクト）を確認すること。
+    # ビュー層のデバイスチェックを通過して正常登録（302リダイレクト）を確認すること。
 
     def test_register_without_gadget_type_master_returns_error(self, client, measurement_item):
         """4.3.10: GadgetTypeMaster に「棒グラフ」レコードが存在しない場合はエラー
