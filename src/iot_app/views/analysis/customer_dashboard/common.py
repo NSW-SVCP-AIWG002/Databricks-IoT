@@ -666,14 +666,9 @@ def gadget_delete(gadget_uuid):
 
 
 # ---------------------------------------------------------------------------
-# No.23 ガジェットデータ取得（ガジェット種別個別仕様に委譲）
+# No.23 ガジェットデータ取得（各ガジェット種別モジュールに委譲）
 # ---------------------------------------------------------------------------
-
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-@require_auth
-def gadget_data(gadget_uuid):
-    """ガジェットデータ取得AJAX（ガジェット個別仕様書参照）"""
-    return jsonify({'error': 'Not Implemented'}), 501
+# bar_chart.py 等、各ガジェット種別モジュールが /gadgets/<gadget_uuid>/data を実装する
 
 
 # ---------------------------------------------------------------------------
@@ -700,14 +695,9 @@ def layout_save():
 
 
 # ---------------------------------------------------------------------------
-# No.25 CSVエクスポート（ガジェット種別個別仕様に委譲）
+# No.25 CSVエクスポート（各ガジェット種別モジュールに委譲）
 # ---------------------------------------------------------------------------
-
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>', methods=['GET'])
-@require_auth
-def gadget_csv_export(gadget_uuid):
-    """ガジェットCSVエクスポート（ガジェット個別仕様書参照）"""
-    return jsonify({'error': 'Not Implemented'}), 501
+# bar_chart.py 等、各ガジェット種別モジュールが /gadgets/<gadget_uuid> を実装する
 
 
 # ---------------------------------------------------------------------------
