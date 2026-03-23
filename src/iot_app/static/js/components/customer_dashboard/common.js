@@ -595,8 +595,7 @@ const CustomerDashboard = (function () {
     document.querySelectorAll('.datetime-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const range = btn.dataset.range;
-        const params = _calcDateRange(range);
-        _fetchAllGadgetsData(params);
+        _fetchAllGadgetsData({ range });
       });
     });
 
@@ -659,57 +658,6 @@ const CustomerDashboard = (function () {
     }
   }
 
-  /**
-   * 日時レンジ文字列から開始/終了日時を計算する
-   */
-  function _calcDateRange(range) {
-    const now = new Date();
-    let start, end;
-
-    switch (range) {
-      case 'today':
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-        break;
-      case 'yesterday': {
-        const y = new Date(now);
-        y.setDate(y.getDate() - 1);
-        start = new Date(y.getFullYear(), y.getMonth(), y.getDate());
-        end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
-        break;
-      }
-      case 'this_week': {
-        const day = now.getDay();
-        const mon = new Date(now);
-        mon.setDate(now.getDate() - ((day + 6) % 7));
-        start = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate());
-        end = now;
-        break;
-      }
-      case 'this_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = now;
-        break;
-      case 'this_year':
-        start = new Date(now.getFullYear(), 0, 1);
-        end = now;
-        break;
-      default:
-        start = new Date(now.getTime() - 3600000); // 1時間前
-        end = now;
-    }
-
-    return {
-      range,
-      start: _formatDatetime(start),
-      end: _formatDatetime(end),
-    };
-  }
-
-  function _formatDatetime(date) {
-    return date.toISOString().slice(0, 19);
-  }
-
   /* =========================================================
    * ガジェットデータ取得（AJAX）
    * ========================================================= */
@@ -717,50 +665,31 @@ const CustomerDashboard = (function () {
   /**
    * 全ガジェットのデータを取得する
    */
-  async function _fetchAllGadgetsData(params) {
+  function _fetchAllGadgetsData(params) {
     const gadgets = document.querySelectorAll('.gadget[data-data-url]');
     const deviceId = document.getElementById('select-device')?.value || null;
     const orgId = document.getElementById('select-organization')?.value || null;
 
-    const promises = Array.from(gadgets).map(function (gadget) {
-      return _fetchGadgetData(gadget, params, orgId, deviceId);
+    gadgets.forEach(function (gadget) {
+      _fetchGadgetData(gadget, params, orgId, deviceId);
     });
-    await Promise.all(promises);
     _updateLastUpdatedTime();
   }
 
   /**
    * 単一ガジェットのデータを取得してグラフを更新する
    */
-  async function _fetchGadgetData(gadgetEl, params, orgId, deviceId) {
-    const url = gadgetEl.dataset.dataUrl;
-    if (!url) return;
-
-    try {
-      const body = {
+  function _fetchGadgetData(gadgetEl, params, orgId, deviceId) {
+    // データ取得・描画はガジェット種別ごとの JS に委譲する
+    // CustomEvent で日時範囲を通知し、各ガジェット JS が自身のエンドポイントを呼ぶ
+    gadgetEl.dispatchEvent(new CustomEvent('gadget:daterange-changed', {
+      bubbles: false,
+      detail: {
         ...params,
         organization_id: orgId ? parseInt(orgId, 10) : null,
         device_id: deviceId ? parseInt(deviceId, 10) : null,
-      };
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        console.warn(`ガジェットデータ取得失敗: ${gadgetEl.dataset.gadgetUuid} (${res.status})`);
-        return;
-      }
-
-      // ガジェット個別仕様に委譲: データを受け取ってチャートを更新
-      // const data = await res.json();
-      // ChartRenderer.render(gadgetEl, data);  // ← 各ガジェット種別ルーティング（将来実装）
-
-    } catch (e) {
-      console.error('ガジェットデータ取得エラー', e);
-    }
+      },
+    }));
   }
 
   /* =========================================================
