@@ -3,7 +3,6 @@ from datetime import datetime
 
 from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
 
-from iot_app.common.exceptions import NotFoundError
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
 from iot_app.services.customer_dashboard.bar_chart import (
@@ -150,7 +149,6 @@ def gadget_bar_chart_register():
 
     form = BarChartGadgetForm()
     # device_id: DBから選択肢を構築し、送信値が含まれない場合も追加
-    # （存在チェックはサービス層で行う）
     submitted_device_id = request.form.get('device_id', type=int) or 0
     form.device_id.choices = [(0, '選択してください')] + [
         (d.device_id, d.device_name) for d in context['devices']
@@ -173,7 +171,11 @@ def gadget_bar_chart_register():
             **context,
         ), 400
 
-    accessible_org_ids = get_accessible_org_ids(getattr(g, 'current_user_organization_id', None))
+    # デバイス固定モード時: デバイス存在&データスコープチェック
+    if form.device_mode.data == 'fixed':
+        accessible_org_ids = get_accessible_org_ids(getattr(g, 'current_user_organization_id', None))
+        if check_device_access(form.device_id.data, accessible_org_ids) is None:
+            abort(404)
 
     params = {
         'title': form.title.data,
@@ -191,12 +193,9 @@ def gadget_bar_chart_register():
         register_bar_chart_gadget(
             params=params,
             current_user_id=getattr(g, 'current_user_id', None),
-            accessible_org_ids=accessible_org_ids,
         )
         return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
 
-    except NotFoundError:
-        abort(404)
     except Exception as e:
         logger.error(f'棒グラフガジェット登録エラー: {str(e)}')
         abort(500)

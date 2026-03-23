@@ -603,34 +603,27 @@ def check_device_access(device_id, accessible_org_ids):
 # ガジェット登録
 # ============================================================
 
-def register_bar_chart_gadget(params, current_user_id, accessible_org_ids=None):
+def register_bar_chart_gadget(params, current_user_id):
     """棒グラフガジェットを登録する
 
     Args:
         params (dict): 登録パラメータ
         current_user_id (int): 操作ユーザーID
-        accessible_org_ids (list): アクセス可能な組織IDリスト
 
     Returns:
         int: 登録されたガジェットの gadget_id
 
     Raises:
         ValidationError: バリデーションエラー時
-        NotFoundError: デバイスが見つからない場合
+        NotFoundError: ガジェット種別が見つからない場合
         Exception: DB エラー時
     """
-    if accessible_org_ids is None:
-        accessible_org_ids = []
-
     # バリデーション
     validate_gadget_registration(params)
 
-    # デバイス固定モードのデバイス存在チェック
+    # デバイス固定モード
     device_id = None
     if params.get("device_mode") == "fixed":
-        device = check_device_access(params.get("device_id"), accessible_org_ids)
-        if not device:
-            raise NotFoundError("指定されたデバイスが見つかりません")
         device_id = params.get("device_id")
 
     chart_config = json.dumps({
