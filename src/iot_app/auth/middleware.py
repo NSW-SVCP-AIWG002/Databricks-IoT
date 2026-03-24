@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 
 from flask import g, request, session, abort, render_template, current_app
 
@@ -56,6 +57,7 @@ def authenticate_request():
 
     _sync_session(idp_user_info, app_user)
 
+    g.current_user = SimpleNamespace()
     g.current_user.user_id = session.get('user_id')
     g.current_user.user_type_id = session.get('user_type_id')
 
