@@ -300,7 +300,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
-<script src="{{ url_for('static', filename='js/components/bar_chart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},
