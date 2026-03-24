@@ -256,7 +256,9 @@
                   </div>
 
                   {# ガジェット種別固有UI #}
-                  {% include 'analysis/customer_dashboard/bar_chart.html' %}
+                  {% if gadget.gadget_type_id == gadget_type_ids['棒グラフ'] %}
+                    {% include 'analysis/customer_dashboard/bar_chart.html' %}
+                  {% endif %}
 
                 </div>{# /gadget #}
             {% endfor %}
