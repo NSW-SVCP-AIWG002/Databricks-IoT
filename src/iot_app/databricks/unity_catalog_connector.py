@@ -24,7 +24,7 @@ class UnityCatalogConnector:
         Returns:
             list[dict]: クエリ結果行のリスト
         """
-        token = getattr(g, 'databricks_token', None)
+        token = getattr(getattr(g, 'current_user', None), 'databricks_token', None)
 
         # :param_name → %(param_name)s に変換（databricks-sql-connector の形式）
         converted_sql = re.sub(r':(\w+)', r'%(\1)s', sql_text)
@@ -49,7 +49,7 @@ class UnityCatalogConnector:
         Returns:
             dict | None: 先頭1行。結果が0件の場合は None
         """
-        token = getattr(g, 'databricks_token', None)
+        token = getattr(getattr(g, 'current_user', None), 'databricks_token', None)
         converted_sql = re.sub(r':(\w+)', r'%(\1)s', sql_text)
 
         with sql.connect(
