@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta
 from flask import Response
 
 from iot_app import db
-from iot_app.databricks.unity_catalog_connector import get_databricks_connection
+from iot_app.databricks.unity_catalog_connector import UnityCatalogConnector
 from iot_app.models.alert import (
     AlertHistory,
     AlertLevelMaster,
@@ -512,16 +512,13 @@ def _fetch_graph_data_from_mysql(device_id, start_dt, end_dt):
 def _fetch_graph_data_from_uc(device_id, start_str, end_str):
     """Unity Catalogからグラフ用センサーデータを取得する。"""
     try:
-        with get_databricks_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-                " WHERE device_id = ?"
-                " AND event_timestamp BETWEEN ? AND ?"
-                " ORDER BY event_timestamp ASC",
-                [device_id, start_str, end_str],
-            )
-            return cursor.fetchall()
+        return UnityCatalogConnector().execute(
+            f"SELECT * FROM {_SENSOR_DATA_VIEW}"
+            " WHERE device_id = :device_id"
+            " AND event_timestamp BETWEEN :start AND :end"
+            " ORDER BY event_timestamp ASC",
+            {'device_id': device_id, 'start': start_str, 'end': end_str},
+        )
     except Exception:
         return []
 
