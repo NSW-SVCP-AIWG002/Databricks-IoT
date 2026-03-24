@@ -864,10 +864,9 @@ class TestGetLatestSensorData:
         """3.1.4.2: センサーデータが存在しない場合、Noneが返却される"""
         self._setup_mock_db(mocker, first_return=None)
         mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
+            "iot_app.services.industry_dashboard_service.UnityCatalogConnector"
         )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchone.return_value = None
+        mock_connector.return_value.execute_one.return_value = None
         result = get_latest_sensor_data(device_id=999)
         assert result is None
 
@@ -875,17 +874,14 @@ class TestGetLatestSensorData:
         """3.1.1.1: device_id がUCのSQLクエリに渡される（MySQLにデータなしの場合）"""
         self._setup_mock_db(mocker, first_return=None)
         mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.get_databricks_connection"
+            "iot_app.services.industry_dashboard_service.UnityCatalogConnector"
         )
-        mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-        mock_cursor.fetchone.return_value = None
+        mock_connector.return_value.execute_one.return_value = None
         get_latest_sensor_data(device_id=42)
-        mock_cursor.execute.assert_called_once()
-        call_args = mock_cursor.execute.call_args
-        assert any(
-            str(42) in str(arg) or 42 in (arg if isinstance(arg, (list, tuple, dict)) else [])
-            for arg in call_args.args + tuple(call_args.kwargs.values())
-        )
+        mock_connector.return_value.execute_one.assert_called_once()
+        call_args = mock_connector.return_value.execute_one.call_args
+        params = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get('params', {})
+        assert params.get('device_id') == 42
 
     def test_returns_row_when_found(self):
         """センサーデータが存在する場合にRowオブジェクトを返すこと"""
@@ -898,10 +894,9 @@ class TestGetLatestSensorData:
     def test_returns_none_when_not_found(self):
         """センサーデータが存在しない場合に None を返すこと"""
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db, \
-             patch("iot_app.services.industry_dashboard_service.get_databricks_connection") as mock_connector:
+             patch("iot_app.services.industry_dashboard_service.UnityCatalogConnector") as mock_connector:
             mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
-            mock_cursor = mock_connector.return_value.__enter__.return_value.cursor.return_value
-            mock_cursor.fetchone.return_value = None
+            mock_connector.return_value.execute_one.return_value = None
             result = get_latest_sensor_data(device_id=99)
         assert result is None
 
