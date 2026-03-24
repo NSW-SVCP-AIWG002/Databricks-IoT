@@ -2109,3 +2109,61 @@ class TestGetGadgetUpdateDate:
         result = get_gadget_update_date('nonexistent-uuid')
 
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_gadget_type_id_by_name
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetGadgetTypeIdByName:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）, 2.2.3（論理削除済み）
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示: gadget_type_ids 構築）
+
+    ガジェット種別名から gadget_type_id を返す。
+    delete_flag=False のレコードのみ対象とする。
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_gadget_type_id_when_found(self, mock_db):
+        """2.2.1 ガジェット種別名が存在する場合: gadget_type_id を返す"""
+        # Arrange
+        mock_result = MagicMock()
+        mock_result.gadget_type_id = 6
+        mock_db.session.query.return_value.filter_by.return_value.first.return_value = mock_result
+        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
+
+        # Act
+        result = get_gadget_type_id_by_name('棒グラフ')
+
+        # Assert
+        assert result == 6
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """2.2.2 ガジェット種別名が存在しない場合: None を返す"""
+        # Arrange
+        mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
+
+        # Act
+        result = get_gadget_type_id_by_name('存在しない種別')
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_logically_deleted(self, mock_db):
+        """2.2.3 delete_flag=True のレコードのみ存在する場合: None を返す"""
+        # Arrange
+        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
+        mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
+
+        # Act
+        result = get_gadget_type_id_by_name('棒グラフ')
+
+        # Assert
+        assert result is None
