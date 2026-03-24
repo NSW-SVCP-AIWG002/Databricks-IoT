@@ -30,7 +30,6 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
-    AUTH_TYPE = 'dev'
 
 
 class ProductionConfig(Config):
