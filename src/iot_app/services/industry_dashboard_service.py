@@ -404,19 +404,20 @@ def get_latest_sensor_data(device_id):
         return mysql_result
 
     # fallback: Unity Catalog から最新データを取得
-    try:
-        with get_databricks_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-                " WHERE device_id = ?"
-                " ORDER BY event_timestamp DESC"
-                " LIMIT 1",
-                [device_id],
-            )
-            return cursor.fetchone()
-    except Exception:
-        return None
+    # try:
+    #     with get_databricks_connection() as conn:
+    #         cursor = conn.cursor()
+    #         cursor.execute(
+    #             f"SELECT * FROM {_SENSOR_DATA_VIEW}"
+    #             " WHERE device_id = ?"
+    #             " ORDER BY event_timestamp DESC"
+    #             " LIMIT 1",
+    #             [device_id],
+    #         )
+    #         return cursor.fetchone()
+    # except Exception:
+    #     return None
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -5,12 +5,12 @@ services:
       - ..:/workspaces/Databricks-IoT:cached
     command: sleep infinity
     environment:
-      - DATABASE_URL=mysql+pymysql://user:password@db:3306/databricks_iot
-      - MYSQL_HOST=db
-      - MYSQL_PORT=3306
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
-      - MYSQL_DATABASE=databricks_iot
+      # - DATABASE_URL=mysql+pymysql://user:password@db:3306/databricks_iot
+      # - MYSQL_HOST=db
+      # - MYSQL_PORT=3306
+      # - MYSQL_USER=user
+      # - MYSQL_PASSWORD=password
+      # - MYSQL_DATABASE=databricks_iot
       - PYTHONPATH=/workspaces/Databricks-IoT/src
     depends_on:
       db:
