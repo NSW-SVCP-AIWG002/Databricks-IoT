@@ -22,6 +22,10 @@
   --spacing-6: 24px;
   --spacing-8: 32px;
 
+
+  /* ===== ボタン制御 ===== */
+  --border-radius-base: 5px;
+
   /* ===== フォント ===== */
   --font-family-base: 'メイリオ', 'Meiryo', sans-serif;
   --font-size-sm: 12px;
