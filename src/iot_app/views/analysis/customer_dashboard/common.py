@@ -25,6 +25,7 @@ from iot_app.services.customer_dashboard.common import (
     get_devices,
     get_devices_by_organization,
     get_first_dashboard,
+    get_gadget_type_id_by_name,
     get_gadget_types,
     get_gadget_update_date,
     get_gadgets_by_groups,
@@ -71,6 +72,7 @@ def customer_dashboard():
             dashboard=None,
             groups=[],
             gadgets=[],
+            gadget_type_ids={},
             organizations=organizations,
             devices=[],
             user_setting=user_setting,
@@ -80,6 +82,9 @@ def customer_dashboard():
     groups = get_dashboard_groups(dashboard_id)
     group_ids = [grp.dashboard_group_id for grp in groups]
     gadgets = get_gadgets_by_groups(group_ids)
+    gadget_type_ids = {
+        '棒グラフ': get_gadget_type_id_by_name('棒グラフ'),
+    }
 
     devices = []
     if user_setting and user_setting.organization_id is not None:
@@ -91,6 +96,7 @@ def customer_dashboard():
         dashboard=dashboard,
         groups=groups,
         gadgets=gadgets,
+        gadget_type_ids=gadget_type_ids,
         organizations=organizations,
         devices=devices,
         user_setting=user_setting,

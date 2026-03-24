@@ -319,6 +319,16 @@ def get_gadgets_by_groups(group_ids):
     )
 
 
+def get_gadget_type_id_by_name(gadget_type_name):
+    """ガジェット種別名から gadget_type_id を返す。該当なしの場合は None"""
+    result = (
+        db.session.query(GadgetTypeMaster.gadget_type_id)
+        .filter_by(gadget_type_name=gadget_type_name, delete_flag=False)
+        .first()
+    )
+    return result.gadget_type_id if result else None
+
+
 def get_gadget_types():
     """全ガジェット種別をdisplay_order昇順で返す"""
     return (
