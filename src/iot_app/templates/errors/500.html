@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>システムエラー</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <main class="error-page">
+        <div class="error-page__container">
+            <p class="error-page__code">500</p>
+            <h1 class="error-page__title">システムエラーが発生しました</h1>
+            <p class="error-page__message">
+                予期しないエラーが発生しました。<br>
+                しばらく時間をおいてから再度お試しください。<br>
+                問題が続く場合は、システム管理者にお問い合わせください。
+            </p>
+            <p class="error-page__detail">エラーコード: 500 Internal Server Error</p>
+        </div>
+    </main>
+</body>
+</html>
