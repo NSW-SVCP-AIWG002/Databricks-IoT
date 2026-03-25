@@ -7,6 +7,7 @@
   action="{{ url_for('customer_dashboard.group_update', dashboard_group_uuid=group.dashboard_group_uuid) }}"
   class="modal-form"
   data-ajax-submit
+  novalidate
 >
   {{ form.hidden_tag() }}
 
