@@ -10,7 +10,7 @@
 </head>
 
 <body>
-{%- set uid = g.get('current_user_type_id') -%}
+{%- set uid = g.current_user.user_type_id if g.get('current_user') else none -%}
 
 <nav class="navigation">
   <ul class="nav__menu">
