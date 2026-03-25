@@ -140,9 +140,8 @@ def gadget_bar_chart_register():
     ]
     if submitted_device_id not in [c[0] for c in form.device_id.choices]:
         form.device_id.choices.append((submitted_device_id, ''))
-    form.measurement_item_id.choices = [(0, '選択してください')] + [
-        (m.measurement_item_id, m.display_name) for m in context['measurement_items']
-    ]
+    submitted_measurement_item_id = request.form.get('measurement_item_id', type=int) or 0
+    form.measurement_item_id.choices = [(submitted_measurement_item_id, '')]
     # group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
     submitted_group_id = request.form.get('group_id', type=int) or 0
     submitted_summary_method_id = request.form.get('summary_method_id', type=int) or 0
