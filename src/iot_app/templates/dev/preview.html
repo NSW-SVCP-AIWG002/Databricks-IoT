@@ -5,7 +5,7 @@
 {% block content %}
 <div style="padding: 24px;">
   <h2>グローバルメニュー 確認用ページ</h2>
-  <p>現在のロール: uid={{ g.get('current_user_type_id') }}</p>
+  <p>現在のロール: uid={{ g.current_user.user_type_id if g.get('current_user') else 'none' }}</p>
   <ul>
     <li><a href="?uid=1">uid=1: system_admin（システム保守者）</a></li>
     <li><a href="?uid=2">uid=2: management_admin（管理者）</a></li>
