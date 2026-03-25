@@ -230,6 +230,10 @@ const CustomerDashboard = (function () {
         items.forEach(function (item) {
           item.style.display = item.dataset.sourceType === sourceType ? '' : 'none';
         });
+        const firstVisible = Array.from(items).find(function (item) {
+          return item.dataset.sourceType === sourceType;
+        });
+        if (firstVisible) firstVisible.click();
       });
     });
 
