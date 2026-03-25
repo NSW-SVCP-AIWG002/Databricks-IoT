@@ -386,7 +386,7 @@ class TestGadgetBarChartRegister:
         """
         if request.node.name in self._SKIP_GADGET_TYPE:
             return
-        from iot_app.models.dashboard import GadgetTypeMaster
+        from iot_app.models.customer_dashboard import GadgetTypeMaster
         gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', delete_flag=False)
         db_session.add(gt)
         db_session.flush()
@@ -420,7 +420,7 @@ class TestGadgetBarChartRegister:
     def test_register_creates_record_in_db(self, client, app, measurement_item):
         """4.3.2: 正常登録後、dashboard_gadget_master に1件レコードが追加される"""
         # Arrange
-        from iot_app.models.dashboard import DashboardGadgetMaster
+        from iot_app.models.customer_dashboard import DashboardGadgetMaster
 
         # Act
         client.post(self._URL, data=self._valid_form())
@@ -439,7 +439,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget is not None
         assert len(gadget.gadget_uuid) == 36  # UUID形式
@@ -452,7 +452,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_name == '棒グラフテスト'
 
@@ -464,7 +464,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_size == '2x4'
 
@@ -586,7 +586,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.position_x == 0
 
@@ -598,7 +598,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.display_order == 1
 
@@ -610,7 +610,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.position_y == 1
 
@@ -625,7 +625,7 @@ class TestGadgetBarChartRegister:
         # Assert: 2件目の position_y == 2
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadgets = db.session.query(DashboardGadgetMaster).order_by(
                 DashboardGadgetMaster.position_y.asc()
             ).all()
@@ -641,7 +641,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         chart_config = json.loads(gadget.chart_config)
         assert chart_config['min_value'] is None
@@ -655,7 +655,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.dashboard_group_id == 5
 
@@ -667,7 +667,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_type_id == 1
 
@@ -679,7 +679,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         chart_config = json.loads(gadget.chart_config)
         assert chart_config['measurement_item_id'] == 1
@@ -693,7 +693,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         data_source_config = json.loads(gadget.data_source_config)
         assert data_source_config['device_id'] is None
@@ -706,7 +706,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.delete_flag is False
 
@@ -718,7 +718,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_id is not None
         assert isinstance(gadget.gadget_id, int)
@@ -732,7 +732,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.create_date is not None
         assert gadget.update_date is not None
@@ -746,7 +746,7 @@ class TestGadgetBarChartRegister:
         # Assert
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.creator is None
         assert gadget.modifier is None
@@ -826,7 +826,7 @@ class TestGadgetBarChartRegister:
         # Arrange: delete_flag=True の棒グラフレコードのみ登録
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import GadgetTypeMaster
+            from iot_app.models.customer_dashboard import GadgetTypeMaster
             gt = GadgetTypeMaster(
                 gadget_type_name='棒グラフ',
                 delete_flag=True,
@@ -856,7 +856,7 @@ class TestGadgetBarChartRegister:
         # Assert: DBに保存された gadget_type_id が GadgetTypeMaster の値と一致
         with app.app_context():
             from iot_app import db
-            from iot_app.models.dashboard import DashboardGadgetMaster
+            from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_type_id == expected_gadget_type_id
 
@@ -1215,7 +1215,7 @@ class TestSecurity:
     def _insert_gadget_with_name(self, db_session, gadget_name, gadget_type):
         """XSSテスト用ガジェットをDB直接登録するヘルパー（20文字制限を回避）"""
         import json as _json
-        from iot_app.models.dashboard import DashboardGadgetMaster
+        from iot_app.models.customer_dashboard import DashboardGadgetMaster
         gadget = DashboardGadgetMaster(
             gadget_uuid=str(uuid.uuid4()),
             gadget_name=gadget_name,
@@ -1395,7 +1395,7 @@ class TestTransaction:
     ):
         """7.2.1: gadget_uuid UNIQUE制約違反時にロールバックされ500エラー"""
         import json as _json
-        from iot_app.models.dashboard import DashboardGadgetMaster
+        from iot_app.models.customer_dashboard import DashboardGadgetMaster
 
         fixed_uuid_str = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
@@ -1769,7 +1769,7 @@ class TestGadgetBarChartCreateNewFlow:
     ):
         """user_setting が存在するが dashboard が存在しない場合 404"""
         # Arrange: 存在しない dashboard_id=9999 を指す user_setting を直接作成
-        from iot_app.models.dashboard import DashboardMaster, DashboardUserSetting
+        from iot_app.models.customer_dashboard import DashboardMaster, DashboardUserSetting
         dummy_dashboard = DashboardMaster(dashboard_id=9999, dashboard_name='存在しない', delete_flag=False)
         db_session.add(dummy_dashboard)
         db_session.flush()
@@ -1823,7 +1823,7 @@ class TestGadgetBarChartRegisterRedirect:
 
     @pytest.fixture(autouse=True)
     def _require_gadget_type(self, db_session):
-        from iot_app.models.dashboard import GadgetTypeMaster
+        from iot_app.models.customer_dashboard import GadgetTypeMaster
         gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', delete_flag=False)
         db_session.add(gt)
         db_session.flush()

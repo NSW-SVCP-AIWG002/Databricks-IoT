@@ -13,7 +13,7 @@ def app():
 
     with app.app_context():
         # 遅延インポートのモデルを create_all() 前に明示的にインポート
-        import iot_app.models.dashboard  # noqa: F401
+        import iot_app.models.customer_dashboard  # noqa: F401
         import iot_app.models.measurement  # noqa: F401
         import iot_app.models.organization  # noqa: F401
         import iot_app.models.device  # noqa: F401
