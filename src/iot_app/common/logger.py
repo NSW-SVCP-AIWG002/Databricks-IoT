@@ -25,11 +25,20 @@ class AppLoggerAdapter(logging.LoggerAdapter):
                 extra["userId"] = user_id
 
         kw_extra = kwargs.pop("extra", {})
+        caller_extra = {}
         for key, value in kw_extra.items():
-            extra[key] = _MASKING_RULES[key](value) if key in _MASKING_RULES else value
+            masked_value = _MASKING_RULES[key](value) if key in _MASKING_RULES else value
+            extra[key] = masked_value
+            caller_extra[key] = masked_value
 
         if extra:
             kwargs["extra"] = extra
+
+        # 呼び出し元が渡した extra フィールド（マスキング適用済み）をメッセージに付与する
+        # これにより caplog.text 等のフォーマット済みログに値が現れる
+        if caller_extra:
+            extra_str = " ".join(f"{k}={v}" for k, v in caller_extra.items())
+            msg = f"{msg} | {extra_str}"
 
         return msg, kwargs
 

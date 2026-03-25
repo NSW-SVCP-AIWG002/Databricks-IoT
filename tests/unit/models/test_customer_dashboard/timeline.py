@@ -46,7 +46,7 @@ class TestDashboardGadgetMaster:
 
     def _make_gadget(self, **overrides):
         """DashboardGadgetMaster インスタンスを生成するヘルパー"""
-        from iot_app.models.dashboard import DashboardGadgetMaster
+        from iot_app.models.customer_dashboard import DashboardGadgetMaster
         defaults = dict(
             gadget_uuid='aaaaaaaa-0000-0000-0000-000000000001',
             gadget_name='時系列テスト',
@@ -247,7 +247,7 @@ class TestDashboardGadgetMaster:
     def test_tablename(self):
         """モデルのテーブル名が dashboard_gadget_master である
         仕様: workflow-specification.md > ガジェット登録③ INSERT INTO dashboard_gadget_master"""
-        from iot_app.models.dashboard import DashboardGadgetMaster
+        from iot_app.models.customer_dashboard import DashboardGadgetMaster
 
         # Assert
         assert DashboardGadgetMaster.__tablename__ == 'dashboard_gadget_master'
@@ -267,7 +267,7 @@ class TestGadgetTypeMaster:
 
     def _make_gadget_type(self, **overrides):
         """GadgetTypeMaster インスタンスを生成するヘルパー"""
-        from iot_app.models.dashboard import GadgetTypeMaster
+        from iot_app.models.customer_dashboard import GadgetTypeMaster
         defaults = dict(gadget_type_name='時系列グラフ')
         defaults.update(overrides)
         return GadgetTypeMaster(**defaults)
@@ -296,7 +296,7 @@ class TestGadgetTypeMaster:
 
     def test_tablename(self):
         """モデルのテーブル名が gadget_type_master である"""
-        from iot_app.models.dashboard import GadgetTypeMaster
+        from iot_app.models.customer_dashboard import GadgetTypeMaster
 
         # Assert
         assert GadgetTypeMaster.__tablename__ == 'gadget_type_master'

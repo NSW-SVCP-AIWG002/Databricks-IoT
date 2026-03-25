@@ -286,6 +286,32 @@ function initGadget(gadgetEl) {
     },
   });
 
+  // ツールバー日時ボタン連動
+  gadgetEl.addEventListener('gadget:daterange-changed', function (e) {
+    const { range, start, end } = e.detail;
+    let newStart, newEnd;
+
+    if (range === 'yesterday') {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const s = new Date(d); s.setHours(0, 0, 0, 0);
+      const t = new Date(d); t.setHours(23, 59, 59, 0);
+      newStart = formatDatetime(s);
+      newEnd   = formatDatetime(t);
+    } else if (range === 'custom') {
+      newStart = start ? start.replace(/-/g, '/').replace('T', ' ').slice(0, 19) : formatDatetime(oneHourAgo());
+      newEnd   = end   ? end.replace(/-/g, '/').replace('T', ' ').slice(0, 19)   : formatDatetime(now());
+    } else {
+      // today / this_week / this_month / this_year → 1時間前～現在
+      newStart = formatDatetime(oneHourAgo());
+      newEnd   = formatDatetime(now());
+    }
+
+    startFp.setDate(newStart, false);
+    endFp.setDate(newEnd, false);
+    fetchAndRender(gadgetUuid, chart, legendEl, newStart, newEnd);
+  });
+
   // 🔄 開始日時リセットボタン（現在日時-1時間）
   const refreshBtns = gadgetEl.querySelectorAll('.timeline__refresh-btn');
   if (refreshBtns[0]) {
@@ -303,7 +329,8 @@ function initGadget(gadgetEl) {
   // CSV エクスポートボタン
   const csvBtn = gadgetEl.querySelector('.gadget__csv-btn');
   if (csvBtn) {
-    csvBtn.addEventListener('click', () => {
+    csvBtn.addEventListener('click', (e) => {
+      e.preventDefault();
       const startInput = document.getElementById(`start-datetime-${gadgetUuid}`);
       const endInput   = document.getElementById(`end-datetime-${gadgetUuid}`);
       const start = encodeURIComponent(startInput.value);
