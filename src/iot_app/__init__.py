@@ -71,6 +71,12 @@ def create_app():
     def health():
         return jsonify(status='ok'), 200
 
+    # ルートリダイレクト
+    @app.route('/')
+    def index():
+        from flask import redirect
+        return redirect('/analysis/industry-dashboard/store-monitoring')
+
     # エラーハンドラー登録
     from iot_app.common.error_handlers import register_error_handlers
     register_error_handlers(app)
