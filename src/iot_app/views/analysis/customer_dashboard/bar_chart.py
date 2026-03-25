@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
+from flask import Response, abort, g, jsonify, redirect, render_template, request, url_for
 
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
@@ -11,7 +11,6 @@ from iot_app.services.customer_dashboard.bar_chart import (
     format_bar_chart_data,
     generate_bar_chart_csv,
     get_accessible_org_ids,
-    get_all_active_gadgets,
     get_bar_chart_create_context,
     get_dashboard_by_id,
     get_dashboard_groups,
@@ -24,29 +23,15 @@ from iot_app.services.customer_dashboard.bar_chart import (
 
 logger = get_logger(__name__)
 
-customer_dashboard_bp = Blueprint(
-    'customer_dashboard',
-    __name__,
-    url_prefix='/analysis/customer-dashboard',
-)
+from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # noqa: E402
 
 
 # ============================================================
 # ルート定義
 # ============================================================
 
-@customer_dashboard_bp.route('', methods=['GET'])
-def customer_dashboard():
-    """顧客作成ダッシュボード初期表示"""
-    gadgets = get_all_active_gadgets()
-    return render_template(
-        'analysis/customer_dashboard/index.html',
-        gadgets=gadgets,
-    )
-
-
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-def gadget_bar_chart_data(gadget_uuid):
+def gadget_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
     gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:

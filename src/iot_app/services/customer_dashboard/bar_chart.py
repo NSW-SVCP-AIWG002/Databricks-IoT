@@ -10,7 +10,7 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.models.dashboard import DashboardGadgetMaster, GadgetTypeMaster
+from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster
 
 logger = get_logger(__name__)
 
@@ -537,7 +537,7 @@ def get_measurement_item_column_name(measurement_item_id):
 
 def get_dashboard_user_setting(user_id):
     """ユーザーIDでダッシュボードユーザー設定を取得する"""
-    from iot_app.models.dashboard import DashboardUserSetting
+    from iot_app.models.customer_dashboard import DashboardUserSetting
     if user_id is None:
         return None
     return db.session.query(DashboardUserSetting).filter_by(user_id=user_id).first()
@@ -548,7 +548,7 @@ def get_dashboard_by_id(dashboard_id, accessible_org_ids):
 
     NOTE: accessible_org_ids によるフィルタは本実装で追加予定（仮実装では delete_flag のみ）
     """
-    from iot_app.models.dashboard import DashboardMaster
+    from iot_app.models.customer_dashboard import DashboardMaster
     return (
         db.session.query(DashboardMaster)
         .filter(
@@ -561,7 +561,7 @@ def get_dashboard_by_id(dashboard_id, accessible_org_ids):
 
 def get_dashboard_groups(dashboard_id):
     """ダッシュボードIDでグループ一覧を表示順で取得する"""
-    from iot_app.models.dashboard import DashboardGroupMaster
+    from iot_app.models.customer_dashboard import DashboardGroupMaster
     return (
         db.session.query(DashboardGroupMaster)
         .filter(

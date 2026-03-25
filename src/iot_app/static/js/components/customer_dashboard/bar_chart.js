@@ -107,10 +107,39 @@
     if (gadgetEl) {
       const csvBtn = gadgetEl.querySelector('.gadget__csv-btn');
       if (csvBtn) {
-        csvBtn.addEventListener('click', function () {
+        csvBtn.addEventListener('click', function (e) {
+          e.preventDefault();
           exportCsv(state);
         });
       }
+
+      // ツールバー日時ボタン連動（common.js からの CustomEvent を受信）
+      gadgetEl.addEventListener('gadget:daterange-changed', function (e) {
+        const { range, start } = e.detail;
+        const config = _rangeToBarChartConfig(range, start);
+
+        // displayUnit が変わる場合は flatpickr を再初期化
+        if (config.unit !== state.displayUnit) {
+          state.displayUnit = config.unit;
+          const datetimeInput = el.querySelector('.bar-chart__datetime-input');
+          if (datetimeInput && state.fp) {
+            state.fp.destroy();
+            state.fp = createFlatpickr(datetimeInput, state);
+          }
+          updateDatetimeLabel(el, state.displayUnit);
+          toggleIntervalSelector(el, state.displayUnit);
+          // UIアクティブボタン更新
+          el.querySelectorAll('.bar-chart__unit-btn').forEach(function (btn) {
+            btn.classList.toggle('bar-chart__unit-btn--active', btn.dataset.unit === state.displayUnit);
+          });
+        }
+
+        // baseDatetime を上書き（createFlatpickr がデフォルト値をセットするため後から上書き）
+        state.baseDatetime = config.datetime;
+        if (state.fp) state.fp.setDate(state.baseDatetime, false);
+
+        fetchAndRender(state);
+      });
     }
   }
 
@@ -220,6 +249,20 @@
     return d.getFullYear() + '/' + pad(d.getMonth() + 1);
   }
 
+  function thisMonthString() {
+    const d = new Date();
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '/' + pad(d.getMonth() + 1);
+  }
+
+  function mondayString() {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() - ((day + 6) % 7));
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate());
+  }
+
   function toFullDatetime(baseDatetime, displayUnit) {
     if (displayUnit === 'day' || displayUnit === 'week') {
       return baseDatetime + ' 00:00:00';
@@ -258,6 +301,19 @@
         fetchAndRender(state);
       },
     });
+  }
+
+  function _rangeToBarChartConfig(range, start) {
+    switch (range) {
+      case 'today':      return { unit: 'hour',  datetime: nowString() };
+      case 'yesterday':  return { unit: 'day',   datetime: yesterdayString() };
+      case 'this_week':  return { unit: 'week',  datetime: mondayString() };
+      case 'this_month': return { unit: 'month', datetime: thisMonthString() };
+      case 'this_year':  return { unit: 'hour',  datetime: nowString() };
+      case 'custom':
+        return { unit: 'hour', datetime: start ? start.replace(/-/g, '/').replace('T', ' ') : nowString() };
+      default:           return { unit: 'hour',  datetime: nowString() };
+    }
   }
 
   function updateDatetimeLabel(el, displayUnit) {
