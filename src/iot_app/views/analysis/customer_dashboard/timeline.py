@@ -8,7 +8,7 @@
 
 from datetime import datetime
 
-from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
+from flask import Response, abort, g, jsonify, redirect, render_template, request, url_for
 
 from iot_app import db
 from iot_app.common.logger import get_logger
@@ -19,43 +19,21 @@ from iot_app.services.customer_dashboard.timeline import (
     fetch_timeline_data,
     format_timeline_data,
     get_accessible_org_ids,
-    get_active_gadgets_in_scope,
     get_chart_column_names,
     get_gadget_in_scope,
     get_timeline_create_context,
     register_gadget,
     validate_chart_params,
 )
+from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
-
-customer_dashboard_bp = Blueprint(
-    'customer_dashboard',
-    __name__,
-    url_prefix='/analysis',
-)
 
 _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 
 
 # ---------------------------------------------------------------------------
-# 1. 顧客作成ダッシュボード初期表示
-# GET /analysis/customer-dashboard
-# ---------------------------------------------------------------------------
-
-@customer_dashboard_bp.route('/customer-dashboard', methods=['GET'])
-def customer_dashboard():
-    """顧客作成ダッシュボード画面 初期表示"""
-    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
-    gadgets = get_active_gadgets_in_scope(accessible_org_ids)
-    return render_template(
-        'analysis/customer_dashboard/index.html',
-        gadgets=gadgets,
-    )
-
-
-# ---------------------------------------------------------------------------
-# 2. ガジェットデータ取得 (AJAX)
+# 1. ガジェットデータ取得 (AJAX)
 # POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
 # ---------------------------------------------------------------------------
 
@@ -63,7 +41,7 @@ def customer_dashboard():
     '/customer-dashboard/gadgets/<string:gadget_uuid>/data',
     methods=['POST'],
 )
-def gadget_timeline_data(gadget_uuid):
+def gadget_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
     accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
     gadget = get_gadget_in_scope(gadget_uuid, accessible_org_ids)
@@ -118,6 +96,8 @@ def gadget_timeline_create():
         context = get_timeline_create_context(accessible_org_ids, current_user_id)
     except NotFoundError:
         abort(404)
+    except Exception:
+        abort(500)
 
     form = TimelineGadgetForm()
     form.group_id.choices = [
@@ -145,6 +125,10 @@ def gadget_timeline_create():
 def gadget_timeline_register():
     """時系列グラフガジェット 登録実行"""
     form = TimelineGadgetForm()
+
+    # group_id: 送信値の存在チェックのみ（必須選択）
+    submitted_group_id = request.form.get('group_id', type=int) or 0
+    form.group_id.choices = [(submitted_group_id, '')]
 
     if not form.validate_on_submit():
         return render_template(
@@ -203,7 +187,7 @@ def gadget_timeline_register():
 )
 def gadget_csv_export(gadget_uuid):
     """時系列グラフガジェット CSVエクスポート"""
-    from iot_app.common.exceptions import ValidationError, NotFoundError
+    from iot_app.common.exceptions import NotFoundError
 
     if request.args.get('export') != 'csv':
         abort(404)
@@ -215,6 +199,9 @@ def gadget_csv_export(gadget_uuid):
     start_datetime_str = request.args.get('start_datetime')
     end_datetime_str   = request.args.get('end_datetime')
     current_user_id    = getattr(getattr(g, 'current_user', None), 'user_id', None)
+
+    if not validate_chart_params(start_datetime_str, end_datetime_str):
+        abort(400)
 
     try:
         csv_content = export_timeline_csv(
@@ -230,10 +217,6 @@ def gadget_csv_export(gadget_uuid):
             mimetype='text/csv; charset=utf-8',
             headers={'Content-Disposition': f'attachment; filename={filename}'},
         )
-
-    except ValidationError as e:
-        logger.warning(f'時系列グラフCSVエクスポート バリデーションエラー: {str(e)}')
-        abort(400)
 
     except NotFoundError:
         abort(404)

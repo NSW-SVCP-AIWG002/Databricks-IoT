@@ -19,7 +19,7 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.models.dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster
+from iot_app.models.customer_dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster
 
 logger = get_logger(__name__)
 
@@ -140,19 +140,23 @@ def check_device_in_scope(device_id, accessible_org_ids):
 
 
 # ---------------------------------------------------------------------------
-# 外部依存（テストではモック化される）
+# DBアクセス関数
 # ---------------------------------------------------------------------------
 
 def get_dashboard_user_setting(user_id):
     """ダッシュボードユーザー設定を取得する（dashboard_user_setting テーブル）"""
-    from iot_app import db as _db
-    from sqlalchemy import text
-    row = _db.session.execute(
-        text('SELECT device_id FROM dashboard_user_setting WHERE user_id = :uid AND delete_flag = FALSE'),
-        {'uid': user_id}
+    from iot_app.models.customer_dashboard import DashboardUserSetting
+    if user_id is None:
+        return None
+    return db.session.query(DashboardUserSetting).filter_by(
+        user_id=user_id,
+        delete_flag=False,
     ).first()
-    return row
 
+
+# ---------------------------------------------------------------------------
+# 外部依存（テストではモック化される）
+# ---------------------------------------------------------------------------
 
 def execute_silver_query(device_id, start_datetime, end_datetime, limit=100):
     """Unity Catalog sensor_data_view からセンサーデータを取得する"""
@@ -360,7 +364,7 @@ def fetch_timeline_data(gadget_uuid, start_datetime, end_datetime, limit=100, cu
         NotFoundError:  ガジェットが存在しない、または論理削除済みの場合
         Exception:      センサークエリ失敗時（上位に伝播）
     """
-    gadget = DashboardGadgetMaster.query.filter_by(gadget_uuid=gadget_uuid).first()
+    gadget = db.session.query(DashboardGadgetMaster).filter_by(gadget_uuid=gadget_uuid).first()
 
     if gadget is None or gadget.delete_flag:
         raise NotFoundError(f'ガジェットが見つかりません: gadget_uuid={gadget_uuid}')
@@ -380,7 +384,7 @@ def fetch_timeline_data(gadget_uuid, start_datetime, end_datetime, limit=100, cu
             limit=limit,
         )
         return rows
-    except Exception as e:
+    except Exception:
         logger.error(
             f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}',
             exc_info=True,
@@ -441,11 +445,18 @@ def register_gadget(params, current_user_id=0):
         DashboardGadgetMaster.delete_flag == False,
     ).scalar() or 0
 
+    gadget_type = db.session.query(GadgetTypeMaster).filter_by(
+        gadget_type_name='時系列グラフ',
+        delete_flag=False,
+    ).first()
+    if not gadget_type:
+        raise NotFoundError('ガジェット種別が見つかりません')
+
     now = datetime.now()
     gadget = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name=params.get('title'),
-        gadget_type_id=1,
+        gadget_type_id=gadget_type.gadget_type_id,
         dashboard_group_id=group_id,
         chart_config=chart_config,
         data_source_config=data_source_config,
@@ -486,19 +497,19 @@ def get_timeline_create_context(accessible_org_ids, current_user_id):
     Raises:
         NotFoundError: ユーザー設定またはダッシュボードが存在しない場合
     """
-    from sqlalchemy import text
     from iot_app.models.measurement import MeasurementItem
     from iot_app.models.organization import OrganizationMaster
     from iot_app.models.device import DeviceMaster
+    from iot_app.models.customer_dashboard import DashboardUserSetting
 
     # ① ダッシュボードユーザー設定取得
-    user_setting_row = db.session.execute(
-        text('SELECT dashboard_id FROM dashboard_user_setting WHERE user_id = :uid AND delete_flag = FALSE'),
-        {'uid': current_user_id},
+    user_setting = db.session.query(DashboardUserSetting).filter_by(
+        user_id=current_user_id,
+        delete_flag=False,
     ).first()
-    if user_setting_row is None:
+    if user_setting is None:
         raise NotFoundError('ダッシュボードユーザー設定が見つかりません')
-    dashboard_id = user_setting_row[0]
+    dashboard_id = user_setting.dashboard_id
 
     # ② ダッシュボード情報取得（スコープ確認）
     dashboard = db.session.query(DashboardMaster).filter(
@@ -599,6 +610,10 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
     if start_dt >= end_dt:
         raise ValidationError('終了日時は開始日時以降の日時を入力してください')
 
+    # 24時間以内チェック
+    if (end_dt - start_dt) > timedelta(hours=24):
+        raise ValidationError('取得期間は24時間以内で指定してください')
+
     try:
         rows = fetch_timeline_data(
             gadget_uuid=gadget_uuid,
@@ -608,8 +623,9 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
             current_user_id=current_user_id,
         )
 
-        gadget = DashboardGadgetMaster.query.filter_by(
-            gadget_uuid=gadget_uuid, delete_flag=False
+        gadget = db.session.query(DashboardGadgetMaster).filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
         ).first()
         chart_config = json.loads(gadget.chart_config)
 
@@ -629,7 +645,7 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
         raise
     except NotFoundError:
         raise
-    except Exception as e:
+    except Exception:
         logger.error(
             f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}',
             exc_info=True,

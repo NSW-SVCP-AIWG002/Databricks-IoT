@@ -83,7 +83,7 @@ class TimelineGadgetForm(FlaskForm):
 
     def validate_device_id(self, field):
         """デバイス固定モード時はデバイスIDが必須"""
-        if self.device_mode.data == 'fixed' and not field.data:
+        if self.device_mode.data == 'fixed' and field.data is None:
             raise ValidationError('デバイスを選択してください')
 
     def validate_left_min_value(self, field):
