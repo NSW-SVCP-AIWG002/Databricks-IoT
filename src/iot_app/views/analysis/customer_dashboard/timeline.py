@@ -15,16 +15,19 @@ from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.timeline import TimelineGadgetForm
 from iot_app.services.customer_dashboard.timeline import (
     check_device_in_scope,
+    check_gadget_access,
     export_timeline_csv,
     fetch_timeline_data,
     format_timeline_data,
     get_accessible_org_ids,
-    get_chart_column_names,
-    get_gadget_in_scope,
+    get_dashboard_user_setting,
+    get_gadget_by_uuid,
+    get_measurement_item,
     get_timeline_create_context,
     register_gadget,
     validate_chart_params,
 )
+from iot_app.services.customer_dashboard.common import get_organization_id_by_user
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
@@ -43,10 +46,16 @@ _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 )
 def gadget_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
-    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
-    gadget = get_gadget_in_scope(gadget_uuid, accessible_org_ids)
-    if gadget is None:
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
+
+    # ① ガジェット設定取得
+    gadget = get_gadget_by_uuid(gadget_uuid)
+    if not gadget:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+
+    # データスコープ制限チェック
+    if not check_gadget_access(gadget, accessible_org_ids):
+        return jsonify({'error': 'アクセス権限がありません'}), 404
 
     params = request.get_json() or {}
     start_datetime_str = params.get('start_datetime')
@@ -58,14 +67,32 @@ def gadget_data(gadget_uuid):
     try:
         start_datetime = datetime.strptime(start_datetime_str, _DATETIME_FORMAT)
         end_datetime   = datetime.strptime(end_datetime_str,   _DATETIME_FORMAT)
-        current_user_id = getattr(getattr(g, 'current_user', None), 'user_id', None)
+
+        # ② デバイスID決定
+        import json as _json
+        data_source_config = _json.loads(gadget.data_source_config or '{}')
+        device_id = data_source_config.get('device_id')
+        if not device_id:
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
+            device_id = user_setting.device_id if user_setting else None
+
+        chart_config = _json.loads(gadget.chart_config or '{}')
+
+        # ③ カラム名取得
+        left_item  = get_measurement_item(chart_config['left_item_id'])
+        right_item = get_measurement_item(chart_config['right_item_id'])
+        left_col   = left_item.silver_data_column_name
+        right_col  = right_item.silver_data_column_name
+
         rows = fetch_timeline_data(
-            gadget_uuid=gadget_uuid,
+            device_id=device_id,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            current_user_id=current_user_id,
+            left_item_id=chart_config['left_item_id'],
+            right_item_id=chart_config['right_item_id'],
         )
-        left_col, right_col = get_chart_column_names(gadget)
+
+        # ④ データ整形
         chart_data = format_timeline_data(rows, left_col, right_col)
         return jsonify({
             'gadget_uuid': gadget_uuid,
@@ -89,7 +116,7 @@ def gadget_data(gadget_uuid):
 def gadget_timeline_create():
     """時系列グラフガジェット 登録モーダル表示"""
     from iot_app.common.exceptions import NotFoundError
-    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
     current_user_id = g.current_user.user_id
 
     try:
@@ -136,11 +163,11 @@ def gadget_timeline_register():
             form=form,
         ), 400
 
-    current_user_id = getattr(getattr(g, 'current_user', None), 'user_id', 0)
+    current_user_id = g.current_user.user_id
 
     # デバイス固定モード時: デバイス存在&データスコープチェック
     if form.device_mode.data == 'fixed':
-        accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
+        accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
         if check_device_in_scope(form.device_id.data, accessible_org_ids) is None:
             abort(404)
 
@@ -192,13 +219,13 @@ def gadget_csv_export(gadget_uuid):
     if request.args.get('export') != 'csv':
         abort(404)
 
-    accessible_org_ids = get_accessible_org_ids(g.current_user.organization_id)
-    if get_gadget_in_scope(gadget_uuid, accessible_org_ids) is None:
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
+    gadget = get_gadget_by_uuid(gadget_uuid)
+    if not gadget or not check_gadget_access(gadget, accessible_org_ids):
         abort(404)
 
     start_datetime_str = request.args.get('start_datetime')
     end_datetime_str   = request.args.get('end_datetime')
-    current_user_id    = getattr(getattr(g, 'current_user', None), 'user_id', None)
 
     if not validate_chart_params(start_datetime_str, end_datetime_str):
         abort(400)
@@ -208,7 +235,7 @@ def gadget_csv_export(gadget_uuid):
             gadget_uuid=gadget_uuid,
             start_datetime=start_datetime_str,
             end_datetime=end_datetime_str,
-            current_user_id=current_user_id,
+            current_user_id=g.current_user.user_id,
         )
 
         filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"

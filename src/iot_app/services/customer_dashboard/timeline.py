@@ -121,6 +121,53 @@ def get_chart_column_names(gadget):
     return left_item.silver_data_column_name, right_item.silver_data_column_name
 
 
+def get_gadget_by_uuid(gadget_uuid):
+    """ガジェットをUUIDで取得する（スコープチェックなし）
+
+    Args:
+        gadget_uuid (str): ガジェット UUID
+
+    Returns:
+        DashboardGadgetMaster | None: ガジェット、または None（存在しない・論理削除済み）
+    """
+    return db.session.query(DashboardGadgetMaster).filter(
+        DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+        DashboardGadgetMaster.delete_flag == False,
+    ).first()
+
+
+def check_gadget_access(gadget, accessible_org_ids):
+    """ガジェットがアクセス可能な組織に属するか確認する
+
+    Args:
+        gadget (DashboardGadgetMaster): ガジェットオブジェクト
+        accessible_org_ids (list[int]): アクセス可能な組織IDリスト
+
+    Returns:
+        bool: アクセス可能であれば True
+    """
+    return get_gadget_in_scope(gadget.gadget_uuid, accessible_org_ids) is not None
+
+
+def get_measurement_item(item_id):
+    """測定項目を取得する
+
+    Args:
+        item_id (int): 測定項目ID
+
+    Returns:
+        MeasurementItem | None: 測定項目、または None
+
+    Raises:
+        NotFoundError: 測定項目が存在しない場合
+    """
+    from iot_app.models.measurement import MeasurementItem
+    item = db.session.get(MeasurementItem, item_id)
+    if item is None:
+        raise NotFoundError(f'測定項目が見つかりません: item_id={item_id}')
+    return item
+
+
 def check_device_in_scope(device_id, accessible_org_ids):
     """デバイスがスコープ内に存在するか確認する
 
@@ -347,35 +394,23 @@ def generate_timeline_csv(rows, left_column_name, right_column_name, left_label,
 # fetch_timeline_data
 # ---------------------------------------------------------------------------
 
-def fetch_timeline_data(gadget_uuid, start_datetime, end_datetime, limit=100, current_user_id=None):
-    """ガジェット設定を取得し、センサーデータを返す
+def fetch_timeline_data(device_id, start_datetime, end_datetime, left_item_id, right_item_id, limit=100):
+    """センサーデータを取得する
 
     Args:
-        gadget_uuid:      ガジェット UUID
-        start_datetime:   開始日時（datetime）
-        end_datetime:     終了日時（datetime）
-        limit:            最大取得件数（デフォルト 100）
-        current_user_id:  現在のユーザーID（デバイス可変モード時に使用）
+        device_id (int):        デバイスID
+        start_datetime:         開始日時（datetime）
+        end_datetime:           終了日時（datetime）
+        left_item_id (int):     左軸測定項目ID
+        right_item_id (int):    右軸測定項目ID
+        limit (int):            最大取得件数（デフォルト 100）
 
     Returns:
         list: センサーデータ行のリスト
 
     Raises:
-        NotFoundError:  ガジェットが存在しない、または論理削除済みの場合
-        Exception:      センサークエリ失敗時（上位に伝播）
+        Exception: センサークエリ失敗時（上位に伝播）
     """
-    gadget = db.session.query(DashboardGadgetMaster).filter_by(gadget_uuid=gadget_uuid).first()
-
-    if gadget is None or gadget.delete_flag:
-        raise NotFoundError(f'ガジェットが見つかりません: gadget_uuid={gadget_uuid}')
-
-    data_source_config = json.loads(gadget.data_source_config)
-    device_id = data_source_config.get('device_id')
-
-    if device_id is None:
-        user_setting = get_dashboard_user_setting(current_user_id)
-        device_id = user_setting.device_id if user_setting else None
-
     try:
         rows = execute_silver_query(
             device_id=device_id,
@@ -386,7 +421,7 @@ def fetch_timeline_data(gadget_uuid, start_datetime, end_datetime, limit=100, cu
         return rows
     except Exception:
         logger.error(
-            f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}',
+            f'時系列グラフデータ取得エラー: device_id={device_id}',
             exc_info=True,
         )
         raise
@@ -615,23 +650,28 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
         raise ValidationError('取得期間は24時間以内で指定してください')
 
     try:
+        gadget = get_gadget_by_uuid(gadget_uuid)
+        if gadget is None:
+            raise NotFoundError(f'ガジェットが見つかりません: gadget_uuid={gadget_uuid}')
+
+        data_source_config = json.loads(gadget.data_source_config or '{}')
+        device_id = data_source_config.get('device_id')
+        if not device_id:
+            user_setting = get_dashboard_user_setting(current_user_id)
+            device_id = user_setting.device_id if user_setting else None
+
+        chart_config = json.loads(gadget.chart_config or '{}')
+        left_item  = get_measurement_item(chart_config['left_item_id'])
+        right_item = get_measurement_item(chart_config['right_item_id'])
+
         rows = fetch_timeline_data(
-            gadget_uuid=gadget_uuid,
+            device_id=device_id,
             start_datetime=start_dt,
             end_datetime=end_dt,
+            left_item_id=chart_config['left_item_id'],
+            right_item_id=chart_config['right_item_id'],
             limit=100000,
-            current_user_id=current_user_id,
         )
-
-        gadget = db.session.query(DashboardGadgetMaster).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False,
-        ).first()
-        chart_config = json.loads(gadget.chart_config)
-
-        from iot_app.models.measurement import MeasurementItem
-        left_item  = db.session.get(MeasurementItem, chart_config['left_item_id'])
-        right_item = db.session.get(MeasurementItem, chart_config['right_item_id'])
 
         return generate_timeline_csv(
             rows,
