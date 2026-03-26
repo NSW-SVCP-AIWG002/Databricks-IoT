@@ -65,12 +65,34 @@ def clean_db(app):
         _db.session.commit()
 
 
+@pytest.fixture(autouse=True)
+def inject_current_user(app):
+    """テスト用: g.current_user（user_id=None）を全テストで注入
+
+    認証未実装ブランチのため user_id=None を設定する。
+    auth_user_id フィクスチャと併用する場合は auth_user_id 側で上書きされる。
+    """
+    from types import SimpleNamespace
+
+    def _inject():
+        from flask import g
+        if not hasattr(g, 'current_user'):
+            g.current_user = SimpleNamespace(user_id=None)
+
+    app.before_request_funcs.setdefault(None, []).append(_inject)
+    yield
+    app.before_request_funcs[None].remove(_inject)
+
+
 @pytest.fixture()
 def auth_user_id(app):
-    """テスト用: g.current_user_id を 1 に設定する before_request ハンドラを登録"""
+    """テスト用: g.current_user_id=1 および g.current_user.user_id=1 を設定"""
+    from types import SimpleNamespace
+
     def _inject():
         from flask import g
         g.current_user_id = 1
+        g.current_user = SimpleNamespace(user_id=1)
 
     app.before_request_funcs.setdefault(None, []).append(_inject)
     yield 1

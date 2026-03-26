@@ -3,6 +3,7 @@ from datetime import datetime
 
 from flask import Response, abort, g, jsonify, redirect, render_template, request, url_for
 
+from iot_app.common.exceptions import NotFoundError
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
 from iot_app.services.customer_dashboard.bar_chart import (
@@ -20,6 +21,7 @@ from iot_app.services.customer_dashboard.bar_chart import (
     register_bar_chart_gadget,
     validate_chart_params,
 )
+from iot_app.services.customer_dashboard.common import check_gadget_access, get_organization_id_by_user
 
 logger = get_logger(__name__)
 
@@ -37,6 +39,10 @@ def gadget_data(gadget_uuid):
     if not gadget:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
 
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
+    if check_gadget_access(gadget_uuid, accessible_org_ids) is None:
+        return jsonify({'error': 'アクセス権限がありません'}), 404
+
     params = request.get_json() or {}
     display_unit = params.get('display_unit', 'hour')
     interval = params.get('interval', '10min')
@@ -50,7 +56,7 @@ def gadget_data(gadget_uuid):
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
         if device_id is None:
-            setting = get_dashboard_user_setting(getattr(g, 'current_user_id', None))
+            setting = get_dashboard_user_setting(g.current_user.user_id)
             device_id = setting.device_id if setting else None
         chart_config = json.loads(gadget.chart_config or '{}')
         measurement_item_id = chart_config.get('measurement_item_id', 1)
@@ -88,11 +94,11 @@ def gadget_bar_chart_create():
     if current_user_id is None:
         abort(404)
 
-    setting = get_dashboard_user_setting(current_user_id)
+    setting = get_dashboard_user_setting(g.current_user.user_id)
     if setting is None:
         abort(404)
 
-    accessible_org_ids = get_accessible_org_ids(getattr(g, 'current_user_organization_id', None))
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
     dashboard = get_dashboard_by_id(setting.dashboard_id, accessible_org_ids)
     if dashboard is None:
         abort(404)
@@ -100,7 +106,7 @@ def gadget_bar_chart_create():
     groups = get_dashboard_groups(dashboard.dashboard_id)
 
     try:
-        context = get_bar_chart_create_context()
+        context = get_bar_chart_create_context(accessible_org_ids)
     except Exception as e:
         logger.error(f'棒グラフ登録モーダル表示エラー: {str(e)}')
         abort(500)
@@ -126,29 +132,25 @@ def gadget_bar_chart_create():
 @customer_dashboard_bp.route('/gadgets/bar-chart/register', methods=['POST'])
 def gadget_bar_chart_register():
     """棒グラフガジェット登録実行"""
-    try:
-        context = get_bar_chart_create_context()
-    except Exception as e:
-        logger.error(f'棒グラフガジェット登録コンテキスト取得エラー: {str(e)}')
-        abort(500)
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
 
     form = BarChartGadgetForm()
-    # device_id: DBから選択肢を構築し、送信値が含まれない場合も追加
+    # device_id / measurement_item_id / group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
     submitted_device_id = request.form.get('device_id', type=int) or 0
-    form.device_id.choices = [(0, '選択してください')] + [
-        (d.device_id, d.device_name) for d in context['devices']
-    ]
-    if submitted_device_id not in [c[0] for c in form.device_id.choices]:
-        form.device_id.choices.append((submitted_device_id, ''))
+    form.device_id.choices = [(submitted_device_id, '')]
     submitted_measurement_item_id = request.form.get('measurement_item_id', type=int) or 0
     form.measurement_item_id.choices = [(submitted_measurement_item_id, '')]
-    # group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
     submitted_group_id = request.form.get('group_id', type=int) or 0
     submitted_summary_method_id = request.form.get('summary_method_id', type=int) or 0
     form.group_id.choices = [(submitted_group_id, '')]
     form.summary_method_id.choices = [(submitted_summary_method_id, '')]
 
     if not form.validate_on_submit():
+        try:
+            context = get_bar_chart_create_context(accessible_org_ids)
+        except Exception as e:
+            logger.error(f'棒グラフガジェット登録コンテキスト取得エラー: {str(e)}')
+            abort(500)
         return render_template(
             'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
             form=form,
@@ -157,7 +159,6 @@ def gadget_bar_chart_register():
 
     # デバイス固定モード時: デバイス存在&データスコープチェック
     if form.device_mode.data == 'fixed':
-        accessible_org_ids = get_accessible_org_ids(getattr(g, 'current_user_organization_id', None))
         if check_device_access(form.device_id.data, accessible_org_ids) is None:
             abort(404)
 
@@ -176,10 +177,12 @@ def gadget_bar_chart_register():
     try:
         register_bar_chart_gadget(
             params=params,
-            current_user_id=getattr(g, 'current_user_id', None),
+            current_user_id=g.current_user.user_id,
         )
         return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
 
+    except NotFoundError:
+        abort(404)
     except Exception as e:
         logger.error(f'棒グラフガジェット登録エラー: {str(e)}')
         abort(500)
@@ -191,8 +194,12 @@ def gadget_csv_export(gadget_uuid):
     if request.args.get('export') != 'csv':
         abort(404)
 
+    accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
+
     gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
+        abort(404)
+    if check_gadget_access(gadget_uuid, accessible_org_ids) is None:
         abort(404)
 
     display_unit = request.args.get('display_unit', 'hour')
@@ -206,7 +213,7 @@ def gadget_csv_export(gadget_uuid):
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
         if device_id is None:
-            setting = get_dashboard_user_setting(getattr(g, 'current_user_id', None))
+            setting = get_dashboard_user_setting(g.current_user.user_id)
             device_id = setting.device_id if setting else None
         chart_config = json.loads(gadget.chart_config or '{}')
         measurement_item_id = chart_config.get('measurement_item_id', 1)

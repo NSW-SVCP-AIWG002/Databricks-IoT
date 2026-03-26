@@ -484,8 +484,11 @@ def get_all_active_gadgets():
     )
 
 
-def get_bar_chart_create_context():
+def get_bar_chart_create_context(accessible_org_ids):
     """棒グラフ登録モーダル用データを取得する
+
+    Args:
+        accessible_org_ids: アクセス可能な組織IDリスト（スコープ制限に使用）
 
     Returns:
         dict: measurement_items, organizations, devices をキーに持つ dict
@@ -501,13 +504,19 @@ def get_bar_chart_create_context():
     )
     organizations = (
         db.session.query(OrganizationMaster)
-        .filter(OrganizationMaster.delete_flag == False)
+        .filter(
+            OrganizationMaster.organization_id.in_(accessible_org_ids),
+            OrganizationMaster.delete_flag == False,
+        )
         .order_by(OrganizationMaster.organization_id.asc())
         .all()
     )
     devices = (
         db.session.query(DeviceMaster)
-        .filter(DeviceMaster.delete_flag == False)
+        .filter(
+            DeviceMaster.organization_id.in_(accessible_org_ids),
+            DeviceMaster.delete_flag == False,
+        )
         .order_by(DeviceMaster.device_id.asc())
         .all()
     )
