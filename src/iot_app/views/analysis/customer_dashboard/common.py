@@ -25,6 +25,7 @@ from iot_app.services.customer_dashboard.common import (
     get_devices,
     get_devices_by_organization,
     get_first_dashboard,
+    get_gadget_type,
     get_gadget_type_id_by_name,
     get_gadget_types,
     get_gadget_update_date,
@@ -83,7 +84,8 @@ def customer_dashboard():
     group_ids = [grp.dashboard_group_id for grp in groups]
     gadgets = get_gadgets_by_groups(group_ids)
     gadget_type_ids = {
-        '棒グラフ': get_gadget_type_id_by_name('棒グラフ'),
+        '棒グラフ':    get_gadget_type_id_by_name('棒グラフ'),
+        '時系列グラフ': get_gadget_type_id_by_name('時系列グラフ'),
     }
 
     devices = []
@@ -527,8 +529,18 @@ def gadget_add():
 @customer_dashboard_bp.route('/gadgets/<string:gadget_type>/create', methods=['GET'])
 @require_auth
 def gadget_create(gadget_type):
-    """ガジェット登録モーダル表示（ガジェット個別仕様書参照）"""
-    abort(501)
+    """ガジェット登録モーダル表示（ガジェット種別ごとのハンドラーにディスパッチ）"""
+    from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
+    from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    _CREATE_HANDLERS = {
+        '時系列グラフ': timeline_view.handle_gadget_create,
+        '棒グラフ':   bar_chart_view.handle_gadget_create,
+    }
+    handler = _CREATE_HANDLERS.get(gadget_type)
+    if handler is None:
+        logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}')
+        abort(500)
+    return handler(gadget_type)
 
 
 # ---------------------------------------------------------------------------
@@ -538,8 +550,18 @@ def gadget_create(gadget_type):
 @customer_dashboard_bp.route('/gadgets/<string:gadget_type>/register', methods=['POST'])
 @require_auth
 def gadget_register(gadget_type):
-    """ガジェット登録実行（ガジェット個別仕様書参照）"""
-    abort(501)
+    """ガジェット登録実行（ガジェット種別ごとのハンドラーにディスパッチ）"""
+    from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
+    from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    _REGISTER_HANDLERS = {
+        '時系列グラフ': timeline_view.handle_gadget_register,
+        '棒グラフ':   bar_chart_view.handle_gadget_register,
+    }
+    handler = _REGISTER_HANDLERS.get(gadget_type)
+    if handler is None:
+        logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}')
+        abort(500)
+    return handler(gadget_type)
 
 
 # ---------------------------------------------------------------------------
@@ -672,9 +694,43 @@ def gadget_delete(gadget_uuid):
 
 
 # ---------------------------------------------------------------------------
-# No.23 ガジェットデータ取得（各ガジェット種別モジュールに委譲）
+# No.23 ガジェットデータ取得 / CSVエクスポート（ガジェット種別ごとのハンドラーにディスパッチ）
 # ---------------------------------------------------------------------------
-# bar_chart.py 等、各ガジェット種別モジュールが /gadgets/<gadget_uuid>/data を実装する
+
+@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
+@require_auth
+def gadget_data(gadget_uuid):
+    """ガジェットデータ取得（AJAX）"""
+    from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
+    from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    _DATA_HANDLERS = {
+        '時系列グラフ': timeline_view.handle_gadget_data,
+        '棒グラフ':   bar_chart_view.handle_gadget_data,
+    }
+    gadget_type = get_gadget_type(gadget_uuid)
+    handler = _DATA_HANDLERS.get(gadget_type)
+    if handler is None:
+        logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')
+        abort(500)
+    return handler(gadget_uuid)
+
+
+@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>', methods=['GET'])
+@require_auth
+def gadget_csv_export(gadget_uuid):
+    """ガジェット CSVエクスポート"""
+    from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
+    from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    _CSV_HANDLERS = {
+        '時系列グラフ': timeline_view.handle_gadget_csv_export,
+        '棒グラフ':   bar_chart_view.handle_gadget_csv_export,
+    }
+    gadget_type = get_gadget_type(gadget_uuid)
+    handler = _CSV_HANDLERS.get(gadget_type)
+    if handler is None:
+        logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')
+        abort(500)
+    return handler(gadget_uuid)
 
 
 # ---------------------------------------------------------------------------

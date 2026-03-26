@@ -1,13 +1,19 @@
 from flask import abort
 
-from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
-
 # 起動エラー回避用スタブ、barchartブランチマージ時に上書きすること
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-def gadget_data(gadget_uuid):
+
+
+def handle_gadget_data(gadget_uuid):
     abort(501)
 
-# 起動エラー回避用スタブ、barchartブランチマージ時に上書きすること
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>', methods=['GET'])
-def gadget_csv_export(gadget_uuid):
+
+def handle_gadget_csv_export(gadget_uuid):
+    abort(501)
+
+
+def handle_gadget_create(gadget_type):
+    abort(501)
+
+
+def handle_gadget_register(gadget_type):
     abort(501)

@@ -8,3 +8,4 @@ customer_dashboard_bp = Blueprint(
 
 from iot_app.views.analysis.customer_dashboard import common  # noqa: E402, F401
 from iot_app.views.analysis.customer_dashboard import bar_chart  # noqa: E402, F401
+from iot_app.views.analysis.customer_dashboard import timeline  # noqa: E402, F401

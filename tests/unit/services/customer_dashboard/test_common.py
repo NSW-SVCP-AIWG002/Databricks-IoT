@@ -2167,3 +2167,74 @@ class TestGetGadgetTypeIdByName:
 
         # Assert
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_gadget_type
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetGadgetType:
+    """gadget_uuid から gadget_type_name を返す
+
+    使用ルート:
+        POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
+        GET  /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_gadget_type_name(self, mock_db):
+        """2.3.1 gadget_uuid が存在する場合: gadget_type_name を返す"""
+        # Arrange
+        mock_row = MagicMock()
+        mock_row.gadget_type_name = 'timeline'
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = mock_row
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('test-uuid-1234')
+
+        # Assert
+        assert result == 'timeline'
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """2.3.2 gadget_uuid が存在しない場合: None を返す"""
+        # Arrange
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('non-existent-uuid')
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_logically_deleted(self, mock_db):
+        """2.3.3 delete_flag=True のガジェットのみ存在する場合: None を返す"""
+        # Arrange
+        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('deleted-uuid-5678')
+
+        # Assert
+        assert result is None
