@@ -637,11 +637,11 @@ ORDER BY
 **⑧ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/create', methods=['GET'])
-@require_auth
-def gadget_timeline_create():
+# ルートデコレータは持たない。common.py の gadget_create(gadget_type) ディスパッチャーから呼ばれる。
+def handle_gadget_create(gadget_type):
     """時系列グラフガジェット登録モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    organization_id = get_organization_id_by_user(g.current_user.user_id)
+    accessible_org_ids = get_accessible_organizations(organization_id)
 
     # ① ユーザー設定取得
     user_setting = get_dashboard_user_setting(g.current_user.user_id)
@@ -669,6 +669,7 @@ def gadget_timeline_create():
     return render_template(
         'customer_dashboard/modals/gadget_register/timeline.html',
         form=form,
+        gadget_type=gadget_type,  # フォームの action URL 構築に使用
         dashboard=dashboard,
         groups=groups,
         measurement_items=measurement_items,
@@ -840,18 +841,19 @@ INSERT INTO dashboard_gadget_master (
 **④ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/register', methods=['POST'])
-@require_auth
-def gadget_timeline_register():
+# ルートデコレータは持たない。common.py の gadget_register(gadget_type) ディスパッチャーから呼ばれる。
+def handle_gadget_register(gadget_type):
     """時系列グラフガジェット登録実行"""
     form = TimelineGadgetForm()
     if not form.validate_on_submit():
         return render_template(
             'customer_dashboard/modals/gadget_register/timeline.html',
-            form=form
+            form=form,
+            gadget_type=gadget_type,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    organization_id = get_organization_id_by_user(g.current_user.user_id)
+    accessible_org_ids = get_accessible_organizations(organization_id)
 
     # ① デバイス固定モードの場合: デバイス存在&データスコープチェック
     device_id = None
@@ -1184,9 +1186,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/register', methods=['POST'])
-@require_auth
-def gadget_timeline_register():
+def handle_gadget_register(gadget_type):
     logger.info(f'時系列グラフガジェット登録開始: user_id={g.current_user.user_id}')
 
     try:
