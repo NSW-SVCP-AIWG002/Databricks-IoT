@@ -5,6 +5,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/common.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/bar_chart.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/timeline.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -258,6 +259,8 @@
                   {# ガジェット種別固有UI #}
                   {% if gadget.gadget_type_id == gadget_type_ids['棒グラフ'] %}
                     {% include 'analysis/customer_dashboard/gadgets/bar_chart.html' %}
+                  {% elif gadget.gadget_type_id == gadget_type_ids['時系列グラフ'] %}
+                    {% include 'analysis/customer_dashboard/gadgets/timeline.html' %}
                   {% endif %}
 
                 </div>{# /gadget #}
@@ -301,6 +304,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},
