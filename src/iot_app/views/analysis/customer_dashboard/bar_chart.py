@@ -90,10 +90,6 @@ def gadget_data(gadget_uuid):
 @customer_dashboard_bp.route('/gadgets/bar-chart/create', methods=['GET'])
 def gadget_bar_chart_create():
     """棒グラフガジェット登録モーダル表示"""
-    current_user_id = getattr(g, 'current_user_id', None)
-    if current_user_id is None:
-        abort(404)
-
     setting = get_dashboard_user_setting(g.current_user.user_id)
     if setting is None:
         abort(404)
