@@ -1,5 +1,6 @@
 import logging
 import re
+
 from flask import g, request, has_request_context
 
 _MASKING_RULES = {
