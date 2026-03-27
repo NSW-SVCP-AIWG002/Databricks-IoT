@@ -28,7 +28,6 @@ from iot_app.services.customer_dashboard.timeline import (
     validate_chart_params,
 )
 from iot_app.services.customer_dashboard.common import get_organization_id_by_user
-from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
 
@@ -40,11 +39,7 @@ _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 # POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
 # ---------------------------------------------------------------------------
 
-@customer_dashboard_bp.route(
-    '/customer-dashboard/gadgets/<string:gadget_uuid>/data',
-    methods=['POST'],
-)
-def gadget_data(gadget_uuid):
+def handle_gadget_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
 
@@ -78,7 +73,7 @@ def gadget_data(gadget_uuid):
 
         chart_config = _json.loads(gadget.chart_config or '{}')
 
-        # ③ カラム名取得
+        # ③ カラム名・表示情報取得
         left_item  = get_measurement_item(chart_config['left_item_id'])
         right_item = get_measurement_item(chart_config['right_item_id'])
         left_col   = left_item.silver_data_column_name
@@ -92,8 +87,19 @@ def gadget_data(gadget_uuid):
             right_item_id=chart_config['right_item_id'],
         )
 
-        # ④ データ整形
+        # ④ データ整形 + ラベル・単位・最小/最大値を補完 [A]
         chart_data = format_timeline_data(rows, left_col, right_col)
+        chart_data.update({
+            'left_label':  left_item.display_name  if left_item  else '左軸',
+            'right_label': right_item.display_name if right_item else '右軸',
+            'left_unit':   left_item.unit_name     if left_item  else '',
+            'right_unit':  right_item.unit_name    if right_item else '',
+            'left_min':    chart_config.get('left_min_value'),
+            'left_max':    chart_config.get('left_max_value'),
+            'right_min':   chart_config.get('right_min_value'),
+            'right_max':   chart_config.get('right_max_value'),
+        })
+
         return jsonify({
             'gadget_uuid': gadget_uuid,
             'chart_data':  chart_data,
@@ -109,11 +115,7 @@ def gadget_data(gadget_uuid):
 # GET /analysis/customer-dashboard/gadgets/timeline/create
 # ---------------------------------------------------------------------------
 
-@customer_dashboard_bp.route(
-    '/customer-dashboard/gadgets/timeline/create',
-    methods=['GET'],
-)
-def gadget_timeline_create():
+def handle_gadget_create(gadget_type):
     """時系列グラフガジェット 登録モーダル表示"""
     from iot_app.common.exceptions import NotFoundError
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
@@ -136,6 +138,7 @@ def gadget_timeline_create():
     return render_template(
         'analysis/customer_dashboard/gadgets/modals/timeline.html',
         form=form,
+        gadget_type=gadget_type,
         **context,
     )
 
@@ -145,11 +148,7 @@ def gadget_timeline_create():
 # POST /analysis/customer-dashboard/gadgets/timeline/register
 # ---------------------------------------------------------------------------
 
-@customer_dashboard_bp.route(
-    '/customer-dashboard/gadgets/timeline/register',
-    methods=['POST'],
-)
-def gadget_timeline_register():
+def handle_gadget_register(gadget_type):
     """時系列グラフガジェット 登録実行"""
     form = TimelineGadgetForm()
 
@@ -158,10 +157,21 @@ def gadget_timeline_register():
     form.group_id.choices = [(submitted_group_id, '')]
 
     if not form.validate_on_submit():
+        # [D] 422時にフルコンテキストを渡す
+        from iot_app.common.exceptions import NotFoundError
+        accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
+        try:
+            context = get_timeline_create_context(accessible_org_ids, g.current_user.user_id)
+        except NotFoundError:
+            abort(404)
+        except Exception:
+            abort(500)
         return render_template(
             'analysis/customer_dashboard/gadgets/modals/timeline.html',
             form=form,
-        ), 400
+            gadget_type=gadget_type,
+            **context,
+        ), 422
 
     current_user_id = g.current_user.user_id
 
@@ -208,11 +218,7 @@ def gadget_timeline_register():
 # GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
 # ---------------------------------------------------------------------------
 
-@customer_dashboard_bp.route(
-    '/customer-dashboard/gadgets/<string:gadget_uuid>',
-    methods=['GET'],
-)
-def gadget_csv_export(gadget_uuid):
+def handle_gadget_csv_export(gadget_uuid):
     """時系列グラフガジェット CSVエクスポート"""
     from iot_app.common.exceptions import NotFoundError
 

@@ -1,18 +1,19 @@
-<div class="modal-overlay">
-  <div class="modal-content modal-content--lg">
+<div class="modal-content--lg">
 
     <!-- モーダルヘッダー -->
-    <div class="modal-header">
-      <h2 class="modal-header__title">折れ線</h2>
+    <div class="modal__header">
+      <h2 class="modal__title">折れ線</h2>
     </div>
 
     <!-- モーダルボディ -->
     <form method="POST"
-          action="{{ url_for('customer_dashboard.gadget_timeline_register') }}"
-          id="timeline-register-form">
+          action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
+          id="timeline-register-form"
+          novalidate
+          data-ajax-submit>
       {{ form.hidden_tag() }}
 
-      <div class="modal-body">
+      <div class="modal__body">
 
         <!-- (1) タイトル行 -->
         <div class="gadget-register__title-row">
@@ -224,13 +225,11 @@
       </div>
 
       <!-- モーダルフッター：登録/キャンセル -->
-      <div class="modal-footer">
+      <div class="modal__footer">
         <button type="submit" class="button button--primary" id="register-btn">登録</button>
         <button type="button" class="button button--secondary"
-                onclick="document.getElementById('timeline-register-modal').classList.remove('active')">キャンセル</button>
+                id="modal-close-btn">キャンセル</button>
       </div>
 
     </form>
-  </div>
 </div>
-
