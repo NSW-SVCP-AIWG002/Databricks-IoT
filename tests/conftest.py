@@ -6,9 +6,15 @@ os.environ["FLASK_ENV"] = "testing"
 from iot_app import create_app, db as _db
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def app():
-    """テスト用Flaskアプリケーションを生成（TestingConfig使用）"""
+    """テスト用Flaskアプリケーションを生成（TestingConfig使用）
+
+    function スコープ: テストごとに新しいインメモリ SQLite DB を作成し、
+    テスト終了後に drop_all でクリアする。
+    これにより db.session.commit() を呼ぶエンドポイントのテストでも
+    テスト間のデータ汚染が発生しない。
+    """
     app = create_app()
 
     with app.app_context():
@@ -30,8 +36,10 @@ def client(app):
 
 @pytest.fixture()
 def db_session(app):
-    """テスト用DBセッション（各テスト後にロールバック）"""
+    """テスト用DBセッション
+
+    app が function スコープのため、各テストは独立した DB を持つ。
+    セッションをそのまま yield し、テスト終了後は app の drop_all に委ねる。
+    """
     with app.app_context():
-        _db.session.begin_nested()
         yield _db.session
-        _db.session.rollback()
