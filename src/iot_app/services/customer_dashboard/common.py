@@ -319,6 +319,10 @@ def get_gadgets_by_groups(group_ids):
     )
 
 
+# gadget_size 文字列 → DB整数値の変換マップ（dashboard_gadget_master.gadget_size: 0=2x2, 1=2x4）
+GADGET_SIZE_TO_INT = {'2x2': 0, '2x4': 1}
+
+
 def get_gadget_type_id_by_name(gadget_type_name):
     """ガジェット種別名から gadget_type_id を返す。該当なしの場合は None"""
     result = (
@@ -327,6 +331,23 @@ def get_gadget_type_id_by_name(gadget_type_name):
         .first()
     )
     return result.gadget_type_id if result else None
+
+
+def get_gadget_type(gadget_uuid):
+    """gadget_uuid から gadget_type_name を返す。
+    dashboard_gadget_master と gadget_type_master を JOIN して逆引きする。
+    該当レコードが存在しない場合は None を返す。
+    """
+    result = (
+        db.session.query(GadgetTypeMaster.gadget_type_name)
+        .join(DashboardGadgetMaster, DashboardGadgetMaster.gadget_type_id == GadgetTypeMaster.gadget_type_id)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .first()
+    )
+    return result.gadget_type_name if result else None
 
 
 def get_gadget_types():
