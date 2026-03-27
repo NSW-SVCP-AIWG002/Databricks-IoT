@@ -32,8 +32,7 @@ from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # n
 # ルート定義
 # ============================================================
 
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-def gadget_data(gadget_uuid):
+def handle_gadget_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
     gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
@@ -184,8 +183,7 @@ def gadget_bar_chart_register():
         abort(500)
 
 
-@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>', methods=['GET'])
-def gadget_csv_export(gadget_uuid):
+def handle_gadget_csv_export(gadget_uuid):
     """棒グラフガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
