@@ -19,6 +19,7 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
+from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster
 
 logger = get_logger(__name__)
@@ -112,10 +113,10 @@ def get_chart_column_names(gadget):
     Raises:
         NotFoundError: 測定項目が存在しない場合
     """
-    from iot_app.models.measurement import MeasurementItem
+    from iot_app.models.measurement import MeasurementItemMaster
     chart_config = json.loads(gadget.chart_config)
-    left_item  = db.session.get(MeasurementItem, chart_config['left_item_id'])
-    right_item = db.session.get(MeasurementItem, chart_config['right_item_id'])
+    left_item  = db.session.get(MeasurementItemMaster, chart_config['left_item_id'])
+    right_item = db.session.get(MeasurementItemMaster, chart_config['right_item_id'])
     if left_item is None or right_item is None:
         raise NotFoundError('測定項目が見つかりません')
     return left_item.silver_data_column_name, right_item.silver_data_column_name
@@ -161,8 +162,8 @@ def get_measurement_item(item_id):
     Raises:
         NotFoundError: 測定項目が存在しない場合
     """
-    from iot_app.models.measurement import MeasurementItem
-    item = db.session.get(MeasurementItem, item_id)
+    from iot_app.models.measurement import MeasurementItemMaster
+    item = db.session.get(MeasurementItemMaster, item_id)
     if item is None:
         raise NotFoundError(f'測定項目が見つかりません: item_id={item_id}')
     return item
@@ -207,14 +208,40 @@ def get_dashboard_user_setting(user_id):
 
 def execute_silver_query(device_id, start_datetime, end_datetime, limit=100):
     """Unity Catalog sensor_data_view からセンサーデータを取得する"""
+    import os
+    if os.getenv('FLASK_ENV') == 'development':
+        # 開発環境向けモック（Unity Catalog に疎通できる環境になったら削除）
+        from datetime import timedelta
+        rows = []
+        t = start_datetime
+        step = (end_datetime - start_datetime) / max(10, 1)
+        for i in range(10):
+            rows.append({
+                'event_timestamp': t + step * i,
+                'device_id': device_id,
+                'device_name': 'モックデバイス',
+                'temperature': 20.0 + i,
+                'humidity': 50.0 + i,
+            })
+        return rows
+
     from iot_app.databricks.unity_catalog_connector import UnityCatalogConnector
     connector = UnityCatalogConnector()
-    return connector.execute_query(
-        device_id=device_id,
-        start_datetime=start_datetime,
-        end_datetime=end_datetime,
-        limit=limit,
-    )
+    sql_text = """
+        SELECT *
+        FROM iot_catalog.views.sensor_data_view
+        WHERE device_id = :device_id
+          AND event_timestamp >= :start_datetime
+          AND event_timestamp < :end_datetime
+        ORDER BY event_timestamp
+        LIMIT :limit
+    """
+    return connector.execute(sql_text, {
+        'device_id':      device_id,
+        'start_datetime': start_datetime,
+        'end_datetime':   end_datetime,
+        'limit':          limit,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +524,7 @@ def register_gadget(params, current_user_id=0):
         data_source_config=data_source_config,
         position_x=0,
         position_y=max_position_y + 1,
-        gadget_size=params.get('gadget_size'),
+        gadget_size=GADGET_SIZE_TO_INT[params.get('gadget_size')],
         display_order=max_display_order + 1,
         create_date=now,
         update_date=now,
@@ -532,7 +559,7 @@ def get_timeline_create_context(accessible_org_ids, current_user_id):
     Raises:
         NotFoundError: ユーザー設定またはダッシュボードが存在しない場合
     """
-    from iot_app.models.measurement import MeasurementItem
+    from iot_app.models.measurement import MeasurementItemMaster
     from iot_app.models.organization import OrganizationMaster
     from iot_app.models.device import DeviceMaster
     from iot_app.models.customer_dashboard import DashboardUserSetting
@@ -556,9 +583,9 @@ def get_timeline_create_context(accessible_org_ids, current_user_id):
         raise NotFoundError('ダッシュボードが見つかりません')
 
     # ③ 表示項目一覧取得
-    measurement_items = db.session.query(MeasurementItem).filter_by(
+    measurement_items = db.session.query(MeasurementItemMaster).filter_by(
         delete_flag=False
-    ).order_by(MeasurementItem.measurement_item_id.asc()).all()
+    ).order_by(MeasurementItemMaster.measurement_item_id.asc()).all()
 
     # ④ 組織一覧取得
     organizations = db.session.query(OrganizationMaster).filter(
@@ -672,6 +699,16 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
             right_item_id=chart_config['right_item_id'],
             limit=100000,
         )
+
+        # [E] device_id → device_name マッピングを構築して各行に付加
+        from iot_app.models.device import DeviceMaster
+        device_ids = {row['device_id'] for row in rows}
+        devices = db.session.query(DeviceMaster).filter(
+            DeviceMaster.device_id.in_(device_ids)
+        ).all()
+        device_name_map = {d.device_id: d.device_name for d in devices}
+        for row in rows:
+            row['device_name'] = device_name_map.get(row['device_id'], '')
 
         return generate_timeline_csv(
             rows,

@@ -210,6 +210,9 @@ async function fetchAndRender(gadgetUuid, chart, legendEl, startDatetime, endDat
     );
 
     if (!resp.ok) {
+      if (resp.status === 400) {
+        legendEl.innerHTML = '<span class="form__error">日時の指定が不正です（取得期間は24時間以内、終了は開始より後に設定してください）</span>';
+      }
       console.error(`[timeline] データ取得失敗: gadget_uuid=${gadgetUuid} status=${resp.status}`);
       return;
     }
