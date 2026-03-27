@@ -86,8 +86,8 @@ def handle_gadget_data(gadget_uuid):
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 
 
-@customer_dashboard_bp.route('/gadgets/bar-chart/create', methods=['GET'])
-def gadget_bar_chart_create():
+# TODO: 仮修正（このブランチの作業範囲外）— bar_chartブランチで正式対応すること
+def handle_gadget_create(gadget_type):
     """棒グラフガジェット登録モーダル表示"""
     setting = get_dashboard_user_setting(g.current_user.user_id)
     if setting is None:
@@ -124,8 +124,8 @@ def gadget_bar_chart_create():
     )
 
 
-@customer_dashboard_bp.route('/gadgets/bar-chart/register', methods=['POST'])
-def gadget_bar_chart_register():
+# TODO: 仮修正（このブランチの作業範囲外）— bar_chartブランチで正式対応すること
+def handle_gadget_register(gadget_type):
     """棒グラフガジェット登録実行"""
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
 
