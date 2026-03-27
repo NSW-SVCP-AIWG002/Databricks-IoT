@@ -4,3 +4,7 @@ class NotFoundError(Exception):
 
 class ValidationError(Exception):
     """入力値バリデーションエラーの例外"""
+
+
+class AuthError(Exception):
+    """認証エラー"""
