@@ -20,7 +20,7 @@
             data-name="{{ gadget_type.gadget_type_name }}"
             data-image="{{ gadget_type.gadget_image_path }}"
             data-description="{{ gadget_type.gadget_description }}"
-            data-create-url="{{ url_for('customer_dashboard.gadget_create', gadget_type=gadget_type.gadget_type_id) }}"
+            data-create-url="{{ url_for('customer_dashboard.gadget_create', gadget_type=gadget_type.gadget_type_name) }}"
           >{{ gadget_type.gadget_type_name }}</li>
         {% endfor %}
       </ul>
