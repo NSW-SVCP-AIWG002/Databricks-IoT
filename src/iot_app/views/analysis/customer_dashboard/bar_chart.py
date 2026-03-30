@@ -86,8 +86,7 @@ def handle_gadget_data(gadget_uuid):
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 
 
-@customer_dashboard_bp.route('/gadgets/bar-chart/create', methods=['GET'])
-def gadget_bar_chart_create():
+def handle_gadget_create(gadget_type):
     """棒グラフガジェット登録モーダル表示"""
     setting = get_dashboard_user_setting(g.current_user.user_id)
     if setting is None:
@@ -111,21 +110,24 @@ def gadget_bar_chart_create():
         (d.device_id, d.device_name) for d in context['devices']
     ]
     form.group_id.choices = [(0, '選択してください')] + [
-        (gr.group_id, gr.group_name) for gr in groups
+        (gr.dashboard_group_id, gr.dashboard_group_name) for gr in groups
     ]
-    form.summary_method_id.choices = [(0, '選択してください')]
+    form.summary_method_id.choices = [(0, '選択してください')] + [
+        (sm.summary_method_id, sm.summary_method_name) for sm in context['summary_methods']
+    ]
     form.measurement_item_id.choices = [(0, '選択してください')] + [
         (m.measurement_item_id, m.display_name) for m in context['measurement_items']
     ]
     return render_template(
         'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
         form=form,
+        gadget_type=gadget_type,
+        groups=groups,
         **context,
     )
 
 
-@customer_dashboard_bp.route('/gadgets/bar-chart/register', methods=['POST'])
-def gadget_bar_chart_register():
+def handle_gadget_register(gadget_type):
     """棒グラフガジェット登録実行"""
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
 
@@ -143,12 +145,16 @@ def gadget_bar_chart_register():
     if not form.validate_on_submit():
         try:
             context = get_bar_chart_create_context(accessible_org_ids)
+            setting = get_dashboard_user_setting(g.current_user.user_id)
+            groups = get_dashboard_groups(setting.dashboard_id) if setting else []
         except Exception as e:
             logger.error(f'棒グラフガジェット登録コンテキスト取得エラー: {str(e)}')
             abort(500)
         return render_template(
             'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
             form=form,
+            gadget_type=gadget_type,
+            groups=groups,
             **context,
         ), 400
 

@@ -89,6 +89,20 @@ class GadgetTypeMaster(db.Model):
         super().__init__(**kwargs)
 
 
+class GoldSummaryMethodMaster(db.Model):
+    """サマリー計算手法マスタ"""
+    __tablename__ = 'gold_summary_method_master'
+
+    summary_method_id = db.Column(db.Integer, primary_key=True)
+    summary_method_code = db.Column(db.String(20), nullable=False)
+    summary_method_name = db.Column(db.String(30), nullable=False)
+    create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    creator = db.Column(db.Integer, nullable=False)
+    update_date = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    modifier = db.Column(db.Integer, nullable=False)
+    delete_flag = db.Column(db.Boolean, nullable=False, default=False)
+
+
 class DashboardUserSetting(db.Model):
     """ダッシュボードユーザー設定"""
     __tablename__ = 'dashboard_user_setting'

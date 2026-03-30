@@ -10,7 +10,8 @@ from sqlalchemy import func
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
-from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster
+from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster, GoldSummaryMethodMaster
+from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
 
 logger = get_logger(__name__)
 
@@ -322,6 +323,40 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
     Raises:
         Exception: クエリ実行失敗時
     """
+    # ── 開発用モック（削除予定）────────────────────────────────────────────
+    # UC接続確認後（開発環境でも Unity Catalog に疎通できる状態になったら）以下ブロックごと削除すること
+    import os
+    if os.environ.get('FLASK_ENV') == 'development':
+        import calendar as _cal
+        if display_unit == 'hour':
+            col = get_measurement_item_column_name(measurement_item_id) or 'external_temp'
+            start = base_datetime.replace(minute=0, second=0, microsecond=0)
+            return [
+                {'event_timestamp': start + timedelta(minutes=i * 10), col: round(18.0 + i * 1.5, 1)}
+                for i in range(6)
+            ]
+        elif display_unit == 'day':
+            return [
+                {'collection_hour': h, 'summary_value': round(20.0 + h * 0.3, 1)}
+                for h in range(24)
+            ]
+        elif display_unit == 'week':
+            days_since_sunday = (base_datetime.weekday() + 1) % 7
+            start_date = (base_datetime - timedelta(days=days_since_sunday)).date()
+            return [
+                {'collection_date': start_date + timedelta(days=d), 'summary_value': round(15.0 + d * 2.0, 1)}
+                for d in range(7)
+            ]
+        elif display_unit == 'month':
+            start_date = base_datetime.replace(day=1).date()
+            last_day = _cal.monthrange(base_datetime.year, base_datetime.month)[1]
+            return [
+                {'collection_date': start_date.replace(day=d + 1), 'summary_value': round(10.0 + d * 0.8, 1)}
+                for d in range(last_day)
+            ]
+        return []
+    # ── /開発用モック ──────────────────────────────────────────────────────
+
     try:
         if display_unit == "hour":
             start_datetime = base_datetime.replace(minute=0, second=0, microsecond=0)
@@ -520,10 +555,17 @@ def get_bar_chart_create_context(accessible_org_ids):
         .order_by(DeviceMaster.device_id.asc())
         .all()
     )
+    summary_methods = (
+        db.session.query(GoldSummaryMethodMaster)
+        .filter(GoldSummaryMethodMaster.delete_flag == False)
+        .order_by(GoldSummaryMethodMaster.summary_method_id.asc())
+        .all()
+    )
     return {
         'measurement_items': measurement_items,
         'organizations': organizations,
         'devices': devices,
+        'summary_methods': summary_methods,
     }
 
 
@@ -672,7 +714,7 @@ def register_bar_chart_gadget(params, current_user_id):
         data_source_config=data_source_config,
         position_x=0,
         position_y=max_position_y + 1,
-        gadget_size=params.get("gadget_size"),
+        gadget_size=GADGET_SIZE_TO_INT[params.get("gadget_size")],
         display_order=max_order + 1,
         creator=current_user_id,
         modifier=current_user_id,

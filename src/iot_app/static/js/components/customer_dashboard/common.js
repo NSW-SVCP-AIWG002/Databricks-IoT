@@ -91,6 +91,9 @@ const CustomerDashboard = (function () {
 
     // ガジェット追加モーダル専用
     _bindGadgetAddEvents(container);
+
+    // 棒グラフ登録モーダル専用
+    _bindBarChartRegisterEvents(container);
   }
 
   /**
@@ -281,6 +284,60 @@ const CustomerDashboard = (function () {
         }
       });
     }
+  }
+
+  /* =========================================================
+   * 棒グラフ登録モーダル専用イベント
+   * ========================================================= */
+
+  function _bindBarChartRegisterEvents(container) {
+    const modeButtons = container.querySelectorAll('.bar-chart-register__device-mode-btn');
+    if (!modeButtons.length) return;
+
+    const deviceModeInput = container.querySelector('#device_mode');
+    const deviceFixedArea = container.querySelector('#device-fixed-area');
+    const deviceNameArea  = container.querySelector('#device-name-area');
+    const orgFilter       = container.querySelector('#organization-filter');
+    const deviceSelect    = container.querySelector('#device-select');
+
+    // デバイスモード切替
+    modeButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        modeButtons.forEach(function (b) {
+          b.classList.remove('bar-chart-register__device-mode-btn--active');
+        });
+        btn.classList.add('bar-chart-register__device-mode-btn--active');
+        const mode = btn.dataset.mode;
+        if (deviceModeInput) deviceModeInput.value = mode;
+        const isFixed = mode === 'fixed';
+        if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
+        if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      });
+    });
+
+    if (!orgFilter || !deviceSelect) return;
+
+    // 組織フィルターによるデバイス選択絞り込み
+    const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
+    orgFilter.addEventListener('change', function () {
+      const orgId = orgFilter.value;
+      deviceSelect.innerHTML = '<option value="">選択してください</option>';
+      allDeviceOptions.forEach(function (opt) {
+        if (!orgId || opt.dataset.org === orgId) {
+          deviceSelect.appendChild(opt.cloneNode(true));
+        }
+      });
+      deviceSelect.disabled = !orgId;
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = '-';
+    });
+
+    // デバイス選択時デバイス名表示
+    deviceSelect.addEventListener('change', function () {
+      const selected = deviceSelect.options[deviceSelect.selectedIndex];
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = selected ? (selected.dataset.name || '-') : '-';
+    });
   }
 
   /* =========================================================
