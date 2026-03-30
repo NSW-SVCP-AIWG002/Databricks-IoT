@@ -708,6 +708,8 @@ def gadget_data(gadget_uuid):
         '棒グラフ':   bar_chart_view.handle_gadget_data,
     }
     gadget_type = get_gadget_type(gadget_uuid)
+    if gadget_type is None:
+        abort(404)
     handler = _DATA_HANDLERS.get(gadget_type)
     if handler is None:
         logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')
@@ -726,6 +728,8 @@ def gadget_csv_export(gadget_uuid):
         '棒グラフ':   bar_chart_view.handle_gadget_csv_export,
     }
     gadget_type = get_gadget_type(gadget_uuid)
+    if gadget_type is None:
+        abort(404)
     handler = _CSV_HANDLERS.get(gadget_type)
     if handler is None:
         logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')
