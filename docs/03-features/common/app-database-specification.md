@@ -667,13 +667,17 @@
 | #   | カラム物理名       | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
 | --- | ------------------ | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
 | 1   | device_id          | デバイスID   | VARCHAR(100) | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
-| 2   | last_received_time | 最終受信時刻 | TIMESTAMP    | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 |
+| 2   | last_received_time | 最終受信時刻 | TIMESTAMP    | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 　※1|
 | 3   | delete_flag        | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
 | 4   | create_date        | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
 | 5   | update_date        | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
 
+※1　このテーブルでは、アラート発生中かどうかといったステータスではなく、テレメトリデータが一度も受信されていない（未接続）か、受信している（接続済み）かのステータスを管理する。
+
 **外部キー:**
 - `device_id` → `device_master.device_id`
+
+
 
 ---
 
