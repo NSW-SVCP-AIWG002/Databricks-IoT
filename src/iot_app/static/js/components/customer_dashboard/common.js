@@ -611,7 +611,9 @@ const CustomerDashboard = (function () {
     return false;
   }
 
-  function _onDragLeave() {
+  function _onDragLeave(e) {
+    // ガジェット内の子要素へ移動した場合は誤発火なので無視する
+    if (this.contains(e.relatedTarget)) return;
     this.closest('.dashboard-content')?.classList.remove('gadget--drag-over');
   }
 
@@ -620,23 +622,25 @@ const CustomerDashboard = (function () {
     const content = this.closest('.dashboard-content');
     if (content) content.classList.remove('gadget--drag-over');
 
-    if (_dragSrcEl && _dragSrcEl !== this) {
-      // DOM上でドラッグ元とドロップ先を入れ替える
-      const parent = this.parentNode;
-      const srcNext = _dragSrcEl.nextSibling;
-      const targetNext = this.nextSibling;
+    if (!_dragSrcEl || _dragSrcEl === this) return false;
 
-      if (srcNext === this) {
-        parent.insertBefore(_dragSrcEl, targetNext);
-      } else {
-        parent.insertBefore(this, _dragSrcEl);
-        if (srcNext) {
-          parent.insertBefore(_dragSrcEl, srcNext);
-        } else {
-          parent.appendChild(_dragSrcEl);
-        }
-      }
+    const srcParent = _dragSrcEl.parentNode;
+    const tgtParent = this.parentNode;
+    const srcNext = _dragSrcEl.nextSibling;
+    const tgtNext = this.nextSibling;
+
+    if (srcNext === this) {
+      // ドラッグ元がターゲットの直前: ターゲットをドラッグ元の前へ
+      srcParent.insertBefore(this, _dragSrcEl);
+    } else if (tgtNext === _dragSrcEl) {
+      // ターゲットがドラッグ元の直前: ドラッグ元をターゲットの前へ
+      tgtParent.insertBefore(_dragSrcEl, this);
+    } else {
+      // 一般ケース: 互いの元位置へ挿入（グループ間移動も対応）
+      tgtParent.insertBefore(_dragSrcEl, tgtNext);
+      srcParent.insertBefore(this, srcNext);
     }
+
     return false;
   }
 
