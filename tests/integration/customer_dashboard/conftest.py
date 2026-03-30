@@ -8,6 +8,7 @@ NOTE: このテストはモデルファイル（models/dashboard.py, models/meas
 import json
 import os
 import uuid
+from datetime import date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -71,6 +72,7 @@ def clean_db(app):
         from iot_app.models.device import DeviceMaster
         from iot_app.models.measurement import MeasurementItemMaster
         from iot_app.models.organization import OrganizationClosure, OrganizationMaster
+        from iot_app.models.user import User
         _db.session.query(DashboardGadgetMaster).delete()
         _db.session.query(DashboardUserSetting).delete()
         _db.session.query(DashboardGroupMaster).delete()
@@ -80,6 +82,7 @@ def clean_db(app):
         _db.session.query(GadgetTypeMaster).delete()
         _db.session.query(GoldSummaryMethodMaster).delete()
         _db.session.query(MeasurementItemMaster).delete()
+        _db.session.query(User).delete()
         _db.session.query(OrganizationMaster).delete()
         _db.session.commit()
 
@@ -287,3 +290,77 @@ def gadget(db_session, gadget_type):
     db_session.add(g)
     db_session.flush()
     return g
+
+
+@pytest.fixture()
+def organization_master_record(db_session):
+    """OrganizationMaster テストレコード（organization_id=1）"""
+    from iot_app.models.organization import OrganizationMaster
+    org = OrganizationMaster(
+        organization_id=1,
+        organization_name='テスト組織',
+        organization_type_id=1,
+        address='テスト住所',
+        phone_number='000-0000-0000',
+        contact_person='テスト担当者',
+        contract_status_id=1,
+        contract_start_date=date(2024, 1, 1),
+        databricks_group_id='test-group',
+        creator=1,
+        modifier=1,
+    )
+    db_session.add(org)
+    db_session.flush()
+    return org
+
+
+@pytest.fixture()
+def organization_closure_record(db_session, organization_master_record):
+    """OrganizationClosure テストレコード（org_id=1 の自己参照）"""
+    from iot_app.models.organization import OrganizationClosure
+    closure = OrganizationClosure(
+        parent_organization_id=1,
+        subsidiary_organization_id=1,
+        depth=0,
+    )
+    db_session.add(closure)
+    db_session.flush()
+    return closure
+
+
+@pytest.fixture()
+def user_master_record(db_session, organization_master_record):
+    """UserMaster テストレコード（user_id=1, organization_id=1）"""
+    from iot_app.models.user import User
+    now = datetime.now()
+    user = User(
+        user_id=1,
+        databricks_user_id='test-databricks-id',
+        user_name='テストユーザー',
+        organization_id=1,
+        email_address='test@test.com',
+        user_type_id=1,
+        language_code='ja',
+        region_id=1,
+        address='',
+        creator=1,
+        modifier=1,
+        create_date=now,
+        update_date=now,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+@pytest.fixture()
+def auth_scope(auth_user_id, user_master_record, organization_closure_record):
+    """認証ユーザー（user_id=1）のアクセス可能組織スコープをセットアップする結合テスト用フィクスチャ
+
+    - user_master: user_id=1, organization_id=1
+    - organization_closure: parent=1, subsidiary=1
+    これにより get_organization_id_by_user(1) → 1,
+    get_accessible_org_ids(1) → [1] となりスコープチェックを通過できる。
+    dashboard_master.organization_id=1 であることが前提。
+    """
+    return auth_user_id
