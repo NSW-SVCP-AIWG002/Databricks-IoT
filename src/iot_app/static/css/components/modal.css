@@ -1,0 +1,170 @@
+/* ===== モーダル・ダイアログ ===== */
+
+/* モーダルオーバーレイ（デフォルト非表示） */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* .active クラス付与時に表示（main.js の classList.add('active') 対応） */
+.modal-overlay.active {
+  display: flex;
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   以下はデザイン検討中のため残置。
+   採用する場合はコメントアウトを解除し、
+   下部のアクティブデザインをコメントアウトすること。
+   ───────────────────────────────────────────────────────── */
+
+/*
+.modal {
+  background-color: var(--color-white);
+  border-radius: var(--border-radius-base);
+  box-shadow: var(--shadow-lg);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slide-up 0.3s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal--small    { max-width: 400px; }
+.modal--medium   { max-width: 600px; }
+.modal--large    { max-width: 800px; }
+.modal--fullscreen { max-width: 90%; width: 90%; }
+
+.modal__header {
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  justify-content: space-between;
+  padding: var(--spacing-5);
+}
+
+.modal__header-group {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.modal__icon {
+  width: 40px;
+  height: 40px;
+}
+
+.modal__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
+  margin-left: var(--spacing-4);
+}
+
+.modal__description {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-900);
+  margin-top: var(--spacing-4);
+}
+
+.modal__description--error {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-danger);
+  margin-top: var(--spacing-4);
+}
+
+.modal__body {
+  padding: var(--spacing-0) var(--spacing-5);
+}
+
+.modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-0) var(--spacing-3);
+  padding: var(--spacing-5);
+}
+
+.modal__title--success { color: var(--color-success); }
+.modal__title--error   { color: var(--color-danger); }
+*/
+
+/* ─────────────────────────────────────────────────────────
+   アクティブデザイン（customer_dashboard/common.css より移植）
+   ───────────────────────────────────────────────────────── */
+
+.modal {
+  background: #fff;
+  border-radius: 4px;
+  min-width: 400px;
+  max-width: 680px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.modal__header {
+  padding: var(--spacing-4) var(--spacing-6);
+  border-bottom: 1px solid #ddd;
+  background-color: var(--color-primary);
+  border-radius: 4px 4px 0 0;
+}
+
+.modal__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: #fff;
+  margin: 0;
+}
+
+.modal__body {
+  padding: var(--spacing-6);
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid #ddd;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.modal__warning {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-2);
+}

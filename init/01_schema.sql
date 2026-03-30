@@ -87,26 +87,29 @@ CREATE TABLE IF NOT EXISTS device_type_master (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 11. 在庫状況マスタ
-CREATE TABLE IF NOT EXISTS stock_status_master (
-    stock_status_id   INT          NOT NULL,
-    stock_status_name VARCHAR(100) NOT NULL,
-    create_date       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator           INT          NOT NULL,
-    update_date       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    modifier          INT          NOT NULL,
-    delete_flag       BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (stock_status_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- 13. 測定項目マスタ
-CREATE TABLE IF NOT EXISTS measurement_item_master (
-    measurement_item_id   INT          NOT NULL AUTO_INCREMENT,
-    measurement_item_name VARCHAR(50)  NOT NULL,
+CREATE TABLE IF NOT EXISTS inventory_status_master (
+    inventory_status_id   INT          NOT NULL,
+    inventory_status_name VARCHAR(100) NOT NULL,
     create_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator               INT          NOT NULL,
     update_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     modifier              INT          NOT NULL,
     delete_flag           BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (inventory_status_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 13. 測定項目マスタ
+CREATE TABLE IF NOT EXISTS measurement_item_master (
+    measurement_item_id     INT          NOT NULL AUTO_INCREMENT,
+    measurement_item_name   VARCHAR(50)  NOT NULL,
+    silver_data_column_name VARCHAR(50)  NOT NULL,
+    display_name            VARCHAR(50)  NOT NULL,
+    unit_name               VARCHAR(10)  NOT NULL,
+    create_date             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator                 INT          NOT NULL,
+    update_date             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier                INT          NOT NULL,
+    delete_flag             BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (measurement_item_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -222,24 +225,27 @@ CREATE TABLE IF NOT EXISTS user_master (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 10. デバイス在庫情報マスタ
-CREATE TABLE IF NOT EXISTS device_stock_info_master (
-    device_stock_id                INT          NOT NULL,
-    stock_status_id                INT          NOT NULL,
-    purchase_date                  DATETIME     NOT NULL,
-    estimated_ship_date            DATETIME     NULL,
-    ship_date                      DATETIME     NULL,
-    manufacturer_warranty_end_date DATETIME     NOT NULL,
-    vendor_warranty_end_date       DATETIME     NOT NULL,
-    stock_location                 VARCHAR(100) NOT NULL,
-    create_date                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    creator                        INT          NOT NULL,
-    update_date                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    modifier                       INT          NOT NULL,
-    delete_flag                    BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (device_stock_id),
-    INDEX IX_device_stock_status_id (stock_status_id),
-    CONSTRAINT FK_device_stock_status FOREIGN KEY (stock_status_id)
-        REFERENCES stock_status_master (stock_status_id)
+CREATE TABLE IF NOT EXISTS device_inventory_master (
+    device_inventory_id             INT          NOT NULL AUTO_INCREMENT,
+    device_inventory_uuid           VARCHAR(36)  NOT NULL,
+    inventory_status_id             INT          NOT NULL,
+    device_model                    VARCHAR(100) NOT NULL,
+    mac_address                     VARCHAR(17)  NOT NULL,
+    purchase_date                   DATETIME     NOT NULL,
+    estimated_ship_date             DATETIME     NULL,
+    ship_date                       DATETIME     NULL,
+    manufacturer_warranty_end_date  DATETIME     NOT NULL,
+    inventory_location              VARCHAR(100) NOT NULL,
+    create_date                     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator                         INT          NOT NULL,
+    update_date                     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier                        INT          NOT NULL,
+    delete_flag                     BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (device_inventory_id),
+    UNIQUE INDEX UX_device_inventory_uuid (device_inventory_uuid),
+    INDEX IX_device_inventory_status_id (inventory_status_id),
+    CONSTRAINT FK_device_inventory_status FOREIGN KEY (inventory_status_id)
+        REFERENCES inventory_status_master (inventory_status_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 8. デバイスマスタ
@@ -250,7 +256,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     device_type_id              INT          NOT NULL,
     device_name                 VARCHAR(100) NOT NULL,
     device_model                VARCHAR(100) NOT NULL,
-    device_stock_id             INT          NOT NULL,
+    device_inventory_id         INT          NOT NULL,
     sim_id                      VARCHAR(100) NULL,
     mac_address                 VARCHAR(100) NULL,
     software_version            VARCHAR(100) NULL,
@@ -269,9 +275,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     CONSTRAINT FK_device_organization FOREIGN KEY (organization_id)
         REFERENCES organization_master (organization_id),
     CONSTRAINT FK_device_type FOREIGN KEY (device_type_id)
-        REFERENCES device_type_master (device_type_id),
-    CONSTRAINT FK_device_stock FOREIGN KEY (device_stock_id)
-        REFERENCES device_stock_info_master (device_stock_id)
+        REFERENCES device_type_master (device_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 12. アラート設定マスタ
@@ -400,6 +404,166 @@ CREATE TABLE IF NOT EXISTS master_list (
     PRIMARY KEY (master_id),
     CONSTRAINT FK_master_list_user_type FOREIGN KEY (user_type_id)
         REFERENCES user_type_master (user_type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ============================================================
+-- 顧客作成ダッシュボード
+-- ============================================================
+
+-- 32. ガジェット種別マスタ
+CREATE TABLE IF NOT EXISTS gadget_type_master (
+    gadget_type_id      INT           NOT NULL AUTO_INCREMENT,
+    gadget_type_name    VARCHAR(20)   NOT NULL,
+    data_source_type    INT           NOT NULL,
+    gadget_image_path   VARCHAR(100)  NOT NULL,
+    gadget_description  VARCHAR(500)  NOT NULL,
+    display_order       INT           NOT NULL,
+    create_date         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator             INT           NOT NULL,
+    update_date         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier            INT           NOT NULL,
+    delete_flag         BOOLEAN       NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (gadget_type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 29. ダッシュボードマスタ
+CREATE TABLE IF NOT EXISTS dashboard_master (
+    dashboard_id    INT          NOT NULL AUTO_INCREMENT,
+    dashboard_uuid  VARCHAR(36)  NOT NULL,
+    dashboard_name  VARCHAR(50)  NOT NULL,
+    organization_id INT          NOT NULL,
+    create_date     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator         INT          NOT NULL,
+    update_date     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier        INT          NOT NULL,
+    delete_flag     BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (dashboard_id),
+    CONSTRAINT FK_dashboard_organization FOREIGN KEY (organization_id)
+        REFERENCES organization_master (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 30. ダッシュボードグループマスタ
+CREATE TABLE IF NOT EXISTS dashboard_group_master (
+    dashboard_group_id   INT          NOT NULL AUTO_INCREMENT,
+    dashboard_group_uuid VARCHAR(36)  NOT NULL,
+    dashboard_group_name VARCHAR(50)  NOT NULL,
+    dashboard_id         INT          NOT NULL,
+    display_order        INT          NOT NULL,
+    create_date          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator              INT          NOT NULL,
+    update_date          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier             INT          NOT NULL,
+    delete_flag          BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (dashboard_group_id),
+    CONSTRAINT FK_dashboard_group_dashboard FOREIGN KEY (dashboard_id)
+        REFERENCES dashboard_master (dashboard_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 31. ダッシュボードガジェットマスタ
+CREATE TABLE IF NOT EXISTS dashboard_gadget_master (
+    gadget_id           INT          NOT NULL AUTO_INCREMENT,
+    gadget_uuid         VARCHAR(36)  NOT NULL,
+    gadget_name         VARCHAR(20)  NOT NULL,
+    dashboard_group_id  INT          NOT NULL,
+    gadget_type_id      INT          NOT NULL,
+    chart_config        JSON         NOT NULL,
+    data_source_config  JSON         NOT NULL,
+    position_x          INT          NOT NULL,
+    position_y          INT          NOT NULL,
+    gadget_size         INT          NOT NULL,
+    display_order       INT          NOT NULL,
+    create_date         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator             INT          NOT NULL,
+    update_date         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier            INT          NOT NULL,
+    delete_flag         BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (gadget_id),
+    CONSTRAINT FK_gadget_group FOREIGN KEY (dashboard_group_id)
+        REFERENCES dashboard_group_master (dashboard_group_id),
+    CONSTRAINT FK_gadget_type FOREIGN KEY (gadget_type_id)
+        REFERENCES gadget_type_master (gadget_type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 33. ダッシュボードユーザー設定
+CREATE TABLE IF NOT EXISTS dashboard_user_setting (
+    user_id         INT      NOT NULL,
+    dashboard_id    INT      NOT NULL,
+    organization_id INT      NOT NULL,
+    device_id       INT      NOT NULL,
+    create_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator         INT      NOT NULL,
+    update_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier        INT      NOT NULL,
+    delete_flag     BOOLEAN  NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (user_id),
+    CONSTRAINT FK_dashboard_user_setting_user FOREIGN KEY (user_id)
+        REFERENCES user_master (user_id),
+    CONSTRAINT FK_dashboard_user_setting_dashboard FOREIGN KEY (dashboard_id)
+        REFERENCES dashboard_master (dashboard_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 34. サマリー計算手法マスタ
+CREATE TABLE IF NOT EXISTS gold_summary_method_master (
+    summary_method_id   INT          NOT NULL AUTO_INCREMENT,
+    summary_method_code VARCHAR(20)  NOT NULL,
+    summary_method_name VARCHAR(30)  NOT NULL,
+    create_date         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator             INT          NOT NULL,
+    update_date         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    modifier            INT          NOT NULL,
+    delete_flag         BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (summary_method_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ============================================================
+-- 通知・アラート処理
+-- ============================================================
+
+-- 23. メール通知キュー
+CREATE TABLE IF NOT EXISTS email_notification_queue (
+    queue_id          BIGINT         NOT NULL AUTO_INCREMENT,
+    device_id         INT            NOT NULL,
+    organization_id   INT            NOT NULL,
+    alert_id          INT            NOT NULL,
+    recipient_email   VARCHAR(2000)  NOT NULL,
+    subject           VARCHAR(500)   NOT NULL,
+    body              VARCHAR(2000)  NOT NULL,
+    alert_detail_json JSON           NOT NULL,
+    status            VARCHAR(20)    NOT NULL,
+    retry_count       INT            NOT NULL,
+    error_message     JSON           NULL,
+    event_timestamp   TIMESTAMP      NOT NULL,
+    queued_time       TIMESTAMP      NOT NULL,
+    processed_time    TIMESTAMP      NULL,
+    create_time       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (queue_id),
+    CONSTRAINT FK_email_queue_device FOREIGN KEY (device_id)
+        REFERENCES device_master (device_id),
+    CONSTRAINT FK_email_queue_organization FOREIGN KEY (organization_id)
+        REFERENCES organization_master (organization_id),
+    CONSTRAINT FK_email_queue_alert FOREIGN KEY (alert_id)
+        REFERENCES alert_setting_master (alert_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 24. アラート異常状態
+CREATE TABLE IF NOT EXISTS alert_abnomal_state (
+    device_id           INT       NOT NULL,
+    alert_id            INT       NOT NULL,
+    abnormal_start_time TIMESTAMP NULL,
+    last_event_time     TIMESTAMP NOT NULL,
+    last_sensor_value   DOUBLE    NULL,
+    alert_fired_time    TIMESTAMP NULL,
+    alert_history_id    INT       NULL,
+    create_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_id, alert_id),
+    CONSTRAINT FK_alert_abnormal_device FOREIGN KEY (device_id)
+        REFERENCES device_master (device_id),
+    CONSTRAINT FK_alert_abnormal_alert FOREIGN KEY (alert_id)
+        REFERENCES alert_setting_master (alert_id),
+    CONSTRAINT FK_alert_abnormal_history FOREIGN KEY (alert_history_id)
+        REFERENCES alert_history (alert_history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
