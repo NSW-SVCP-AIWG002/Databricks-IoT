@@ -3,7 +3,7 @@ import pytest
 
 os.environ["FLASK_ENV"] = "testing"
 
-from src import create_app, db as _db
+from iot_app import create_app, db as _db
 
 
 @pytest.fixture(scope="session")
@@ -12,6 +12,11 @@ def app():
     app = create_app()
 
     with app.app_context():
+        # 遅延インポートのモデルを create_all() 前に明示的にインポート
+        import iot_app.models.customer_dashboard  # noqa: F401
+        import iot_app.models.measurement  # noqa: F401
+        import iot_app.models.organization  # noqa: F401
+        import iot_app.models.device  # noqa: F401
         _db.create_all()
         yield app
         _db.drop_all()
