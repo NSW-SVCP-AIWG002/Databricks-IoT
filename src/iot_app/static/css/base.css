@@ -1,0 +1,7 @@
+/* ===== 基本スタイル ===== */
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+}
