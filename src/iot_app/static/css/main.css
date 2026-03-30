@@ -15,4 +15,5 @@
 @import url('./components/spinner.css');
 @import url('./components/sidebar.css');
 @import url('./components/customer_dashboard/common.css');
+@import url('./components/customer_dashboard/bar_chart.css');
 @import url('./components/error.css');

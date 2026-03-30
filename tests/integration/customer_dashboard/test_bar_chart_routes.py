@@ -4,8 +4,8 @@
 対象エンドポイント:
   GET  /analysis/customer-dashboard
   POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
-  GET  /analysis/customer-dashboard/gadgets/bar-chart/create
-  POST /analysis/customer-dashboard/gadgets/bar-chart/register
+  GET  /analysis/customer-dashboard/gadgets/棒グラフ/create
+  POST /analysis/customer-dashboard/gadgets/棒グラフ/register
   GET  /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
 
 参照設計書:
@@ -273,7 +273,7 @@ class TestGadgetBarChartData:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. ガジェット登録モーダル表示
-# GET /analysis/customer-dashboard/gadgets/bar-chart/create
+# GET /analysis/customer-dashboard/gadgets/棒グラフ/create
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -283,7 +283,7 @@ class TestGadgetBarChartCreate:
     観点: 2.1.3 登録画面表示、2.2 エラー時遷移
     """
 
-    _URL = f"{BASE_URL}/gadgets/bar-chart/create"
+    _URL = f"{BASE_URL}/gadgets/棒グラフ/create"
 
     def test_create_modal_returns_200(
         self, client, auth_user_id, dashboard_user_setting, dashboard_master, dashboard_group_master
@@ -358,10 +358,45 @@ class TestGadgetBarChartCreate:
         assert label is not None
         assert '外気温度' in label.get_text()
 
+    def test_create_modal_lists_groups(
+        self, client, auth_user_id, dashboard_user_setting, dashboard_master, dashboard_group_master,
+    ):
+        """2.1.3: dashboard_group_master のグループ名が group_id セレクトの option として描画される"""
+        # Arrange: dashboard_group_master フィクスチャで 'テストグループ' を登録済み
+
+        # Act
+        response = client.get(self._URL)
+        soup = _soup(response)
+
+        # Assert
+        select = soup.find('select', {'name': 'group_id'})
+        assert select is not None
+        option_texts = [opt.get_text(strip=True) for opt in select.find_all('option')]
+        assert 'テストグループ' in option_texts
+
+    def test_create_modal_lists_summary_methods(
+        self, client, auth_user_id, dashboard_user_setting, dashboard_master, dashboard_group_master,
+        gold_summary_method_master,
+    ):
+        """2.1.3: gold_summary_method_master の集約方法名が summary_method_id セレクトの option として描画される"""
+        # Arrange: gold_summary_method_master フィクスチャで AVG/MAX/MIN を登録済み
+
+        # Act
+        response = client.get(self._URL)
+        soup = _soup(response)
+
+        # Assert
+        select = soup.find('select', {'name': 'summary_method_id'})
+        assert select is not None
+        option_texts = [opt.get_text(strip=True) for opt in select.find_all('option')]
+        assert '平均' in option_texts
+        assert '最大' in option_texts
+        assert '最小' in option_texts
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. ガジェット登録実行
-# POST /analysis/customer-dashboard/gadgets/bar-chart/register
+# POST /analysis/customer-dashboard/gadgets/棒グラフ/register
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -371,7 +406,7 @@ class TestGadgetBarChartRegister:
     観点: 3.1 必須チェック、3.2 文字列長チェック、3.8 相関チェック、4.3 登録、2.3 リダイレクト
     """
 
-    _URL = f"{BASE_URL}/gadgets/bar-chart/register"
+    _URL = f"{BASE_URL}/gadgets/棒グラフ/register"
 
     _SKIP_GADGET_TYPE = frozenset({
         'test_register_without_gadget_type_master_returns_error',
@@ -387,7 +422,7 @@ class TestGadgetBarChartRegister:
         if request.node.name in self._SKIP_GADGET_TYPE:
             return
         from iot_app.models.customer_dashboard import GadgetTypeMaster
-        gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', delete_flag=False)
+        gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', data_source_type=1, gadget_image_path='images/gadgets/bar_chart.png', gadget_description='棒グラフガジェット', display_order=1, creator=1, modifier=1, delete_flag=False)
         db_session.add(gt)
         db_session.flush()
 
@@ -468,7 +503,7 @@ class TestGadgetBarChartRegister:
             gadget = db.session.query(DashboardGadgetMaster).first()
         assert gadget.gadget_size == '2x4'
 
-    def test_register_title_required_returns_422(self, client, measurement_item):
+    def test_register_title_required_returns_400(self, client, measurement_item):
         """3.1.1: タイトル未入力で400（バリデーションエラー）"""
         # Act
         response = client.post(self._URL, data=self._valid_form(title=''))
@@ -484,7 +519,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 302
 
-    def test_register_title_21_chars_returns_422(self, client, measurement_item):
+    def test_register_title_21_chars_returns_400(self, client, measurement_item):
         """3.2.2: タイトル21文字以上で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(title='あ' * 21))
@@ -500,7 +535,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 404
 
-    def test_register_group_required_returns_422(self, client, measurement_item):
+    def test_register_group_required_returns_400(self, client, measurement_item):
         """3.1.3: グループ未選択（0）で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(group_id='0'))
@@ -508,7 +543,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 400
 
-    def test_register_summary_method_required_returns_422(self, client, measurement_item):
+    def test_register_summary_method_required_returns_400(self, client, measurement_item):
         """3.1.4: 集約方法未選択（0）で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(summary_method_id='0'))
@@ -516,7 +551,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 400
 
-    def test_register_measurement_item_required_returns_422(self, client, measurement_item):
+    def test_register_measurement_item_required_returns_400(self, client, measurement_item):
         """3.1.5: 表示項目未選択（0）で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(measurement_item_id='0'))
@@ -524,7 +559,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 400
 
-    def test_register_gadget_size_required_returns_422(self, client, measurement_item):
+    def test_register_gadget_size_required_returns_400(self, client, measurement_item):
         """3.1.6: 部品サイズ未選択で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(gadget_size=''))
@@ -532,7 +567,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 400
 
-    def test_register_min_greater_than_max_returns_422(self, client, measurement_item):
+    def test_register_min_greater_than_max_returns_400(self, client, measurement_item):
         """3.8.1: 最小値 > 最大値で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(min_value='10.0', max_value='5.0'))
@@ -540,7 +575,7 @@ class TestGadgetBarChartRegister:
         # Assert
         assert response.status_code == 400
 
-    def test_register_min_equals_max_returns_422(self, client, measurement_item):
+    def test_register_min_equals_max_returns_400(self, client, measurement_item):
         """3.8.2: 最小値 = 最大値で400"""
         # Act
         response = client.post(self._URL, data=self._valid_form(min_value='5.0', max_value='5.0'))
@@ -1164,11 +1199,11 @@ class TestHtmlRendering:
         # Assert
         assert soup.find(class_='customer-dashboard__empty') is None
 
-    def test_register_422_re_renders_modal_with_form(self, client, measurement_item):
+    def test_register_400_re_renders_modal_with_form(self, client, measurement_item):
         """バリデーションエラー時（400）に登録モーダルが再描画され、フォームが含まれる"""
         # Act: タイトル空で送信 → 400
         response = client.post(
-            f"{BASE_URL}/gadgets/bar-chart/register",
+            f"{BASE_URL}/gadgets/棒グラフ/register",
             data={
                 'title': '',
                 'device_mode': 'variable',
@@ -1197,7 +1232,7 @@ class TestSecurity:
     観点: 9.1 SQLインジェクション、9.2 XSS、9.3 CSRF対策
     """
 
-    _REGISTER_URL = f"{BASE_URL}/gadgets/bar-chart/register"
+    _REGISTER_URL = f"{BASE_URL}/gadgets/棒グラフ/register"
 
     def _valid_form(self, **overrides):
         data = {
@@ -1243,7 +1278,7 @@ class TestSecurity:
 
     def test_sql_injection_basic_in_title(self, client):
         """9.1.1: タイトルに基本的なSQLインジェクション（' OR '1'='1）を入力してもサーバーがクラッシュしない"""
-        # Act: SQLAlchemy ORM がパラメータをエスケープするため 302 または 422 を返す
+        # Act: SQLAlchemy ORM がパラメータをエスケープするため 302 または 400 を返す
         response = client.post(
             self._REGISTER_URL,
             data=self._valid_form(title="' OR '1'='1"),
@@ -1375,7 +1410,7 @@ class TestTransaction:
     観点: 7.2.1 UNIQUE制約違反、7.2.3/7.2.4 コミット失敗→ロールバック
     """
 
-    _REGISTER_URL = f"{BASE_URL}/gadgets/bar-chart/register"
+    _REGISTER_URL = f"{BASE_URL}/gadgets/棒グラフ/register"
 
     def _valid_form(self, **overrides):
         data = {
@@ -1552,7 +1587,7 @@ class TestLogging:
         import logging
         with caplog.at_level(logging.INFO):
             client.post(
-                f"{BASE_URL}/gadgets/bar-chart/register",
+                f"{BASE_URL}/gadgets/棒グラフ/register",
                 data={
                     "title": "SQLログテスト",
                     "device_mode": "variable",
@@ -1658,7 +1693,7 @@ class TestLogging:
 
         with caplog.at_level(logging.ERROR, logger="iot_app.services.customer_dashboard.bar_chart"):
             client.post(
-                f"{BASE_URL}/gadgets/bar-chart/register",
+                f"{BASE_URL}/gadgets/棒グラフ/register",
                 data={
                     "title": "ログテスト",
                     "device_mode": "variable",
@@ -1742,7 +1777,7 @@ class TestGadgetBarChartDataVariableMode:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 新テスト: Route 3 - dashboard_user_setting → dashboard_master フロー
-# GET /analysis/customer-dashboard/gadgets/bar-chart/create
+# GET /analysis/customer-dashboard/gadgets/棒グラフ/create
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -1752,7 +1787,7 @@ class TestGadgetBarChartCreateNewFlow:
     観点: current_user_id=None→404、user_setting無し→404、dashboard無し→404、正常表示→200
     """
 
-    _URL = f"{BASE_URL}/gadgets/bar-chart/create"
+    _URL = f"{BASE_URL}/gadgets/棒グラフ/create"
 
     def test_create_no_user_setting_returns_404(self, client, auth_user_id, dashboard_master):
         """user_setting が存在しない場合 404"""
@@ -1799,14 +1834,14 @@ class TestGadgetBarChartCreateNewFlow:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 新テスト: Route 4 - リダイレクト先に ?registered=1 付与
-# POST /analysis/customer-dashboard/gadgets/bar-chart/register
+# POST /analysis/customer-dashboard/gadgets/棒グラフ/register
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
 class TestGadgetBarChartRegisterRedirect:
     """棒グラフガジェット 登録後リダイレクト URL 検証"""
 
-    _URL = f"{BASE_URL}/gadgets/bar-chart/register"
+    _URL = f"{BASE_URL}/gadgets/棒グラフ/register"
 
     def _valid_form(self, **overrides):
         data = {
@@ -1824,7 +1859,7 @@ class TestGadgetBarChartRegisterRedirect:
     @pytest.fixture(autouse=True)
     def _require_gadget_type(self, db_session):
         from iot_app.models.customer_dashboard import GadgetTypeMaster
-        gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', delete_flag=False)
+        gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', data_source_type=1, gadget_image_path='images/gadgets/bar_chart.png', gadget_description='棒グラフガジェット', display_order=1, creator=1, modifier=1, delete_flag=False)
         db_session.add(gt)
         db_session.flush()
 

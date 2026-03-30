@@ -168,3 +168,8 @@
   font-size: var(--font-size-sm);
   margin-top: var(--spacing-2);
 }
+
+/* 幅広モーダル（3カラムレイアウト等、標準幅では収まらないガジェット登録フォーム用） */
+.modal:has(.modal-content--lg) {
+  max-width: min(900px, 90vw);
+}
