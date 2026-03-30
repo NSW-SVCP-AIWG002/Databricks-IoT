@@ -664,13 +664,13 @@
 
 **概要**: デバイスの接続状態を保持するテーブル
 
-| #   | カラム物理名       | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
-| --- | ------------------ | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
-| 1   | device_id          | デバイスID   | VARCHAR(100) | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
-| 2   | last_received_time | 最終受信時刻 | TIMESTAMP    | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 |
-| 3   | delete_flag        | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
-| 4   | create_date        | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
-| 5   | update_date        | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
+| #   | カラム物理名       | カラム論理名 | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
+| --- | ------------------ | ------------ | --------- | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
+| 1   | device_id          | デバイスID   | INT       | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
+| 2   | last_received_time | 最終受信時刻 | TIMESTAMP | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 |
+| 3   | delete_flag        | 削除フラグ   | BOOLEAN   | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
+| 4   | create_date        | 作成日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
+| 5   | update_date        | 更新日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
 
 **外部キー:**
 - `device_id` → `device_master.device_id`
