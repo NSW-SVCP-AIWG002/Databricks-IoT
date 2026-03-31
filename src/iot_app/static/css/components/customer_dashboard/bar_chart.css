@@ -237,16 +237,6 @@
    棒グラフガジェット登録モーダル
    ============================================================ */
 
-.gadget-register__title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  margin-bottom: var(--spacing-4);
-}
-
-.gadget-register__title-row .form__input {
-  flex: 0 0 200px;
-}
 
 .gadget-register__top-row {
   display: grid;

@@ -4,8 +4,8 @@
 対象エンドポイント:
   GET  /analysis/customer-dashboard
   POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
-  GET  /analysis/customer-dashboard/gadgets/棒グラフ/create
-  POST /analysis/customer-dashboard/gadgets/棒グラフ/register
+  GET  /analysis/customer-dashboard/gadgets/bar-chart/create
+  POST /analysis/customer-dashboard/gadgets/bar-chart/register
   GET  /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
 
 参照設計書:
@@ -261,7 +261,7 @@ class TestGadgetBarChartData:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. ガジェット登録モーダル表示
-# GET /analysis/customer-dashboard/gadgets/棒グラフ/create
+# GET /analysis/customer-dashboard/gadgets/bar-chart/create
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -271,7 +271,7 @@ class TestGadgetBarChartCreate:
     観点: 2.1.3 登録画面表示、2.2 エラー時遷移
     """
 
-    _URL = f"{BASE_URL}/gadgets/棒グラフ/create"
+    _URL = f"{BASE_URL}/gadgets/bar-chart/create"
 
     def test_create_modal_returns_200(
         self, client, auth_user_id, dashboard_user_setting, dashboard_master, dashboard_group_master
@@ -384,7 +384,7 @@ class TestGadgetBarChartCreate:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. ガジェット登録実行
-# POST /analysis/customer-dashboard/gadgets/棒グラフ/register
+# POST /analysis/customer-dashboard/gadgets/bar-chart/register
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -394,7 +394,7 @@ class TestGadgetBarChartRegister:
     観点: 3.1 必須チェック、3.2 文字列長チェック、3.8 相関チェック、4.3 登録、2.3 リダイレクト
     """
 
-    _URL = f"{BASE_URL}/gadgets/棒グラフ/register"
+    _URL = f"{BASE_URL}/gadgets/bar-chart/register"
 
     _SKIP_GADGET_TYPE = frozenset({
         'test_register_without_gadget_type_master_returns_error',
@@ -516,12 +516,12 @@ class TestGadgetBarChartRegister:
         assert response.status_code == 400
 
     def test_register_device_id_required_in_fixed_mode(self, client, measurement_item):
-        """3.1.2: device_mode=fixed でデバイスID未指定（0）は404（ビュー層でデバイス不在チェック）"""
+        """3.1.2: device_mode=fixed でデバイスID未指定（0）は400（バリデーションエラー）"""
         # Act
         response = client.post(self._URL, data=self._valid_form(device_mode='fixed', device_id='0'))
 
         # Assert
-        assert response.status_code == 404
+        assert response.status_code == 400
 
     def test_register_group_required_returns_400(self, client, measurement_item):
         """3.1.3: グループ未選択（0）で400"""
@@ -909,7 +909,7 @@ class TestGadgetBarChartRegister:
         """バリデーションエラー時（400）に登録モーダルが再描画され、フォームが含まれる"""
         # Act: タイトル空で送信 → 400
         response = client.post(
-            f"{BASE_URL}/gadgets/棒グラフ/register",
+            f"{BASE_URL}/gadgets/bar-chart/register",
             data={
                 'title': '',
                 'device_mode': 'variable',
@@ -1154,7 +1154,7 @@ class TestSecurity:
     def _require_auth_scope(self, auth_scope, dashboard_master, dashboard_group_master, gadget_type):
         """全テストで認証ユーザー＋アクセス可能スコープ＋ガジェット関連マスタを事前登録する"""
 
-    _REGISTER_URL = f"{BASE_URL}/gadgets/棒グラフ/register"
+    _REGISTER_URL = f"{BASE_URL}/gadgets/bar-chart/register"
 
     def _valid_form(self, **overrides):
         data = {
@@ -1332,7 +1332,7 @@ class TestTransaction:
     観点: 7.2.1 UNIQUE制約違反、7.2.3/7.2.4 コミット失敗→ロールバック
     """
 
-    _REGISTER_URL = f"{BASE_URL}/gadgets/棒グラフ/register"
+    _REGISTER_URL = f"{BASE_URL}/gadgets/bar-chart/register"
 
     def _valid_form(self, **overrides):
         data = {
@@ -1474,7 +1474,7 @@ class TestLogging:
         import logging
         with caplog.at_level(logging.INFO):
             client.post(
-                f"{BASE_URL}/gadgets/棒グラフ/register",
+                f"{BASE_URL}/gadgets/bar-chart/register",
                 data={
                     "title": "SQLログテスト",
                     "device_mode": "variable",
@@ -1580,7 +1580,7 @@ class TestLogging:
 
         with caplog.at_level(logging.ERROR, logger="iot_app.services.customer_dashboard.bar_chart"):
             client.post(
-                f"{BASE_URL}/gadgets/棒グラフ/register",
+                f"{BASE_URL}/gadgets/bar-chart/register",
                 data={
                     "title": "ログテスト",
                     "device_mode": "variable",
@@ -1668,7 +1668,7 @@ class TestGadgetBarChartDataVariableMode:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 新テスト: Route 3 - dashboard_user_setting → dashboard_master フロー
-# GET /analysis/customer-dashboard/gadgets/棒グラフ/create
+# GET /analysis/customer-dashboard/gadgets/bar-chart/create
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -1678,7 +1678,7 @@ class TestGadgetBarChartCreateNewFlow:
     観点: current_user_id=None→404、user_setting無し→404、dashboard無し→404、正常表示→200
     """
 
-    _URL = f"{BASE_URL}/gadgets/棒グラフ/create"
+    _URL = f"{BASE_URL}/gadgets/bar-chart/create"
 
     def test_create_no_user_setting_returns_404(self, client, auth_user_id, dashboard_master):
         """user_setting が存在しない場合 404"""
@@ -1739,14 +1739,14 @@ class TestGadgetBarChartCreateNewFlow:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 新テスト: Route 4 - リダイレクト先に ?registered=1 付与
-# POST /analysis/customer-dashboard/gadgets/棒グラフ/register
+# POST /analysis/customer-dashboard/gadgets/bar-chart/register
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
 class TestGadgetBarChartRegisterRedirect:
     """棒グラフガジェット 登録後リダイレクト URL 検証"""
 
-    _URL = f"{BASE_URL}/gadgets/棒グラフ/register"
+    _URL = f"{BASE_URL}/gadgets/bar-chart/register"
 
     def _valid_form(self, **overrides):
         data = {
