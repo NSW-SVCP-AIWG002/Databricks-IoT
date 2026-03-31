@@ -25,6 +25,13 @@ class BarChartGadgetForm(FlaskForm):
     min_value = FloatField('最小値', validators=[Optional()])
     max_value = FloatField('最大値', validators=[Optional()])
 
+    def validate(self, extra_validators=None):
+        result = super().validate(extra_validators)
+        if self.device_mode.data == 'fixed' and (self.device_id.data is None or self.device_id.data == 0):
+            self.device_id.errors.append('デバイスを選択してください')
+            result = False
+        return result
+
     def validate_min_value(self, field):
         from wtforms import ValidationError as WTFormsValidationError
         if field.data is not None and self.max_value.data is not None:

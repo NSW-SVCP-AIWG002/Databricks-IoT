@@ -16,7 +16,7 @@
   <div class="modal__body">
 
     <!-- (1) タイトル -->
-    <div class="gadget-register__title-row">
+    <div class="form__group">
       <label class="form__label form__label--required" for="title">タイトル</label>
       {{ form.title(class="form__input", id="title", value="棒グラフ", maxlength=20) }}
       {% if form.title.errors %}

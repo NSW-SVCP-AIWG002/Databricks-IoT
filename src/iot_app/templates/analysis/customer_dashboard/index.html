@@ -219,8 +219,8 @@
                   data-position-x="{{ gadget.position_x }}"
                   data-position-y="{{ gadget.position_y }}"
                   data-display-order="{{ gadget.display_order }}"
-                  data-chart-config="{{ gadget.chart_config | tojson | e }}"
-                  data-datasource-config="{{ gadget.data_source_config | tojson | e }}"
+                  data-chart-config='{{ gadget.chart_config | tojson }}'
+                  data-datasource-config='{{ gadget.data_source_config | tojson }}'
                   data-data-url="{{ url_for('customer_dashboard.gadget_data', gadget_uuid=gadget.gadget_uuid) }}"
                 >
                   {# ガジェットヘッダー #}

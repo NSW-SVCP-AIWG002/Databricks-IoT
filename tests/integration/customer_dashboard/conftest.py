@@ -113,7 +113,6 @@ def auth_user_id(app):
 
     def _inject():
         from flask import g
-        g.current_user_id = 1
         g.current_user = SimpleNamespace(user_id=1)
 
     app.before_request_funcs.setdefault(None, []).append(_inject)

@@ -113,11 +113,12 @@ class TestHandle4xx:
 
         with app.test_request_context("/"):
             with patch("iot_app.common.error_handlers.logger") as mock_logger:
-                handle_4xx(error)
+                with patch("iot_app.common.error_handlers.render_template", return_value=""):
+                    handle_4xx(error)
 
-                mock_logger.warning.assert_called_once()
-                _, kwargs = mock_logger.warning.call_args
-                assert kwargs.get("extra", {}).get("httpStatus") == 404
+                    mock_logger.warning.assert_called_once()
+                    _, kwargs = mock_logger.warning.call_args
+                    assert kwargs.get("extra", {}).get("httpStatus") == 404
 
     @pytest.mark.parametrize("error", [
         BadRequest(),
@@ -128,7 +129,8 @@ class TestHandle4xx:
         """handle_4xx() が渡されたエラーのステータスコードをそのまま返す"""
         with app.test_request_context("/"):
             with patch("iot_app.common.error_handlers.logger"):
-                response, status_code = handle_4xx(error)
+                with patch("iot_app.common.error_handlers.render_template", return_value=""):
+                    response, status_code = handle_4xx(error)
 
-                assert status_code == error.code
-                assert response == ''
+                    assert status_code == error.code
+                    assert response == ''
