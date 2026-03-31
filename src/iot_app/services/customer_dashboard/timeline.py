@@ -404,12 +404,12 @@ def generate_timeline_csv(rows, left_column_name, right_column_name, left_label,
     output = io.StringIO()
     writer = csv.writer(output)
 
-    writer.writerow(['受信日時', 'デバイス名', left_label, right_label])
+    writer.writerow(['デバイス名', '時刻', left_label, right_label])
 
     for row in rows:
         writer.writerow([
-            row['event_timestamp'].strftime(_DATETIME_FORMAT),
             row['device_name'],
+            row['event_timestamp'].strftime(_DATETIME_FORMAT),
             row[left_column_name],
             row[right_column_name],
         ])
