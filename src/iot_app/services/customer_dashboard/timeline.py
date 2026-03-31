@@ -211,18 +211,24 @@ def execute_silver_query(device_id, start_datetime, end_datetime, limit=100):
     import os
     if os.getenv('FLASK_ENV') == 'development':
         # 開発環境向けモック（Unity Catalog に疎通できる環境になったら削除）
-        from datetime import timedelta
+        from iot_app import db
+        from iot_app.models.measurement import MeasurementItemMaster
+        col_names = [r.silver_data_column_name for r in db.session.query(
+            MeasurementItemMaster.silver_data_column_name
+        ).filter_by(delete_flag=False).all()]
+
         rows = []
         t = start_datetime
         step = (end_datetime - start_datetime) / max(10, 1)
         for i in range(10):
-            rows.append({
+            row = {
                 'event_timestamp': t + step * i,
                 'device_id': device_id,
                 'device_name': 'モックデバイス',
-                'temperature': 20.0 + i,
-                'humidity': 50.0 + i,
-            })
+            }
+            for col in col_names:
+                row[col] = round(20.0 + i * 0.1, 2)
+            rows.append(row)
         return rows
 
     from iot_app.databricks.unity_catalog_connector import UnityCatalogConnector
