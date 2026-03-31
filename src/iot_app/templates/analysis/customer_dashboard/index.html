@@ -250,7 +250,7 @@
 
                   {# データソース・CSVエクスポート行 #}
                   <div class="gadget__subheader">
-                    <span class="gadget__datasource-name">--</span>
+                    <span class="gadget__datasource-name">{{ gadget_device_names.get(gadget.gadget_uuid, '--') }}</span>
                     <a
                       class="button button--primary gadget__csv-btn"
                       href="{{ url_for('customer_dashboard.gadget_csv_export', gadget_uuid=gadget.gadget_uuid) }}?export=csv"
