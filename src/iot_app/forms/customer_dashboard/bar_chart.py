@@ -25,14 +25,24 @@ class BarChartGadgetForm(FlaskForm):
     min_value = FloatField('最小値', validators=[Optional()])
     max_value = FloatField('最大値', validators=[Optional()])
 
+    def validate(self, extra_validators=None):
+        result = super().validate(extra_validators)
+        if self.device_mode.data == 'fixed' and (self.device_id.data is None or self.device_id.data == 0):
+            self.device_id.errors.append('デバイスを選択してください')
+            result = False
+        return result
+
     def validate_min_value(self, field):
         from wtforms import ValidationError as WTFormsValidationError
         if field.data is not None and self.max_value.data is not None:
             if field.data >= self.max_value.data:
-                raise WTFormsValidationError(
-                    '最小値は最大値より小さい値を入力してください。'
-                    '最大値は最小値より大きい値を入力してください'
-                )
+                raise WTFormsValidationError('最小値は最大値より小さい値を入力してください')
+
+    def validate_max_value(self, field):
+        from wtforms import ValidationError as WTFormsValidationError
+        if field.data is not None and self.min_value.data is not None:
+            if field.data <= self.min_value.data:
+                raise WTFormsValidationError('最大値は最小値より大きい値を入力してください')
 
     gadget_size = SelectField(
         '部品サイズ',

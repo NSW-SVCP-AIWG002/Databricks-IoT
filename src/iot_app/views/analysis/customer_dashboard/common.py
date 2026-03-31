@@ -24,6 +24,7 @@ from iot_app.services.customer_dashboard.common import (
     get_dashboards,
     get_devices,
     get_devices_by_organization,
+    get_fixed_gadget_device_names,
     get_first_dashboard,
     get_gadget_type,
     get_gadget_type_id_by_name,
@@ -100,6 +101,8 @@ def customer_dashboard():
     if user_setting and user_setting.organization_id is not None:
         devices = get_devices(user_setting.organization_id)
 
+    gadget_device_names = get_fixed_gadget_device_names(gadgets)
+
     return render_template(
         'analysis/customer_dashboard/index.html',
         dashboards=dashboards,
@@ -110,6 +113,7 @@ def customer_dashboard():
         organizations=organizations,
         devices=devices,
         user_setting=user_setting,
+        gadget_device_names=gadget_device_names,
     )
 
 
