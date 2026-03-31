@@ -172,7 +172,7 @@ flowchart TD
     ClearCookie --> InitParams[検索条件を初期化<br>page=1, sort_by=user_id, order=asc]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
 
-    InitParams --> Scope[データスコープ制限適用<br>organization_closureテーブルから下位組織IDリスト取得]
+    InitParams --> Scope[データスコープ制限適用<br>v_user_master_by_userにuser_idを渡して絞り込み]
     OverridePage --> Scope
 
     Scope --> Count[検索結果件数取得DBクエリ実行]
@@ -231,11 +231,8 @@ def users_list():
         search_params['page'] = request.args.get('page', 1, type=int)
         save_cookie = False
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # DB検索実行
-    users, total = search_users(search_params, accessible_org_ids)
+    # DB検索実行（v_user_master_by_userにuser_idを渡してスコープ制限適用）
+    users, total = search_users(search_params, g.current_user.user_id)
 
     # レンダリング
     response = make_response(render_template(
@@ -322,48 +319,15 @@ per_page = ITEM_PER_PAGE  # 設定ファイルから取得
 
 **③ データスコープ制限の適用**
 
-組織階層に基づいてデータスコープ制限を適用します。
+`v_user_master_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
 
-**処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
-  - **ロールによる条件分岐は一切行わない**
-
-**注**: システム保守者・管理者が全データにアクセスできるのは、
-ルート組織に所属しているため
-
-**変数・パラメータ:**
-- `accessible_org_ids`: list - アクセス可能な組織IDリスト
-
-**実装例:**
-```python
-def apply_data_scope_filter(query, current_user):
-    # organization_closure テーブルから下位組織リストを取得（全ユーザー共通）
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
-
-    # 下位組織IDのリストを抽出
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        # アクセス可能な組織がない場合は空の結果を返す
-        # （通常は発生しない - 最低でも自組織は含まれる）
-        return query.filter(User.organization_id.in_([]))
-
-    # 組織IDリストでフィルタリング
-    return query.filter(User.organization_id.in_(org_ids))
-```
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
 
 **④ データベースクエリ実行**
 
 ユーザーマスタからデータを取得します。
 
-**使用テーブル:** user_master（ユーザーマスタ）、user_type_masterユーザー種別マスタ、organization_master（組織マスタ）、region_master（地域マスタ）
+**使用テーブル:** v_user_master_by_user（ユーザー一覧用VIEW）、user_type_master（ユーザー種別マスタ）、organization_master（組織マスタ）、region_master（地域マスタ）
 
 **SQL詳細:**
 TODO
@@ -372,10 +336,10 @@ TODO
 SELECT
   COUNT(user_id) AS data_count
 FROM
-  user_master
+  v_user_master_by_user
 WHERE
-  delete_flag = FALSE
-  AND organization_id IN (:accessible_org_ids)
+  login_user_id = :user_id
+  AND delete_flag = FALSE
 ```
 
 - 検索結果取得DBクエリ
@@ -389,7 +353,7 @@ SELECT
   r.region_name,
   u.status
 FROM
-  user_master u
+  v_user_master_by_user u
 LEFT JOIN organization_master o
   ON u.organization_id = o.organization_id
   AND o.delete_flag = FALSE
@@ -400,8 +364,8 @@ LEFT JOIN user_type_master t
   ON u.user_type_id = t.user_type_id
   AND t.delete_flag = FALSE
 WHERE
-  u.delete_flag = FALSE
-  AND organization_id IN (:accessible_org_ids)
+  u.login_user_id = :user_id
+  AND u.delete_flag = FALSE
 ORDER BY
   u.user_id ASC
 LIMIT :item_per_page OFFSET 0
@@ -411,17 +375,17 @@ LIMIT :item_per_page OFFSET 0
 ```python
 offset = (page - 1) * per_page
 
-# ベースクエリ
-query = User.query.filter_by(delete_flag=FALSE)
-
-# データスコープ制限適用
-query = apply_data_scope_filter(query, g.current_user)
+# ベースクエリ（v_user_master_by_userにlogin_user_idを渡してスコープ制限適用）
+query = UserMasterByUser.query.filter(
+    UserMasterByUser.login_user_id == g.current_user.user_id,
+    UserMasterByUser.delete_flag == False,
+)
 
 # ソート適用
 if order == 'asc':
-    query = query.order_by(getattr(User, sort_by).asc())
+    query = query.order_by(getattr(UserMasterByUser, sort_by).asc())
 else:
-    query = query.order_by(getattr(User, sort_by).desc())
+    query = query.order_by(getattr(UserMasterByUser, sort_by).desc())
 
 # ページング適用
 users = query.limit(per_page).offset(offset).all()
@@ -508,14 +472,14 @@ flowchart TD
 #### 処理詳細（サーバーサイド）
 
 **検索クエリ実行**
-**使用テーブル:** user_master（ユーザーマスタ）、user_type_masterユーザー種別マスタ、organization_master（組織マスタ）、region_master（地域マスタ）
+**使用テーブル:** v_user_master_by_user（ユーザー一覧用VIEW）、user_type_master（ユーザー種別マスタ）、organization_master（組織マスタ）、region_master（地域マスタ）
 
 - 検索結果件数取得DBクエリ
 ```sql
 SELECT
   COUNT(u.user_id) AS user_count
 FROM
-  user_master u
+  v_user_master_by_user u
 LEFT JOIN organization_master o
   ON u.organization_id = o.organization_id
   AND o.delete_flag = FALSE
@@ -526,8 +490,8 @@ LEFT JOIN user_type_master t
   ON u.user_type_id = t.user_type_id
   AND t.delete_flag = FALSE
 WHERE
-  u.delete_flag = FALSE
-  AND u.organization_id IN (:accessible_org_ids)
+  u.login_user_id = :user_id
+  AND u.delete_flag = FALSE
   AND CASE WHEN :user_name IS NULL THEN TRUE ELSE u.user_name LIKE CONCAT('%', :user_name, '%') END
   AND CASE WHEN :email_address IS NULL THEN TRUE ELSE u.email_address LIKE CONCAT('%', :email_address, '%') END
   AND CASE WHEN :user_type_id < 0 THEN TRUE ELSE u.user_type_id = :user_type_id END
@@ -548,7 +512,7 @@ SELECT
   r.region_name,
   u.status
 FROM
-  user_master u
+  v_user_master_by_user u
 LEFT JOIN organization_master o
   ON u.organization_id = o.organization_id
   AND o.delete_flag = FALSE
@@ -559,8 +523,8 @@ LEFT JOIN user_type_master t
   ON u.user_type_id = t.user_type_id
   AND t.delete_flag = FALSE
 WHERE
-  u.delete_flag = FALSE
-  AND u.organization_id IN (:accessible_org_ids)
+  u.login_user_id = :user_id
+  AND u.delete_flag = FALSE
   AND CASE WHEN :user_name IS NULL THEN TRUE ELSE u.user_name LIKE CONCAT('%', :user_name, '%') END
   AND CASE WHEN :email_address IS NULL THEN TRUE ELSE u.email_address LIKE CONCAT('%', :email_address, '%') END
   AND CASE WHEN :user_type_id < 0 THEN TRUE ELSE u.user_type_id = :user_type_id END
@@ -650,7 +614,7 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラー ※1]
 
-    CheckPerm -->|権限OK| GetOrg[データスコープ制限適用<br>組織マスタを取得<br>SELECT * FROM organization_master<br>WHERE organization_id IN accessible_org_ids]
+    CheckPerm -->|権限OK| GetOrg[データスコープ制限適用<br>組織マスタを取得<br>SELECT * FROM v_organization_master_by_user<br>WHERE user_id = :user_id]
     GetOrg --> CheckOrg{DBクエリ結果}
 
     CheckOrg -->|成功| GetUserType[ユーザー種別マスタを取得<br>SELECT * FROM user_type_master]
@@ -700,12 +664,10 @@ def create_user_form():
 
         # ② 組織マスタ一覧取得（データスコープ制限適用）
         logger.info('組織マスタ一覧取得開始')
-        organizations = db.session.query(Organization)\
-            .join(OrganizationClosure,
-                  Organization.organization_id == OrganizationClosure.subsidiary_organization_id)\
-            .filter(OrganizationClosure.parent_organization_id == current_user.organization_id)\
-            .filter(Organization.delete_flag == False)\
-            .order_by(Organization.organization_name)\
+        organizations = db.session.query(OrganizationMasterByUser)\
+            .filter(OrganizationMasterByUser.user_id == current_user.user_id)\
+            .filter(OrganizationMasterByUser.delete_flag == False)\
+            .order_by(OrganizationMasterByUser.organization_name)\
             .all()
         logger.info(f'組織マスタ一覧取得成功: count={len(organizations)}')
 
@@ -1196,19 +1158,15 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラー ※1]
 
-    CheckPerm -->|権限OK| LoadUser[ユーザー情報を取得<br>SELECT * FROM user_master<br>WHERE user_id = :user_id]
+    CheckPerm -->|権限OK| LoadUser[ユーザー情報を取得（スコープ制限適用）<br>SELECT * FROM v_user_master_by_user<br>WHERE login_user_id = :login_user_id<br>AND user_id = :user_id]
     LoadUser --> CheckDB1{DBクエリ結果}
 
-    CheckDB1 -->|成功| CheckData{データ存在?}
+    CheckDB1 -->|成功| CheckData{データ存在?<br>※スコープ外も存在なしと同等}
     CheckDB1 -->|失敗| Error500[500エラーページ表示]
 
     CheckData -->|なし| Error404[404エラー]
 
-    CheckData -->|あり| ScopeCheck[データスコープチェック]
-    ScopeCheck --> CheckScope{スコープOK?}
-    CheckScope -->|NG| Error404
-
-    CheckScope -->|OK| LoadOrg[組織マスタを取得<br>SELECT * FROM organization_master<br>データスコープ制限適用]
+    CheckData -->|あり| LoadOrg[組織マスタを取得<br>SELECT * FROM v_organization_master_by_user<br>WHERE user_id = :login_user_id]
     LoadOrg --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|成功| LoadUserType[ユーザー種別マスタを取得<br>SELECT * FROM user_type_master]
@@ -1262,12 +1220,10 @@ def edit_user_form(databricks_user_id):
 
         # ② ユーザー情報取得（データスコープ制限適用）
         logger.info('ユーザー情報取得開始')
-        user = db.session.query(User)\
-            .join(OrganizationClosure,
-                  User.organization_id == OrganizationClosure.subsidiary_organization_id)\
-            .filter(OrganizationClosure.parent_organization_id == current_user.organization_id)\
-            .filter(User.databricks_user_id == databricks_user_id)\
-            .filter(User.delete_flag == False)\
+        user = db.session.query(UserMasterByUser)\
+            .filter(UserMasterByUser.login_user_id == current_user.user_id)\
+            .filter(UserMasterByUser.databricks_user_id == databricks_user_id)\
+            .filter(UserMasterByUser.delete_flag == False)\
             .first()
 
         # ③ データ存在チェック
@@ -1279,12 +1235,10 @@ def edit_user_form(databricks_user_id):
 
         # ④ 組織マスタ一覧取得（データスコープ制限適用）
         logger.info('組織マスタ一覧取得開始')
-        organizations = db.session.query(Organization)\
-            .join(OrganizationClosure,
-                  Organization.organization_id == OrganizationClosure.subsidiary_organization_id)\
-            .filter(OrganizationClosure.parent_organization_id == current_user.organization_id)\
-            .filter(Organization.delete_flag == False)\
-            .order_by(Organization.organization_name)\
+        organizations = db.session.query(OrganizationMasterByUser)\
+            .filter(OrganizationMasterByUser.user_id == current_user.user_id)\
+            .filter(OrganizationMasterByUser.delete_flag == False)\
+            .order_by(OrganizationMasterByUser.organization_name)\
             .all()
         logger.info(f'組織マスタ一覧取得成功: count={len(organizations)}')
 
@@ -1336,7 +1290,7 @@ flowchart TD
     CheckAuth --> |権限OK| FrontValidate[フロントサイドバリデーション]
     CheckAuth --> |権限なし| Error403[403エラー ※1]
 
-    FrontValidate --> CheckExists[ユーザーの存在チェック<br>SELECT * FROM user_master<br>WHERE databricks_user_id = :databricks_user_id]
+    FrontValidate --> CheckExists[ユーザーの存在チェック（スコープ制限適用）<br>SELECT * FROM v_user_master_by_user<br>WHERE login_user_id = :login_user_id<br>AND databricks_user_id = :databricks_user_id]
     CheckExists --> CheckDB1{DBクエリ結果}
 
     CheckDB1 -->|成功| CheckExistsResult{ユーザー存在?}
@@ -1436,12 +1390,10 @@ def update_user(databricks_user_id):
 
         # ③④ 元データ取得とデータスコープチェック
         logger.info('元データ取得開始')
-        user = db.session.query(User)\
-            .join(OrganizationClosure,
-                  User.organization_id == OrganizationClosure.subsidiary_organization_id)\
-            .filter(OrganizationClosure.parent_organization_id == current_user.organization_id)\
-            .filter(User.databricks_user_id == databricks_user_id)\
-            .filter(User.delete_flag == False)\
+        user = db.session.query(UserMasterByUser)\
+            .filter(UserMasterByUser.login_user_id == current_user.user_id)\
+            .filter(UserMasterByUser.databricks_user_id == databricks_user_id)\
+            .filter(UserMasterByUser.delete_flag == False)\
             .first()
 
         if not user:
@@ -1645,8 +1597,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ```mermaid
 flowchart TD
-    Start([ユーザー名クリック]) --> DataScope[データスコープチェック]
-    DataScope --> GetUser[ユーザー詳細情報取得]
+    Start([ユーザー名クリック]) --> GetUser[ユーザー詳細情報取得（スコープ制限適用）<br>SELECT * FROM v_user_master_by_user<br>WHERE login_user_id = :login_user_id<br>AND databricks_user_id = :databricks_user_id]
     GetUser --> CheckDB{DB取得<br>成功?}
 
     CheckDB -->|成功| Modal[詳細モーダル表示<br>render_template<br>'users/detail_modal.html']
@@ -1664,16 +1615,12 @@ flowchart TD
 @require_auth
 def view_user_detail(databricks_user_id):
     try:
-        # ユーザー詳細情報取得（データスコープチェック含む）
-        query = User.query.options(
-            joinedload(User.organization),
-            joinedload(User.user_type),
-            joinedload(User.language),
-            joinedload(User.region)
-        ).filter_by(databricks_user_id=databricks_user_id, delete_flag=FALSE)
-
-        query = apply_data_scope_filter(query, g.current_user)
-        user = query.first_or_404()
+        # ユーザー詳細情報取得（v_user_master_by_userでスコープ制限適用）
+        user = UserMasterByUser.query.filter(
+            UserMasterByUser.login_user_id == g.current_user.user_id,
+            UserMasterByUser.databricks_user_id == databricks_user_id,
+            UserMasterByUser.delete_flag == False,
+        ).first_or_404()
 
         return render_template('users/detail_modal.html', user=user)
 
@@ -1705,7 +1652,7 @@ flowchart TD
     CheckAuth -->|権限OK| ConfirmResult{ユーザー確認}
     CheckAuth -->|権限なし| Error403[403エラー ※1]
 
-    ConfirmResult -->|削除| GetOriginal[元データ取得<br>SELECT * FROM user_master<br>WHERE databricks_user_id = :databricks_user_id]
+    ConfirmResult -->|削除| GetOriginal[元データ取得（スコープ制限適用）<br>SELECT * FROM v_user_master_by_user<br>WHERE login_user_id = :login_user_id<br>AND databricks_user_id = :databricks_user_id]
     ConfirmResult -->|キャンセル| ValidEnd[処理中断]
 
     GetOriginal --> CheckDB1{DBクエリ結果}
@@ -1800,12 +1747,10 @@ def delete_users():
 
             # a. 元データ取得とデータスコープチェック
             logger.info('元データ取得開始')
-            user = db.session.query(User)\
-                .join(OrganizationClosure,
-                      User.organization_id == OrganizationClosure.subsidiary_organization_id)\
-                .filter(OrganizationClosure.parent_organization_id == current_user.organization_id)\
-                .filter(User.databricks_user_id == databricks_user_id)\
-                .filter(User.delete_flag == 0)\
+            user = db.session.query(UserMasterByUser)\
+                .filter(UserMasterByUser.login_user_id == current_user.user_id)\
+                .filter(UserMasterByUser.databricks_user_id == databricks_user_id)\
+                .filter(UserMasterByUser.delete_flag == False)\
                 .first()
 
             if not user:
@@ -2055,7 +2000,7 @@ def export_users_csv(users):
 | 2   | user_master          | ユーザーマスタ             | INSERT   | ユーザー登録                                    | ユーザー情報の新規登録             | -                                                |
 | 3   | user_master          | ユーザーマスタ             | UPDATE   | ユーザー更新、削除                              | ユーザー情報の更新・論理削除       | PRIMARY KEY (user_id)                            |
 | 4   | organization_master  | 組織マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 組織選択肢取得                     | PRIMARY KEY (organization_id)                    |
-| 5   | organization_closure | 組織閉方テーブル           | SELECT   | 全ワークフロー                                  | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
+| 5   | organization_closure | 組織閉包テーブル           | SELECT   | 全ワークフロー（VIEW経由）                      | データスコープ制限（VIEWの内部実装で使用。アプリから直接アクセスしない） | PRIMARY KEY (parent_org_id, subsidiary_org_id)   |
 | 6   | user_type_master     | ユーザー種別マスタ         | SELECT   | 初期表示、登録/更新画面表示、検索条件、一覧表示 | ユーザー種別選択肢取得             | PRIMARY KEY (user_type_id)                       |
 | 7   | region_master        | 地域マスタ                 | SELECT   | 初期表示、登録/更新画面表示、検索条件           | 地域選択肢取得                     | PRIMARY KEY (region_id)                          |
 | 8   | user_password        | ユーザーパスワード         | INSERT   | ユーザー登録（オンプレミス環境のみ）            | パスワード管理レコード作成         | PRIMARY KEY (user_id)                            |
@@ -2167,10 +2112,8 @@ Databricks SCIM API操作が失敗
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
+- **全ユーザー共通**: 各リソース用VIEW（`v_user_master_by_user` 等）に `user_id` を渡すことでスコープ制限を自動適用
+  - VIEWが内部で `organization_closure` を参照し、アクセス可能な組織配下のデータのみ返す
   - **ロールによる条件分岐は一切行わない**
 
 **注**: システム保守者・管理者が全データにアクセスできるのは、
@@ -2178,43 +2121,15 @@ Databricks SCIM API操作が失敗
 
 **実装例:**
 ```python
-def apply_data_scope_filter(query, current_user):
-    """組織階層に基づいたデータスコープ制限を適用
-
-    すべてのユーザーに対して同じフィルタリングロジックを適用。
-    ロールによる条件分岐は一切行わない。
-
-    システム保守者・管理者が全データにアクセスできるのは、
-    ルート組織に所属しており、すべての組織がその下位組織として
-    登録されているため。
-    """
-    # organization_closure テーブルから下位組織リストを取得（全ユーザー共通）
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
-
-    # 下位組織IDのリストを抽出
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        # アクセス可能な組織がない場合は空の結果を返す
-        return query.filter(User.organization_id.in_([]))
-
-    # 組織IDリストでフィルタリング
-    return query.filter(User.organization_id.in_(org_ids))
-
-# 使用例
+# 使用例: ユーザー一覧取得
 @admin_bp.route('/users', methods=['GET'])
 @require_auth
 def list_users():
-    query = User.query.filter_by(delete_flag=FALSE)
-
-    # データスコープ制限適用
-    query = apply_data_scope_filter(query, g.current_user)
-
-    users = query.all()
+    # v_user_master_by_user に login_user_id を渡すだけでスコープ制限が自動適用される
+    users = db.session.query(UserMasterByUser).filter(
+        UserMasterByUser.login_user_id == g.current_user.user_id,
+        UserMasterByUser.delete_flag == False,
+    ).all()
     return render_template('users/list.html', users=users)
 ```
 
