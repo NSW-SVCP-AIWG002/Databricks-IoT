@@ -377,7 +377,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  margin-bottom: 62px;
+  margin-bottom: 104px;
 }
 
 .gadget-register__preview-timeline {
@@ -403,6 +403,7 @@
   flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-start;
+  margin-bottom:0;
 }
 
 .gadget-register__minmax-row .form__group {
@@ -492,6 +493,7 @@
   display: flex;
   gap: var(--spacing-6);
   align-items: center;
+  margin-top: var(--spacing-1);
 }
 
 .form__row .form__group--half:first-child {
@@ -504,6 +506,7 @@
   align-items: center;
   gap: var(--spacing-2);
   margin-bottom: 0;
+  flex-wrap: nowrap;
 }
 
 .form__group--inline .form__label {
