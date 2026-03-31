@@ -2238,3 +2238,114 @@ class TestGetGadgetType:
 
         # Assert
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_fixed_gadget_device_names
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetFixedGadgetDeviceNames:
+    """固定モードガジェットのデバイス名取得
+
+    使用ルート:
+        GET  /analysis/customer-dashboard（初期表示）
+
+    data_source_config.device_id が設定されている（固定モード）ガジェットのみ
+    gadget_uuid → device_name の辞書を返す。可変モード（device_id=null）は含まない。
+    """
+
+    def _make_gadget(self, gadget_uuid, data_source_config):
+        g = MagicMock()
+        g.gadget_uuid = gadget_uuid
+        g.data_source_config = data_source_config
+        return g
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_returns_empty_when_no_gadgets(self, mock_get_devices):
+        """1.1 ガジェット0件: 空dictを返す"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+
+        result = get_fixed_gadget_device_names([])
+
+        assert result == {}
+        mock_get_devices.assert_not_called()
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_returns_empty_when_all_variable_mode(self, mock_get_devices):
+        """1.2 全ガジェットが可変モード（device_id=null）: 空dictを返す"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        gadgets = [
+            self._make_gadget('uuid-1', '{"device_id": null}'),
+            self._make_gadget('uuid-2', '{"device_id": null}'),
+        ]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert result == {}
+        mock_get_devices.assert_not_called()
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_returns_device_name_for_fixed_mode(self, mock_get_devices):
+        """1.3 固定モードのガジェット: device_nameを返す"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        device = MagicMock()
+        device.device_id = 10
+        device.device_name = 'デバイスA'
+        mock_get_devices.return_value = [device]
+        gadgets = [self._make_gadget('uuid-fixed', '{"device_id": 10}')]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert result == {'uuid-fixed': 'デバイスA'}
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_skips_variable_mode_gadgets(self, mock_get_devices):
+        """1.4 固定・可変モード混在: 固定モードのみ含む"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        device = MagicMock()
+        device.device_id = 10
+        device.device_name = 'デバイスA'
+        mock_get_devices.return_value = [device]
+        gadgets = [
+            self._make_gadget('uuid-fixed', '{"device_id": 10}'),
+            self._make_gadget('uuid-variable', '{"device_id": null}'),
+        ]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert 'uuid-fixed' in result
+        assert 'uuid-variable' not in result
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_returns_fallback_when_device_not_found(self, mock_get_devices):
+        """1.5 固定モードだがデバイスがDB未存在（論理削除等）: '--'を返す"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        mock_get_devices.return_value = []
+        gadgets = [self._make_gadget('uuid-1', '{"device_id": 99}')]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert result == {'uuid-1': '--'}
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_skips_gadget_with_none_config(self, mock_get_devices):
+        """1.6 data_source_configがNone: そのガジェットをスキップする"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        gadgets = [self._make_gadget('uuid-1', None)]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert result == {}
+        mock_get_devices.assert_not_called()
+
+    @patch(f'{MODULE}._get_devices_by_ids')
+    def test_skips_gadget_with_malformed_config(self, mock_get_devices):
+        """1.7 data_source_configが不正JSON: そのガジェットをスキップする"""
+        from iot_app.services.customer_dashboard.common import get_fixed_gadget_device_names
+        gadgets = [self._make_gadget('uuid-1', 'invalid-json')]
+
+        result = get_fixed_gadget_device_names(gadgets)
+
+        assert result == {}
+        mock_get_devices.assert_not_called()

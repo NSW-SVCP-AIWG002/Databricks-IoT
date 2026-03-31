@@ -420,7 +420,9 @@ const CustomerDashboard = (function () {
       deviceSelect.disabled = true;
 
       if (!orgId) {
-        _saveDataSource(null, null);
+        await _saveDataSource(null, null);
+        _updateGadgetDatasourceDisplay(null, null);
+        _fetchAllGadgetsData({ range: 'today' });
         return;
       }
 
@@ -443,7 +445,9 @@ const CustomerDashboard = (function () {
         console.error('デバイス一覧取得エラー', e);
       }
 
-      _saveDataSource(orgId, null);
+      await _saveDataSource(orgId, null);
+      _updateGadgetDatasourceDisplay(orgId, null);
+      _fetchAllGadgetsData({ range: 'today' });
     });
 
     // デバイス選択変更時: データソース保存
@@ -485,6 +489,11 @@ const CustomerDashboard = (function () {
       : '--';
 
     document.querySelectorAll('.gadget__datasource-name').forEach(function (el) {
+      const gadgetEl = el.closest('.gadget');
+      const _raw = gadgetEl?.dataset.datasourceConfig || '{}';
+      const _parsed = JSON.parse(_raw);
+      const config = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
+      if (config.device_id !== null && config.device_id !== undefined) return;
       el.textContent = deviceName;
     });
   }
