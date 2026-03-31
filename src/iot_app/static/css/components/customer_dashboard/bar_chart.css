@@ -208,7 +208,7 @@
 }
 
 .bar-chart__datetime-input {
-  width: 160px;
+  width: 170px;
   font-size: var(--font-size-sm);
   padding: 2px var(--spacing-2) 2px 24px;
 }
@@ -280,13 +280,11 @@
   flex: 0 0 220px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
 }
 
 .gadget-register__minmax {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
 }
 
 .gadget-register__minmax .form__input {
@@ -303,14 +301,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
-  padding-left: var(--spacing-4);
 }
 
 .gadget-register__middle .form__group {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
 }
 
 .gadget-register__right {
@@ -321,13 +316,12 @@
 /* ガジェットイメージプレビュー */
 .gadget-register__preview {
   width: 100%;
-  height: 140px;
+  height: 126px;
   border: 1px solid #ddd;
   border-radius: 4px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: var(--spacing-3);
   gap: var(--spacing-2);
 }
 
@@ -417,7 +411,6 @@
   display: flex;
   gap: var(--spacing-4);
   align-items: center;
-  margin-top: var(--spacing-4);
 }
 
 /* インラインフォームグループ（ラベル＋コントロール同一行） */
