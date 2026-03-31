@@ -533,3 +533,8 @@
   display: block;
   min-height: 1.4em;
 }
+
+#group_id,
+#gadget_size {
+  width: 170px;
+}

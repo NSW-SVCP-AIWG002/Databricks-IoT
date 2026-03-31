@@ -434,6 +434,11 @@
   flex: 1;
 }
 
+#group_id,
+#gadget_size {
+  width: 170px;
+}
+
 /* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
 .gadget--2x2 .bar-chart__unit-selector {
   width: 100%;
