@@ -91,6 +91,11 @@ const CustomerDashboard = (function () {
 
     // ガジェット追加モーダル専用
     _bindGadgetAddEvents(container);
+
+    // 時系列グラフ登録モーダル専用（timeline.js で定義）
+    if (typeof bindTimelineGadgetRegister === 'function') {
+      bindTimelineGadgetRegister(container);
+    }
   }
 
   /**

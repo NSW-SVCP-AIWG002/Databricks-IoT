@@ -11,6 +11,22 @@ from wtforms import FloatField, IntegerField, RadioField, SelectField, StringFie
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 
 
+class _JaFloatField(FloatField):
+    """日本語エラーメッセージ付き FloatField"""
+
+    def __init__(self, label, message, **kwargs):
+        super().__init__(label, **kwargs)
+        self._number_message = message
+
+    def process_formdata(self, valuelist):
+        if valuelist:
+            try:
+                self.data = float(valuelist[0])
+            except (ValueError, TypeError):
+                self.data = None
+                raise ValueError(self._number_message)
+
+
 class TimelineGadgetForm(FlaskForm):
     """時系列グラフガジェット登録フォーム
 
@@ -29,7 +45,7 @@ class TimelineGadgetForm(FlaskForm):
     device_mode = RadioField(
         '表示デバイス選択',
         choices=[('fixed', 'デバイス固定'), ('variable', 'デバイス可変')],
-        default='fixed',
+        default='variable',
         validators=[DataRequired(message='表示デバイス選択を選択してください')],
     )
 
@@ -55,23 +71,27 @@ class TimelineGadgetForm(FlaskForm):
         validators=[DataRequired(message='右表示項目を選択してください')],
     )
 
-    left_min_value = FloatField(
+    left_min_value = _JaFloatField(
         '左表示項目 最小値',
+        message='左表示項目の最小値は数値で入力してください',
         validators=[Optional()],
     )
 
-    left_max_value = FloatField(
+    left_max_value = _JaFloatField(
         '左表示項目 最大値',
+        message='左表示項目の最大値は数値で入力してください',
         validators=[Optional()],
     )
 
-    right_min_value = FloatField(
+    right_min_value = _JaFloatField(
         '右表示項目 最小値',
+        message='右表示項目の最小値は数値で入力してください',
         validators=[Optional()],
     )
 
-    right_max_value = FloatField(
+    right_max_value = _JaFloatField(
         '右表示項目 最大値',
+        message='右表示項目の最大値は数値で入力してください',
         validators=[Optional()],
     )
 
@@ -81,10 +101,12 @@ class TimelineGadgetForm(FlaskForm):
         validators=[DataRequired(message='部品サイズを選択してください')],
     )
 
-    def validate_device_id(self, field):
-        """デバイス固定モード時はデバイスIDが必須"""
-        if self.device_mode.data == 'fixed' and field.data is None:
-            raise ValidationError('デバイスを選択してください')
+    def validate(self, extra_validators=None):
+        result = super().validate(extra_validators)
+        if self.device_mode.data == 'fixed' and not self.device_id.data:
+            self.device_id.errors.append('デバイスを選択してください')
+            result = False
+        return result
 
     def validate_left_min_value(self, field):
         """左最小値 < 左最大値"""

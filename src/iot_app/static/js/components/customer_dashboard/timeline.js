@@ -351,6 +351,83 @@ function initGadget(gadgetEl) {
 }
 
 // ---------------------------------------------------------------------------
+// 登録モーダル イベントバインド（common.js の _bindModalEvents から呼ばれる）
+// ---------------------------------------------------------------------------
+
+/**
+ * 時系列グラフ登録モーダルのイベントをバインドする
+ * @param {Element} container - モーダルコンテナ要素
+ */
+function bindTimelineGadgetRegister(container) {
+  const modeBtns = container.querySelectorAll('.timeline-register__device-mode-btn');
+  if (!modeBtns.length) return;
+
+  const deviceModeInput = container.querySelector('#device_mode');
+  const deviceFixedArea = container.querySelector('#device-fixed-area');
+  const deviceNameArea  = container.querySelector('#device-name-area');
+  const deviceSelect    = container.querySelector('#device-select');
+
+  function applyMode(mode) {
+    modeBtns.forEach(function (btn) {
+      btn.classList.toggle('timeline-register__device-mode-btn--active', btn.dataset.mode === mode);
+    });
+    if (deviceModeInput) deviceModeInput.value = mode;
+    const isFixed = mode === 'fixed';
+    if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? 'visible' : 'hidden';
+    if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? 'visible' : 'hidden';
+  }
+
+  modeBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      applyMode(btn.dataset.mode);
+    });
+  });
+
+  const orgFilter = container.querySelector('#organization-filter');
+
+  if (orgFilter && deviceSelect) {
+    const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
+
+    orgFilter.addEventListener('change', function () {
+      const orgId   = orgFilter.value;
+      const prevVal = deviceSelect.value;
+      deviceSelect.innerHTML = '<option value="">選択してください</option>';
+      allDeviceOptions.forEach(function (opt) {
+        if (!orgId || opt.dataset.org === orgId) {
+          deviceSelect.appendChild(opt.cloneNode(true));
+        }
+      });
+      deviceSelect.value    = prevVal;
+      deviceSelect.disabled = !orgId;
+      if (!deviceSelect.value) {
+        const nameEl = container.querySelector('#selected-device-name');
+        if (nameEl) nameEl.textContent = '-';
+      }
+    });
+  }
+
+  if (deviceSelect) {
+    deviceSelect.addEventListener('change', function () {
+      const opt    = deviceSelect.options[deviceSelect.selectedIndex];
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = opt ? (opt.dataset.name || '-') : '-';
+    });
+  }
+
+  // 422再描画時：選択済みデバイス名を復元
+  if (deviceSelect) {
+    const selectedOpt = deviceSelect.options[deviceSelect.selectedIndex];
+    if (selectedOpt && selectedOpt.value) {
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = selectedOpt.dataset.name || '-';
+    }
+  }
+
+  // 初期状態を適用（hidden inputの現在値に合わせる）
+  applyMode(deviceModeInput ? deviceModeInput.value : 'variable');
+}
+
+// ---------------------------------------------------------------------------
 // エントリーポイント
 // ---------------------------------------------------------------------------
 

@@ -166,6 +166,10 @@ def handle_gadget_register(gadget_type):
             abort(404)
         except Exception:
             abort(500)
+        # グループ選択肢をフル選択肢に更新（検証用の1件だけでは再描画時に空になるため）
+        form.group_id.choices = [
+            (grp.dashboard_group_id, grp.dashboard_group_name) for grp in context['groups']
+        ]
         return render_template(
             'analysis/customer_dashboard/gadgets/modals/timeline.html',
             form=form,
