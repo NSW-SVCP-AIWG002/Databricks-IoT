@@ -159,25 +159,36 @@ function renderLegends(legendEl, chartData) {
     right_max,
   } = chartData;
 
-  let html = '';
-
-  // 左凡例
+  // 1行目：左右軸の名称
+  let html = '<div class="timeline__legends-row">';
   html += `<span class="timeline__legend-item" style="color:${CHART_COLOR_LEFT}">■ ${left_label}（${left_unit}）</span>`;
-  // 右凡例
   html += `<span class="timeline__legend-item" style="color:${CHART_COLOR_RIGHT}">■ ${right_label}（${right_unit}）</span>`;
+  html += '</div>';
 
-  // 上限/下限凡例（設定値がある場合のみ）
-  if (left_max !== null && left_max !== undefined) {
-    html += `<span class="timeline__legend-item">上限（${left_label}）: ${left_max}</span>`;
+  // 2行目：左軸の上限/下限（設定値がある場合のみ）
+  const hasLeftLimits = (left_max !== null && left_max !== undefined) || (left_min !== null && left_min !== undefined);
+  if (hasLeftLimits) {
+    html += '<div class="timeline__legends-row">';
+    if (left_max !== null && left_max !== undefined) {
+      html += `<span class="timeline__legend-item">上限（${left_label}）: ${left_max}</span>`;
+    }
+    if (left_min !== null && left_min !== undefined) {
+      html += `<span class="timeline__legend-item">下限（${left_label}）: ${left_min}</span>`;
+    }
+    html += '</div>';
   }
-  if (left_min !== null && left_min !== undefined) {
-    html += `<span class="timeline__legend-item">下限（${left_label}）: ${left_min}</span>`;
-  }
-  if (right_max !== null && right_max !== undefined) {
-    html += `<span class="timeline__legend-item">上限（${right_label}）: ${right_max}</span>`;
-  }
-  if (right_min !== null && right_min !== undefined) {
-    html += `<span class="timeline__legend-item">下限（${right_label}）: ${right_min}</span>`;
+
+  // 3行目：右軸の上限/下限（設定値がある場合のみ）
+  const hasRightLimits = (right_max !== null && right_max !== undefined) || (right_min !== null && right_min !== undefined);
+  if (hasRightLimits) {
+    html += '<div class="timeline__legends-row">';
+    if (right_max !== null && right_max !== undefined) {
+      html += `<span class="timeline__legend-item">上限（${right_label}）: ${right_max}</span>`;
+    }
+    if (right_min !== null && right_min !== undefined) {
+      html += `<span class="timeline__legend-item">下限（${right_label}）: ${right_min}</span>`;
+    }
+    html += '</div>';
   }
 
   legendEl.innerHTML = html;

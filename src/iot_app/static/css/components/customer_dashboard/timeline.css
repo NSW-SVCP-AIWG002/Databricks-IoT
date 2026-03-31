@@ -163,13 +163,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: var(--spacing-2);
 }
 
 /* グラフキャンバスラッパー */
 .timeline__canvas-wrapper {
-  flex: 1;
-  min-height: 160px;
+  height: 250px;
+  flex-shrink: 0;
 }
 
 .timeline__canvas {
@@ -181,11 +180,16 @@
 /* 凡例エリア */
 .timeline__legends {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--spacing-2) var(--spacing-4);
+  flex-direction: column;
+  gap: var(--spacing-1);
   font-size: var(--font-size-sm);
   padding: 0;
+}
+
+.timeline__legends-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-4);
 }
 
 .timeline__legend-item {
