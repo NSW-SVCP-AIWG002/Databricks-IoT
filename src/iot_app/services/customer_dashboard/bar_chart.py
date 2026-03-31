@@ -88,6 +88,23 @@ def validate_gadget_registration(params):
     if params.get("measurement_item_id") is None:
         raise ValidationError("表示項目を選択してください")
 
+    min_value = params.get("min_value")
+    max_value = params.get("max_value")
+    if min_value is not None:
+        try:
+            min_value = float(min_value)
+        except (TypeError, ValueError):
+            raise ValidationError("最小値は数値で入力してください")
+    if max_value is not None:
+        try:
+            max_value = float(max_value)
+        except (TypeError, ValueError):
+            raise ValidationError("最大値は数値で入力してください")
+    if min_value is not None and max_value is not None and min_value >= max_value:
+        raise ValidationError(
+            "最小値は最大値より小さい値を入力してください。最大値は最小値より大きい値を入力してください。"
+        )
+
     gadget_size = params.get("gadget_size")
     if gadget_size is None:
         raise ValidationError("部品サイズを選択してください")
@@ -197,21 +214,80 @@ def format_bar_chart_data(rows, display_unit, interval="10min", summary_method_i
 # CSV 生成
 # ============================================================
 
-def generate_bar_chart_csv(chart_data):
+_JP_WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"]  # weekday() Monday=0 ... Sunday=6
+_EN_WEEKDAY_OFFSET = {"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
+_CSV_TIME_COL_HEADERS = {"hour": "時間", "day": "時間", "week": "曜日", "month": "日付"}
+
+
+def _csv_timestamp(label, display_unit, base_datetime):
+    """chart_data のラベルを CSV 用フルタイムスタンプ文字列に変換する"""
+    date_prefix = base_datetime.strftime("%Y/%m/%d")
+    if display_unit in ("hour", "day"):
+        return f"{date_prefix} {label}"
+    elif display_unit == "week":
+        days_since_sunday = (base_datetime.weekday() + 1) % 7
+        start_date = (base_datetime - timedelta(days=days_since_sunday)).date()
+        offset = _EN_WEEKDAY_OFFSET.get(label, 0)
+        d = start_date + timedelta(days=offset)
+        jp_wd = _JP_WEEKDAYS[d.weekday()]
+        return d.strftime(f"%Y/%m/%d({jp_wd})")
+    elif display_unit == "month":
+        return f"{base_datetime.strftime('%Y/%m/')}{label}"
+    return label
+
+
+def generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name):
     """チャートデータから CSV 文字列を生成する
 
     Args:
         chart_data (dict): {"labels": [...], "values": [...]}
+        display_unit (str): 表示単位（hour/day/week/month）
+        base_datetime (datetime): 基準日時（日付補完に使用）
+        device_name (str): デバイス名（列1）
+        legend_name (str): 凡例名（列3ヘッダー、例: "外気温度（℃）"）
 
     Returns:
-        str: CSV 文字列
+        str: CSV 文字列（BOM付き UTF-8）
     """
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["timestamp", "value"])
+    time_col = _CSV_TIME_COL_HEADERS.get(display_unit, "時間")
+    writer.writerow(["デバイス名", time_col, legend_name])
     for label, value in zip(chart_data["labels"], chart_data["values"]):
-        writer.writerow([label, value])
+        ts = _csv_timestamp(label, display_unit, base_datetime)
+        writer.writerow([device_name, ts, f"{value:.2f}"])
     return '\ufeff' + output.getvalue()
+
+
+def get_device_name_by_id(device_id):
+    """デバイスIDからデバイス名を取得する
+
+    Returns:
+        str: デバイス名。未登録または削除済みの場合は '--'
+    """
+    if device_id is None:
+        return '--'
+    from iot_app.models.device import DeviceMaster
+    device = db.session.query(DeviceMaster).filter_by(
+        device_id=device_id,
+        delete_flag=False,
+    ).first()
+    return device.device_name if device else '--'
+
+
+def get_measurement_item_legend_name(measurement_item_id):
+    """測定項目IDから凡例名（表示名＋単位）を取得する
+
+    Returns:
+        str: "表示名（単位）" 形式。未登録の場合は空文字
+    """
+    from iot_app.models.measurement import MeasurementItemMaster
+    item = db.session.query(MeasurementItemMaster).filter_by(
+        measurement_item_id=measurement_item_id,
+    ).first()
+    if not item:
+        return ''
+    return f"{item.display_name}（{item.unit_name}）"
 
 
 # ============================================================
@@ -248,7 +324,7 @@ def execute_silver_query(device_id, start_datetime, end_datetime, limit=100):
         "start_datetime": start_datetime,
         "end_datetime": end_datetime,
         "limit": limit,
-    })
+    }, operation="Silver層クエリ実行")
 
 
 def execute_gold_query(device_id, display_unit, measurement_item_id, summary_method_id,
@@ -278,7 +354,7 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
             "summary_method_id": summary_method_id,
             "target_date": target_date,
             "limit": limit,
-        })
+        }, operation="Gold層クエリ実行")
     else:
         sql = """
             SELECT collection_date, summary_value
@@ -297,7 +373,7 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
             "start_date": start_date,
             "end_date": end_date,
             "limit": limit,
-        })
+        }, operation="Gold層クエリ実行")
 
 
 # ============================================================
@@ -473,7 +549,9 @@ def export_bar_chart_csv(gadget_uuid, device_id, display_unit, interval,
         chart_data = format_bar_chart_data(
             rows, display_unit, interval, summary_method_id
         )
-        return generate_bar_chart_csv(chart_data)
+        device_name = get_device_name_by_id(device_id)
+        legend_name = get_measurement_item_legend_name(measurement_item_id)
+        return generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name)
 
     except ValidationError:
         raise

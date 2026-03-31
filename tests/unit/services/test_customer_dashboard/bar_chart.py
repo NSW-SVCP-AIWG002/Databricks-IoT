@@ -1041,130 +1041,129 @@ class TestBarChartCsvGeneration:
     観点: 3.5.1 CSV生成ロジック, 3.5.2 エスケープ処理
     """
 
-    def test_csv_header_contains_timestamp_and_value(self):
-        """3.5.1.1: CSV ヘッダー行に timestamp / value が出力される"""
+    # ----------------------------------------------------------
+    # テスト共通ヘルパー
+    # ----------------------------------------------------------
+
+    def _call(self, chart_data, display_unit="hour",
+              base_datetime=None, device_name="DEV-001", legend_name="外気温度（℃）"):
         from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
+        from datetime import datetime
+        if base_datetime is None:
+            base_datetime = datetime(2026, 2, 5, 15, 0, 0)
+        return generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name)
+
+    def _read_csv(self, csv_text):
         import io, csv
+        return list(csv.reader(io.StringIO(csv_text.lstrip('\ufeff'))))
 
-        # Arrange
-        chart_data = {"labels": ["15:10"], "values": [10.5]}
+    # ----------------------------------------------------------
+    # 3.5.1 CSV生成ロジック - ヘッダー
+    # ----------------------------------------------------------
 
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
+    def test_csv_header_columns_for_hour_unit(self):
+        """3.5.1.1: 時単位ヘッダーは デバイス名 / 時間 / 凡例名"""
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]}, "hour"))
+        assert rows[0] == ["デバイス名", "時間", "外気温度（℃）"]
 
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text.lstrip('\ufeff')))
-        header = next(reader)
-        assert "timestamp" in header
-        assert "value" in header
+    def test_csv_header_columns_for_day_unit(self):
+        """3.5.1.1: 日単位ヘッダーは デバイス名 / 時間 / 凡例名"""
+        rows = self._read_csv(self._call({"labels": ["10:00"], "values": [25.5]}, "day"))
+        assert rows[0] == ["デバイス名", "時間", "外気温度（℃）"]
 
-    def test_csv_data_rows_match_chart_data(self):
-        """3.5.1.2: データ行数が chart_data の件数と一致する"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
-        import io, csv
+    def test_csv_header_columns_for_week_unit(self):
+        """3.5.1.1: 週単位ヘッダーは デバイス名 / 曜日 / 凡例名"""
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["Sun"], "values": [25.5]}, "week",
+                                          base_datetime=datetime(2026, 2, 4, 15, 0, 0)))
+        assert rows[0] == ["デバイス名", "曜日", "外気温度（℃）"]
 
-        # Arrange
-        chart_data = {
-            "labels": ["15:10", "15:20", "15:30"],
-            "values": [10.5, 12.3, 9.8],
-        }
+    def test_csv_header_columns_for_month_unit(self):
+        """3.5.1.1: 月単位ヘッダーは デバイス名 / 日付 / 凡例名"""
+        rows = self._read_csv(self._call({"labels": ["01"], "values": [25.5]}, "month"))
+        assert rows[0] == ["デバイス名", "日付", "外気温度（℃）"]
 
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
+    # ----------------------------------------------------------
+    # 3.5.1 CSV生成ロジック - データ行
+    # ----------------------------------------------------------
 
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text))
-        next(reader)  # skip header
-        rows = list(reader)
-        assert len(rows) == 3
+    def test_csv_device_name_in_column_1(self):
+        """3.5.1.2: データ行の列1にデバイス名が出力される"""
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]},
+                                          device_name="TEST-DEV"))
+        assert rows[1][0] == "TEST-DEV"
+
+    def test_csv_timestamp_hour_format(self):
+        """3.5.1.3: 時単位タイムスタンプは YYYY/MM/DD HH:mm 形式"""
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]}, "hour",
+                                          base_datetime=datetime(2026, 2, 5, 15, 0, 0)))
+        assert rows[1][1] == "2026/02/05 10:10"
+
+    def test_csv_timestamp_day_format(self):
+        """3.5.1.3: 日単位タイムスタンプは YYYY/MM/DD HH:mm 形式"""
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["10:00"], "values": [25.5]}, "day",
+                                          base_datetime=datetime(2026, 2, 5, 15, 0, 0)))
+        assert rows[1][1] == "2026/02/05 10:00"
+
+    def test_csv_timestamp_week_format_sunday(self):
+        """3.5.1.3: 週単位タイムスタンプは YYYY/MM/DD(曜) 形式 - 日曜"""
+        # base: 2026-02-04(水) → 週開始(日): 2026-02-01(日)
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["Sun"], "values": [25.5]}, "week",
+                                          base_datetime=datetime(2026, 2, 4, 15, 0, 0)))
+        assert rows[1][1] == "2026/02/01(日)"
+
+    def test_csv_timestamp_week_format_monday(self):
+        """3.5.1.3: 週単位タイムスタンプは YYYY/MM/DD(曜) 形式 - 月曜"""
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["Mon"], "values": [25.5]}, "week",
+                                          base_datetime=datetime(2026, 2, 4, 15, 0, 0)))
+        assert rows[1][1] == "2026/02/02(月)"
+
+    def test_csv_timestamp_month_format(self):
+        """3.5.1.3: 月単位タイムスタンプは YYYY/MM/DD 形式"""
+        from datetime import datetime
+        rows = self._read_csv(self._call({"labels": ["01"], "values": [25.5]}, "month",
+                                          base_datetime=datetime(2026, 2, 5, 15, 0, 0)))
+        assert rows[1][1] == "2026/02/01"
+
+    def test_csv_value_formatted_to_2_decimal_places(self):
+        """3.5.1.4: センサー値は小数点2桁で出力される"""
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]}))
+        assert rows[1][2] == "25.50"
+
+    def test_csv_data_rows_count_matches_chart_data(self):
+        """3.5.1.5: データ行数が chart_data の件数と一致する"""
+        rows = self._read_csv(self._call({
+            "labels": ["10:10", "10:20", "10:30"],
+            "values": [25.5, 25.6, 25.7],
+        }))
+        assert len(rows) - 1 == 3  # ヘッダー除く
 
     def test_csv_empty_data_outputs_header_only(self):
-        """3.5.1.3: データなし（空）の場合はヘッダー行のみ出力される"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
+        """3.5.1.6: データなし（空）の場合はヘッダー行のみ出力される"""
+        rows = self._read_csv(self._call({"labels": [], "values": []}))
+        assert len(rows) == 1
+        assert len(rows[0]) == 3  # デバイス名, 時間, 凡例名
+
+    # ----------------------------------------------------------
+    # 3.5.2 エスケープ処理
+    # ----------------------------------------------------------
+
+    def test_csv_device_name_with_comma_is_escaped(self):
+        """3.5.2.1: デバイス名にカンマを含む場合はダブルクォートで囲まれる"""
         import io, csv
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]},
+                                          device_name="DEV,001"))
+        assert rows[1][0] == "DEV,001"
 
-        # Arrange
-        chart_data = {"labels": [], "values": []}
-
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
-
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text))
-        header = next(reader)
-        assert len(header) == 2  # timestamp, value
-        rows = list(reader)
-        assert len(rows) == 0
-
-    def test_csv_column_order_is_timestamp_then_value(self):
-        """3.5.1.4: 列順序は timestamp → value の順であること"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
-        import io, csv
-
-        # Arrange
-        chart_data = {"labels": ["15:10"], "values": [10.5]}
-
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
-
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text.lstrip('\ufeff')))
-        header = next(reader)
-        assert header[0] == "timestamp"
-        assert header[1] == "value"
-
-    def test_csv_data_values_are_correct(self):
-        """3.5.1.2: CSV データ行の値が chart_data の labels / values と一致する"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
-        import io, csv
-
-        # Arrange
-        chart_data = {"labels": ["15:10"], "values": [10.5]}
-
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
-
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text))
-        next(reader)  # skip header
-        row = next(reader)
-        assert row[0] == "15:10"
-        assert float(row[1]) == pytest.approx(10.5)
-
-    def test_csv_label_with_comma_is_escaped(self):
-        """3.5.2.1: ラベルにカンマを含む場合はダブルクォートで囲まれる"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
-        import io, csv
-
-        # Arrange
-        chart_data = {"labels": ["15:10,extra"], "values": [10.5]}
-
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
-
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text))
-        next(reader)
-        row = next(reader)
-        # csv.reader はエスケープ済みの値を正しく読める
-        assert row[0] == "15:10,extra"
-
-    def test_csv_label_with_double_quote_is_escaped(self):
-        """3.5.2.3: ラベルにダブルクォートを含む場合は \"\" でエスケープされる"""
-        from iot_app.services.customer_dashboard.bar_chart import generate_bar_chart_csv
-        import io, csv
-
-        # Arrange
-        chart_data = {"labels": ['15"10'], "values": [10.5]}
-
-        # Act
-        csv_text = generate_bar_chart_csv(chart_data)
-
-        # Assert
-        reader = csv.reader(io.StringIO(csv_text))
-        next(reader)
-        row = next(reader)
-        assert row[0] == '15"10'
+    def test_csv_device_name_with_double_quote_is_escaped(self):
+        """3.5.2.2: デバイス名にダブルクォートを含む場合は \"\" でエスケープされる"""
+        rows = self._read_csv(self._call({"labels": ["10:10"], "values": [25.5]},
+                                          device_name='DEV"001'))
+        assert rows[1][0] == 'DEV"001'
 
     # ----------------------------------------------------------
     # CSVエクスポート パラメータバリデーション（観点 1.1.4, 1.1.6）
@@ -1283,7 +1282,10 @@ class TestBarChartCsvGeneration:
             )
         assert "日付形式が不正です" in str(exc_info.value)
 
-    def test_csv_export_valid_params_does_not_raise_validation_error(self):
+    @patch('iot_app.services.customer_dashboard.bar_chart.get_measurement_item_legend_name', return_value='外気温度（℃）')
+    @patch('iot_app.services.customer_dashboard.bar_chart.get_device_name_by_id', return_value='DEV-001')
+    @patch('iot_app.services.customer_dashboard.bar_chart.fetch_bar_chart_data', return_value=[])
+    def test_csv_export_valid_params_does_not_raise_validation_error(self, mock_fetch, mock_device, mock_legend):
         """2.1.1: すべてのパラメータが有効な場合はバリデーションエラーが発生しない"""
         from iot_app.services.customer_dashboard.bar_chart import export_bar_chart_csv
         from iot_app.common.exceptions import ValidationError
@@ -1293,8 +1295,6 @@ class TestBarChartCsvGeneration:
         valid_datetime = datetime(2026, 3, 6, 15, 0, 0)
 
         # Act & Assert（ValidationError が発生しないこと）
-        # ※ DB アクセス部分はモックなしのためその先で別例外が発生する場合があるが
-        #   ValidationError が発生しないことのみ確認する
         try:
             export_bar_chart_csv(
                 gadget_uuid="test-uuid",

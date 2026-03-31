@@ -16,8 +16,10 @@ from iot_app.services.customer_dashboard.bar_chart import (
     get_dashboard_by_id,
     get_dashboard_groups,
     get_dashboard_user_setting,
+    get_device_name_by_id,
     get_gadget_by_uuid,
     get_measurement_item_column_name,
+    get_measurement_item_legend_name,
     register_bar_chart_gadget,
     validate_chart_params,
 )
@@ -232,7 +234,9 @@ def handle_gadget_csv_export(gadget_uuid):
             summary_method_id=summary_method_id, limit=100_000,
         )
         chart_data = format_bar_chart_data(rows, display_unit, interval, summary_method_id, column_name=column_name)
-        csv_content = generate_bar_chart_csv(chart_data)
+        device_name = get_device_name_by_id(device_id)
+        legend_name = get_measurement_item_legend_name(measurement_item_id)
+        csv_content = generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name)
 
         filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
         return Response(
