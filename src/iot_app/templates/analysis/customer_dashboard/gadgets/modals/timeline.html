@@ -75,12 +75,12 @@
             <!-- (8) 左最小値/最大値 -->
             <div class="gadget-register__minmax">
               <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">左最小値</label>
+                <label class="form__label">左表示項目 最小値</label>
                 {{ form.left_min_value(class="form__input gadget-register__minmax-input", id="left_min_value") }}
                 <span class="form__error form__error--reserved">{% if form.left_min_value.errors %}{{ form.left_min_value.errors[0] }}{% endif %}</span>
               </div>
               <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">左最大値</label>
+                <label class="form__label">左表示項目 最大値</label>
                 {{ form.left_max_value(class="form__input gadget-register__minmax-input", id="left_max_value") }}
                 <span class="form__error form__error--reserved">{% if form.left_max_value.errors %}{{ form.left_max_value.errors[0] }}{% endif %}</span>
               </div>
@@ -120,12 +120,12 @@
             <!-- (9) 右最小値/最大値（常時表示） -->
             <div class="gadget-register__minmax">
               <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">右最小値</label>
+                <label class="form__label">右表示項目 最小値</label>
                 {{ form.right_min_value(class="form__input gadget-register__minmax-input", id="right_min_value") }}
                 <span class="form__error form__error--reserved">{% if form.right_min_value.errors %}{{ form.right_min_value.errors[0] }}{% endif %}</span>
               </div>
               <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">右最大値</label>
+                <label class="form__label">右表示項目 最大値</label>
                 {{ form.right_max_value(class="form__input gadget-register__minmax-input", id="right_max_value") }}
                 <span class="form__error form__error--reserved">{% if form.right_max_value.errors %}{{ form.right_max_value.errors[0] }}{% endif %}</span>
               </div>
