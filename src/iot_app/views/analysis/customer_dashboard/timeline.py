@@ -39,6 +39,16 @@ _DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 # POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
 # ---------------------------------------------------------------------------
 
+def handle_gadget_create(gadget_type):
+    """時系列グラフガジェット登録モーダル表示（スタブ） TODO:時系列マージ後上書き"""
+    abort(501)
+
+
+def handle_gadget_register(gadget_type):
+    """時系列グラフガジェット登録実行（スタブ） TODO:時系列マージ後上書き"""
+    abort(501)
+
+
 def handle_gadget_data(gadget_uuid):
     """時系列グラフガジェット データ取得（AJAX）"""
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))

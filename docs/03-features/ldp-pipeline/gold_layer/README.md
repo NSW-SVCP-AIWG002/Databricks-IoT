@@ -51,7 +51,7 @@
 | 3   | collection_date   | 集約日       | DATE      | NOT NULL | ○   | センサーデータを集約した日                   |
 | 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
 | 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
-| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                     |
+| 6   | summary_value     | 集約値       | DOUBLE    | NULL     |     | 集約結果                                     |
 | 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                             |
 | 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                             |
 
@@ -61,10 +61,10 @@
 | --- | --------------------- | ------------ | ---------- | -------- | --- | -------------------------------------------- |
 | 1   | device_id             | デバイスID   | INT        | NOT NULL | ○   | IoTデバイスの一意識別子                      |
 | 2   | organization_id       | 組織ID       | INT        | NOT NULL | ○   | 所属組織ID                                   |
-| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM）      |
+| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM形式、例: 2026/01） |
 | 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
 | 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
-| 6   | summary_value         | 集約値       | DOUBLE     | NOT NULL |     | 集約結果                                     |
+| 6   | summary_value         | 集約値       | DOUBLE     | NULL     |     | 集約結果                                     |
 | 7   | data_count            | データ数     | INT        | NOT NULL |     | 集約したデータ数                             |
 | 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     | レコード作成日時                             |
 
@@ -74,10 +74,10 @@
 | --- | ----------------- | ------------ | --------- | -------- | --- | -------------------------------------------- |
 | 1   | device_id         | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子                      |
 | 2   | organization_id   | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                                   |
-| 3   | collection_year   | 集約年       | INT       | NOT NULL | ○   | センサーデータを集約した年（YYYY）           |
+| 3   | collection_year   | 集約年       | INT       | NOT NULL | ○   | センサーデータを集約した年（YYYY形式、例: 2026）         |
 | 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
 | 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
-| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                     |
+| 6   | summary_value     | 集約値       | DOUBLE    | NULL     |     | 集約結果                                     |
 | 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                             |
 | 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                             |
 
@@ -140,19 +140,19 @@ flowchart TB
         subgraph Daily["日次集計"]
             D_Read[センサーデータ読込]
             D_Group[日次グループ化]
-            D_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
+            D_Agg["集約処理<br>avg/max/min/p25/median/p75/stddev/p95 + data_count(別カラム)"]
         end
 
         subgraph Monthly["月次集計"]
             M_Read[センサーデータ読込]
             M_Group[月次グループ化]
-            M_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
+            M_Agg["集約処理<br>avg/max/min/p25/median/p75/stddev/p95 + data_count(別カラム)"]
         end
 
         subgraph Yearly["年次集計"]
             Y_Read[センサーデータ読込]
             Y_Group[年次グループ化]
-            Y_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
+            Y_Agg["集約処理<br>avg/max/min/p25/median/p75/stddev/p95 + data_count(別カラム)"]
         end
     end
 
@@ -232,11 +232,11 @@ flowchart TB
 
 ## パフォーマンス要件
 
-| 要件         | 値                          | 対応策                                  |
-| ------------ | --------------------------- | --------------------------------------- |
-| 処理時間     | 日次バッチ完了まで1時間以内 | インクリメンタル処理                    |
-| スループット | 10,000デバイス × 1分間隔    | 水平スケーリング、最適クラスタ構成      |
-| データ量     | 10GB/日                     | Liquid Clustering、インクリメンタル処理 |
+| 要件         | 値                                                | 対応策                                  |
+| ------------ | ------------------------------------------------- | --------------------------------------- |
+| 処理時間     | 日次バッチ完了まで1時間以内                       | インクリメンタル処理                    |
+| スループット | 70,000デバイス分の日次データを1時間以内に集計完了 | インクリメンタル処理、Liquid Clustering |
+| データ量     | 10GB/日                                           | Liquid Clustering、インクリメンタル処理 |
 
 ---
 

@@ -92,10 +92,8 @@ const CustomerDashboard = (function () {
     // ガジェット追加モーダル専用
     _bindGadgetAddEvents(container);
 
-    // 時系列グラフ登録モーダル専用（timeline.js で定義）
-    if (typeof bindTimelineGadgetRegister === 'function') {
-      bindTimelineGadgetRegister(container);
-    }
+    // 棒グラフ登録モーダル専用
+    _bindBarChartRegisterEvents(container);
   }
 
   /**
@@ -289,6 +287,60 @@ const CustomerDashboard = (function () {
   }
 
   /* =========================================================
+   * 棒グラフ登録モーダル専用イベント
+   * ========================================================= */
+
+  function _bindBarChartRegisterEvents(container) {
+    const modeButtons = container.querySelectorAll('.bar-chart-register__device-mode-btn');
+    if (!modeButtons.length) return;
+
+    const deviceModeInput = container.querySelector('#device_mode');
+    const deviceFixedArea = container.querySelector('#device-fixed-area');
+    const deviceNameArea  = container.querySelector('#device-name-area');
+    const orgFilter       = container.querySelector('#organization-filter');
+    const deviceSelect    = container.querySelector('#device-select');
+
+    // デバイスモード切替
+    modeButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        modeButtons.forEach(function (b) {
+          b.classList.remove('bar-chart-register__device-mode-btn--active');
+        });
+        btn.classList.add('bar-chart-register__device-mode-btn--active');
+        const mode = btn.dataset.mode;
+        if (deviceModeInput) deviceModeInput.value = mode;
+        const isFixed = mode === 'fixed';
+        if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
+        if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      });
+    });
+
+    if (!orgFilter || !deviceSelect) return;
+
+    // 組織フィルターによるデバイス選択絞り込み
+    const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
+    orgFilter.addEventListener('change', function () {
+      const orgId = orgFilter.value;
+      deviceSelect.innerHTML = '<option value="">選択してください</option>';
+      allDeviceOptions.forEach(function (opt) {
+        if (!orgId || opt.dataset.org === orgId) {
+          deviceSelect.appendChild(opt.cloneNode(true));
+        }
+      });
+      deviceSelect.disabled = !orgId;
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = '-';
+    });
+
+    // デバイス選択時デバイス名表示
+    deviceSelect.addEventListener('change', function () {
+      const selected = deviceSelect.options[deviceSelect.selectedIndex];
+      const nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = selected ? (selected.dataset.name || '-') : '-';
+    });
+  }
+
+  /* =========================================================
    * 設定メニュー（⚙ ドロップダウン）
    * ========================================================= */
 
@@ -368,7 +420,9 @@ const CustomerDashboard = (function () {
       deviceSelect.disabled = true;
 
       if (!orgId) {
-        _saveDataSource(null, null);
+        await _saveDataSource(null, null);
+        _updateGadgetDatasourceDisplay(null, null);
+        _fetchAllGadgetsData({ range: 'today' });
         return;
       }
 
@@ -391,7 +445,9 @@ const CustomerDashboard = (function () {
         console.error('デバイス一覧取得エラー', e);
       }
 
-      _saveDataSource(orgId, null);
+      await _saveDataSource(orgId, null);
+      _updateGadgetDatasourceDisplay(orgId, null);
+      _fetchAllGadgetsData({ range: 'today' });
     });
 
     // デバイス選択変更時: データソース保存
@@ -433,6 +489,11 @@ const CustomerDashboard = (function () {
       : '--';
 
     document.querySelectorAll('.gadget__datasource-name').forEach(function (el) {
+      const gadgetEl = el.closest('.gadget');
+      const _raw = gadgetEl?.dataset.datasourceConfig || '{}';
+      const _parsed = JSON.parse(_raw);
+      const config = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
+      if (config.device_id !== null && config.device_id !== undefined) return;
       el.textContent = deviceName;
     });
   }
@@ -559,7 +620,9 @@ const CustomerDashboard = (function () {
     return false;
   }
 
-  function _onDragLeave() {
+  function _onDragLeave(e) {
+    // ガジェット内の子要素へ移動した場合は誤発火なので無視する
+    if (this.contains(e.relatedTarget)) return;
     this.closest('.dashboard-content')?.classList.remove('gadget--drag-over');
   }
 
@@ -568,23 +631,25 @@ const CustomerDashboard = (function () {
     const content = this.closest('.dashboard-content');
     if (content) content.classList.remove('gadget--drag-over');
 
-    if (_dragSrcEl && _dragSrcEl !== this) {
-      // DOM上でドラッグ元とドロップ先を入れ替える
-      const parent = this.parentNode;
-      const srcNext = _dragSrcEl.nextSibling;
-      const targetNext = this.nextSibling;
+    if (!_dragSrcEl || _dragSrcEl === this) return false;
 
-      if (srcNext === this) {
-        parent.insertBefore(_dragSrcEl, targetNext);
-      } else {
-        parent.insertBefore(this, _dragSrcEl);
-        if (srcNext) {
-          parent.insertBefore(_dragSrcEl, srcNext);
-        } else {
-          parent.appendChild(_dragSrcEl);
-        }
-      }
+    const srcParent = _dragSrcEl.parentNode;
+    const tgtParent = this.parentNode;
+    const srcNext = _dragSrcEl.nextSibling;
+    const tgtNext = this.nextSibling;
+
+    if (srcNext === this) {
+      // ドラッグ元がターゲットの直前: ターゲットをドラッグ元の前へ
+      srcParent.insertBefore(this, _dragSrcEl);
+    } else if (tgtNext === _dragSrcEl) {
+      // ターゲットがドラッグ元の直前: ドラッグ元をターゲットの前へ
+      tgtParent.insertBefore(_dragSrcEl, this);
+    } else {
+      // 一般ケース: 互いの元位置へ挿入（グループ間移動も対応）
+      tgtParent.insertBefore(_dragSrcEl, tgtNext);
+      srcParent.insertBefore(this, srcNext);
     }
+
     return false;
   }
 
