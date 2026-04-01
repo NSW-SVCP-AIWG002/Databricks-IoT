@@ -1,0 +1,445 @@
+/* ============================================================
+   顧客作成ダッシュボード - 共通レイアウト
+   ============================================================ */
+
+.customer-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+}
+
+.customer-dashboard__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.customer-dashboard__title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+}
+
+.customer-dashboard__toolbar-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.customer-dashboard__datasource {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.customer-dashboard__datasource-field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.customer-dashboard__content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.customer-dashboard__empty {
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--color-secondary);
+}
+
+/* ============================================================
+   ガジェット共通
+   ============================================================ */
+
+.gadget {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.gadget--2x2 {
+  width: 480px;
+  height: 480px;
+}
+
+.gadget--2x4 {
+  width: 960px;
+  height: 480px;
+}
+
+.gadget__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2) var(--spacing-4);
+  background: var(--color-primary);
+  color: #fff;
+  position: relative;
+}
+
+.gadget__title {
+  font-weight: bold;
+  font-size: var(--font-size-base);
+  text-align: center;
+  flex: 1;
+}
+
+.gadget__setting-btn {
+  position: absolute;
+  right: var(--spacing-2);
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  padding: 0 var(--spacing-1);
+}
+
+.gadget__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-bottom: 1px solid #eee;
+}
+
+.gadget__device-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-secondary);
+}
+
+.gadget__body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   棒グラフガジェット
+   ============================================================ */
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bar-chart__canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.bar-chart__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.bar-chart__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-top: 1px solid #eee;
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart__label {
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.bar-chart__unit-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.bar-chart__unit-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.bar-chart__unit-btn {
+  padding: 2px var(--spacing-2);
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  border-radius: 2px;
+}
+
+.bar-chart__unit-btn--active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.bar-chart__interval-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.bar-chart__interval-select {
+  padding: 2px var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart__datetime-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.bar-chart__datetime-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bar-chart__datetime-input {
+  width: 170px;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--spacing-2) 2px 24px;
+}
+
+.bar-chart__calendar-btn {
+  position: absolute;
+  left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+
+.bar-chart__refresh-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  padding: 0;
+  line-height: 1;
+}
+
+/* ============================================================
+   棒グラフガジェット登録モーダル
+   ============================================================ */
+
+
+.gadget-register__top-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+}
+
+
+.gadget-register__device-name-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  min-height: var(--spacing-6);
+  margin-bottom: var(--spacing-2);
+}
+
+.gadget-register__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-6);
+  margin-top: var(--spacing-4);
+}
+
+.gadget-register__left {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__minmax {
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__minmax .form__input {
+  width: 100%;
+}
+
+.gadget-register__measurement-label {
+  display: block;
+  margin-bottom: var(--spacing-1);
+}
+
+.gadget-register__middle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__middle .form__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__right {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ガジェットイメージプレビュー */
+.gadget-register__preview {
+  width: 100%;
+  height: 126px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--spacing-2);
+}
+
+.gadget-register__preview-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100%;
+}
+
+.gadget-register__preview-bar {
+  width: 20px;
+  background: var(--color-primary);
+  border-radius: 2px 2px 0 0;
+}
+.gadget-register__preview-bar--1 { height: 40%; }
+.gadget-register__preview-bar--2 { height: 70%; }
+.gadget-register__preview-bar--3 { height: 55%; }
+.gadget-register__preview-bar--4 { height: 85%; }
+
+/* デバイスモードボタン */
+.bar-chart-register__device-mode-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.bar-chart-register__device-mode-btn {
+  padding: var(--spacing-1) var(--spacing-3);
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart-register__device-mode-btn--active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* デバイス名表示 */
+.bar-chart-register__device-name {
+  font-size: var(--font-size-base);
+}
+
+.bar-chart-register__device-name--wide {
+  grid-column: 1 / 3;
+}
+
+/* デバイスモードエリア（ラベル＋ボタン同一行・グリッド列1〜2スパン） */
+.gadget-register__device-mode-area {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* 表示項目選択リスト */
+.bar-chart-register__measurement-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.bar-chart-register__measurement-list table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.bar-chart-register__measurement-list thead {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.bar-chart-register__measurement-list th,
+.bar-chart-register__measurement-list td {
+  border: 1px solid #ddd;
+}
+
+/* 表示デバイス指定セクション見出し */
+.gadget-register__section-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  margin: 0 0 var(--spacing-1) 0;
+}
+
+/* フォーム行レイアウト */
+.form__row {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: flex-start;
+  margin-top: var(--spacing-4);
+}
+
+/* インラインフォームグループ（ラベル＋コントロール同一行） */
+.form__group--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: 0;
+}
+
+.form__group--inline .form__label {
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+.form__group--half {
+  flex: 1;
+}
+
+.form__group--third {
+  flex: 1;
+}
+
+#group_id,
+#gadget_size {
+  width: 170px;
+}
+
+/* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
+.gadget--2x2 .bar-chart__unit-selector {
+  width: 100%;
+}
+
+/* 登録フォーム: 横並びグループ内のエラーメッセージを次行に折り返す */
+.form__group--inline .form__error {
+  flex-basis: 100%;
+  margin-top: var(--spacing-1);
+}

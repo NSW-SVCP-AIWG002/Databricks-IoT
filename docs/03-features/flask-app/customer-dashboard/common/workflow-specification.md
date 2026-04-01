@@ -177,8 +177,8 @@
 | 14 | ダッシュボードグループ削除確認画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認モーダル表示 | HTML（モーダル） | - |
 | 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
 | 16 | ガジェット追加画面 | `/analysis/customer-dashboard/gadgets/add` | GET | ガジェット追加モーダル表示 | HTML（モーダル） | - |
-| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/analysis/customer-dashboard/gadgets/bar-chart/create`） |
-| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard`、ガジェット毎にFlaskルートが異なる（棒グラフの場合: `/analysis/customer-dashboard/gadgets/bar-chart/register`） |
+| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | `{gadget_type}` はガジェット種別名（文字列）。`common.py` の共通ルートがガジェット種別ごとのハンドラーにディスパッチする（例: `timeline`, `bar-chart`） |
+| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard`。`{gadget_type}` はガジェット種別名（文字列）。`common.py` の共通ルートがディスパッチする |
 | 19 | ガジェットタイトル更新画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新モーダル表示 | HTML（モーダル） | - |
 | 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
 | 21 | ガジェット削除確認画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認モーダル表示 | HTML（モーダル） | - |
@@ -231,7 +231,7 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 登録画面ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示 |
+| 登録画面ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示（`{gadget_type}` には `gadget_type_name` 文字列を使用。`gadget_add.html` の `data-create-url` 属性に `url_for('customer_dashboard.gadget_create', gadget_type=gadget_type.gadget_type_name)` で設定） |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 登録・更新モーダル
@@ -2334,7 +2334,8 @@ flowchart TD
 - データソースが「組織」のガジェットは、選択された組織がデータソースになる（WHERE句の `organization_id` が変更）
 
 **デバイス選択変更時:**
-- データソースが「デバイス」のガジェットは、選択されたデバイスがデータソースになる（WHERE句の `device_id` が変更）
+- データソースが「デバイス」のガジェットのうち、**デバイス可変モード**（`data_source_config.device_id` が null）のものは、選択されたデバイスがデータソースになる（WHERE句の `device_id` が変更）
+- **デバイス固定モード**（`data_source_config.device_id` が設定されている）のガジェットは、グローバルフィルタの変更対象外。登録時に指定されたデバイスIDを常に使用する
 - 各ガジェットのデータを再取得
 
 **組織・デバイスが未選択の場合:**

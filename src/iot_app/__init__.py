@@ -1,11 +1,17 @@
+import logging as _logging
 import os
 import sys
 import logging
+import time
+import uuid
 
-from flask import Flask, jsonify, g, session
+from flask import Flask, g, jsonify, request, session
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
+_logger = None
+_sql_logger = None
 
 
 def configure_logging(app, env):
@@ -36,6 +42,8 @@ def configure_logging(app, env):
 
 def create_app():
     """Flaskアプリケーションファクトリ"""
+    global _logger, _sql_logger
+
     app = Flask(__name__)
 
     config_name = os.getenv("FLASK_ENV", "development")
@@ -45,8 +53,49 @@ def create_app():
 
     db.init_app(app)
 
+    # db.create_all() が全テーブルを認識できるようモデルを明示インポート
+    with app.app_context():
+        from iot_app.models import customer_dashboard, organization, device, measurement  # noqa: F401
+
     # ログハンドラー設定
     configure_logging(app, config_name)
+
+    from iot_app.common.logger import get_logger
+    _logger = get_logger(__name__)
+    _sql_logger = get_logger("iot_app.sql")
+
+    # ── リクエスト前後ログ（6.2）──────────────────────────────────────────
+
+    @app.before_request
+    def _before_request():
+        g.request_id = str(uuid.uuid4())
+        g.request_start_time = time.monotonic()
+        _logger.info("リクエスト開始")
+
+    @app.after_request
+    def _after_request(response):
+        duration_ms = int((time.monotonic() - getattr(g, "request_start_time", time.monotonic())) * 1000)
+        _logger.info(
+            "リクエスト完了",
+            extra={"httpStatus": response.status_code, "processingTime": duration_ms},
+        )
+        return response
+
+    # ── SQLAlchemy イベントリスナー（6.5）────────────────────────────────
+
+    with app.app_context():
+        from sqlalchemy import event as _sa_event
+
+        @_sa_event.listens_for(db.engine, "before_cursor_execute")
+        def _before_sql(conn, cursor, statement, parameters, context, executemany):
+            conn.info.setdefault("query_start_time", []).append(time.monotonic())
+
+        @_sa_event.listens_for(db.engine, "after_cursor_execute")
+        def _after_sql(conn, cursor, statement, parameters, context, executemany):
+            duration_ms = int((time.monotonic() - conn.info["query_start_time"].pop(-1)) * 1000)
+            stmt = statement.strip()
+            level = _logging.DEBUG if stmt.upper().startswith("SELECT") else _logging.INFO
+            _sql_logger.log(level, "SQL実行", extra={"query": stmt, "duration_ms": duration_ms})
 
     # auth_provider を初期化（get_auth_provider は current_app を参照するため app context 内で実行）
     import iot_app.auth.middleware as mw
@@ -76,10 +125,6 @@ def create_app():
     def index():
         from flask import redirect
         return redirect('/analysis/industry-dashboard/store-monitoring')
-
-    # エラーハンドラー登録
-    from iot_app.common.error_handlers import register_error_handlers
-    register_error_handlers(app)
 
     # 分析機能 Blueprint
     from iot_app.views.analysis import customer_dashboard_bp

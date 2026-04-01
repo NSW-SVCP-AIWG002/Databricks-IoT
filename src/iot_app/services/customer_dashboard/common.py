@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from sqlalchemy import func
@@ -319,6 +320,10 @@ def get_gadgets_by_groups(group_ids):
     )
 
 
+# gadget_size 文字列 → DB整数値の変換マップ（dashboard_gadget_master.gadget_size: 0=2x2, 1=2x4）
+GADGET_SIZE_TO_INT = {'2x2': 0, '2x4': 1}
+
+
 def get_gadget_type_id_by_name(gadget_type_name):
     """ガジェット種別名から gadget_type_id を返す。該当なしの場合は None"""
     result = (
@@ -327,6 +332,23 @@ def get_gadget_type_id_by_name(gadget_type_name):
         .first()
     )
     return result.gadget_type_id if result else None
+
+
+def get_gadget_type(gadget_uuid):
+    """gadget_uuid から gadget_type_name を返す。
+    dashboard_gadget_master と gadget_type_master を JOIN して逆引きする。
+    該当レコードが存在しない場合は None を返す。
+    """
+    result = (
+        db.session.query(GadgetTypeMaster.gadget_type_name)
+        .join(DashboardGadgetMaster, DashboardGadgetMaster.gadget_type_id == GadgetTypeMaster.gadget_type_id)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .first()
+    )
+    return result.gadget_type_name if result else None
 
 
 def get_gadget_types():
@@ -481,6 +503,50 @@ def get_devices(organization_id):
             DeviceMaster.delete_flag == False,
         )
         .order_by(DeviceMaster.device_id)
+        .all()
+    )
+
+
+def get_fixed_gadget_device_names(gadgets):
+    """固定モードガジェットのデバイス名を返す
+
+    Returns:
+        dict: {gadget_uuid: device_name} （固定モードのガジェットのみ）
+    """
+    fixed_device_id_map = {}
+    for gadget in gadgets:
+        if gadget.data_source_config:
+            try:
+                config = json.loads(gadget.data_source_config)
+                device_id = config.get('device_id')
+                if device_id is not None:
+                    fixed_device_id_map[gadget.gadget_uuid] = device_id
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+    if not fixed_device_id_map:
+        return {}
+
+    device_name_map = {
+        d.device_id: d.device_name
+        for d in _get_devices_by_ids(list(set(fixed_device_id_map.values())))
+    }
+    return {
+        gadget_uuid: device_name_map.get(device_id, '--')
+        for gadget_uuid, device_id in fixed_device_id_map.items()
+    }
+
+
+def _get_devices_by_ids(device_ids):
+    """デバイスID一覧に対応するデバイス一覧を返す（内部使用）"""
+    if not device_ids:
+        return []
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.device_id.in_(device_ids),
+            DeviceMaster.delete_flag == False,
+        )
         .all()
     )
 

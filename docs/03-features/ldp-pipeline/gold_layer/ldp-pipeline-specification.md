@@ -7,19 +7,24 @@
   - [概要](#概要)
   - [処理一覧](#処理一覧)
   - [ワークフロー詳細](#ワークフロー詳細)
-    - [日次集計処理](#日次集計処理)
+    - [時次集計処理](#時次集計処理)
       - [処理フロー](#処理フロー)
       - [処理詳細](#処理詳細)
       - [バリデーション](#バリデーション)
-    - [月次集計処理](#月次集計処理)
+    - [日次集計処理](#日次集計処理)
       - [処理フロー](#処理フロー-1)
       - [処理詳細](#処理詳細-1)
-    - [年次集計処理](#年次集計処理)
+      - [バリデーション](#バリデーション-1)
+    - [月次集計処理](#月次集計処理)
       - [処理フロー](#処理フロー-2)
       - [処理詳細](#処理詳細-2)
+    - [年次集計処理](#年次集計処理)
+      - [処理フロー](#処理フロー-3)
+      - [処理詳細](#処理詳細-3)
   - [データ変換仕様](#データ変換仕様)
     - [共通集約方法（gold\_summary\_method\_master）](#共通集約方法gold_summary_method_master)
     - [マスタテーブル結合方式](#マスタテーブル結合方式)
+    - [時次集計変換ロジック](#時次集計変換ロジック)
     - [日次集計変換ロジック](#日次集計変換ロジック)
     - [月次集計変換ロジック](#月次集計変換ロジック)
     - [年次集計変換ロジック](#年次集計変換ロジック)
@@ -71,7 +76,8 @@
 このドキュメントは、ゴールド層LDPパイプラインの処理フロー、データ変換ロジック、エラーハンドリングの詳細を記載します。
 
 **このドキュメントの役割:**
-- ✅ 処理フローの詳細（日次・月次・年次集計処理）
+
+- ✅ 処理フローの詳細（時次・日次・月次・年次集計処理）
 - ✅ データ変換ロジック（集約対象項目・集約方法）
 - ✅ エラーハンドリングフロー
 - ✅ トランザクション管理
@@ -79,14 +85,14 @@
 
 **パイプライン概要:**
 
-| 項目     | 値                                           |
-| -------- | -------------------------------------------- |
-| 機能ID   | FR-002-2                                     |
-| 機能名   | データ処理（ゴールド層）                     |
-| 処理方式 | インクリメンタル処理                         |
-| 実行頻度 | 日次バッチ                                   |
-| 入力     | シルバー層センサーデータ                     |
-| 出力     | ゴールド層サマリテーブル（日次・月次・年次） |
+| 項目     | 値                                                 |
+| -------- | -------------------------------------------------- |
+| 機能ID   | FR-002-2                                           |
+| 機能名   | データ処理（ゴールド層）                           |
+| 処理方式 | インクリメンタル処理                               |
+| 実行頻度 | 定時バッチ（1時間に1回）                           |
+| 入力     | シルバー層センサーデータ                           |
+| 出力     | ゴールド層サマリテーブル（時次・日次・月次・年次） |
 
 **注:** テーブル定義・カラム仕様の詳細は [README.md](./README.md) を参照してください。
 
@@ -96,19 +102,113 @@
 
 | No  | 処理名       | 処理タイプ | 入力               | 出力                             | 説明                         |
 | --- | ------------ | ---------- | ------------------ | -------------------------------- | ---------------------------- |
-| 1   | 日次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_daily_summary   | シルバー層データを日次で集計 |
-| 2   | 月次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_monthly_summary | シルバー層データを月次で集計 |
-| 3   | 年次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_yearly_summary  | シルバー層データを年次で集計 |
+| 1   | 時次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_hourly_summary  | シルバー層データを時次で集計 |
+| 2   | 日次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_daily_summary   | シルバー層データを日次で集計 |
+| 3   | 月次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_monthly_summary | シルバー層データを月次で集計 |
+| 4   | 年次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_yearly_summary  | シルバー層データを年次で集計 |
 
 ---
 
 ## ワークフロー詳細
+
+### 時次集計処理
+
+**トリガー:** 時次バッチスケジュール
+
+**前提条件:**
+- シルバー層テーブル `silver_sensor_data` にデータが存在する
+- 対象時の全データがシルバー層に取り込み完了している
+
+#### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([時次集計処理開始]) --> GetDate[処理対象時を取得<br>default: 前時]
+    GetDate --> CheckSource{シルバー層に<br>対象時データが<br>存在するか}
+
+    CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
+    LogNoData --> EndSuccess([処理終了<br>正常完了])
+    CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_datetime = 対象時]
+    ReadSilver --> CheckRead{読込結果}
+
+    CheckRead -->|成功| Transform[データ変換<br>集約対象項目ごとに<br>統計値を算出]
+    CheckRead -->|失敗| ErrorRead[エラーログ出力]
+    ErrorRead --> RetryRead{リトライ<br>回数確認}
+    RetryRead -->|3回未満| ReadSilver
+    RetryRead -->|3回以上| AlertRead[エラー通知]
+    AlertRead --> EndError([処理終了<br>異常終了])
+
+    Transform --> Validate{バリデーション<br>結果確認}
+    Validate -->|エラー| ErrorValidate[不正データをログ出力<br>スキップして続行]
+    ErrorValidate --> WriteGold
+
+    Validate -->|OK| WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_hourly_summary]
+    WriteGold --> CheckWrite{書込結果}
+
+    CheckWrite -->|成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
+    UpdateMeta --> EndSuccess
+
+    CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
+    ErrorWrite --> RetryWrite{リトライ<br>回数確認}
+    RetryWrite -->|3回未満| WriteGold
+    RetryWrite -->|3回以上| AlertWrite[エラー通知]
+    AlertWrite --> EndError
+```
+
+#### 処理詳細
+
+時次集計処理は[共通集計処理](#共通集計処理の実装)を使用して実行します。
+
+**実行例:**
+
+```python
+from datetime import date, timedelta
+
+# 前時の時刻を取得
+target_datetime = datetime.now() - timedelta(hour=1)
+
+# 時次集計を実行
+run_aggregation(
+    period=AggregationPeriod.DAILY,
+    target_filter=f"event_datetime = '{target_datetime}'"
+)
+```
+
+**処理ステップ:**
+
+| ステップ | 処理内容             | 詳細                                 |
+| -------- | -------------------- | ------------------------------------ |
+| ①        | シルバー層データ読込 | `event_datetime = 対象時` でフィルタ |
+| ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し |
+| ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理        |
+
+**設定値:**
+
+| 項目         | 値                                                 |
+| ------------ | -------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_hourly_summary` |
+| 時間カラム   | `collection_datetime`                              |
+| 時間式       | `event_datetime`                                   |
+
+#### バリデーション
+
+| 項目                | ルール                                    | エラー時の処理                       |
+| ------------------- | ----------------------------------------- | ------------------------------------ |
+| device_id           | NOT NULL                                  | 該当レコードをスキップ、ログ出力     |
+| organization_id     | NOT NULL                                  | 該当レコードをスキップ、ログ出力     |
+| collection_datetime | 有効な時刻                                | 該当レコードをスキップ、ログ出力     |
+| summary_item        | 1〜22の範囲                               | 該当レコードをスキップ、ログ出力     |
+| summary_method_id   | マスタテーブルに存在（delete_flag=FALSE） | マスタ結合時に自動除外               |
+| summary_value       | 数値型                                    | NULL値を許容（データ欠損として記録） |
+
+---
 
 ### 日次集計処理
 
 **トリガー:** 日次バッチスケジュール（深夜実行）
 
 **前提条件:**
+
 - シルバー層テーブル `silver_sensor_data` にデータが存在する
 - 対象日の全データがシルバー層に取り込み完了している
 
@@ -214,7 +314,13 @@ flowchart TD
     LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date BETWEEN 月初 AND 月末]
-    ReadSilver --> Transform[データ変換<br>センサーデータを月次で集約]
+    ReadSilver --> CheckRead{読込結果}
+    CheckRead -->|成功| Transform[データ変換<br>センサーデータを月次で集約]
+    CheckRead -->|失敗| ErrorRead[エラーログ出力]
+    ErrorRead --> RetryRead{リトライ<br>回数確認}
+    RetryRead -->|3回未満| ReadSilver
+    RetryRead -->|3回以上| AlertRead[エラー通知]
+    AlertRead --> EndError
     Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_monthly_summary]
     WriteGold --> CheckWrite{書込結果}
 
@@ -227,6 +333,8 @@ flowchart TD
     Retry -->|3回以上| Alert[エラー通知]
     Alert --> EndError([処理終了<br>異常終了])
 ```
+
+> **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
 
 #### 処理詳細
 
@@ -260,11 +368,11 @@ run_aggregation(
 
 **設定値:**
 
-| 項目         | 値                                                  |
-| ------------ | --------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary` |
-| 時間カラム   | `collection_year_month`                             |
-| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM')`                |
+| 項目         | 値                                                            |
+| ------------ | ------------------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary`           |
+| 時間カラム   | `collection_year_month`                                       |
+| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month` |
 
 ---
 
@@ -286,7 +394,13 @@ flowchart TD
     LogNoData --> EndSuccess([処理終了<br>正常完了])
 
     CheckSource -->|データあり| ReadSilver["シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年"]
-    ReadSilver --> Transform[データ変換<br>センサーデータを年次で集約]
+    ReadSilver --> CheckRead{読込結果}
+    CheckRead -->|成功| Transform[データ変換<br>センサーデータを年次で集約]
+    CheckRead -->|失敗| ErrorRead[エラーログ出力]
+    ErrorRead --> RetryRead{リトライ<br>回数確認}
+    RetryRead -->|3回未満| ReadSilver
+    RetryRead -->|3回以上| AlertRead[エラー通知]
+    AlertRead --> EndError
     Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_yearly_summary]
     WriteGold --> CheckWrite{書込結果}
 
@@ -299,6 +413,8 @@ flowchart TD
     Retry -->|3回以上| Alert[エラー通知]
     Alert --> EndError([処理終了<br>異常終了])
 ```
+
+> **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
 
 #### 処理詳細
 
@@ -333,7 +449,7 @@ run_aggregation(
 | ------------ | -------------------------------------------------- |
 | 出力テーブル | `iot_catalog.gold.gold_sensor_data_yearly_summary` |
 | 時間カラム   | `collection_year`                                  |
-| 時間式       | `YEAR(event_date)`                                 |
+| 時間式       | `YEAR(event_date) AS collection_year`              |
 
 ---
 
@@ -384,11 +500,22 @@ VALUES
 | 一貫性       | 日次・月次・年次で同一のマスタを参照し、集約方法の一貫性を保証 |
 
 **結合条件:**
+
 ```sql
 INNER JOIN iot_catalog.gold.gold_summary_method_master m
     ON u.method_code = m.summary_method_code
 WHERE m.delete_flag = FALSE
 ```
+
+### 時次集計変換ロジック
+
+シルバー層センサーデータを時次で集計し、マスタテーブルで有効な集約方法のレコードを生成します。
+
+| 入力データ         | 集約キー                                                 | 出力                                                  |
+| ------------------ | -------------------------------------------------------- | ----------------------------------------------------- |
+| silver_sensor_data | device_id, organization_id, event_datetime, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
+
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
 
 ### 日次集計変換ロジック
 
@@ -398,6 +525,8 @@ WHERE m.delete_flag = FALSE
 | ------------------ | ---------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, event_date, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
 
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
+
 ### 月次集計変換ロジック
 
 シルバー層センサーデータを月次で集計し、マスタテーブルで有効な集約方法のレコードを生成します。
@@ -405,6 +534,8 @@ WHERE m.delete_flag = FALSE
 | 入力データ         | 集約キー                                                        | 出力                                                  |
 | ------------------ | --------------------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, collection_year_month, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
+
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
 
 ### 年次集計変換ロジック
 
@@ -414,21 +545,23 @@ WHERE m.delete_flag = FALSE
 | ------------------ | --------------------------------------------------------- | ----------------------------------------------------- |
 | silver_sensor_data | device_id, organization_id, collection_year, summary_item | マスタで有効な集約方法（delete_flag=FALSE）のレコード |
 
+sensor_value が全件 NULL のグループはサマリレコードが生成されない
+
 ### 共通集計処理の実装
 
-日次・月次・年次集計処理は構造が共通（約90%）のため、パラメータ化された共通関数として実装します。
+時次・日次・月次・年次集計処理は構造が共通（約90%）のため、パラメータ化された共通関数として実装します。
 
 #### 共通部分と差分
 
-| 項目                   | 共通/差分 | 説明                                                 |
-| ---------------------- | --------- | ---------------------------------------------------- |
-| stack関数によるunpivot | 共通      | 22項目の横持ち→縦持ち変換                            |
-| 統計値計算             | 共通      | AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95                |
-| マスタテーブル結合     | 共通      | gold_summary_method_masterとのINNER JOIN             |
-| MERGE処理              | 共通      | upsert処理                                           |
-| 集約キー               | **差分**  | event_date / collection_year_month / collection_year |
-| 出力テーブル           | **差分**  | daily / monthly / yearly                             |
-| WHERE条件              | **差分**  | 日付条件                                             |
+| 項目                   | 共通/差分 | 説明                                                                                                         |
+| ---------------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| stack関数によるunpivot | 共通      | 22項目の横持ち→縦持ち変換                                                                                    |
+| 統計値計算             | 共通      | AVG/MAX/MIN/P25/MEDIAN/P75/STDDEV/P95                                                                        |
+| マスタテーブル結合     | 共通      | gold_summary_method_masterとのINNER JOIN                                                                     |
+| MERGE処理              | 共通      | upsert処理                                                                                                   |
+| 集約キー               | **差分**  | event_datetime / event_date / colecction_datetime / collecton_date / collection_year_month / collection_year |
+| 出力テーブル           | **差分**  | hourly / daily / monthly / yearly                                                                            |
+| WHERE条件              | **差分**  | 日付条件                                                                                                     |
 
 #### 設定クラス定義
 
@@ -438,9 +571,11 @@ from dataclasses import dataclass
 from typing import Callable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException  # リトライ対象外例外（テーブル未存在・権限不足等）
 
 class AggregationPeriod(Enum):
     """集計期間"""
+    HOURLY = "hourly"
     DAILY = "daily"
     MONTHLY = "monthly"
     YEARLY = "yearly"
@@ -455,6 +590,12 @@ class AggregationConfig:
 
 # 設定定義
 AGGREGATION_CONFIGS = {
+    AggregationPeriod.HOURLY: AggregationConfig(
+        period=AggregationPeriod.HOURLY,
+        output_table="iot_catalog.gold.gold_sensor_data_hourly_summary",
+        time_column="collection_datetime",
+        time_expr="event_datetime"
+    ),
     AggregationPeriod.DAILY: AggregationConfig(
         period=AggregationPeriod.DAILY,
         output_table="iot_catalog.gold.gold_sensor_data_daily_summary",
@@ -539,6 +680,9 @@ def aggregate_sensor_data(
         "device_id",
         "organization_id",
         f"{config.time_expr} AS {config.time_column}",
+        # → DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month（月次）
+        # → YEAR(event_date) AS collection_year（年次）
+        
         create_unpivot_expr()
     ).filter("sensor_value IS NOT NULL")
 
@@ -592,7 +736,7 @@ def aggregate_sensor_data(
         "organization_id",
         config.time_column,
         "summary_item",
-        "summary_method_id",
+        "summary_method_id", # gold_summary_method_master から取得
         "summary_value",
         "data_count",
         F.current_timestamp().alias("create_time")
@@ -631,8 +775,7 @@ def merge_to_gold(aggregated_df: DataFrame, config: AggregationConfig):
     ).whenMatchedUpdate(
         set={
             "summary_value": "source.summary_value",
-            "data_count": "source.data_count",
-            "create_time": "source.create_time"
+            "data_count": "source.data_count"
         }
     ).whenNotMatchedInsertAll().execute()
 ```
@@ -640,15 +783,21 @@ def merge_to_gold(aggregated_df: DataFrame, config: AggregationConfig):
 #### 集計処理の実行
 
 ```python
+import logging
+logger = logging.getLogger(__name__)
+
 def run_aggregation(period: AggregationPeriod, target_filter: str):
     """
     集計処理の実行
 
     Args:
-        period: 集計期間（DAILY/MONTHLY/YEARLY）
+        period: 集計期間（HOURLY/DAILY/MONTHLY/YEARLY）
         target_filter: WHERE条件
 
     Examples:
+        # 時次集計（前時）
+        run_aggregation(AggregationPeriod.HOURLY, "event_datetime = '2026-01-28 0:00:00'")
+
         # 日次集計（前日）
         run_aggregation(AggregationPeriod.DAILY, "event_date = '2026-01-28'")
 
@@ -661,28 +810,65 @@ def run_aggregation(period: AggregationPeriod, target_filter: str):
     """
     config = AGGREGATION_CONFIGS[period]
 
+    # フェーズ1: シルバー層データ読込（最大3回リトライ）
+    MAX_READ_RETRY = 3
+    silver_df = None
+    for attempt in range(1, MAX_READ_RETRY + 1):
+        try:
+            silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
+                .filter(target_filter)
+            break  # 読込成功
+        except (AnalysisException, PermissionError) as e:
+            # リトライ対象外（テーブル未存在・権限不足・不正なクエリ等）
+            error_msg = f"シルバー層からのデータ読込に失敗しました（リトライ不可）: {str(e)}"
+            logger.error(f"GOLD_ERR_001: {error_msg}")
+            notify_error(
+                error_code="GOLD_ERR_001",
+                error_message=error_msg,
+                pipeline_name=config.output_table,
+                target_date=target_filter
+            )
+            raise
+        except Exception as e:
+            # リトライ対象（ネットワーク・タイムアウト等の一時的エラー）
+            error_msg = f"シルバー層からのデータ読込に失敗しました (試行 {attempt}/{MAX_READ_RETRY}): {str(e)}"
+            logger.error(f"GOLD_ERR_001: {error_msg}")
+            if attempt >= MAX_READ_RETRY:
+                notify_error(
+                    error_code="GOLD_ERR_001",
+                    error_message=error_msg,
+                    pipeline_name=config.output_table,
+                    target_date=target_filter
+                )
+                raise
+
+    if silver_df.isEmpty():
+        logger.warning(f"GOLD_WARN_001: 対象期間のデータが存在しません ({period.value})")
+        return
+
+    # フェーズ2: 集計処理
     try:
-        # シルバー層データ読込
-        silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
-            .filter(target_filter)
-
-        if silver_df.isEmpty():
-            logger.warning(f"GOLD_WARN_001: 対象期間のデータが存在しません ({period.value})")
-            return
-
-        # 共通集計処理
         aggregated = aggregate_sensor_data(silver_df, config)
-
-        # MERGE処理
-        merge_to_gold(aggregated, config)
-
-        logger.info(f"{period.value}集計完了: {aggregated.count()} レコード")
-
     except Exception as e:
-        error_msg = f"集計処理中にエラーが発生しました: {str(e)}"
+        error_msg = f"データ変換中にエラーが発生しました: {str(e)}"
         logger.error(f"GOLD_ERR_002: {error_msg}")
         notify_error(
             error_code="GOLD_ERR_002",
+            error_message=error_msg,
+            pipeline_name=config.output_table,
+            target_date=target_filter
+        )
+        raise
+
+    # フェーズ3: MERGE処理（書込）
+    try:
+        merge_to_gold(aggregated, config)
+        logger.info(f"{period.value}集計完了: {aggregated.count()} レコード")
+    except Exception as e:
+        error_msg = f"ゴールド層への書込に失敗しました: {str(e)}"
+        logger.error(f"GOLD_ERR_003: {error_msg}")
+        notify_error(
+            error_code="GOLD_ERR_003",
             error_message=error_msg,
             pipeline_name=config.output_table,
             target_date=target_filter
@@ -692,13 +878,13 @@ def run_aggregation(period: AggregationPeriod, target_filter: str):
 
 #### 共通化のメリット
 
-| 観点     | 効果                                    |
-| -------- | --------------------------------------- |
-| コード量 | 約60%削減（3つの処理→1つの共通関数）    |
-| 保守性   | 統計値追加時、1箇所の修正で全期間に反映 |
-| テスト   | 共通ロジックのテストで3処理をカバー     |
-| バグ修正 | 1箇所の修正で全期間に適用               |
-| 一貫性   | 日次・月次・年次で同一ロジックを保証    |
+| 観点     | 効果                                       |
+| -------- | ------------------------------------------ |
+| コード量 | 約60%削減（3つの処理→1つの共通関数）       |
+| 保守性   | 統計値追加時、1箇所の修正で全期間に反映    |
+| テスト   | 共通ロジックのテストで3処理をカバー        |
+| バグ修正 | 1箇所の修正で全期間に適用                  |
+| 一貫性   | 時次・日次・月次・年次で同一ロジックを保証 |
 
 ---
 
@@ -712,16 +898,17 @@ sequenceDiagram
     participant LDP as LDPパイプライン
     participant Silver as シルバー層<br>silver_sensor_data
     participant Master as マスタ<br>gold_summary_method_master
+    participant GoldHourly as ゴールド層<br>gold_sensor_data_hourly_summary
     participant GoldDaily as ゴールド層<br>gold_sensor_data_daily_summary
     participant GoldMonthly as ゴールド層<br>gold_sensor_data_monthly_summary
     participant GoldYearly as ゴールド層<br>gold_sensor_data_yearly_summary
     participant Alert as エラー通知
 
-    Note over Scheduler,Alert: 日次バッチ（毎日深夜実行）
+    Note over Scheduler,Alert: 時次バッチ（毎時0分0秒実行）
 
-    Scheduler->>LDP: 日次集計処理を起動
+    Scheduler->>LDP: 時次集計処理を起動
 
-    LDP->>Silver: 前日データ読込
+    LDP->>Silver: 前時データ読込
     Silver-->>LDP: センサーデータ
 
     LDP->>LDP: データ変換<br>（横持ち→縦持ち、統計値計算）
@@ -732,12 +919,38 @@ sequenceDiagram
     LDP->>LDP: マスタ結合<br>（有効な集約方法のみ出力）
 
     alt 変換成功
-        LDP->>GoldDaily: MERGE INTO gold_sensor_data_daily_summary
-        GoldDaily-->>LDP: 書込成功
-        LDP-->>Scheduler: 日次集計完了
+        LDP->>GoldHourly: MERGE INTO gold_sensor_data_hourly_summary
+        GoldHourly-->>LDP: 書込成功
+        LDP-->>Scheduler: 時次集計完了
     else 変換失敗
         LDP->>Alert: エラー通知
-        LDP-->>Scheduler: 日次集計失敗
+        LDP-->>Scheduler: 時次集計失敗
+    end
+    
+    
+    Note over Scheduler,Alert: 0:00:00を超えた場合は日次集計も実行
+
+    opt 0:00:00を超えた場合
+        Scheduler->>LDP: 日次集計処理を起動
+
+        LDP->>Silver: 前日データ読込
+        Silver-->>LDP: センサーデータ
+
+        LDP->>LDP: データ変換<br>（横持ち→縦持ち、統計値計算）
+
+        LDP->>Master: 有効な集約方法を取得<br>（delete_flag = FALSE）
+        Master-->>LDP: 集約方法マスタ
+
+        LDP->>LDP: マスタ結合<br>（有効な集約方法のみ出力）
+
+        alt 変換成功
+            LDP->>GoldDaily: MERGE INTO gold_sensor_data_daily_summary
+            GoldDaily-->>LDP: 書込成功
+            LDP-->>Scheduler: 日次集計完了
+        else 変換失敗
+            LDP->>Alert: エラー通知
+            LDP-->>Scheduler: 日次集計失敗
+        end
     end
 
     Note over Scheduler,Alert: 月初の場合は月次集計も実行
@@ -790,6 +1003,11 @@ sequenceDiagram
         end
     end
 ```
+
+> **日次・月初・年初判定の責務分担:**
+> 日次・月次・年次集計の起動判断（日次=0:00:00を超えたか、月初=1日か、年初=1月1日か）は**スケジューラが行う**。
+> パイプラインは `run_aggregation()` を受動的に呼び出すだけであり、日付判定ロジックを内包しない。
+> スケジューラは毎時に時次集計を起動し、0:00:00を超えていたら日次集計も、当日が月初であれば月次集計も、1月1日であれば年次集計も追加で起動する。
 
 ---
 
@@ -1045,26 +1263,28 @@ def notify_error(error_code: str, error_message: str, pipeline_name: str, target
 #### パイプラインへの組み込み例
 
 ```python
-@dlt.table(name="gold_sensor_data_daily_summary")
-def gold_sensor_data_daily_summary():
+from datetime import date, timedelta
+
+def run_daily_aggregation():
     """日次集計処理（Teams通知付き）"""
-    target_date = date_sub(current_date(), 1)
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
         # シルバー層からデータ読込
-        silver_df = dlt.read("silver_sensor_data")
+        silver_df = spark.table("iot_catalog.silver.silver_sensor_data")
         daily_data = silver_df.filter(
-            to_date(col("collection_timestamp")) == target_date
+            col("event_date") == target_date
         )
 
         if daily_data.isEmpty():
             logger.warning("GOLD_WARN_001: 対象期間のデータが存在しません")
-            return spark.createDataFrame([], schema)
+            return
 
         # 集計処理
-        aggregated = perform_daily_aggregation(daily_data)
+        config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+        aggregated = aggregate_sensor_data(daily_data, config)
+        merge_to_gold(aggregated, config)
         logger.info(f"日次集計完了: {aggregated.count()} レコード")
-        return aggregated
 
     except Exception as e:
         # エラー通知をTeamsに送信
@@ -1072,7 +1292,7 @@ def gold_sensor_data_daily_summary():
             error_code="GOLD_ERR_002",
             error_message=f"データ変換中にエラーが発生しました: {str(e)}",
             pipeline_name="gold_sensor_data_daily_summary",
-            target_date=str(target_date)
+            target_date=target_date
         )
         raise
 ```
@@ -1080,51 +1300,59 @@ def gold_sensor_data_daily_summary():
 ### 例外処理実装例（Python）
 
 ```python
-import dlt
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
+from datetime import date, timedelta
+from pyspark.sql.functions import col
 import logging
 
 logger = logging.getLogger(__name__)
 
-@dlt.table(
-    name="gold_sensor_data_daily_summary",
-    comment="日次センサーデータサマリ",
-    table_properties={
-        "quality": "gold",
-        "pipelines.autoOptimize.managed": "true"
-    }
-)
-@dlt.expect_all({
-    "valid_device_id": "device_id IS NOT NULL",
-    "valid_organization_id": "organization_id IS NOT NULL",
-    "valid_collection_date": "collection_date IS NOT NULL",
-    "valid_summary_item": "summary_item BETWEEN 1 AND 22"
-    # summary_method_idはマスタテーブル結合により自動的に有効な値のみ出力
-})
-def gold_sensor_data_daily_summary():
+def run_daily_aggregation():
     """日次集計処理"""
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
     try:
         # シルバー層からデータ読込
-        silver_df = dlt.read("silver_sensor_data")
+        silver_df = spark.table("iot_catalog.silver.silver_sensor_data")
 
         # 対象日のデータをフィルタ
-        target_date = date_sub(current_date(), 1)
         daily_data = silver_df.filter(
-            to_date(col("collection_timestamp")) == target_date
+            col("event_date") == target_date
         )
 
         # データが存在しない場合
         if daily_data.isEmpty():
             logger.warning("GOLD_WARN_001: 対象期間のデータが存在しません")
-            return spark.createDataFrame([], schema)
+            return
 
-        # 集計処理
-        aggregated = perform_daily_aggregation(daily_data)
+        # バリデーション前後の件数差分を取得してスキップ数をログ出力
+        count_before = daily_data.count()
+        validated_data = daily_data.filter(
+            "device_id IS NOT NULL "
+            "AND organization_id IS NOT NULL "
+            "AND event_date IS NOT NULL"
+        )
+        count_after = validated_data.count()
+        skip_count = count_before - count_after
+
+        if skip_count > 0:
+            logger.warning(
+                f"GOLD_WARN_002候補: バリデーション失敗により {skip_count} 件をスキップしました "
+                f"（全 {count_before} 件中）"
+            )
+            if skip_count >= 100:
+                notify_error(
+                    error_code="GOLD_WARN_002",
+                    error_message=f"バリデーション失敗により {skip_count} 件をスキップしました",
+                    pipeline_name="gold_sensor_data_daily_summary",
+                    target_date=target_date
+                )
+
+        # 集計処理（バリデーション済みデータのみ使用）
+        config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+        aggregated = aggregate_sensor_data(validated_data, config)
+        merge_to_gold(aggregated, config)
 
         logger.info(f"日次集計完了: {aggregated.count()} レコード")
-        return aggregated
 
     except Exception as e:
         logger.error(f"GOLD_ERR_002: データ変換中にエラーが発生しました: {str(e)}")
@@ -1139,6 +1367,7 @@ def gold_sensor_data_daily_summary():
 
 | 処理     | トランザクション範囲 | コミットタイミング   | ロールバック条件 |
 | -------- | -------------------- | -------------------- | ---------------- |
+| 時次集計 | 1時間分のデータ単位  | 全レコード書込完了後 | 書込エラー発生時 |
 | 日次集計 | 1日分のデータ単位    | 全レコード書込完了後 | 書込エラー発生時 |
 | 月次集計 | 1か月分のデータ単位  | 全レコード書込完了後 | 書込エラー発生時 |
 | 年次集計 | 1年分のデータ単位    | 全レコード書込完了後 | 書込エラー発生時 |
@@ -1173,7 +1402,7 @@ WHEN NOT MATCHED THEN INSERT *
 
 | 要件         | 値                          | 対応策                                 |
 | ------------ | --------------------------- | -------------------------------------- |
-| 処理時間     | 日次バッチ完了まで1時間以内 | インクリメンタル処理、クラスタ最適化   |
+| 処理時間     | 時次バッチ完了まで1時間以内 | インクリメンタル処理、クラスタ最適化   |
 | スループット | 10,000デバイス × 1分間隔    | 水平スケーリング、パーティション最適化 |
 | データ量     | 10GB/日                     | Liquid Clustering                      |
 
@@ -1182,6 +1411,10 @@ WHEN NOT MATCHED THEN INSERT *
 各テーブルに対して、クエリパターンに応じたクラスタリングキーを設定します。
 
 ```sql
+-- 時次サマリ：時刻っとデバイスIDでの検索が多い
+ALTER TABLE gold_sensor_data_hourly_summary
+CLUSTER BY (collection_datetime, device_id);
+
 -- 日次サマリ：日付とデバイスIDでの検索が多い
 ALTER TABLE gold_sensor_data_daily_summary
 CLUSTER BY (collection_date, device_id);
@@ -1197,24 +1430,24 @@ CLUSTER BY (collection_year, device_id);
 
 ### インクリメンタル処理
 
+- **時次集計**: 前時のデータのみを処理（フルスキャン不要）
 - **日次集計**: 前日のデータのみを処理（フルスキャン不要）
 - **月次集計**: 前月のデータのみを処理
 - **年次集計**: 前年のデータのみを処理
 
 ```python
 # インクリメンタル処理の実装例（バッチ処理）
-@dlt.table(
-    name="gold_sensor_data_daily_summary"
-)
-def gold_sensor_data_daily_summary():
-    # 前日のデータのみを対象
-    target_date = date_sub(current_date(), 1)
+from datetime import date, timedelta
 
-    return (
-        dlt.read("silver_sensor_data")
+def run_daily_aggregation():
+    # 前日のデータのみを対象
+    target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    config = AGGREGATION_CONFIGS[AggregationPeriod.DAILY]
+
+    silver_df = spark.table("iot_catalog.silver.silver_sensor_data") \
         .filter(col("event_date") == target_date)
-        .transform(perform_daily_aggregation)
-    )
+    aggregated = aggregate_sensor_data(silver_df, config)
+    merge_to_gold(aggregated, config)
 ```
 
 ### 並列処理最適化
@@ -1235,13 +1468,20 @@ spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
 
 | テーブル                         | 保持期間 | タイムトラベル | 削除方式        |
 | -------------------------------- | -------- | -------------- | --------------- |
+| gold_sensor_data_hourly_summary  | 10年間   | 7日間          | DELETE + VACUUM |
 | gold_sensor_data_daily_summary   | 10年間   | 7日間          | DELETE + VACUUM |
 | gold_sensor_data_monthly_summary | 10年間   | 7日間          | DELETE + VACUUM |
 | gold_sensor_data_yearly_summary  | 10年間   | 7日間          | DELETE + VACUUM |
 
+gold_summary_method_masterについては、恒久保持とし、データ削除は行わない。
+
 ### 削除処理
 
 ```sql
+-- 時次サマリ削除例（10年以上前）
+DELETE FROM iot_catalog.gold.gold_sensor_data_hourly_volume
+WHERE collection_datetime < DATE_SUB(CURRENT_DATE(), 3650)
+
 -- 10年以上前のデータを削除（日次サマリ）
 DELETE FROM iot_catalog.gold.gold_sensor_data_daily_summary
 WHERE collection_date < DATE_SUB(CURRENT_DATE(), 3650);
@@ -1249,16 +1489,25 @@ WHERE collection_date < DATE_SUB(CURRENT_DATE(), 3650);
 -- 削除後のVACUUM処理（7日以上前の履歴を物理削除）
 VACUUM iot_catalog.gold.gold_sensor_data_daily_summary
 RETAIN 168 HOURS;  -- 7日間
+
+-- 月次サマリ削除例（10年以上前）
+DELETE FROM iot_catalog.gold.gold_sensor_data_monthly_summary
+WHERE collection_year_month < DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 3650), 'yyyy/MM');
+
+-- 年次サマリ削除例（10年以上前）
+DELETE FROM iot_catalog.gold.gold_sensor_data_yearly_summary
+WHERE collection_year < YEAR(DATE_SUB(CURRENT_DATE(), 3650));
 ```
 
 ### 削除スケジュール
 
-| 処理           | 実行頻度           | 実行時間           |
-| -------------- | ------------------ | ------------------ |
-| 日次サマリ削除 | 月次（毎月1日）    | 深夜（集計処理後） |
-| 月次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後） |
-| 年次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後） |
-| VACUUM処理     | 週次（毎週日曜）   | 深夜               |
+| 処理           | 実行頻度           | 実行時間                       |
+| -------------- | ------------------ | ------------------------------ |
+| 時次サマリ削除 | 時次（毎時）       | 定時バッチ実行時（集計処理後） |
+| 日次サマリ削除 | 月次（毎月1日）    | 深夜（集計処理後）             |
+| 月次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後）             |
+| 年次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後）             |
+| VACUUM処理     | 週次（毎週日曜）   | 深夜                           |
 
 ---
 

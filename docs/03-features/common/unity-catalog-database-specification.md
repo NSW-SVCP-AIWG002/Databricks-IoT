@@ -38,9 +38,10 @@
   - [動的ビュー](#動的ビュー)
     - [動的ビュー一覧](#動的ビュー一覧)
       - [1. センサーデータビュー (sensor\_data\_view)](#1-センサーデータビュー-sensor_data_view)
-      - [2. 日次サマリビュー（daily\_summary\_view）](#2-日次サマリビューdaily_summary_view)
-      - [3. 月次サマリビュー（monthly\_summary\_view）](#3-月次サマリビューmonthly_summary_view)
-      - [4. 年次サマリビュー（yearly\_summary\_view）](#4-年次サマリビューyearly_summary_view)
+      - [2. 時次サマリビュー（hourly\_summary\_view）](#2-時次サマリビューhourly_summary_view)
+      - [3. 日次サマリビュー（daily\_summary\_view）](#3-日次サマリビューdaily_summary_view)
+      - [4. 月次サマリビュー（monthly\_summary\_view）](#4-月次サマリビューmonthly_summary_view)
+      - [5. 年次サマリビュー（yearly\_summary\_view）](#5-年次サマリビューyearly_summary_view)
     - [行レベルセキュリティの実装](#行レベルセキュリティの実装)
       - [Row Access Policyの定義](#row-access-policyの定義)
       - [動作イメージ](#動作イメージ)
@@ -310,7 +311,7 @@ TBLPROPERTIES (
 | --- | ------------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
 | 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
 | 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
-| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時          |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」          |
 | 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
 | 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
 | 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
@@ -711,7 +712,41 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 - `sensor_data_json`: 構造化済みカラムで十分なため除外
 - `create_time`: ダッシュボード表示に不要なため除外
 
-#### 2. 日次サマリビュー（daily_summary_view）
+
+#### 2. 時次サマリビュー（hourly_summary_view）
+
+```SQL
+CREATE OR REPLACE VIEW iot_catalog.views.hourly_summary_view (
+    device_id, 
+    organization_id, 
+    collection_datetime, 
+    summary_item,
+    summary_method_id, 
+    summary_value, 
+    data_count 
+)
+FROM iot_catalog.gold.gold_sensor_data_hourly_summary;
+
+-- Genieによる検索精度を上げるため、日本語でコメントをつける
+COMMENT ON VIEW iot_catalog.views.hourly_summary_view IS '時次サマリ、1時間ごとのサマリ、時別のサマリ';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.device_id IS 'デバイスID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.organization_id IS '組織ID、所属組織のID、組織のID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.collection_datetime IS '集計時、集約時、時刻';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_item IS '集約対象';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_method_id IS '集約方法ID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_value IS '集約結果、計算結果、集約値';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.data_count IS 'データ件数、データの件数、データ数';
+
+-- 既存のPolicyを各ビューに適用
+ALTER VIEW iot_catalog.views.hourly_summary_view
+SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
+```
+
+**ゴールド層の時次サマリテーブルからの除外カラム**:
+
+- `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
+
+#### 3. 日次サマリビュー（daily_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.daily_summary_view AS
@@ -744,7 +779,7 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
 - `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
 
-#### 3. 月次サマリビュー（monthly_summary_view）
+#### 4. 月次サマリビュー（monthly_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.monthly_summary_view AS
@@ -777,7 +812,7 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
 - `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
 
-#### 4. 年次サマリビュー（yearly_summary_view）
+#### 5. 年次サマリビュー（yearly_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.yearly_summary_view AS
