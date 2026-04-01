@@ -321,7 +321,13 @@ class TestCircleChartGadgetFormGroupId:
         from iot_app.forms.customer_dashboard.circle_chart import CircleChartGadgetForm
         # Act
         with app.test_request_context():
-            form = CircleChartGadgetForm(data={'gadget_name': '円グラフ', 'group_id': '1'})
+            form = CircleChartGadgetForm(data={
+                'gadget_name': '円グラフ',
+                'group_id': '1',
+                'device_mode': 'device_tree',
+                'measurement_item_ids': ['1'],
+            })
+            form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
             result = form.validate()
         # Assert
         assert result is True
@@ -399,7 +405,10 @@ class TestCircleChartGadgetFormDeviceId:
                 'gadget_name': '円グラフ',
                 'device_mode': 'device_specified',
                 'device_id': '42',
+                'group_id': '1',
+                'measurement_item_ids': ['1'],
             })
+            form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
             result = form.validate()
         # Assert
         assert result is True
@@ -416,7 +425,10 @@ class TestCircleChartGadgetFormDeviceId:
                 'gadget_name': '円グラフ',
                 'device_mode': 'device_tree',
                 'device_id': '',
+                'group_id': '1',
+                'measurement_item_ids': ['1'],
             })
+            form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
             result = form.validate()
         # Assert
         assert result is True
@@ -452,7 +464,7 @@ class TestCircleChartGadgetFormDeviceId:
             })
             form.validate()
         # Assert
-        assert 'デバイスを選択してください' in form.errors.get('device_mode', [])
+        assert '表示デバイスを選択してください' in form.errors.get('device_mode', [])
 
 
 # ===========================================================================
@@ -1214,12 +1226,13 @@ class TestErrorHandling_ValidationError:
                 'gadget_name': '円グラフ',
                 'device_mode': 'device_tree',
                 'group_id': '1',
-                'items': [],
+                'measurement_item_ids': [],
             })
+            form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
             result = form.validate()
         # Assert
         assert result is False
-        assert 'items' in form.errors
+        assert 'measurement_item_ids' in form.errors
 
     def test_form_invalid_when_items_count_exceeds_five(self, app):
         """1.3.2.4 表示項目が6個以上: validate() = False → ビュー層で 400 返却
@@ -1235,12 +1248,13 @@ class TestErrorHandling_ValidationError:
                 'gadget_name': '円グラフ',
                 'device_mode': 'device_tree',
                 'group_id': '1',
-                'items': [1, 2, 3, 4, 5, 6],
+                'measurement_item_ids': ['1', '2', '3', '4', '5', '6'],
             })
+            form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
             result = form.validate()
         # Assert
         assert result is False
-        assert 'items' in form.errors
+        assert 'measurement_item_ids' in form.errors
 
 
 # ---------------------------------------------------------------------------
