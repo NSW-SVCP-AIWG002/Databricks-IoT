@@ -7,11 +7,32 @@
     POST /api/analysis/chat   - 質問送信API
 """
 import json
+import os
 import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests as req_lib
+
+
+# ---------------------------------------------------------------------------
+# フィクスチャ
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def bypass_auth_middleware():
+    """認証ミドルウェアをテスト用にバイパスする
+
+    DevAuthProvider が "dev@localhost" のユーザーを DB から検索するが、
+    テスト DB には存在しないため 403 になる。
+    find_user_by_email をパッチして middleware が正常通過するようにする。
+    """
+    with patch(
+        'iot_app.auth.middleware.find_user_by_email',
+        return_value={'user_id': 1, 'user_type_id': 1},
+    ):
+        with patch.dict(os.environ, {'DEV_DATABRICKS_TOKEN': 'test-token'}):
+            yield
 
 
 # ---------------------------------------------------------------------------
