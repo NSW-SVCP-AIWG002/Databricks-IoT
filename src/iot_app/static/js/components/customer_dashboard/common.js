@@ -94,6 +94,9 @@ const CustomerDashboard = (function () {
 
     // 棒グラフ登録モーダル専用
     _bindBarChartRegisterEvents(container);
+
+    // 時系列グラフ登録モーダル専用
+    bindTimelineGadgetRegister(container);
   }
 
   /**
