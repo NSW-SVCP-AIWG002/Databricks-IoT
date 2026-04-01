@@ -10,7 +10,7 @@
 </head>
 
 <body>
-{%- set uid = g.get('current_user_type_id') -%}
+{%- set uid = g.current_user.user_type_id if g.get('current_user') else none -%}
 
 <nav class="navigation">
   <ul class="nav__menu">
@@ -35,16 +35,16 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint == 'admin.user_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.user_') %} nav__item--active{% endif %}"
            href="/admin/users">ユーザー管理</a>
         {%- if uid != 4 %}{# 組織管理：サービス利用者(4)は非表示 #}
-        <a class="nav__item--child{% if request.endpoint == 'admin.organization_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.organization_') %} nav__item--active{% endif %}"
            href="/admin/organizations">組織管理</a>
         {%- endif %}
-        <a class="nav__item--child{% if request.endpoint == 'admin.device_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.device_') and not request.endpoint.startswith('admin.device_inventory_') %} nav__item--active{% endif %}"
            href="/admin/devices">デバイス管理</a>
         {%- if uid == 1 %}{# デバイス台帳管理：システム保守者(1)のみ #}
-        <a class="nav__item--child{% if request.endpoint == 'admin.device_inventory_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.device_inventory_') %} nav__item--active{% endif %}"
            href="/admin/device-inventory">デバイス台帳管理</a>
         {%- endif %}
       </div>
@@ -60,9 +60,9 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint == 'alert.alert_history_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('alert.alert_history_') %} nav__item--active{% endif %}"
            href="/alert/alert-history">アラート履歴</a>
-        <a class="nav__item--child{% if request.endpoint == 'alert.alert_setting_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('alert.alert_setting_') %} nav__item--active{% endif %}"
            href="/alert/alert-settings">アラート設定</a>
       </div>
     </li>
@@ -77,7 +77,7 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint == 'notice.mail_history_list' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('notice.mail_history_') %} nav__item--active{% endif %}"
            href="/notice/mail-history">メール通知履歴</a>
       </div>
     </li>
@@ -92,11 +92,11 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint == 'analysis.industry_dashboard' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('industry_dashboard.') %} nav__item--active{% endif %}"
            href="/analysis/industry-dashboard/store-monitoring">店舗モニタリング</a>
-        <a class="nav__item--child{% if request.endpoint == 'analysis.customer_dashboard' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('customer_dashboard.') %} nav__item--active{% endif %}"
            href="/analysis/customer-dashboard">顧客作成ダッシュボード</a>
-        <a class="nav__item--child{% if request.endpoint == 'analysis.chat' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('chat.') %} nav__item--active{% endif %}"
            href="/analysis/chat">AIチャット</a>
       </div>
     </li>
@@ -127,9 +127,9 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint == 'account.language' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('account.language') %} nav__item--active{% endif %}"
            href="/account/language">言語設定</a>
-        <a class="nav__item--child{% if request.endpoint == 'account.profile' %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('account.profile') %} nav__item--active{% endif %}"
            href="/account/profile">ユーザー情報参照</a>
         <a class="nav__item--child{% if request.endpoint == 'account.logout' %} nav__item--active{% endif %}"
            href="/account/logout">ログアウト</a>
