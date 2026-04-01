@@ -120,3 +120,17 @@ INSERT INTO master_list (master_id, user_type_id, master_name, creator, modifier
     (3, 1, '組織', 0, 0),
     (4, 1, 'アラート設定', 0, 0),
     (5, 1, 'デバイス在庫情報', 0, 0);
+
+-- ------------------------------------------------------------
+-- サマリー計算手法マスタ（unity-catalog-database-specification.md § 5）
+-- Webアプリ管理画面上で操作不可のマスタ
+-- ------------------------------------------------------------
+INSERT INTO gold_summary_method_master (summary_method_id, summary_method_code, summary_method_name, creator, modifier) VALUES
+    (1, 'AVG',    '平均値',        0, 0),
+    (2, 'MAX',    '最大値',        0, 0),
+    (3, 'MIN',    '最小値',        0, 0),
+    (4, 'P25',    '第1四分位数',   0, 0),
+    (5, 'MEDIAN', '中央値',        0, 0),
+    (6, 'P75',    '第3四分位数',   0, 0),
+    (7, 'STDDEV', '標準偏差',      0, 0),
+    (8, 'P95',    '上側5％境界値', 0, 0);

@@ -75,11 +75,6 @@ def create_app():
             "リクエスト完了",
             extra={"httpStatus": response.status_code, "processingTime": duration_ms},
         )
-        if response.status_code >= 500:
-            error_type = getattr(g, "last_exception_type", "Unknown")
-            _logger.error("Internal Server Error", extra={"error_type": error_type})
-        elif response.status_code >= 400:
-            _logger.warning("Client Error", extra={"httpStatus": response.status_code})
         return response
 
     # ── SQLAlchemy イベントリスナー（6.5）────────────────────────────────

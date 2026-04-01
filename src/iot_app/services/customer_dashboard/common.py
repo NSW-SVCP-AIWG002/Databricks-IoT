@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from sqlalchemy import func
@@ -502,6 +503,50 @@ def get_devices(organization_id):
             DeviceMaster.delete_flag == False,
         )
         .order_by(DeviceMaster.device_id)
+        .all()
+    )
+
+
+def get_fixed_gadget_device_names(gadgets):
+    """固定モードガジェットのデバイス名を返す
+
+    Returns:
+        dict: {gadget_uuid: device_name} （固定モードのガジェットのみ）
+    """
+    fixed_device_id_map = {}
+    for gadget in gadgets:
+        if gadget.data_source_config:
+            try:
+                config = json.loads(gadget.data_source_config)
+                device_id = config.get('device_id')
+                if device_id is not None:
+                    fixed_device_id_map[gadget.gadget_uuid] = device_id
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+    if not fixed_device_id_map:
+        return {}
+
+    device_name_map = {
+        d.device_id: d.device_name
+        for d in _get_devices_by_ids(list(set(fixed_device_id_map.values())))
+    }
+    return {
+        gadget_uuid: device_name_map.get(device_id, '--')
+        for gadget_uuid, device_id in fixed_device_id_map.items()
+    }
+
+
+def _get_devices_by_ids(device_ids):
+    """デバイスID一覧に対応するデバイス一覧を返す（内部使用）"""
+    if not device_ids:
+        return []
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.device_id.in_(device_ids),
+            DeviceMaster.delete_flag == False,
+        )
         .all()
     )
 

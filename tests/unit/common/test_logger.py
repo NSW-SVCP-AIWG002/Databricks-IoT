@@ -88,8 +88,9 @@ class TestAppLoggerAdapterProcess:
         from flask import g
         adapter = self._make_adapter()
 
+        from types import SimpleNamespace
         with app.test_request_context("/test"):
-            g.current_user.user_id = 42
+            g.current_user = SimpleNamespace(user_id=42)
             _, kwargs = adapter.process("msg", {})
 
         assert kwargs["extra"]["userId"] == 42
