@@ -49,6 +49,7 @@ class TestingConfig(Config):
     DEBUG = True
     AUTH_TYPE = 'dev'
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    WTF_CSRF_ENABLED = False
 
 
 config = {
