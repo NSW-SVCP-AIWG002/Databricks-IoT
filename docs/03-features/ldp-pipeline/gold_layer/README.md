@@ -29,7 +29,7 @@
 | ------------------ | ------------------ | -------------------------- |
 | silver_sensor_data | iot_catalog.silver | 構造化されたセンサーデータ |
 
-### 出力テーブル（Gold Layer）
+### 出力テーブル（UnityCatalog Gold Layer）
 
 | テーブル名                       | スキーマ         | 説明                     | 集計単位 |
 | -------------------------------- | ---------------- | ------------------------ | -------- |
@@ -37,7 +37,15 @@
 | gold_sensor_data_daily_summary   | iot_catalog.gold | センサーデータ日次サマリ | 1日      |
 | gold_sensor_data_monthly_summary | iot_catalog.gold | センサーデータ月次サマリ | 1か月    |
 | gold_sensor_data_yearly_summary  | iot_catalog.gold | センサーデータ年次サマリ | 1年      |
-| gold_summary_method_master       | iot_catalog.gold | サマリー計算手法マスタ   | -        |
+
+### 出力テーブル（OLTP DB）
+
+| テーブル名                       | スキーマ   | 説明                     | 集計単位 |
+| -------------------------------- | ---------- | ------------------------ | -------- |
+| gold_sensor_data_hourly_summary  | iot_app_db | センサーデータ時次サマリ | 1時間    |
+| gold_sensor_data_daily_summary   | iot_app_db | センサーデータ日次サマリ | 1日      |
+| gold_sensor_data_monthly_summary | iot_app_db | センサーデータ月次サマリ | 1か月    |
+| gold_sensor_data_yearly_summary  | iot_app_db | センサーデータ年次サマリ | 1年      |
 
 ---
 
@@ -130,19 +138,30 @@ CLUSTER BY (collection_year, device_id)
 
 ### 読み取りテーブル（Unity Catalog）
 
-| テーブル名         | スキーマ           | 用途                 |
-| ------------------ | ------------------ | -------------------- |
-| silver_sensor_data | iot_catalog.silver | センサーデータ集計元 |
+| テーブル名                 | スキーマ           | 用途                   |
+| -------------------------- | ------------------ | ---------------------- |
+| silver_sensor_data         | iot_catalog.silver | センサーデータ集計元   |
+| gold_summary_method_master | iot_catalog.gold   | サマリー計算手法マスタ |
 
 ### 書き込みテーブル（Unity Catalog）
 
-| カタログ    | スキーマ | テーブル名                       | 用途                   |
-| ----------- | -------- | -------------------------------- | ---------------------- |
-| iot_catalog | gold     | gold_sensor_data_hourly_summary  | 時次サマリ             |
-| iot_catalog | gold     | gold_sensor_data_daily_summary   | 日次サマリ             |
-| iot_catalog | gold     | gold_sensor_data_monthly_summary | 月次サマリ             |
-| iot_catalog | gold     | gold_sensor_data_yearly_summary  | 年次サマリ             |
-| iot_catalog | gold     | gold_summary_method_master       | サマリー計算手法マスタ |
+| カタログ    | スキーマ | テーブル名                       | 用途       |
+| ----------- | -------- | -------------------------------- | ---------- |
+| iot_catalog | gold     | gold_sensor_data_hourly_summary  | 時次サマリ |
+| iot_catalog | gold     | gold_sensor_data_daily_summary   | 日次サマリ |
+| iot_catalog | gold     | gold_sensor_data_monthly_summary | 月次サマリ |
+| iot_catalog | gold     | gold_sensor_data_yearly_summary  | 年次サマリ |
+
+### 書き込みテーブル（OLTP DB）
+
+| スキーマ   | テーブル名                       | 用途       |
+| ---------- | -------------------------------- | ---------- |
+| iot_app_db | gold_sensor_data_hourly_summary  | 時次サマリ |
+| iot_app_db | gold_sensor_data_daily_summary   | 日次サマリ |
+| iot_app_db | gold_sensor_data_monthly_summary | 月次サマリ |
+| iot_app_db | gold_sensor_data_yearly_summary  | 年次サマリ |
+
+OLTP DBへの書き込みの際、INSERT ... ON DUPLICATE KEY UPDATEを用いて、OLTP DB上のサマリデータに対して冪等性を確保する。
 
 ---
 
@@ -188,21 +207,32 @@ flowchart TB
         GoldMethod[(gold_summary_method_master)]
     end
 
+    subgraph OLTPGOLD["OLTP DB"]
+        OLTP_Hourly[(gold_sensor_data_hourly_summary)]
+        OLTP_Daily[(gold_sensor_data_daily_summary)]
+        OLTP_Monthly[(gold_sensor_data_yearly_summary)]
+        OLTP_Yearly[(gold_summary_method_master)]
+    end
+
     SensorData --> H_Read
     H_Read --> H_Group --> H_Agg --> GoldHourly
     H_Agg -.-> |データ参照| GoldMethod    
+    H_Agg --> OLTP_Hourly
 
     SensorData --> D_Read
     D_Read --> D_Group --> D_Agg --> GoldDaily
     D_Agg -.-> |データ参照| GoldMethod
+    D_Agg --> OLTP_Daily
 
     SensorData --> M_Read
     M_Read --> M_Group --> M_Agg --> GoldMonthly
     M_Agg -.-> |データ参照| GoldMethod
+    M_Agg --> OLTP_Monthly
     
     SensorData --> Y_Read
     Y_Read --> Y_Group --> Y_Agg --> GoldYearly
     Y_Agg -.-> |データ参照| GoldMethod
+    Y_Agg --> OLTP_Yearly
 ```
 
 ---
@@ -231,8 +261,8 @@ flowchart TB
 | 18           | 第3ファンモータ[rpm]        | fan_motor_3                      |
 | 19           | 第4ファンモータ[rpm]        | fan_motor_4                      |
 | 20           | 第5ファンモータ[rpm]        | fan_motor_5                      |
-| 21           | 防露ヒータ出力(1)[%]        | defrost_heater_output_1          |
-| 22           | 防露ヒータ出力(2)[%]        | defrost_heater_output_2          |
+| 21           | 防露ヒータ出力\(1)[%]       | defrost_heater_output_1          |
+| 22           | 防露ヒータ出力\(2)[%]       | defrost_heater_output_2          |
 
 ## 集約方法（summary_method_id）
 
@@ -253,7 +283,7 @@ flowchart TB
 
 | サマリテーブル                   | 集約元データ       | 説明                             |
 | -------------------------------- | ------------------ | -------------------------------- |
-| gold_sensor_data_hourly_summary   | silver_sensor_data | シルバー層の生データを時次で集約 |
+| gold_sensor_data_hourly_summary  | silver_sensor_data | シルバー層の生データを時次で集約 |
 | gold_sensor_data_daily_summary   | silver_sensor_data | シルバー層の生データを日次で集約 |
 | gold_sensor_data_monthly_summary | silver_sensor_data | シルバー層の生データを月次で集約 |
 | gold_sensor_data_yearly_summary  | silver_sensor_data | シルバー層の生データを年次で集約 |
@@ -262,11 +292,11 @@ flowchart TB
 
 ## パフォーマンス要件
 
-| 要件         | 値                                                | 対応策                                  |
-| ------------ | ------------------------------------------------- | --------------------------------------- |
-| 処理時間     | 日次バッチ完了まで1時間以内                       | インクリメンタル処理                    |
-| スループット | 70,000デバイス分の日次データを1時間以内に集計完了 | インクリメンタル処理、Liquid Clustering |
-| データ量     | 10GB/日                                           | Liquid Clustering、インクリメンタル処理 |
+| 要件         | 値                          | 対応策                                  |
+| ------------ | --------------------------- | --------------------------------------- |
+| 処理時間     | 日次バッチ完了まで1時間以内 | インクリメンタル処理                    |
+| スループット | 10,000デバイス × 1分間隔    | インクリメンタル処理、Liquid Clustering |
+| データ量     | 10GB/日                     | Liquid Clustering、インクリメンタル処理 |
 
 ---
 
@@ -333,11 +363,13 @@ flowchart TB
 ### データベース設計
 
 - [Unity Catalogデータベース設計書](../../common/unity-catalog-database-specification.md) - テーブル定義・DDL
+- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - テーブル定義・DDL
 
 ---
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容 | 担当者       |
-| ---------- | ---- | -------- | ------------ |
-| 2026-01-26 | 1.0  | 初版作成 | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                    | 担当者       |
+| ---------- | ---- | --------------------------- | ------------ |
+| 2026-01-26 | 1.0  | 初版作成                    | Kei Sugiyama |
+| 2026-04-01 | 1.1  | データ出力先にOLTP DBを追加 | Kei Sugiyama |
