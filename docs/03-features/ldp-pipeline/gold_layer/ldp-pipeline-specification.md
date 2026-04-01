@@ -428,7 +428,7 @@ flowchart TD
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
     LogNoData --> EndSuccess([処理終了<br>正常完了])
-    CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年]
+    CheckSource -->|データあり| ReadSilver["シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年"]
     ReadSilver --> CheckRead{読込結果}
 
     CheckRead -->|成功| Transform[データ変換<br>集約対象項目ごとに<br>統計値を算出]
