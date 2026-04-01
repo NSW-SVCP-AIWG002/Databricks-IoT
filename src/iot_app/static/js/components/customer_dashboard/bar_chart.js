@@ -27,6 +27,9 @@
     const uuid    = el.dataset.gadgetUuid;
     const chartEl = el.querySelector('.bar-chart__canvas');
     if (!chartEl) return;
+    const _rawConfig = el.closest('.gadget')?.dataset.chartConfig || '{}';
+    const _parsed = JSON.parse(_rawConfig);
+    const chartConfig = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
 
     const chart = echarts.init(chartEl);
     setEmptyChart(chart);
@@ -38,6 +41,8 @@
       interval:    DEFAULT_INTERVAL,
       baseDatetime: nowString(),
       fp:          null,
+      minValue:    chartConfig.min_value ?? null,
+      maxValue:    chartConfig.max_value ?? null,
     };
 
     bindControls(el, state);
@@ -162,7 +167,7 @@
         return res.json();
       })
       .then(function (data) {
-        renderChart(state.chart, data.chart_data, state.displayUnit);
+        renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
       })
       .catch(function (err) {
         console.error('棒グラフデータ取得エラー:', err);
@@ -173,10 +178,14 @@
   // ============================================================
   // ECharts 描画
   // ============================================================
-  function renderChart(chart, chartData, displayUnit) {
+  function renderChart(chart, chartData, displayUnit, minValue, maxValue) {
     const labels      = chartData.labels       || [];
     const values      = chartData.values       || [];
     const legendLabel = chartData.legend_label || '';
+
+    const yAxis = { type: 'value' };
+    if (minValue !== null && minValue !== undefined) yAxis.min = minValue;
+    if (maxValue !== null && maxValue !== undefined) yAxis.max = maxValue;
 
     chart.setOption({
       tooltip: { trigger: 'axis' },
@@ -188,7 +197,7 @@
         type: 'category',
         data: labels,
       },
-      yAxis: { type: 'value' },
+      yAxis: yAxis,
       series: [{
         name:      legendLabel,
         type:      'bar',

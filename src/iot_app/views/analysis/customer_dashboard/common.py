@@ -24,6 +24,7 @@ from iot_app.services.customer_dashboard.common import (
     get_dashboards,
     get_devices,
     get_devices_by_organization,
+    get_fixed_gadget_device_names,
     get_first_dashboard,
     get_gadget_type,
     get_gadget_type_id_by_name,
@@ -43,6 +44,14 @@ from iot_app.services.customer_dashboard.common import (
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
+
+# ガジェット種別名（DB値）→ URLスラグ のマッピング
+# NOTE: gadget_type_master に論理名カラムがないため暫定的にコードで管理
+#       設計確認事項 No.14 参照（gadget_type_slug カラム追加で解消予定）
+GADGET_TYPE_SLUG = {
+    '棒グラフ':    'bar-chart',
+    '時系列グラフ': 'timeline',
+}
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +101,8 @@ def customer_dashboard():
     if user_setting and user_setting.organization_id is not None:
         devices = get_devices(user_setting.organization_id)
 
+    gadget_device_names = get_fixed_gadget_device_names(gadgets)
+
     return render_template(
         'analysis/customer_dashboard/index.html',
         dashboards=dashboards,
@@ -102,6 +113,7 @@ def customer_dashboard():
         organizations=organizations,
         devices=devices,
         user_setting=user_setting,
+        gadget_device_names=gadget_device_names,
     )
 
 
@@ -519,6 +531,7 @@ def gadget_add():
     return render_template(
         'analysis/customer_dashboard/modals/gadget_add.html',
         gadget_types=gadget_types,
+        gadget_type_slug_map=GADGET_TYPE_SLUG,
     )
 
 
@@ -533,8 +546,8 @@ def gadget_create(gadget_type):
     from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
     _CREATE_HANDLERS = {
-        '時系列グラフ': timeline_view.handle_gadget_create,
-        '棒グラフ':   bar_chart_view.handle_gadget_create,
+        'timeline':   timeline_view.handle_gadget_create,
+        'bar-chart':  bar_chart_view.handle_gadget_create,
     }
     handler = _CREATE_HANDLERS.get(gadget_type)
     if handler is None:
@@ -554,8 +567,8 @@ def gadget_register(gadget_type):
     from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
     _REGISTER_HANDLERS = {
-        '時系列グラフ': timeline_view.handle_gadget_register,
-        '棒グラフ':   bar_chart_view.handle_gadget_register,
+        'timeline':   timeline_view.handle_gadget_register,
+        'bar-chart':  bar_chart_view.handle_gadget_register,
     }
     handler = _REGISTER_HANDLERS.get(gadget_type)
     if handler is None:
@@ -708,6 +721,8 @@ def gadget_data(gadget_uuid):
         '棒グラフ':   bar_chart_view.handle_gadget_data,
     }
     gadget_type = get_gadget_type(gadget_uuid)
+    if gadget_type is None:
+        abort(404)
     handler = _DATA_HANDLERS.get(gadget_type)
     if handler is None:
         logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')
@@ -726,6 +741,8 @@ def gadget_csv_export(gadget_uuid):
         '棒グラフ':   bar_chart_view.handle_gadget_csv_export,
     }
     gadget_type = get_gadget_type(gadget_uuid)
+    if gadget_type is None:
+        abort(404)
     handler = _CSV_HANDLERS.get(gadget_type)
     if handler is None:
         logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}, gadget_uuid={gadget_uuid}')

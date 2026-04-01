@@ -44,6 +44,11 @@
     - [32. ガジェット種別マスタ (gadget\_type\_master)](#32-ガジェット種別マスタ-gadget_type_master)
     - [33. ダッシュボードユーザー設定 (dashboard\_user\_setting)](#33-ダッシュボードユーザー設定-dashboard_user_setting)
     - [34. サマリー計算手法マスタ（gold\_summary\_method\_master）](#34-サマリー計算手法マスタgold_summary_method_master)
+    - [35. シルバー層センサーデータ（silver\_sensor\_data）](#35-シルバー層センサーデータsilver_sensor_data)
+    - [36. センサーデータ時次サマリ（gold\_sensor\_data\_hourly\_summary）](#36-センサーデータ時次サマリgold_sensor_data_hourly_summary)
+    - [37. センサーデータ日次サマリ（gold\_sensor\_data\_daily\_summary）](#37-センサーデータ日次サマリgold_sensor_data_daily_summary)
+    - [38. センサーデータ月次サマリ（gold\_sensor\_data\_monthly\_summary）](#38-センサーデータ月次サマリgold_sensor_data_monthly_summary)
+    - [39. センサーデータ年次サマリ（gold\_sensor\_data\_yearly\_summary）](#39-センサーデータ年次サマリgold_sensor_data_yearly_summary)
   - [VIEW定義](#view定義)
     - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
     - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
@@ -116,47 +121,70 @@
 - パスワードリセットトークン ← ユーザーマスタ（オンプレミス環境専用）
 - ログイン履歴 ← ユーザーマスタ（オンプレミス環境専用）
 - アカウントロック管理 ← ユーザーマスタ（オンプレミス環境専用）
+- シルバー層センサーデータ ← デバイスマスタ
+- シルバー層センサーデータ ← 組織マスタ
+- センサーデータ時次サマリ ← デバイスマスタ
+- センサーデータ時次サマリ ← 組織マスタ
+- センサーデータ時次サマリ ← サマリー計算手法マスタ
+- センサーデータ時次サマリ ← 測定項目マスタ
+- センサーデータ日次サマリ ← デバイスマスタ
+- センサーデータ日次サマリ ← 組織マスタ
+- センサーデータ日次サマリ ← サマリー計算手法マスタ
+- センサーデータ日次サマリ ← 測定項目マスタ
+- センサーデータ月次サマリ ← デバイスマスタ
+- センサーデータ月次サマリ ← 組織マスタ
+- センサーデータ月次サマリ ← サマリー計算手法マスタ
+- センサーデータ月次サマリ ← 測定項目マスタ
+- センサーデータ年次サマリ ← デバイスマスタ
+- センサーデータ年次サマリ ← 組織マスタ
+- センサーデータ年次サマリ ← サマリー計算手法マスタ
+- センサーデータ年次サマリ ← 測定項目マスタ
 
 ---
 
 ## テーブル一覧
 
-| #   | テーブル物理名             | テーブル論理名                 | 説明                                                                           |
-| --- | -------------------------- | ------------------------------ | ------------------------------------------------------------------------------ |
-| 1   | user_master                | ユーザーマスタ                 | システム利用ユーザーの情報を管理                                               |
-| 2   | user_type_master           | ユーザー種別マスタ             | ユーザーの種別（権限）を管理                                                   |
-| 3   | language_master            | 言語マスタ                     | システム表示言語を管理                                                         |
-| 4   | organization_master        | 組織マスタ                     | 組織（顧客、販社等）の情報を管理                                               |
-| 5   | organization_type_master   | 組織種別マスタ                 | 組織の種別を管理                                                               |
-| 6   | contract_status_master     | 契約状態マスタ                 | 組織の契約状態を管理                                                           |
-| 7   | organization_closure       | 組織閉方テーブル               | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
-| 8   | device_master              | デバイスマスタ                 | IoTデバイスの情報を管理                                                        |
-| 9   | device_type_master         | デバイス種別マスタ             | デバイスの種別を管理                                                           |
-| 10  | device_inventory_master    | デバイス在庫情報マスタ         | デバイスの在庫・配備状況を管理                                                 |
-| 11  | inventory_status_master    | 在庫状況マスタ                 | デバイス在庫状況のステータスを管理                                             |
-| 12  | alert_setting_master       | アラート設定マスタ             | アラート検知条件・通知設定を管理                                               |
-| 13  | measurement_item_master    | 測定項目マスタ                 | センサーで読み取る、機器に関する測定項目の名前を格納                           |
-| 14  | alert_level_master         | アラートレベルマスタ           | アラートの重要度レベルを管理                                                   |
-| 15  | sort_item_master           | ソート項目マスタ               | 一覧画面のソート項目を管理                                                     |
-| 16  | device_status_data         | デバイスステータス             | デバイスの接続状態を保持                                                       |
-| 17  | region_master              | 地域マスタ                     | 地域情報を管理                                                                 |
-| 18  | mail_history               | メール送信履歴                 | システムから送信されたメールの履歴を管理                                       |
-| 19  | mail_type_master           | メール種別マスタ               | メールの種別を管理                                                             |
-| 20  | alert_history              | アラート履歴                   | アラート履歴を管理                                                             |
-| 21  | alert_status_master        | アラートステータスマスタ       | アラートのステータスを管理                                                     |
-| 22  | master_list                | マスタ一覧                     | CSVインポート・エクスポートするマスタを管理                                    |
-| 23  | email_notification_queue   | メール通知キュー               | メール送信の待機列を管理                                                       |
-| 24  | alert_abnomal_state        | アラート異常状態               | デバイス×アラート設定ごとの異常継続状態を管理                                  |
-| 25  | user_password              | ユーザーパスワード             | ユーザーのパスワード情報を管理 ※オンプレミス環境でのみ使用                     |
-| 26  | password_reset_token       | パスワードリセットトークン     | パスワードリセット・招待用トークンを管理 ※オンプレミス環境でのみ使用           |
-| 27  | login_history              | ログイン履歴                   | ログイン試行（成功・失敗）の履歴を管理 ※オンプレミス環境でのみ使用             |
-| 28  | account_lock               | アカウントロック管理           | アカウントロック状態を管理 ※オンプレミス環境でのみ使用                         |
-| 29  | dashboard_master           | ダッシュボードマスタ           | ダッシュボードを管理                                                           |
-| 30  | dashboard_group_master     | ダッシュボードグループマスタ   | ダッシュボードグループを管理                                                   |
-| 31  | dashboard_gadget_master    | ダッシュボードガジェットマスタ | ガジェットを管理                                                               |
-| 32  | gadget_type_master         | ガジェット種別マスタ           | ガジェット種別を管理                                                           |
-| 33  | dashboard_user_setting     | ダッシュボードユーザー設定     | ダッシュボードのユーザー固有設定を管理                                         |
-| 34  | gold_summary_method_master | サマリー計算手法マスタ         | サマリ作成時の計算手法を管理                                                   |
+| #   | テーブル物理名                   | テーブル論理名                 | 説明                                                                           |
+| --- | -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| 1   | user_master                      | ユーザーマスタ                 | システム利用ユーザーの情報を管理                                               |
+| 2   | user_type_master                 | ユーザー種別マスタ             | ユーザーの種別（権限）を管理                                                   |
+| 3   | language_master                  | 言語マスタ                     | システム表示言語を管理                                                         |
+| 4   | organization_master              | 組織マスタ                     | 組織（顧客、販社等）の情報を管理                                               |
+| 5   | organization_type_master         | 組織種別マスタ                 | 組織の種別を管理                                                               |
+| 6   | contract_status_master           | 契約状態マスタ                 | 組織の契約状態を管理                                                           |
+| 7   | organization_closure             | 組織閉方テーブル               | 組織の階層構造を閉包テーブルで管理。**ユーザーのデータアクセス範囲制限に使用** |
+| 8   | device_master                    | デバイスマスタ                 | IoTデバイスの情報を管理                                                        |
+| 9   | device_type_master               | デバイス種別マスタ             | デバイスの種別を管理                                                           |
+| 10  | device_inventory_master          | デバイス在庫情報マスタ         | デバイスの在庫・配備状況を管理                                                 |
+| 11  | inventory_status_master          | 在庫状況マスタ                 | デバイス在庫状況のステータスを管理                                             |
+| 12  | alert_setting_master             | アラート設定マスタ             | アラート検知条件・通知設定を管理                                               |
+| 13  | measurement_item_master          | 測定項目マスタ                 | センサーで読み取る、機器に関する測定項目の名前を格納                           |
+| 14  | alert_level_master               | アラートレベルマスタ           | アラートの重要度レベルを管理                                                   |
+| 15  | sort_item_master                 | ソート項目マスタ               | 一覧画面のソート項目を管理                                                     |
+| 16  | device_status_data               | デバイスステータス             | デバイスの接続状態を保持                                                       |
+| 17  | region_master                    | 地域マスタ                     | 地域情報を管理                                                                 |
+| 18  | mail_history                     | メール送信履歴                 | システムから送信されたメールの履歴を管理                                       |
+| 19  | mail_type_master                 | メール種別マスタ               | メールの種別を管理                                                             |
+| 20  | alert_history                    | アラート履歴                   | アラート履歴を管理                                                             |
+| 21  | alert_status_master              | アラートステータスマスタ       | アラートのステータスを管理                                                     |
+| 22  | master_list                      | マスタ一覧                     | CSVインポート・エクスポートするマスタを管理                                    |
+| 23  | email_notification_queue         | メール通知キュー               | メール送信の待機列を管理                                                       |
+| 24  | alert_abnomal_state              | アラート異常状態               | デバイス×アラート設定ごとの異常継続状態を管理                                  |
+| 25  | user_password                    | ユーザーパスワード             | ユーザーのパスワード情報を管理 ※オンプレミス環境でのみ使用                     |
+| 26  | password_reset_token             | パスワードリセットトークン     | パスワードリセット・招待用トークンを管理 ※オンプレミス環境でのみ使用           |
+| 27  | login_history                    | ログイン履歴                   | ログイン試行（成功・失敗）の履歴を管理 ※オンプレミス環境でのみ使用             |
+| 28  | account_lock                     | アカウントロック管理           | アカウントロック状態を管理 ※オンプレミス環境でのみ使用                         |
+| 29  | dashboard_master                 | ダッシュボードマスタ           | ダッシュボードを管理                                                           |
+| 30  | dashboard_group_master           | ダッシュボードグループマスタ   | ダッシュボードグループを管理                                                   |
+| 31  | dashboard_gadget_master          | ダッシュボードガジェットマスタ | ガジェットを管理                                                               |
+| 32  | gadget_type_master               | ガジェット種別マスタ           | ガジェット種別を管理                                                           |
+| 33  | dashboard_user_setting           | ダッシュボードユーザー設定     | ダッシュボードのユーザー固有設定を管理                                         |
+| 34  | gold_summary_method_master       | サマリー計算手法マスタ         | サマリ作成時の計算手法を管理                                                   |
+| 35  | silver_sensor_data               | シルバー層センサーデータ       | シルバー化処理されたテレメトリデータを管理                                     |
+| 36  | gold_sensor_data_hourly_summary  | センサーデータ時次サマリ       | シルバー化処理されたテレメトリデータを時単位で集計したデータを管理             |
+| 37  | gold_sensor_data_daily_summary   | センサーデータ日次サマリ       | シルバー化処理されたテレメトリデータを日単位で集計したデータを管理             |
+| 38  | gold_sensor_data_monthly_summary | センサーデータ月次サマリ       | シルバー化処理されたテレメトリデータを月単位で集計したデータを管理             |
+| 39  | gold_sensor_data_yearly_summary  | センサーデータ年次サマリ       | シルバー化処理されたテレメトリデータを年単位で集計したデータを管理             |
 
 ---
 
@@ -187,17 +215,20 @@
 | 17  | delete_flag              | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE           |
 
 **外部キー:**
+
 - `organization_id` → `organization_master.organization_id`
 - `user_type_id` → `user_type_master.user_type_id`
 - `language_code` → `language_master.language_code`
 
 **インデックス:**
+
 - PRIMARY KEY: `user_id`
 - INDEX: `organization_id`
 - INDEX: `user_type_id`
 - INDEX: `language_code`
 
 **ビジネスルール:**
+
 - user_idはAutoIncrementで自動採番（ダミーレコード作成→ID取得→ロールバック方式）
 - databricks_user_idはDatabricks SCIM APIでユーザー作成時に返されるUUID（36文字）
 - email_addressは一意制約（重複登録不可）
@@ -220,9 +251,11 @@
 | 7   | delete_flag    | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `user_type_id`
 
 **初期データ:**
+
 | user_type_id | user_type_name | 説明                              |
 | ------------ | -------------- | --------------------------------- |
 | 1            | システム保守者 | NSW内部担当者（最上位権限）       |
@@ -249,9 +282,11 @@
 | 9   | delete_flag   | 削除フラグ       | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `language_code`
 
 **初期データ:**
+
 | language_code | language_name | 説明                   |
 | ------------- | ------------- | ---------------------- |
 | ja            | 日本語        | システムデフォルト言語 |
@@ -282,13 +317,16 @@
 | 16  | delete_flag          | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE    |
 
 **外部キー:**
+
 - `organization_type_id` → `organization_type_master.organization_type_id`
 - `contract_status_id` → `contract_status_master.contract_status_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `organization_id`
 
 **ビジネスルール:**
+
 - 組織階層はorganization_closureテーブルで管理
 - contract_end_dateがNULLの場合は契約継続中
 - contract_status_idで契約状態を管理（契約中、解約済み等）
@@ -310,6 +348,7 @@
 | 7   | delete_flag            | 削除フラグ   | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `organization_type_id`
 
 ---
@@ -329,6 +368,7 @@
 | 7   | delete_flag          | 削除フラグ   | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `contract_status_id`
 
 ---
@@ -344,14 +384,17 @@
 | 3   | depth                      | 深さ         | INT      | NOT NULL | -   | -   | 0            | 親から子までの階層の深さ（0=自己参照）    |
 
 **外部キー:**
+
 - `parent_organization_id` → `organization_master.organization_id`
 - `subsidiary_organization_id` → `organization_master.organization_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `parent_organization_id`, `subsidiary_organization_id`（複合キー）
 - INDEX: `subsidiary_organization_id`
 
 **ビジネスルール:**
+
 - 閉包テーブルパターンにより、組織階層の全経路を保持
 - depth = 0 は自己参照（全組織が自分自身へのレコードを持つ）
 - 循環参照は禁止（アプリケーション層でチェック）
@@ -387,17 +430,20 @@
 | 17  | delete_flag                 | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE       |
 
 **外部キー:**
+
 - `organization_id` → `organization_master.organization_id`
 - `device_type_id` → `device_type_master.device_type_id`
 - `device_inventory_id` → `device_inventory_master.device_inventory_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `device_id`
 - INDEX: `organization_id`
 - INDEX: `device_type_id`
 - UNIQUE: `mac_address`（NULL可）
 
 **ビジネスルール:**
+
 - device_uuidはAzure IoT Hub、AWS IoT Coreで管理されているデバイスIDと同期させる
 - mac_addressは一意制約（重複登録不可、NULL許容）
 
@@ -418,6 +464,7 @@
 | 7   | delete_flag      | 削除フラグ     | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `device_type_id`
 
 ---
@@ -445,14 +492,17 @@
 | 15  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE    |
 
 **外部キー:**
+
 - `inventory_status_id` → `inventory_status_master.inventory_status_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `device_inventory_id`
 - UNIQUE INDEX: `device_inventory_uuid`
 - INDEX: `inventory_status_id`
 
 **ビジネスルール:**
+
 - device_inventory_idは1デバイスにつき1レコード（1:1関係）
 - device_inventory_uuidはUUID形式で自動生成され、ユニーク制約を持つ
 - inventory_status_idで在庫状態を管理
@@ -474,9 +524,11 @@
 | 7   | delete_flag           | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `inventory_status_id`
 
 **初期データ:**
+
 | inventory_status_id | inventory_status_name | 説明                 |
 | ------------------- | --------------------- | -------------------- |
 | 1                   | 在庫中                | 倉庫に保管中         |
@@ -492,7 +544,7 @@
 ### 12. アラート設定マスタ (alert_setting_master)
 
 **概要**: アラート検知条件と通知設定を管理するテーブル
- 
+
 | #   | カラム物理名                                  | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
 | --- | --------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
 | 1   | alert_id                                      | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                      |
@@ -516,12 +568,14 @@
 | 19  | delete_flag                                   | 削除フラグ                  | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
 
 **外部キー:**
+
 - `device_id` → `device_master.device_id`
 - `alert_conditions_measurement_item_id` → `measurement_item_master.measurement_item_id`
 - `alert_recovery_conditions_measurement_item_id` → `measurement_item_master.measurement_item_id`
 - `alert_level_id` → `alert_level_master.alert_level_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `alert_id`
 - INDEX: `device_id`
 - INDEX: `alert_conditions_measurement_item_id`
@@ -548,9 +602,11 @@
 | 10  | delete_flag             | 削除フラグ             | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                      |
 
 **インデックス:**
+
 - PRIMARY KEY: `measurement_item_id`
 
 **初期データ:**
+
 | measurement_item_id | measurement_item_name      |
 | ------------------- | -------------------------- |
 | 1                   | 共通外気温度[℃]            |
@@ -573,32 +629,8 @@
 | 18                  | 第3ファンモータ回転数[rpm] |
 | 19                  | 第4ファンモータ回転数[rpm] |
 | 20                  | 第5ファンモータ回転数[rpm] |
-| 21                  | 防露ヒータ出力(1)[%]       |
-| 22                  | 防露ヒータ出力(2)[%]       |
-| measurement_item_id | measurement_item_name      |
-| ------------------- | -------------------------- |
-| 1                   | 共通外気温度[℃]            |
-| 2                   | 第1冷凍設定温度[℃]         |
-| 3                   | 第1冷凍庫内センサー温度[℃] |
-| 4                   | 第1冷凍表示温度[℃]         |
-| 5                   | 第1冷凍DF温度[℃]           |
-| 6                   | 第1冷凍凝縮温度[℃]         |
-| 7                   | 第1冷凍微調整後庫内温度[℃] |
-| 8                   | 第2冷凍設定温度[℃]         |
-| 9                   | 第2冷凍庫内センサー温度[℃] |
-| 10                  | 第2冷凍表示温度[℃]         |
-| 11                  | 第2冷凍DF温度[℃]           |
-| 12                  | 第2冷凍凝縮温度[℃]         |
-| 13                  | 第2冷凍微調整後庫内温度[℃] |
-| 14                  | 第1冷凍圧縮機回転数[rpm]   |
-| 15                  | 第2冷凍圧縮機回転数[rpm]   |
-| 16                  | 第1ファンモータ回転数[rpm] |
-| 17                  | 第2ファンモータ回転数[rpm] |
-| 18                  | 第3ファンモータ回転数[rpm] |
-| 19                  | 第4ファンモータ回転数[rpm] |
-| 20                  | 第5ファンモータ回転数[rpm] |
-| 21                  | 防露ヒータ出力(1)[%]       |
-| 22                  | 防露ヒータ出力(2)[%]       |
+| 21                  | 防露ヒータ出力\(1)[%]      |
+| 22                  | 防露ヒータ出力\(2)[%]      |
 
 ---
 
@@ -617,9 +649,11 @@
 | 7   | delete_flag      | 削除フラグ       | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **インデックス:**
+
 - PRIMARY KEY: `alert_level_id`
 
 **初期データ:**
+
 | alert_level_id | alert_level_name |
 | -------------- | ---------------- |
 | 1              | Critical         |
@@ -645,6 +679,7 @@
 - [ ] 各画面のソート項目が決まり次第、以下の初期データに記載すること
 
 **初期データ:**
+
 | view_id | sort_item_id | sort_item_name                 | sort_order | 説明                                                     |
 | ------- | ------------ | ------------------------------ | ---------- | -------------------------------------------------------- |
 | 7       | 0            | device_inventory_id            | 0          | デバイス台帳管理: デバイス在庫ID（未選択時のデフォルト） |
@@ -675,6 +710,7 @@
 ※1　このテーブルでは、アラート発生中かどうかといったステータスではなく、テレメトリデータが一度も受信されていない（未接続）か、受信している（接続済み）かのステータスを管理する。
 
 **外部キー:**
+
 - `device_id` → `device_master.device_id`
 
 ---
@@ -693,9 +729,11 @@
 | 6   | update_date  | 更新日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
 
 **外部キー:**
+
 - `region_id` → `user_master.region_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 ---
@@ -722,11 +760,13 @@
 | 14  | modifier          | 更新者               | INT          | NULL     | -   | -   | -                 | レコード更新者のユーザーID                |
 
 **外部キー:**
+
 - `mail_type` → `mail_type_master.mail_type_id`
 - `user_id` → `user_master.user_id`
 - `organization_id` → `organization_master.organization_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `mail_history_id`
 - UNIQUE INDEX: `mail_history_uuid`
 - INDEX: `organization_id`
@@ -734,6 +774,7 @@
 - INDEX: `mail_type`
 
 **ビジネスルール:**
+
 - mail_typeはメール種別マスタのID（1:アラート通知, 2:招待メール, 3:パスワードリセット, 4:システム通知）
 - recipientsはJSON形式で、toフィールドに送信先メールアドレスの配列を含む（例: `{"to": ["user1@example.com", "user2@example.com"]}`）
 - メール送信履歴は作成のみで更新は行わない（update_date, modifierは通常NULL）
@@ -754,12 +795,15 @@
 | 5   | update_date    | 更新日時     | DATETIME    | NULL     | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時             |
 
 **インデックス:**
+
 - PRIMARY KEY: `mail_type_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 **初期データ:**
+
 | mail_type_id | mail_type_name     | 説明                             |
 | ------------ | ------------------ | -------------------------------- |
 | 1            | アラート通知       | アラート発生時の通知メール       |
@@ -776,9 +820,6 @@
 | #   | カラム物理名              | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
 | --- | ------------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
 | 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement）  |
-| #   | カラム物理名              | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
-| --- | ------------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
-| 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement）  |
 | 2   | alert_history_uuid        | アラート履歴UUID     | VARCHAR(36) | NOT NULL | -   | -   | -                 | 参照モーダル表示でアラート履歴を特定するためのUUID |
 | 3   | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
 | 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
@@ -790,25 +831,28 @@
 | 10  | update_date               | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
 | 11  | modifier                  | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
 | 12  | delete_flag               | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE            |
-| 3   | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
-| 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
-| 5   | alert_recovery_datetime   | アラート復旧日時     | DATETIME    | NULL     | -   | -   | -                 | アラートの復旧日時                                 |
-| 6   | alert_status_id           | アラートステータスID | INT         | NOT NULL | -   | ○   | -                 | アラートステータスの一意識別子（外部キー）         |
-| 7   | alert_value               | アラート発生値       | FLOAT       | NULL     | -   | -   | -                 | アラート発生時の値                                 |
-| 8   | create_date               | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                   |
-| 9   | creator                   | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
-| 10  | update_date               | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
-| 11  | modifier                  | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
-| 12  | delete_flag               | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE            |
+| 13  | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
+| 14  | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
+| 15  | alert_recovery_datetime   | アラート復旧日時     | DATETIME    | NULL     | -   | -   | -                 | アラートの復旧日時                                 |
+| 16  | alert_status_id           | アラートステータスID | INT         | NOT NULL | -   | ○   | -                 | アラートステータスの一意識別子（外部キー）         |
+| 17  | alert_value               | アラート発生値       | FLOAT       | NULL     | -   | -   | -                 | アラート発生時の値                                 |
+| 18  | create_date               | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                   |
+| 19  | creator                   | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
+| 20  | update_date               | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
+| 21  | modifier                  | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
+| 22  | delete_flag               | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE            |
 
 **外部キー:**
+
 - `alert_id` → `alert_setting_master.alert_id`
 - `alert_status_id` → `alert_status_master.alert_status_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `alert_history_id`
 
 **ビジネスルール:**
+
 - アラート履歴は作成のみで更新は行わない（update_date, modifierは通常NULL）
 
 ---
@@ -826,23 +870,17 @@
 | 5   | update_date       | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                    |
 | 6   | modifier          | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                              |
 | 7   | delete_flag       | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                 |
-| #   | カラム物理名      | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                                    |
-| --- | ----------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | ------------------------------------------------------- |
-| 1   | alert_status_id   | アラートステータスID | INT         | NOT NULL | ○   | -   | -                 | アラートステータスの一意識別子（主キー、AutoIncrement） |
-| 2   | alert_status_name | アラートステータス名 | VARCHAR(10) | NOT NULL | -   | -   | -                 | アラートステータス名（発生中、復旧済み）                |
-| 3   | create_date       | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                        |
-| 4   | creator           | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                              |
-| 5   | update_date       | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                    |
-| 6   | modifier          | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                              |
-| 7   | delete_flag       | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                 |
 
 **インデックス:**
+
 - PRIMARY KEY: `alert_status_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 **初期データ:**
+
 | alert_status_id | alert_status_name | 説明             |
 | --------------- | ----------------- | ---------------- |
 | 1               | 発生中            | アラート発生中   |
@@ -868,15 +906,19 @@
 | 7   | delete_flag  | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **外部キー:**
+
 - `user_type_id` → `user_type_master.user_type_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `master_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 **初期データ:**
+
 | master_id | master_name      | 説明                   |
 | --------- | ---------------- | ---------------------- |
 | 1         | デバイス         | デバイスマスタ         |
@@ -907,15 +949,17 @@
 | 12  | event_timestamp   | イベント発生日時     | TIMESTAMP     | NOT NULL | -   | -   | -                 | アラートが発生した日時                                       |
 | 13  | queued_time       | キュー登録日時       | TIMESTAMP     | NOT NULL | -   | -   | -                 | キューに登録された日時                                       |
 | 14  | processed_time    | 処理完了日時         | TIMESTAMP     | NULL     | -   | -   | -                 | メール送信処理が完了した日時                                 |
-| 15  | create_time       | 作成日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
-| 16  | update_time       | 更新日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                             |
+| 15  | create_date       | 作成日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
+| 16  | update_date       | 更新日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                             |
 
 **外部キー:**
+
 - `device_id` → `device_master.device_id`
 - `organization_id` → `organization_master.organization_id`
 - `alert_id` → `alert_setting_master.alert_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `queue_id`
 
 **ステータス遷移**:
@@ -928,6 +972,7 @@
 | FAILED     | 送信失敗（最大リトライ回数超過）     |
 
 **ビジネスルール:**
+
 - LDPストリーミング処理でアラート検出時にPENDINGステータスでINSERT
 - バッチジョブがPENDINGレコードを取得しPROCESSINGに更新後、メール送信
 - 送信成功時はSENT、失敗時はretry_count増加、retry_countが3を超えた場合はFAILEDステータスに更新
@@ -948,10 +993,11 @@
 | 5   | last_sensor_value   | 最終センサー値   | DOUBLE    | NULL     | -   | -   | -                 | 最後に評価したセンサー値                       |
 | 6   | alert_fired_time    | アラート発報時刻 | TIMESTAMP | NULL     | -   | -   | -                 | アラートを発報した時刻（未発報時はNULL）       |
 | 7   | alert_history_id    | アラート履歴ID   | INT       | NULL     | -   | 〇  | -                 | アラート履歴ID（復旧時更新用、未発報時はNULL） |
-| 8   | create_time         | 作成日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
-| 9   | update_time         | 更新日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                               |
+| 8   | create_date         | 作成日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
+| 9   | update_date         | 更新日時         | TIMESTAMP | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                               |
 
 **外部キー:**
+
 - `device_id` → `device_master.device_id`
 - `alert_id` → `alert_setting_master.alert_id`
 
@@ -965,6 +1011,7 @@
 | 復旧         | NULL                | NULL             | 正常値に復旧、状態リセット     |
 
 **ビジネスルール**:
+
 - デバイスID×アラートIDの組み合わせで一意にレコードを管理
 - 閾値超過時に異常状態でなければ、異常開始時刻を記録
 - 異常継続時間が判定時間（judgment_time）を超過した時点でアラートを発報
@@ -992,12 +1039,15 @@
 | 6   | update_date           | 更新日時           | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                          |
 
 **外部キー:**
+
 - `user_id` → `user_master.user_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `user_id`
 
 **ビジネスルール:**
+
 - user_masterと1:1の関係（user_idがPKかつFK）
 - 新規ユーザー登録時（INVITE方式）は`password_hash=NULL`で作成
 - ユーザーが招待リンクからパスワードを設定した時点で`password_hash`が設定される
@@ -1022,14 +1072,17 @@
 | 6   | update_date  | 更新日時         | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                   |
 
 **外部キー:**
+
 - `user_id` → `user_master.user_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `token_hash`
 - INDEX: `user_id`
 - INDEX: `expires_date`
 
 **ビジネスルール:**
+
 - トークンは`secrets.token_urlsafe(32)`で生成し、SHA-256でハッシュ化して保存
 - INVITE（招待）トークンの有効期限: 7日間
 - RESET（リセット）トークンの有効期限: 1時間
@@ -1059,15 +1112,18 @@
 | 10  | update_date      | 更新日時       | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                          |
 
 **外部キー:**
+
 - `user_id` → `user_master.user_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `login_history_id`
 - INDEX: `user_id`
 - INDEX: `email`
 - INDEX: `login_date`
 
 **ビジネスルール:**
+
 - ログイン履歴は作成のみで更新は行わない（監査ログとして保持）
 - failure_reasonの値: `user_not_found`, `password_not_set`, `account_locked`, `invalid_credentials`, `token_exchange_failed`
 - 詳細は[認証仕様書](./authentication-specification.md) 5.4.3節参照
@@ -1090,12 +1146,15 @@
 | 5   | lock_expires_date | ロック解除予定日時 | DATETIME | NULL     | -   | -   | -            | ロック自動解除予定日時                |
 
 **外部キー:**
+
 - `user_id` → `user_master.user_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `user_id`
 
 **ビジネスルール:**
+
 - user_masterと1:1の関係（user_idがPKかつFK）
 - 連続失敗5回でアカウントロック（`locked_date = NOW`, `lock_expires_date = NOW + 15分`）
 - `lock_expires_date > NOW` の場合、アカウントはロック中
@@ -1122,12 +1181,15 @@
 | 9   | delete_flag     | 削除フラグ         | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
 
 **外部キー:**
+
 - `organization_id` → `organization_master.organization_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `dashboard_id`
 
 **ビジネスルール:**
+
 - ダッシュボードは組織に紐づく
 
 ---
@@ -1150,12 +1212,15 @@
 | 10  | delete_flag          | 削除フラグ                 | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                     |
 
 **外部キー:**
+
 - `dashboard_id` → `dashboard_master.dashboard_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `dashboard_group_id`
 
 **ビジネスルール:**
+
 - ダッシュボードグループはダッシュボードに紐づく
 
 ---
@@ -1184,13 +1249,16 @@
 | 16  | delete_flag        | 削除フラグ               | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                             |
 
 **外部キー:**
+
 - `dashboard_group_id` → `dashboard_group_master.dashboard_group_id`
 - `gadget_type_id` → `gadget_type_master.gadget_type_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `gadget_id`
 
 **ビジネスルール:**
+
 - ガジェットはダッシュボードグループに紐づく
 
 ---
@@ -1214,12 +1282,15 @@
 | 11  | delete_flag        | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
 
 **外部キー:**
+
 - `gadget_type_id` → `dashboard_gadget_master.gadget_type_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `gadget_type_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
 
 ---
@@ -1228,28 +1299,31 @@
 
 **概要**: ユーザー毎のダッシュボード設定（選択中ダッシュボードや組織など）を管理するテーブル
 
-| #   | カラム物理名    | カラム論理名     | データ型 | NULL     | PK  | FK  | デフォルト値      | 説明                                                  |
-| --- | --------------- | ---------------- | -------- | -------- | --- | --- | ----------------- | ----------------------------------------------------- |
-| 1   | user_id         | ユーザーID       | INT      | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）              |
-| 2   | dashboard_id    | ダッシュボードID | INT      | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                  |
-| 3   | organization_id | 組織ID           | INT      | NULL     | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合はNULLを登録  |
+| #   | カラム物理名    | カラム論理名     | データ型 | NULL     | PK  | FK  | デフォルト値      | 説明                                                     |
+| --- | --------------- | ---------------- | -------- | -------- | --- | --- | ----------------- | -------------------------------------------------------- |
+| 1   | user_id         | ユーザーID       | INT      | NOT NULL | ○   | ○   | -                 | ユーザーの一意識別子（主キー、外部キー）                 |
+| 2   | dashboard_id    | ダッシュボードID | INT      | NOT NULL | -   | ○   | -                 | 選択中のダッシュボードID（外部キー）                     |
+| 3   | organization_id | 組織ID           | INT      | NULL     | -   | ○   | -                 | 選択中の組織ID（外部キー）、未選択の場合はNULLを登録     |
 | 4   | device_id       | デバイスID       | INT      | NULL     | -   | ○   | -                 | 選択中のデバイスID（外部キー）、未選択の場合はNULLを登録 |
-| 5   | create_date     | 作成日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                      |
-| 6   | creator         | 作成者           | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                            |
-| 7   | update_date     | 更新日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                  |
-| 8   | modifier        | 更新者           | INT      | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                            |
-| 9   | delete_flag     | 削除フラグ       | BOOLEAN  | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE               |
+| 5   | create_date     | 作成日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                         |
+| 6   | creator         | 作成者           | INT      | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                               |
+| 7   | update_date     | 更新日時         | DATETIME | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                     |
+| 8   | modifier        | 更新者           | INT      | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                               |
+| 9   | delete_flag     | 削除フラグ       | BOOLEAN  | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                  |
 
 **外部キー:**
+
 - `user_id` → `user_master.user_id`
 - `dashboard_id` → `dashboard_master.dashboard_id`
 - `organization_id` → `organization_master.organization_id`
 - `device_id` → `device_master.device_id`
 
 **インデックス:**
+
 - PRIMARY KEY: `user_id`
 
 **ビジネスルール:**
+
 - ダッシュボード設定はユーザーに紐づく
 
 ---
@@ -1270,10 +1344,201 @@
 | 8   | delete_flag         | 削除フラグ     | BOOLEAN     | NOT NULL | -   | -   | -                 | 論理削除時使用                                 |
 
 **インデックス:**
+
 - PRIMARY KEY: `summary_method_id`
 
 **ビジネスルール:**
+
 - Webアプリケーションの管理画面上で操作不可のマスタ
+
+---
+
+### 35. シルバー層センサーデータ（silver_sensor_data）
+
+**概要**: UnityCatalogのシルバー化処理が施されたデータを保持するテーブル
+
+| #   | カラム物理名                     | カラム論理名             | データ型    | NULL     | PK  | FK  | デフォルト値   | 説明                                          |
+| --- | -------------------------------- | ------------------------ | ----------- | -------- | --- | --- | -------------- | --------------------------------------------- |
+| 1   | my_row_id                        | 行ID                     | BIGINT      | NOT NULL | 〇  |     | AUTO INCREMENT | 行をユニークにするための疑似ID。INVISIBLE設定 |
+| 2   | device_id                        | デバイスID               | INT         | NOT NULL |     | 〇  |                | データ送信元のデバイスID                      |
+| 3   | organization_id                  | 組織ID                   | INT         | NOT NULL |     | 〇  |                | データ送信元のデバイスが属する組織の組織ID    |
+| 4   | event_timestamp                  | イベント発生日時         | DATETIME(6) | NOT NULL |     |     |                | データ送信イベントの発生時刻                  |
+| 5   | event_date                       | イベント発生日           | DATE        | NOT NULL |     |     |                | データ送信イベントの発生日                    |
+| 6   | external_temp                    | 外気温度                 | DOUBLE      | NULL     |     |     |                | 外気温度                                      |
+| 7   | set_temp_freezer_1               | 第1冷凍 設定温度         | DOUBLE      | NULL     |     |     |                | 第1冷凍 設定温度                              |
+| 8   | internal_sensor_temp_freezer_1   | 第1冷凍 庫内センサー温度 | DOUBLE      | NULL     |     |     |                | 第1冷凍 庫内センサー温度                      |
+| 9   | internal_temp_freezer_1          | 第1冷凍 庫内温度         | DOUBLE      | NULL     |     |     |                | 第1冷凍 庫内温度                              |
+| 10  | df_temp_freezer_1                | 第1冷凍 DF温度           | DOUBLE      | NULL     |     |     |                | 第1冷凍 DF温度                                |
+| 11  | condensing_temp_freezer_1        | 第1冷凍 凝縮温度         | DOUBLE      | NULL     |     |     |                | 第1冷凍 凝縮温度                              |
+| 12  | adjusted_internal_temp_freezer_1 | 第1冷凍 微調整後庫内温度 | DOUBLE      | NULL     |     |     |                | 第1冷凍 微調整後庫内温度                      |
+| 13  | set_temp_freezer_2               | 第2冷凍 設定温度         | DOUBLE      | NULL     |     |     |                | 第2冷凍 設定温度                              |
+| 14  | internal_sensor_temp_freezer_2   | 第2冷凍 庫内センサー温度 | DOUBLE      | NULL     |     |     |                | 第2冷凍 庫内センサー温度                      |
+| 15  | internal_temp_freezer_2          | 第2冷凍 庫内温度         | DOUBLE      | NULL     |     |     |                | 第2冷凍 庫内温度                              |
+| 16  | df_temp_freezer_2                | 第2冷凍 DF温度           | DOUBLE      | NULL     |     |     |                | 第2冷凍 DF温度                                |
+| 17  | condensing_temp_freezer_2        | 第2冷凍 凝縮温度         | DOUBLE      | NULL     |     |     |                | 第2冷凍 凝縮温度                              |
+| 18  | adjusted_internal_temp_freezer_2 | 第2冷凍 微調整後庫内温度 | DOUBLE      | NULL     |     |     |                | 第2冷凍 微調整後庫内温度                      |
+| 19  | compressor_freezer_1             | 第1冷凍 圧縮機           | DOUBLE      | NULL     |     |     |                | 第1冷凍 圧縮機                                |
+| 20  | compressor_freezer_2             | 第2冷凍 圧縮機           | DOUBLE      | NULL     |     |     |                | 第2冷凍 圧縮機                                |
+| 21  | fan_motor_1                      | 第1ファンモータ          | DOUBLE      | NULL     |     |     |                | 第1ファンモータ                               |
+| 22  | fan_motor_2                      | 第2ファンモータ          | DOUBLE      | NULL     |     |     |                | 第2ファンモータ                               |
+| 23  | fan_motor_3                      | 第3ファンモータ          | DOUBLE      | NULL     |     |     |                | 第3ファンモータ                               |
+| 24  | fan_motor_4                      | 第4ファンモータ          | DOUBLE      | NULL     |     |     |                | 第4ファンモータ                               |
+| 25  | fan_motor_5                      | 第5ファンモータ          | DOUBLE      | NULL     |     |     |                | 第5ファンモータ                               |
+| 26  | defrost_heater_output_1          | 防露ヒータ出力(1)        | DOUBLE      | NULL     |     |     |                | 防露ヒータ出力(1)                             |
+| 27  | defrost_heater_output_2          | 防露ヒータ出力(2)        | DOUBLE      | NULL     |     |     |                | 防露ヒータ出力(2)                             |
+| 28  | create_date                      | 作成日時                 | DATETIME(6) | NOT NULL |     |     |                | 作成日時                                      |
+
+**インデックス:**
+
+- PRIMARY KEY: `my_row_id`
+- INDEX: `device_id`
+- INDEX: `event_date`
+
+**外部キー:**
+
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+
+**ビジネスルール:**
+
+- Databricks上に実装されたシルバー層LDPパイプラインの処理によってデータが登録される
+- データ保持期間は2か月として、event_timestampが最新時刻から2か月以上前のレコードはシルバー層LDPパイプライン内の処理によって随時削除される
+
+---
+
+### 36. センサーデータ時次サマリ（gold_sensor_data_hourly_summary）
+
+**概要**: UnityCatalogのシルバー化処理が施されたデータを1時間ごとに集計を行った結果を保持するテーブル
+
+| #   | カラム物理名        | カラム論理名 | データ型 | NULL     | PK  | FK  | デフォルト値 | 説明                                                        |
+| --- | ------------------- | ------------ | -------- | -------- | --- | --- | ------------ | ----------------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT      | NOT NULL | 〇  | 〇  |              | システム内でのIoTデバイスの一意識別子                       |
+| 2   | organization_id     | 組織ID       | INT      | NOT NULL | 〇  | 〇  |              | 所属組織ID                                                  |
+| 3   | collection_datetime | 集約日時     | DATETIME | NOT NULL | 〇  |     |              | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 |
+| 4   | measurement_item_id | 測定項目ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約対象の測定項目ID                                        |
+| 5   | summary_method_id   | 集約方法ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約方法ID（平均、分散など）                                |
+| 6   | summary_value       | 集約値       | DOUBLE   | NOT NULL |     |     |              | 集約結果                                                    |
+| 7   | data_count          | データ数     | INT      | NOT NULL |     |     |              | 集約したデータ数                                            |
+| 8   | create_date         | 作成日時     | DATETIME | NOT NULL |     |     |              | レコード作成日時                                            |
+
+**インデックス:**
+
+- PRIMARY KEY: `device_id`, `organization_id`, `collection_datetime`, `measurement_item_id`, `summary_method_id`(複合キー)
+- INDEX: `device_id`
+
+**外部キー:**
+
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+- `measurement_item_id` → `measurement_item_master.measurement_item_id`
+- `summary_method_id` → `gold_summary_method_master.summary_method_id`
+
+**ビジネスルール:**
+
+- Databricks上に実装されたゴールド層LDPパイプラインの処理によってデータが登録される
+- データ保持期間は2か月として、collection_datetimeが最新時刻から2か月以上前のレコードはゴールド層LDPパイプライン内の処理によって随時削除される
+
+---
+
+### 37. センサーデータ日次サマリ（gold_sensor_data_daily_summary）
+
+**概要**: UnityCatalogのシルバー化処理が施されたデータを1日ごとに集計を行った結果を保持するテーブル
+
+| #   | カラム物理名        | カラム論理名 | データ型 | NULL     | PK  | FK  | デフォルト値 | 説明                                               |
+| --- | ------------------- | ------------ | -------- | -------- | --- | --- | ------------ | -------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT      | NOT NULL | 〇  | 〇  |              | システム内でのIoTデバイスの一意識別子              |
+| 2   | organization_id     | 組織ID       | INT      | NOT NULL | 〇  | 〇  |              | 所属組織ID                                         |
+| 3   | collection_date     | 集約日       | DATE     | NOT NULL | 〇  |     |              | センサーデータを集約した日付。形式は「YYYY/MM/DD」 |
+| 4   | measurement_item_id | 測定項目ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約対象の測定項目ID                               |
+| 5   | summary_method_id   | 集約方法ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約方法ID（平均、分散など）                       |
+| 6   | summary_value       | 集約値       | DOUBLE   | NOT NULL |     |     |              | 集約結果                                           |
+| 7   | data_count          | データ数     | INT      | NOT NULL |     |     |              | 集約したデータ数                                   |
+| 8   | create_date         | 作成日時     | DATETIME | NOT NULL |     |     |              | レコード作成日時                                   |
+
+**インデックス:**
+
+- PRIMARY KEY: `device_id`, `organization_id`, `collection_date`, `measurement_item_id`, `summary_method_id`(複合キー)
+- INDEX: `device_id`
+
+**外部キー:**
+
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+- `measurement_item_id` → `measurement_item_master.measurement_item_id`
+- `summary_method_id` → `gold_summary_method_master.summary_method_id`
+
+**ビジネスルール:**
+
+- Databricks上に実装されたゴールド層LDPパイプラインの処理によってデータが登録される
+- データ保持期間は2か月として、collection_datetimeが最新時刻から2か月以上前のレコードはゴールド層LDPパイプライン内の処理によって随時削除される
+
+---
+
+### 38. センサーデータ月次サマリ（gold_sensor_data_monthly_summary）
+
+**概要**: UnityCatalogのシルバー化処理が施されたデータを1月ごとに集計を行った結果を保持するテーブル
+
+| #   | カラム物理名          | カラム論理名 | データ型   | NULL     | PK  | FK  | デフォルト値 | 説明                                            |
+| --- | --------------------- | ------------ | ---------- | -------- | --- | --- | ------------ | ----------------------------------------------- |
+| 1   | device_id             | デバイスID   | INT        | NOT NULL | 〇  | 〇  |              | システム内でのIoTデバイスの一意識別子           |
+| 2   | organization_id       | 組織ID       | INT        | NOT NULL | 〇  | 〇  |              | 所属組織ID                                      |
+| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | 〇  |     |              | センサーデータを集約した日付。形式は「YYYY/MM」 |
+| 4   | measurement_item_id   | 測定項目ID   | INT        | NOT NULL | 〇  | 〇  |              | 集約対象の測定項目ID                            |
+| 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL | 〇  | 〇  |              | 集約方法ID（平均、分散など）                    |
+| 6   | summary_value         | 集約値       | DOUBLE     | NOT NULL |     |     |              | 集約結果                                        |
+| 7   | data_count            | データ数     | INT        | NOT NULL |     |     |              | 集約したデータ数                                |
+| 8   | create_date           | 作成日時     | DATETIME   | NOT NULL |     |     |              | レコード作成日時                                |
+
+**インデックス:**
+
+- PRIMARY KEY: `device_id`, `organization_id`, `collection_year_month`, `measurement_item_id`, `summary_method_id`(複合キー)
+- INDEX: `device_id`
+
+**外部キー:**
+
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+- `measurement_item_id` → `measurement_item_master.measurement_item_id`
+- `summary_method_id` → `gold_summary_method_master.summary_method_id`
+
+**ビジネスルール:**
+
+- Databricks上に実装されたゴールド層LDPパイプラインの処理によってデータが登録される
+- データ保持期間は3年として、collection_datetimeが最新時刻から3年以上前のレコードはゴールド層LDPパイプライン内の処理によって随時削除される
+
+---
+
+### 39. センサーデータ年次サマリ（gold_sensor_data_yearly_summary）
+
+**概要**: UnityCatalogのシルバー化処理が施されたデータを1年ごとに集計を行った結果を保持するテーブル
+
+| #   | カラム物理名        | カラム論理名 | データ型 | NULL     | PK  | FK  | デフォルト値 | 説明                                         |
+| --- | ------------------- | ------------ | -------- | -------- | --- | --- | ------------ | -------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT      | NOT NULL | 〇  | 〇  |              | システム内でのIoTデバイスの一意識別子        |
+| 2   | organization_id     | 組織ID       | INT      | NOT NULL | 〇  | 〇  |              | 所属組織ID                                   |
+| 3   | collection_year     | 集約年       | INT      | NOT NULL | 〇  |     |              | センサーデータを集約した日付。形式は「YYYY」 |
+| 4   | measurement_item_id | 測定項目ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約対象の測定項目ID                         |
+| 5   | summary_method_id   | 集約方法ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約方法ID（平均、分散など）                 |
+| 6   | summary_value       | 集約値       | DOUBLE   | NOT NULL |     |     |              | 集約結果                                     |
+| 7   | data_count          | データ数     | INT      | NOT NULL |     |     |              | 集約したデータ数                             |
+| 8   | create_date         | 作成日時     | DATETIME | NOT NULL |     |     |              | レコード作成日時                             |
+
+**インデックス:**
+
+- PRIMARY KEY: `device_id`, `organization_id`, `collection_year`, `measurement_item_id`, `summary_method_id`(複合キー)
+- INDEX: `device_id`
+
+**外部キー:**
+
+- `device_id` → `device_master.device_id`
+- `organization_id` → `organization_master.organization_id`
+- `measurement_item_id` → `measurement_item_master.measurement_item_id`
+- `summary_method_id` → `gold_summary_method_master.summary_method_id`
+
+**ビジネスルール:**
+
+- Databricks上に実装されたゴールド層LDPパイプラインの処理によってデータが登録される
+- データ保持期間は3年として、collection_datetimeが最新時刻から3年以上前のレコードはゴールド層LDPパイプライン内の処理によって随時削除される
 
 ---
 
@@ -1282,6 +1547,7 @@
 このセクションでは、アプリケーションで使用するデータベースVIEWを定義します。
 
 **VIEW使用の目的:**
+
 - **データスコープ制御**: ログインユーザーが参照可能な組織配下のデータのみを取得
 - **クエリの簡素化**: 複雑な結合処理をVIEWにカプセル化し、アプリケーション側のコードを簡潔に保つ
 - **セキュリティ強化**: 組織階層（organization_closure）に基づいたアクセス制御を一元管理
@@ -1295,6 +1561,7 @@
 ログインユーザーが参照可能な組織配下のデバイス情報を取得するためのVIEW。
 
 **目的:**
+
 - デバイス一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のデバイスのみを取得
 - organization_closureテーブルを使用した組織階層の権限制御を自動適用
 
@@ -1417,6 +1684,7 @@ def list_devices():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ユーザーの所属組織とその配下の全組織に紐づくデバイスを返す
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除されたデバイス（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
@@ -1432,6 +1700,7 @@ def list_devices():
 ログインユーザーが参照可能な組織配下のユーザー情報を取得するためのVIEW。
 
 **目的:**
+
 - ユーザー一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のユーザーのみを取得
 - organization_closureテーブルを使用した組織階層の権限制御を自動適用
 
@@ -1554,6 +1823,7 @@ def list_users():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に所属するユーザーを返す
 - `depth`カラムで組織階層の深さを確認可能（0=同じ組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除されたユーザー（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
@@ -1568,6 +1838,7 @@ def list_users():
 ログインユーザーが参照可能な組織情報を取得するためのVIEW。
 
 **目的:**
+
 - 組織一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織のみを取得
 - organization_closureテーブルを使用した組織階層の権限制御を自動適用
 
@@ -1688,6 +1959,7 @@ def list_organizations():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織を返す
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除された組織（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
@@ -1702,6 +1974,7 @@ def list_organizations():
 ログインユーザーが参照可能な組織配下のデバイス在庫情報を取得するためのVIEW。
 
 **目的:**
+
 - デバイス在庫情報一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のデバイス在庫情報のみを取得
 - device_stock_info_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
 
@@ -1824,6 +2097,7 @@ def list_device_stocks():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスの在庫情報を返す
 - device_stock_info_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
@@ -1838,6 +2112,7 @@ def list_device_stocks():
 ログインユーザーが参照可能な組織配下のアラート設定情報を取得するためのVIEW。
 
 **目的:**
+
 - アラート設定一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のアラート設定のみを取得
 - alert_setting_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
 
@@ -1971,6 +2246,7 @@ def list_alert_settings():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスのアラート設定を返す
 - alert_setting_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
@@ -1986,6 +2262,7 @@ def list_alert_settings():
 ログインユーザーが参照可能な組織配下のアラート履歴情報を取得するためのVIEW。
 
 **目的:**
+
 - アラート履歴一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のアラート履歴のみを取得
 - alert_historyは組織IDを直接持たないため、alert_setting_master → device_masterを経由して組織階層の権限制御を適用
 
@@ -2114,6 +2391,7 @@ def list_alert_history():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスのアラート履歴を返す
 - alert_historyは組織IDを持たないため、alert_setting_master → device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
@@ -2129,6 +2407,7 @@ def list_alert_history():
 ログインユーザーが参照可能な組織配下のメール通知履歴情報を取得するためのVIEW。
 
 **目的:**
+
 - メール通知履歴一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のメール通知履歴のみを取得
 - organization_closureテーブルを使用した組織階層の権限制御を自動適用
 
@@ -2247,6 +2526,7 @@ def list_mail_history():
 ```
 
 **ビジネスルール:**
+
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくメール通知履歴を返す
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - mail_historyテーブルにはdelete_flagがないため、全てのレコードが結果に含まれる
@@ -2309,10 +2589,12 @@ CREATE INDEX IX_alert_setting_device_level ON alert_setting_master(device_id, al
 ### 1. データ整合性制約
 
 #### NOT NULL制約
+
 - すべてのPKカラムにはNOT NULL制約を設定
 - 登録時の監査証跡カラム（create_date, creator）にはNOT NULL制約を設定
 
 #### UNIQUE制約
+
 - `device_master.mac_address`: MACアドレスの重複を防止（NULL許可）
 
 #### CHECK制約
@@ -2438,10 +2720,12 @@ MODIFY COLUMN update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE 
 ## 関連ドキュメント
 
 ### 機能設計
+
 - [共通仕様書](./common-specification.md) - HTTPステータスコード、エラーコード、セキュリティ等
 - [機能要件定義書](../../02-requirements/functional-requirements.md) - 機能要件とデータ要件
 
 ### 実装関連
+
 - [バックエンド設計](../../01-architecture/backend.md) - Flask/LDP設計
 - [各機能のREADME.md](../flask-app/) - 各機能のデータモデル詳細
 
