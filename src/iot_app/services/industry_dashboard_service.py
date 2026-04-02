@@ -2,18 +2,16 @@
 業種別ダッシュボードサービス
 
 店舗モニタリング・デバイス詳細画面のビジネスロジック。
-Unity Catalog (Databricks) および OLTP DB (MySQL/SQLite) へのアクセスを担当する。
+OLTP DB (MySQL/SQLite) へのアクセスを担当する。
 """
 
 import csv
 from datetime import datetime, timedelta
 from io import StringIO
 
-from dateutil.relativedelta import relativedelta
 from flask import Response
 
 from iot_app import db
-from iot_app.databricks.unity_catalog_connector import UnityCatalogConnector
 from iot_app.models.alert import (
     AlertHistory,
     AlertLevelMaster,
@@ -22,19 +20,13 @@ from iot_app.models.alert import (
 )
 from iot_app.models.contract import ContractStatusMaster  # noqa: F401
 from iot_app.models.device import Device, DeviceTypeMaster
+from iot_app.models.device_status import DeviceStatusData
 from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData  # noqa: F401
 from iot_app.models.organization import OrganizationClosure, OrganizationMaster
 
 _ALERT_RECENT_DAYS = 30
 _ALERT_MAX_TOTAL = 30
-_ITEM_PER_PAGE = 5
-_SENSOR_DATA_VIEW = "iot_catalog.views.sensor_data_view"
-_SENSOR_DATA_CUTOFF_MONTHS = 2
-
-
-def _get_cutoff_datetime():
-    """センサーデータのカットオフ日時を返す（直近2ヶ月）。"""
-    return datetime.now() - relativedelta(months=_SENSOR_DATA_CUTOFF_MONTHS)
+_ITEM_PER_PAGE = 10
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +109,42 @@ def get_accessible_organizations(current_user_organization_id):
 
 
 # ---------------------------------------------------------------------------
+# 店舗名オートコンプリート
+# ---------------------------------------------------------------------------
+
+
+def search_organizations_by_name(name, accessible_org_ids):
+    """部分一致する組織名の一覧を返す（店舗名オートコンプリート用）。
+
+    Args:
+        name: 検索文字列（部分一致）
+        accessible_org_ids: アクセス可能な組織IDリスト
+
+    Returns:
+        list[dict]: {organization_id, organization_name} の辞書リスト
+    """
+    if not accessible_org_ids:
+        return []
+    q = (
+        db.session.query(
+            OrganizationMaster.organization_id,
+            OrganizationMaster.organization_name,
+        )
+        .filter(
+            OrganizationMaster.delete_flag == False,  # noqa: E712
+            OrganizationMaster.organization_id.in_(accessible_org_ids),
+        )
+    )
+    if name:
+        q = q.filter(OrganizationMaster.organization_name.like(f"%{name}%"))
+    rows = q.order_by(OrganizationMaster.organization_name.asc()).all()
+    return [
+        {"organization_id": row.organization_id, "organization_name": row.organization_name}
+        for row in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
 # タスク2-2: デバイスアクセス権限チェック
 # ---------------------------------------------------------------------------
 
@@ -173,7 +201,7 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
     """過去30日以内のアラート履歴を取得する（店舗モニタリング用）。
 
     Args:
-        search_params: 検索条件辞書 (organization_name, device_name)
+        search_params: 検索条件辞書 (organization_id, organization_name, device_name)
         accessible_org_ids: アクセス可能な組織IDリスト
         page: ページ番号（1始まり）
         per_page: 1ページあたりの件数（デフォルト10）
@@ -234,10 +262,13 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
         AlertHistory.alert_occurrence_datetime >= cutoff,
     )
 
+    organization_id = search_params.get("organization_id", "")
     organization_name = search_params.get("organization_name", "")
     device_name = search_params.get("device_name", "")
 
-    if organization_name:
+    if organization_id:
+        q = q.filter(Device.organization_id == organization_id)
+    elif organization_name:
         q = q.filter(
             OrganizationMaster.organization_name.like(f"%{organization_name}%")
         )
@@ -266,7 +297,7 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
     """デバイス一覧をページング付きで取得する（店舗モニタリング用）。
 
     Args:
-        search_params: 検索条件辞書 (organization_name, device_name)
+        search_params: 検索条件辞書 (organization_id, organization_name, device_name)
         accessible_org_ids: アクセス可能な組織IDリスト
         page: ページ番号（1始まり）
         per_page: 1ページあたりの件数（デフォルト10）
@@ -288,6 +319,10 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
         (Device.organization_id == OrganizationMaster.organization_id)
         & (OrganizationMaster.delete_flag == False),  # noqa: E712
         isouter=True,
+    ).join(
+        DeviceStatusData,
+        Device.device_id == DeviceStatusData.device_id,
+        isouter=True,
     )
 
     q = q.filter(
@@ -295,10 +330,13 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
         Device.organization_id.in_(accessible_org_ids),
     )
 
+    organization_id = search_params.get("organization_id", "")
     organization_name = search_params.get("organization_name", "")
     device_name = search_params.get("device_name", "")
 
-    if organization_name:
+    if organization_id:
+        q = q.filter(Device.organization_id == organization_id)
+    elif organization_name:
         q = q.filter(
             OrganizationMaster.organization_name.like(f"%{organization_name}%")
         )
@@ -308,7 +346,7 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
     total = q.count()
     offset = (page - 1) * per_page
     results = (
-        q.order_by(Device.organization_id.asc()).limit(per_page).offset(offset).all()
+        q.order_by(Device.organization_id.asc(), Device.device_id.asc()).limit(per_page).offset(offset).all()
     )
 
     return results, total
@@ -367,14 +405,15 @@ def get_device_alerts_with_count(device_id, search_params):
         AlertHistory.alert_occurrence_datetime >= cutoff,
     )
 
-    total = q.count()
+    total = min(q.count(), _ALERT_MAX_TOTAL)
     offset = (page - 1) * per_page
+    effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
     results = (
         q.order_by(AlertHistory.alert_history_id.desc())
-        .limit(per_page)
+        .limit(effective_limit)
         .offset(offset)
         .all()
-    )
+    ) if effective_limit > 0 else []
 
     return results, total
 
@@ -385,7 +424,7 @@ def get_device_alerts_with_count(device_id, search_params):
 
 
 def get_latest_sensor_data(device_id):
-    """最新センサーデータを1件取得する（MySQL優先、fallback: Unity Catalog）。
+    """最新センサーデータを1件取得する（MySQLのみ）。
 
     Args:
         device_id: デバイスID
@@ -393,31 +432,12 @@ def get_latest_sensor_data(device_id):
     Returns:
         row | None: 最新センサーデータ行、データなしの場合はNone
     """
-    # MySQL から最新データを取得（直近2ヶ月以内）
-    mysql_result = (
+    return (
         db.session.query(SilverSensorData)
         .filter(SilverSensorData.device_id == device_id)
         .order_by(SilverSensorData.event_timestamp.desc())
         .first()
     )
-    if mysql_result:
-        return mysql_result
-
-    # fallback: Unity Catalog から最新データを取得
-    # try:
-    #     with get_databricks_connection() as conn:
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-    #             " WHERE device_id = ?"
-    #             " ORDER BY event_timestamp DESC"
-    #             " LIMIT 1",
-    #             [device_id],
-    #         )
-    #         return cursor.fetchone()
-    # except Exception:
-    #     return None
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -426,19 +446,14 @@ def get_latest_sensor_data(device_id):
 
 
 def get_graph_data(device_id, search_params):
-    """表示期間内のセンサーデータを全件取得する（グラフ用）。
-
-    データソース切り替えロジック:
-    - 終了日時 >= カットオフ かつ 開始日時 >= カットオフ → MySQL優先
-    - 終了日時 < カットオフ → Unity Catalogのみ
-    - 期間またがり → MySQL(直近部分) + Unity Catalog(古い部分) マージ
+    """表示期間内のセンサーデータを全件取得する（グラフ用、MySQLのみ）。
 
     Args:
         device_id: デバイスID
         search_params: 検索条件辞書 (search_start_datetime, search_end_datetime)
 
     Returns:
-        list: センサーデータ行のリスト
+        list: センサーデータ行のリスト（MySQLにデータがない場合は空リスト）
     """
     start_str = search_params.get("search_start_datetime", "")
     end_str = search_params.get("search_end_datetime", "")
@@ -449,20 +464,7 @@ def get_graph_data(device_id, search_params):
     except (ValueError, TypeError):
         return []
 
-    cutoff = _get_cutoff_datetime()
-
-    # 終了日時 < カットオフ → Unity Catalogのみ
-    if end_dt < cutoff:
-        return _fetch_graph_data_from_uc(device_id, start_str, end_str)
-
-    # 終了日時 >= カットオフ かつ 開始日時 >= カットオフ → MySQLのみ
-    if start_dt >= cutoff:
-        return _fetch_graph_data_from_mysql(device_id, start_dt, end_dt)
-
-    # 期間またがり → MySQL(直近部分) + UC(古い部分) マージ
-    mysql_rows = _fetch_graph_data_from_mysql(device_id, cutoff, end_dt)
-    uc_rows = _fetch_graph_data_from_uc(device_id, start_str, cutoff.strftime("%Y-%m-%dT%H:%M"))
-    return uc_rows + mysql_rows
+    return _fetch_graph_data_from_mysql(device_id, start_dt, end_dt)
 
 
 def _sensor_row_to_dict(row):
@@ -509,19 +511,6 @@ def _fetch_graph_data_from_mysql(device_id, start_dt, end_dt):
     return [_sensor_row_to_dict(row) for row in rows]
 
 
-def _fetch_graph_data_from_uc(device_id, start_str, end_str):
-    """Unity Catalogからグラフ用センサーデータを取得する。"""
-    try:
-        return UnityCatalogConnector().execute(
-            f"SELECT * FROM {_SENSOR_DATA_VIEW}"
-            " WHERE device_id = :device_id"
-            " AND event_timestamp BETWEEN :start AND :end"
-            " ORDER BY event_timestamp ASC",
-            {'device_id': device_id, 'start': start_str, 'end': end_str},
-        )
-    except Exception:
-        return []
-
 
 # ---------------------------------------------------------------------------
 # 内部ヘルパー: 全センサーデータ取得（CSV用）
@@ -529,16 +518,14 @@ def _fetch_graph_data_from_uc(device_id, start_str, end_str):
 
 
 def get_all_sensor_data(device_id, search_params):
-    """表示期間内の全センサーデータを取得する（CSV出力用）。
-
-    get_graph_data と同じデータソース切り替えロジックを適用する。
+    """表示期間内の全センサーデータを取得する（CSV出力用、MySQLのみ）。
 
     Args:
         device_id: デバイスID
         search_params: 検索条件辞書 (search_start_datetime, search_end_datetime)
 
     Returns:
-        list: センサーデータ行のリスト
+        list: センサーデータ行のリスト（MySQLにデータがない場合は空リスト）
     """
     return get_graph_data(device_id, search_params)
 
@@ -552,13 +539,13 @@ _CSV_HEADERS = [
     "外気温度",
     "第1冷凍 設定温度",
     "第1冷凍 庫内センサー温度",
-    "第1冷凍 庫内温度",
+    "第1冷凍 表示温度",
     "第1冷凍 DF温度",
     "第1冷凍 凝縮温度",
     "第1冷凍 微調整後庫内温度",
     "第2冷凍 設定温度",
     "第2冷凍 庫内センサー温度",
-    "第2冷凍 庫内温度",
+    "第2冷凍 表示温度",
     "第2冷凍 DF温度",
     "第2冷凍 凝縮温度",
     "第2冷凍 微調整後庫内温度",

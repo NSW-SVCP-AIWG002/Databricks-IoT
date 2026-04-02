@@ -45,6 +45,8 @@ if (chartDom && typeof echarts !== 'undefined') {
     };
   });
 
+  var hasData = graphData.length > 0;
+
   var option = {
     tooltip: { trigger: 'axis' },
     xAxis: {
@@ -53,9 +55,9 @@ if (chartDom && typeof echarts !== 'undefined') {
       axisLabel: { formatter: function(val) { return val ? val.substring(0, 16) : ''; } }
     },
     yAxis: [
-      { type: 'value', name: '℃', position: 'left', nameTextStyle: { align: 'right' } },
-      { type: 'value', name: '%',   position: 'right', nameTextStyle: { align: 'left' }, offset: 0 },
-      { type: 'value', name: 'rpm', position: 'right', nameTextStyle: { align: 'left' }, offset: 60 },
+      { type: 'value', name: hasData ? '℃'  : '', position: 'left',  nameTextStyle: { align: 'right' } },
+      { type: 'value', name: hasData ? '%'   : '', position: 'right', nameTextStyle: { align: 'left' }, offset: 0 },
+      { type: 'value', name: hasData ? 'rpm' : '', position: 'right', nameTextStyle: { align: 'left' }, offset: 60 },
     ],
     grid: { right: 100 },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
@@ -64,6 +66,7 @@ if (chartDom && typeof echarts !== 'undefined') {
   };
 
   myChart.setOption(option);
+  myChart.resize(); // flex計算後の高さを反映
 
   // 最終更新時刻
   var now = new Date();
@@ -71,6 +74,28 @@ if (chartDom && typeof echarts !== 'undefined') {
   document.getElementById('graph-updated-time').textContent =
     '最終更新時刻: ' + now.getFullYear() + '/' + pad(now.getMonth()+1) + '/' + pad(now.getDate()) +
     ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+
+  // 凡例ラインサンプル挿入
+  seriesConfig.forEach(function(cfg) {
+    var cb = document.querySelector('.legend__series-cb[value="' + cfg.name + '"]');
+    if (!cb) return;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '28');
+    svg.setAttribute('height', '12');
+    svg.style.flexShrink = '0';
+    var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '2');
+    line.setAttribute('y1', '6');
+    line.setAttribute('x2', '26');
+    line.setAttribute('y2', '6');
+    line.setAttribute('stroke', cfg.color);
+    line.setAttribute('stroke-width', '2');
+    if (cfg.type === 'dashed') {
+      line.setAttribute('stroke-dasharray', '4,3');
+    }
+    svg.appendChild(line);
+    cb.parentNode.insertBefore(svg, cb.nextSibling);
+  });
 
   // 凡例チェックボックス
   var seriesCbs = document.querySelectorAll('.legend__series-cb');

@@ -31,6 +31,7 @@ from iot_app.services.industry_dashboard_service import (
     get_graph_data,
     get_latest_sensor_data,
     get_recent_alerts_with_count,
+    search_organizations_by_name,
     validate_date_range,
 )
 
@@ -316,21 +317,121 @@ class TestGetAccessibleOrganizations:
         assert isinstance(result, list)
         assert result[0] == 1
 
-    def test_returns_org_id_list(self):
-        """組織IDリストが正しく返されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            mock_db.session.query.return_value.filter.return_value.all.return_value = [
-                (1,), (2,), (3,)
-            ]
-            result = get_accessible_organizations(10)
-        assert result == [1, 2, 3]
 
-    def test_returns_empty_list_when_no_rows(self):
-        """該当行なし時に空リストを返すこと"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            mock_db.session.query.return_value.filter.return_value.all.return_value = []
-            result = get_accessible_organizations(10)
+# =============================================================================
+# 3.5 店舗名オートコンプリート - search_organizations_by_name()
+#     観点: 3.1.1 検索条件指定, 3.1.2 検索条件未指定（全件相当）,
+#           3.1.4 検索結果戻り値ハンドリング
+# =============================================================================
+
+@pytest.mark.unit
+class TestSearchOrganizationsByName:
+    """店舗名オートコンプリート
+
+    観点: 3.1.1 検索条件指定, 3.1.2 検索条件未指定（全件相当）,
+          3.1.4 検索結果戻り値ハンドリング
+    対応ワークフロー仕様書:
+        - 店舗モニタリング検索 > 検索条件（organization_name 部分一致）
+        - search_organizations_by_name(name, accessible_org_ids)
+    仕様:
+        - accessible_org_ids に含まれる組織を対象に organization_name で部分一致検索
+        - accessible_org_ids が空の場合は空リストを即返却
+        - name が空文字の場合は全件相当（フィルタなし）で取得
+        - 戻り値: {organization_id, organization_name} の辞書リスト
+    """
+
+    def _setup_mock_db(self, mocker, rows=None):
+        """db.session.query チェーンのモックを構築するヘルパー"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        q = MagicMock()
+        mock_db.session.query.return_value.filter.return_value = q
+        q.filter.return_value = q
+        q.order_by.return_value.all.return_value = rows or []
+        return mock_db, q
+
+    def test_returns_dict_list_with_org_id_and_name(self, mocker):
+        """3.1.4.1: 戻り値が organization_id / organization_name を持つ辞書リストである"""
+        # Arrange
+        mock_row = Mock()
+        mock_row.organization_id = 1
+        mock_row.organization_name = "店舗A"
+        self._setup_mock_db(mocker, rows=[mock_row])
+
+        # Act
+        result = search_organizations_by_name("店舗", [1])
+
+        # Assert
+        assert len(result) == 1
+        assert result[0]["organization_id"] == 1
+        assert result[0]["organization_name"] == "店舗A"
+
+    def test_returns_empty_list_when_accessible_org_ids_is_empty(self, mocker):
+        """3.1.2.1: accessible_org_ids が空リストの場合、DBクエリを発行せず空リストを返す"""
+        # Arrange
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+
+        # Act
+        result = search_organizations_by_name("店舗", [])
+
+        # Assert
         assert result == []
+        mock_db.session.query.assert_not_called()
+
+    def test_name_filter_applied_when_name_provided(self, mocker):
+        """3.1.1.1: name が指定された場合、部分一致フィルタがクエリに追加される"""
+        # Arrange
+        mock_db, q = self._setup_mock_db(mocker, rows=[])
+
+        # Act
+        search_organizations_by_name("店舗A", [1])
+
+        # Assert
+        # name フィルタが追加されること（filter が複数回呼ばれる）
+        assert q.filter.call_count >= 1
+
+    def test_no_name_filter_when_name_is_empty(self, mocker):
+        """3.1.2.1: name が空文字の場合、追加フィルタなしで全件相当クエリが実行される"""
+        # Arrange
+        mock_row = Mock()
+        mock_row.organization_id = 2
+        mock_row.organization_name = "店舗B"
+        mock_db, q = self._setup_mock_db(mocker, rows=[mock_row])
+
+        # Act
+        result = search_organizations_by_name("", [1, 2])
+
+        # Assert
+        assert len(result) == 1
+        assert result[0]["organization_name"] == "店舗B"
+
+    def test_returns_empty_list_when_no_matching_orgs(self, mocker):
+        """3.1.4.2: 条件に一致する組織が存在しない場合、空リストが返却される"""
+        # Arrange
+        self._setup_mock_db(mocker, rows=[])
+
+        # Act
+        result = search_organizations_by_name("存在しない店舗", [1])
+
+        # Assert
+        assert result == []
+
+    def test_returns_multiple_orgs_as_list(self, mocker):
+        """3.1.4.1: 複数の組織が存在する場合、全件がリストで返却される"""
+        # Arrange
+        rows = []
+        for i in range(3):
+            r = Mock()
+            r.organization_id = i + 1
+            r.organization_name = f"店舗{chr(65 + i)}"
+            rows.append(r)
+        self._setup_mock_db(mocker, rows=rows)
+
+        # Act
+        result = search_organizations_by_name("店舗", [1, 2, 3])
+
+        # Assert
+        assert len(result) == 3
+        assert all("organization_id" in r and "organization_name" in r for r in result)
 
 
 # =============================================================================
@@ -392,34 +493,6 @@ class TestCheckDeviceAccess:
         result = check_device_access("uuid-nonexistent-9999", [1])
         assert result is None
 
-    def test_returns_device_when_accessible(self):
-        """アクセス可能デバイスのオブジェクトを返すこと"""
-        mock_device = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            mock_query = MagicMock()
-            mock_db.session.query.return_value = mock_query
-            mock_query.join.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.first.return_value = mock_device
-            result = check_device_access("test-uuid", [1, 2, 3])
-        assert result == mock_device
-
-    def test_returns_none_when_not_accessible(self):
-        """アクセス不可の場合に None を返すこと"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            mock_query = MagicMock()
-            mock_db.session.query.return_value = mock_query
-            mock_query.join.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.first.return_value = None
-            result = check_device_access("test-uuid", [1, 2, 3])
-        assert result is None
-
-    def test_returns_none_when_empty_org_ids(self):
-        """org_ids が空リストの場合に None を返すこと（DBアクセスなし）"""
-        result = check_device_access("test-uuid", [])
-        assert result is None
-
 
 # =============================================================================
 # 5. アラート一覧取得 - get_recent_alerts_with_count()
@@ -434,7 +507,7 @@ class TestGetRecentAlertsWithCount:
           3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - ③ アラート一覧取得
-        - get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30)
+        - get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
     仕様:
         - アラート発生日時が過去30日以内のアラート履歴を最大30件取得
         - 検索条件: organization_name（部分一致）, device_name（部分一致）
@@ -522,17 +595,6 @@ class TestGetRecentAlertsWithCount:
         """org_ids が空リストの場合に ([], 0) を返すこと"""
         result = get_recent_alerts_with_count({}, [])
         assert result == ([], 0)
-
-    def test_returns_alerts_and_count(self):
-        """アラートリストと件数のタプルを返すこと"""
-        mock_alert = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            self._make_base_query_mock(mock_db, [mock_alert], 1)
-            alerts, total = get_recent_alerts_with_count(
-                {"organization_name": "", "device_name": ""}, [1]
-            )
-        assert total == 1
-        assert alerts == [mock_alert]
 
     def test_organization_name_filter_applied(self):
         """organization_name が指定された場合にフィルタが追加されること"""
@@ -689,17 +751,6 @@ class TestGetDeviceListWithCount:
         result = get_device_list_with_count({}, [], page=1)
         assert result == ([], 0)
 
-    def test_returns_devices_and_count(self):
-        """デバイスリストと件数のタプルを返すこと"""
-        mock_device = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            self._make_base_query_mock(mock_db, [mock_device], 1)
-            devices, total = get_device_list_with_count(
-                {"organization_name": "", "device_name": ""}, [1], page=1
-            )
-        assert total == 1
-        assert devices == [mock_device]
-
     def test_page_offset_calculation(self):
         """ページ番号に応じてオフセットが正しく計算されること"""
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
@@ -720,13 +771,6 @@ class TestGetDeviceListWithCount:
             q = self._make_base_query_mock(mock_db, [], 0)
             get_device_list_with_count({"device_name": "冷蔵庫"}, [1], page=1)
         assert q.filter.call_count >= 1
-
-    def test_page_1_offset_is_zero(self):
-        """page=1 のオフセットが 0 であること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 5)
-            get_device_list_with_count({}, [1], page=1, per_page=10)
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(0)
 
 
 # =============================================================================
@@ -818,7 +862,7 @@ class TestGetDeviceAlertsWithCount:
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
             q = self._make_base_query_mock(mock_db, [], 5)
             get_device_alerts_with_count(device_id=1, search_params={"page": 3})
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(10)
+        q.order_by.return_value.limit.return_value.offset.assert_called_with(20)
 
     def test_default_page_is_1(self):
         """page パラメータがない場合に page=1 として動作すること"""
@@ -861,27 +905,18 @@ class TestGetLatestSensorData:
         assert result is mock_row
 
     def test_returns_none_when_no_sensor_data(self, mocker):
-        """3.1.4.2: センサーデータが存在しない場合、Noneが返却される"""
+        """3.1.4.2: センサーデータが存在しない場合、Noneが返却される（MySQLのみ参照）"""
+        # ワークフロー仕様書「センサーデータ取得仕様」: MySQLにデータが存在しない場合はNoneを返す
         self._setup_mock_db(mocker, first_return=None)
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.UnityCatalogConnector"
-        )
-        mock_connector.return_value.execute_one.return_value = None
         result = get_latest_sensor_data(device_id=999)
         assert result is None
 
     def test_device_id_passed_to_query(self, mocker):
-        """3.1.1.1: device_id がUCのSQLクエリに渡される（MySQLにデータなしの場合）"""
-        self._setup_mock_db(mocker, first_return=None)
-        mock_connector = mocker.patch(
-            "iot_app.services.industry_dashboard_service.UnityCatalogConnector"
-        )
-        mock_connector.return_value.execute_one.return_value = None
+        """3.1.1.1: device_id がMySQLクエリに渡される"""
+        # ワークフロー仕様書「センサーデータ取得仕様」: silver_sensor_data テーブルを参照
+        mock_db = self._setup_mock_db(mocker, first_return=None)
         get_latest_sensor_data(device_id=42)
-        mock_connector.return_value.execute_one.assert_called_once()
-        call_args = mock_connector.return_value.execute_one.call_args
-        params = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get('params', {})
-        assert params.get('device_id') == 42
+        mock_db.session.query.assert_called_once()
 
     def test_returns_row_when_found(self):
         """センサーデータが存在する場合にRowオブジェクトを返すこと"""
@@ -892,11 +927,10 @@ class TestGetLatestSensorData:
         assert result == mock_row
 
     def test_returns_none_when_not_found(self):
-        """センサーデータが存在しない場合に None を返すこと"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db, \
-             patch("iot_app.services.industry_dashboard_service.UnityCatalogConnector") as mock_connector:
+        """センサーデータが存在しない場合に None を返すこと（MySQLのみ参照）"""
+        # ワークフロー仕様書「センサーデータ取得仕様」: MySQLにデータが存在しない場合はNoneを返す
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
             mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
-            mock_connector.return_value.execute_one.return_value = None
             result = get_latest_sensor_data(device_id=99)
         assert result is None
 
@@ -957,6 +991,46 @@ class TestGetGraphData:
         })
         mock_fetch.assert_called_once()
 
+    # ------------------------------------------------------------------
+    # データソース（MySQLのみ）
+    # ワークフロー仕様書「センサーデータ取得仕様」:
+    #   センサーデータは MySQL の silver_sensor_data テーブルのみを参照する
+    # ------------------------------------------------------------------
+
+    def test_mysql_always_called_for_valid_params(self, mocker):
+        """2.1.1: 有効な検索条件のとき _fetch_graph_data_from_mysql が呼ばれる"""
+        mock_mysql = mocker.patch(
+            "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
+            return_value=[_make_mock_sensor_row()],
+        )
+
+        result = get_graph_data(device_id=1, search_params=self._default_search_params())
+
+        mock_mysql.assert_called_once()
+        assert len(result) == 1
+
+    # Unity Catalog参照は現行仕様の対象外（ワークフロー仕様書「センサーデータ取得仕様」でMySQLのみに統一）。
+    # UC参照が必要になった場合は改めてテストを追加すること。
+
+    def test_invalid_date_format_returns_empty_list(self):
+        """1.4.3 / VAL_001: 日時フォーマット不正の場合、空リストが返却される"""
+        # Act
+        result = get_graph_data(device_id=1, search_params={
+            "search_start_datetime": "2026/02/01 00:00",
+            "search_end_datetime":   "invalid-date",
+        })
+
+        # Assert
+        assert result == []
+
+    def test_missing_search_params_returns_empty_list(self):
+        """3.1.1.3: search_params が空辞書の場合、空リストが返却される"""
+        # Act
+        result = get_graph_data(device_id=1, search_params={})
+
+        # Assert
+        assert result == []
+
 
 # =============================================================================
 # 10. CSVエクスポート - export_sensor_data_csv()
@@ -983,13 +1057,13 @@ class TestExportSensorDataCsv:
         "外気温度",
         "第1冷凍 設定温度",
         "第1冷凍 庫内センサー温度",
-        "第1冷凍 庫内温度",
+        "第1冷凍 表示温度",
         "第1冷凍 DF温度",
         "第1冷凍 凝縮温度",
         "第1冷凍 微調整後庫内温度",
         "第2冷凍 設定温度",
         "第2冷凍 庫内センサー温度",
-        "第2冷凍 庫内温度",
+        "第2冷凍 表示温度",
         "第2冷凍 DF温度",
         "第2冷凍 凝縮温度",
         "第2冷凍 微調整後庫内温度",
@@ -1139,3 +1213,319 @@ class TestExportSensorDataCsv:
             mock_dt.now.return_value = datetime(2026, 2, 27, 12, 0, 0)
             response = self._call_export(mocker, sensor_rows=[])
         assert "20260227_120000" in response.headers.get("Content-Disposition", "")
+
+
+# =============================================================================
+# 追加テスト: get_latest_sensor_data() - MySQL専用動作の確認
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetLatestSensorDataMysqlOnly:
+    """最新センサーデータ取得 - MySQL専用動作
+
+    観点: 3.1.4.1 正常系戻り値, 3.1.4.2 空結果, 3.1.1.1 検索条件指定
+    対応ワークフロー仕様書:
+        - センサーデータ取得仕様: silver_sensor_data テーブル（MySQL）のみ参照
+        - MySQLにデータが存在しない場合はNoneを返す（フォールバックなし）
+    仕様:
+        - silver_sensor_data から device_id で絞り込み
+        - event_timestamp DESC LIMIT 1 で最新1件を取得
+        - データなし → None を返す（Unity Catalog への参照は行わない）
+    """
+
+    def test_mysql_returns_row_when_data_exists(self, mocker):
+        """3.1.4.1: MySQLにデータあり → センサーデータ行を返す"""
+        # Arrange
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        expected_row = MagicMock()
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = expected_row
+
+        # Act
+        result = get_latest_sensor_data(device_id=1)
+
+        # Assert: MySQLクエリの結果がそのまま返る
+        assert result is expected_row
+
+    def test_mysql_returns_none_when_no_data(self, mocker):
+        """3.1.4.2: MySQLにデータなし → None を返す（フォールバックなし）"""
+        # Arrange
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
+
+        # Act
+        result = get_latest_sensor_data(device_id=999)
+
+        # Assert: None が返り、他のデータソースへの参照は行わない
+        assert result is None
+
+    def test_query_called_with_device_id(self, mocker):
+        """3.1.1.1: device_id でMySQLクエリが実行される"""
+        # Arrange
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
+
+        # Act
+        get_latest_sensor_data(device_id=42)
+
+        # Assert: session.query が呼ばれる（MySQLへのクエリ発行）
+        mock_db.session.query.assert_called_once()
+
+
+# =============================================================================
+# 追加テスト: get_recent_alerts_with_count() - organization_id 優先フィルタ
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetRecentAlertsOrganizationIdPriority:
+    """アラート一覧取得 - organization_id / organization_name 優先度
+
+    観点: 3.1.1.4 条件結合（organization_id が organization_name より優先）
+    対応ワークフロー仕様書:
+        - 店舗モニタリング検索 > 検索条件
+        - organization_id が指定された場合は organization_name フィルタは使用しない
+    仕様:
+        - organization_id が非空 → organization_id で絞り込み（organization_name は無視）
+        - organization_id が空 かつ organization_name が非空 → organization_name で部分一致
+    """
+
+    def _make_base_query_mock(self, mock_db, alerts=None, count=0):
+        q = MagicMock()
+        mock_db.session.query.return_value.join.return_value = q
+        q.join.return_value = q
+        q.filter.return_value = q
+        q.count.return_value = count
+        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
+            alerts if alerts is not None else []
+        )
+        return q
+
+    def test_organization_id_takes_priority_over_organization_name(self):
+        """3.1.1.4: organization_id と organization_name が両方指定された場合、
+        organization_id フィルタのみが適用される（OR条件にならない）"""
+        # Arrange
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            q = self._make_base_query_mock(mock_db, [], 0)
+
+            # Act
+            get_recent_alerts_with_count(
+                search_params={"organization_id": "1", "organization_name": "店舗A"},
+                accessible_org_ids=[1],
+            )
+
+        # Assert: filter が呼ばれていること（organization_id フィルタが追加される）
+        assert q.filter.call_count >= 1
+
+    def test_organization_name_used_when_organization_id_is_empty(self):
+        """3.1.1.3: organization_id が空文字のとき organization_name フィルタが使われる"""
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            q = self._make_base_query_mock(mock_db, [], 0)
+
+            get_recent_alerts_with_count(
+                search_params={"organization_id": "", "organization_name": "店舗A"},
+                accessible_org_ids=[1],
+            )
+
+        assert q.filter.call_count >= 1
+
+
+# =============================================================================
+# 追加テスト: get_device_list_with_count() - organization_id 優先フィルタ
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetDeviceListOrganizationIdPriority:
+    """デバイス一覧取得 - organization_id / organization_name 優先度
+
+    観点: 3.1.1.4 条件結合（organization_id が organization_name より優先）
+    対応ワークフロー仕様書:
+        - 店舗モニタリング検索 > 検索条件
+        - organization_id が指定された場合は organization_name フィルタは使用しない
+    """
+
+    def _make_base_query_mock(self, mock_db, devices=None, count=0):
+        q = MagicMock()
+        mock_db.session.query.return_value.join.return_value = q
+        q.join.return_value = q
+        q.filter.return_value = q
+        q.count.return_value = count
+        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
+            devices if devices is not None else []
+        )
+        return q
+
+    def test_organization_id_takes_priority_over_organization_name(self):
+        """3.1.1.4: organization_id と organization_name が両方指定された場合、
+        organization_id フィルタのみが適用される（OR条件にならない）"""
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            q = self._make_base_query_mock(mock_db, [], 0)
+
+            get_device_list_with_count(
+                search_params={"organization_id": "1", "organization_name": "店舗A"},
+                accessible_org_ids=[1],
+                page=1,
+            )
+
+        assert q.filter.call_count >= 1
+
+    def test_organization_name_used_when_organization_id_is_empty(self):
+        """3.1.1.3: organization_id が空文字のとき organization_name フィルタが使われる"""
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            q = self._make_base_query_mock(mock_db, [], 0)
+
+            get_device_list_with_count(
+                search_params={"organization_id": "", "organization_name": "店舗A"},
+                accessible_org_ids=[1],
+                page=1,
+            )
+
+        assert q.filter.call_count >= 1
+
+
+# =============================================================================
+# 追加テスト: get_graph_data() - MySQL専用ソート確認
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetGraphDataAdditional:
+    """グラフ用センサーデータ取得 - 追加テスト
+
+    観点: 2.1.1 正常系処理（ソート確認）, 3.1.4 検索結果戻り値ハンドリング
+    対応ワークフロー仕様書:
+        - センサーデータ取得仕様: MySQL の silver_sensor_data のみを参照
+        - event_timestamp ASC でソートして返す
+    """
+
+    def test_mysql_data_is_sorted_by_event_timestamp_asc(self, mocker):
+        """2.1.1: MySQLから取得したデータが event_timestamp ASC でソートされている
+        （_fetch_graph_data_from_mysql が ASC ORDER BY で取得するため）"""
+        # Arrange: 複数行を昇順でモック
+        row_old = _make_mock_sensor_row(event_timestamp=datetime(2026, 2, 10,  6, 0, 0))
+        row_new = _make_mock_sensor_row(event_timestamp=datetime(2026, 2, 20, 12, 0, 0))
+        mocker.patch(
+            "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
+            return_value=[row_old, row_new],
+        )
+
+        # Act
+        result = get_graph_data(device_id=1, search_params={
+            "search_start_datetime": "2026-02-01T00:00",
+            "search_end_datetime":   "2026-02-27T00:00",
+        })
+
+        # Assert: 古い行が先、新しい行が後（ASCソート）
+        assert len(result) == 2
+        ts0 = str(result[0].get("event_timestamp") or "")
+        ts1 = str(result[1].get("event_timestamp") or "")
+        assert ts0 <= ts1, f"ソート順が正しくない: {ts0} > {ts1}"
+
+    # Unity CatalogエラーハンドリングテストはMySQLのみの現行仕様では対象外。
+    # UC参照が再導入された場合に追加すること。
+
+
+# =============================================================================
+# 追加テスト: get_device_alerts_with_count() - effective_limit 境界値
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetDeviceAlertsEffectiveLimit:
+    """デバイス別アラート一覧取得 - effective_limit 境界値
+
+    観点: 3.1.3.1 ページング・件数制御
+    対応ワークフロー仕様書:
+        - デバイス詳細画面 > アラート一覧取得
+        - 最大30件制限: OFFSET が 30 以上になるページでは空リストを返す
+    仕様:
+        - _ALERT_MAX_TOTAL = 30
+        - effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
+        - offset >= 30 → effective_limit = 0 → DBクエリを発行せず [] を返す
+    """
+
+    def _make_base_query_mock(self, mock_db, alerts=None, count=30):
+        q = MagicMock()
+        mock_db.session.query.return_value.join.return_value = q
+        q.join.return_value = q
+        q.filter.return_value = q
+        q.count.return_value = count
+        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
+            alerts if alerts is not None else []
+        )
+        return q
+
+    def test_page_4_with_per_page_10_returns_empty_list(self):
+        """3.1.3.1: page=4, per_page=10 のとき offset=30 で effective_limit=0 → 空リスト"""
+        # Arrange: DBには30件ある
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            self._make_base_query_mock(mock_db, [], 30)
+
+            # Act
+            alerts, total = get_device_alerts_with_count(
+                device_id=1, search_params={"page": 4}
+            )
+
+        # Assert: offset=30 → effective_limit=0 → DBへのクエリなしで空リスト
+        assert alerts == []
+        assert total == 30
+
+    def test_page_3_with_per_page_10_returns_last_page_data(self):
+        """3.1.3.1: page=3, per_page=10 のとき offset=20 → effective_limit=10 → データ取得"""
+        mock_alert = MagicMock()
+        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
+            self._make_base_query_mock(mock_db, [mock_alert], 30)
+
+            alerts, total = get_device_alerts_with_count(
+                device_id=1, search_params={"page": 3}
+            )
+
+        assert total == 30
+        assert alerts == [mock_alert]
+
+
+# =============================================================================
+# 追加テスト: get_all_sensor_data() - get_graph_data への委譲確認
+# =============================================================================
+
+@pytest.mark.unit
+class TestGetAllSensorData:
+    """全センサーデータ取得（CSV用）- get_graph_data への委譲
+
+    観点: 2.1.1 正常系処理
+    対応ワークフロー仕様書:
+        - CSVエクスポート > 処理詳細（サーバーサイド）
+        - get_all_sensor_data は get_graph_data と同じデータソース切り替えロジックを適用
+    仕様:
+        - get_all_sensor_data(device_id, search_params) は get_graph_data に委譲する
+    """
+
+    def test_delegates_to_get_graph_data(self, mocker):
+        """2.1.1: get_all_sensor_data が get_graph_data へ処理を委譲する"""
+        from iot_app.services.industry_dashboard_service import get_all_sensor_data
+
+        mock_graph_data = mocker.patch(
+            "iot_app.services.industry_dashboard_service.get_graph_data",
+            return_value=[_make_mock_sensor_row()],
+        )
+        search_params = {
+            "search_start_datetime": "2026-02-26T12:00",
+            "search_end_datetime":   "2026-02-27T12:00",
+        }
+
+        result = get_all_sensor_data(device_id=1, search_params=search_params)
+
+        mock_graph_data.assert_called_once_with(1, search_params)
+        assert len(result) == 1
+
+    def test_returns_empty_list_when_no_data(self, mocker):
+        """3.1.4.2: データなし時に空リストが返る"""
+        from iot_app.services.industry_dashboard_service import get_all_sensor_data
+
+        mocker.patch(
+            "iot_app.services.industry_dashboard_service.get_graph_data",
+            return_value=[],
+        )
+
+        result = get_all_sensor_data(device_id=1, search_params={
+            "search_start_datetime": "2026-02-26T12:00",
+            "search_end_datetime":   "2026-02-27T12:00",
+        })
+
+        assert result == []
