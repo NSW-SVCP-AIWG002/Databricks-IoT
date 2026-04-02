@@ -33,7 +33,7 @@
     - [21. アラートステータスマスタ (alert\_status\_master)](#21-アラートステータスマスタ-alert_status_master)
     - [22. マスタ一覧 (master\_list)](#22-マスタ一覧-master_list)
     - [23. メール通知キュー（email\_notification\_queue）](#23-メール通知キューemail_notification_queue)
-    - [24. アラート異常状態（alert\_abnomal\_state）](#24-アラート異常状態alert_abnomal_state)
+    - [24. アラート異常状態（alert\_abnormal\_state）](#24-アラート異常状態alert_abnormal_state)
     - [25. ユーザーパスワード (user\_password)](#25-ユーザーパスワード-user_password)
     - [26. パスワードリセットトークン (password\_reset\_token)](#26-パスワードリセットトークン-password_reset_token)
     - [27. ログイン履歴 (login\_history)](#27-ログイン履歴-login_history)
@@ -440,12 +440,13 @@
 - PRIMARY KEY: `device_id`
 - INDEX: `organization_id`
 - INDEX: `device_type_id`
-- UNIQUE: `mac_address`（NULL可）
+- UNIQUE: `mac_address`（NULL可）, `device_uuid`(NULL不可)
 
 **ビジネスルール:**
 
 - device_uuidはAzure IoT Hub、AWS IoT Coreで管理されているデバイスIDと同期させる
 - mac_addressは一意制約（重複登録不可、NULL許容）
+- device_uuidは一意制約（重複登録不可、NULL不可）
 
 ---
 
@@ -577,6 +578,7 @@
 **インデックス:**
 
 - PRIMARY KEY: `alert_id`
+- UNIQUE: `alert_uuid`
 - INDEX: `device_id`
 - INDEX: `alert_conditions_measurement_item_id`
 - INDEX: `alert_recovery_conditions_measurement_item_id`
@@ -850,6 +852,7 @@
 **インデックス:**
 
 - PRIMARY KEY: `alert_history_id`
+- UNIQUE: `alert_history_uuid`
 
 **ビジネスルール:**
 
@@ -980,7 +983,7 @@
 
 ---
 
-### 24. アラート異常状態（alert_abnomal_state）
+### 24. アラート異常状態（alert_abnormal_state）
 
 **概要**: デバイス×アラート設定ごとの異常継続状態を管理するテーブル。アラート設定マスタの判定時間（judgment_time）を超えて異常値が継続した場合にアラートを発報するための状態管理に使用する。
 
