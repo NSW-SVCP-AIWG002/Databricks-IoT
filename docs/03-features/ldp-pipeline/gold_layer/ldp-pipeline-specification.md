@@ -37,7 +37,7 @@
       - [集計処理の実行](#集計処理の実行)
       - [共通化のメリット](#共通化のメリット)
   - [シーケンス図](#シーケンス図)
-    - [日次バッチ処理全体フロー](#日次バッチ処理全体フロー)
+    - [バッチ処理全体フロー](#バッチ処理全体フロー)
   - [エラーハンドリング](#エラーハンドリング)
     - [エラー分類とハンドリング](#エラー分類とハンドリング)
     - [エラーメッセージ一覧](#エラーメッセージ一覧)
@@ -53,6 +53,7 @@
     - [トランザクション方針](#トランザクション方針)
     - [Delta Lakeトランザクション保証](#delta-lakeトランザクション保証)
     - [MERGE処理の冪等性](#merge処理の冪等性)
+    - [INSERT処理の冪等性](#insert処理の冪等性)
   - [パフォーマンス最適化](#パフォーマンス最適化)
     - [パフォーマンス要件](#パフォーマンス要件)
     - [クラスタリング戦略](#クラスタリング戦略)
@@ -67,6 +68,7 @@
     - [関連パイプライン](#関連パイプライン)
     - [要件定義](#要件定義)
     - [共通仕様](#共通仕様)
+    - [データベース設計](#データベース設計)
   - [変更履歴](#変更履歴)
 
 ---
@@ -100,12 +102,14 @@
 
 ## 処理一覧
 
-| No  | 処理名       | 処理タイプ | 入力               | 出力                             | 説明                         |
-| --- | ------------ | ---------- | ------------------ | -------------------------------- | ---------------------------- |
-| 1   | 時次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_hourly_summary  | シルバー層データを時次で集計 |
-| 2   | 日次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_daily_summary   | シルバー層データを日次で集計 |
-| 3   | 月次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_monthly_summary | シルバー層データを月次で集計 |
-| 4   | 年次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_yearly_summary  | シルバー層データを年次で集計 |
+| No  | 処理名       | 処理タイプ | 入力               | 出力                                                      | 説明                         |
+| --- | ------------ | ---------- | ------------------ | --------------------------------------------------------- | ---------------------------- |
+| 1   | 時次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_hourly_summary（UnityCatalog, OLTP DB）  | シルバー層データを時次で集計 |
+| 2   | 日次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_daily_summary（UnityCatalog, OLTP DB）   | シルバー層データを日次で集計 |
+| 3   | 月次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_monthly_summary（UnityCatalog, OLTP DB） | シルバー層データを月次で集計 |
+| 4   | 年次集計処理 | Batch      | silver_sensor_data | gold_sensor_data_yearly_summary（UnityCatalog, OLTP DB）  | シルバー層データを年次で集計 |
+
+OLTP DBのgold_sensor_data_hourly_summary、gold_sensor_data_daily_summary、gold_sensor_data_monthly_summary、gold_sensor_data_yearly_summaryテーブルの定義については、アプリケーションデータベース仕様書を参照のこと。
 
 ---
 
@@ -116,6 +120,7 @@
 **トリガー:** 時次バッチスケジュール
 
 **前提条件:**
+
 - シルバー層テーブル `silver_sensor_data` にデータが存在する
 - 対象時の全データがシルバー層に取り込み完了している
 
@@ -145,8 +150,15 @@ flowchart TD
     Validate -->|OK| WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_hourly_summary]
     WriteGold --> CheckWrite{書込結果}
 
-    CheckWrite -->|成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
+    CheckWrite -->|成功| WriteOLTP[OLTP DBへ書き込み<br>INSERT INTO gold_sensor_data_hourly_summary]
+    WriteOLTP --> CheckWrite1{書込結果}
+    CheckWrite1 --> |成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
     UpdateMeta --> EndSuccess
+
+    CheckWrite1 --> |失敗| ErrorWrite1[エラーログ出力]
+    ErrorWrite1 --> RetryWrite1{リトライ<br>回数確認}
+    RetryWrite1 -->|3回未満| WriteOLTP
+    RetryWrite1 -->|3回以上| AlertWrite[エラー通知]
 
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
     ErrorWrite --> RetryWrite{リトライ<br>回数確認}
@@ -181,14 +193,15 @@ run_aggregation(
 | ①        | シルバー層データ読込 | `event_datetime = 対象時` でフィルタ |
 | ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し |
 | ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理        |
+| ④        | OLTP DBへ書込        | `insert_to_gold()` でinsert処理      |
 
 **設定値:**
 
-| 項目         | 値                                                 |
-| ------------ | -------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_hourly_summary` |
-| 時間カラム   | `collection_datetime`                              |
-| 時間式       | `event_datetime`                                   |
+| 項目         | 値                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_hourly_summary`, `iot_app_db.gold_sensor_data_hourly_summary` |
+| 時間カラム   | `collection_datetime`                                                                            |
+| 時間式       | `event_datetime`                                                                                 |
 
 #### バリデーション
 
@@ -238,8 +251,15 @@ flowchart TD
     Validate -->|OK| WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_daily_summary]
     WriteGold --> CheckWrite{書込結果}
 
-    CheckWrite -->|成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
+    CheckWrite -->|成功| WriteOLTP[OLTP DBへ書き込み<br>INSERT INTO gold_sensor_data_daily_summary]
+    WriteOLTP --> CheckWrite1{書込結果}
+    CheckWrite1 --> |成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
     UpdateMeta --> EndSuccess
+
+    CheckWrite1 --> |失敗| ErrorWrite1[エラーログ出力]
+    ErrorWrite1 --> RetryWrite1{リトライ<br>回数確認}
+    RetryWrite1 -->|3回未満| WriteOLTP
+    RetryWrite1 -->|3回以上| AlertWrite[エラー通知]
 
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
     ErrorWrite --> RetryWrite{リトライ<br>回数確認}
@@ -274,14 +294,15 @@ run_aggregation(
 | ①        | シルバー層データ読込 | `event_date = 対象日` でフィルタ     |
 | ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し |
 | ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理        |
+| ④        | OLTP DBへ書込        | `insert_to_gold()` でinsert処理      |
 
 **設定値:**
 
-| 項目         | 値                                                |
-| ------------ | ------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_daily_summary` |
-| 時間カラム   | `collection_date`                                 |
-| 時間式       | `event_date`                                      |
+| 項目         | 値                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_daily_summary`, `iot_app_db.gold_sensor_data_daily_summary` |
+| 時間カラム   | `collection_date`                                                                              |
+| 時間式       | `event_date`                                                                                   |
 
 #### バリデーション
 
@@ -301,37 +322,50 @@ run_aggregation(
 **トリガー:** 月初バッチスケジュール（毎月1日深夜実行）
 
 **前提条件:**
+
 - シルバー層テーブル `silver_sensor_data` に前月のデータが存在する
 
 #### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([月次集計処理開始]) --> GetMonth[処理対象年月を取得<br>default: 前月]
-    GetMonth --> CheckSource{シルバー層に<br>対象月データが<br>存在するか}
+    Start([月次集計処理開始]) --> GetDate[処理対象月を取得<br>default: 前月]
+    GetDate --> CheckSource{シルバー層に<br>対象月データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
     LogNoData --> EndSuccess([処理終了<br>正常完了])
-
-    CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date BETWEEN 月初 AND 月末]
+    CheckSource -->|データあり| ReadSilver[シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE event_date BETWEEN start_date AND end_date]
     ReadSilver --> CheckRead{読込結果}
-    CheckRead -->|成功| Transform[データ変換<br>センサーデータを月次で集約]
+
+    CheckRead -->|成功| Transform[データ変換<br>集約対象項目ごとに<br>統計値を算出]
     CheckRead -->|失敗| ErrorRead[エラーログ出力]
     ErrorRead --> RetryRead{リトライ<br>回数確認}
     RetryRead -->|3回未満| ReadSilver
     RetryRead -->|3回以上| AlertRead[エラー通知]
-    AlertRead --> EndError
-    Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_monthly_summary]
+    AlertRead --> EndError([処理終了<br>異常終了])
+
+    Transform --> Validate{バリデーション<br>結果確認}
+    Validate -->|エラー| ErrorValidate[不正データをログ出力<br>スキップして続行]
+    ErrorValidate --> WriteGold
+
+    Validate -->|OK| WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_monthly_summary]
     WriteGold --> CheckWrite{書込結果}
 
-    CheckWrite -->|成功| UpdateMeta[メタデータ更新]
+    CheckWrite -->|成功| WriteOLTP[OLTP DBへ書き込み<br>INSERT INTO gold_sensor_data_monthly_summary]
+    WriteOLTP --> CheckWrite1{書込結果}
+    CheckWrite1 --> |成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
     UpdateMeta --> EndSuccess
 
+    CheckWrite1 --> |失敗| ErrorWrite1[エラーログ出力]
+    ErrorWrite1 --> RetryWrite1{リトライ<br>回数確認}
+    RetryWrite1 -->|3回未満| WriteOLTP
+    RetryWrite1 -->|3回以上| AlertWrite[エラー通知]
+
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
-    ErrorWrite --> Retry{リトライ確認}
-    Retry -->|3回未満| WriteGold
-    Retry -->|3回以上| Alert[エラー通知]
-    Alert --> EndError([処理終了<br>異常終了])
+    ErrorWrite --> RetryWrite{リトライ<br>回数確認}
+    RetryWrite -->|3回未満| WriteGold
+    RetryWrite -->|3回以上| AlertWrite[エラー通知]
+    AlertWrite --> EndError
 ```
 
 > **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
@@ -365,14 +399,15 @@ run_aggregation(
 | ①        | シルバー層データ読込 | `event_date BETWEEN 月初 AND 月末` でフィルタ |
 | ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し          |
 | ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理                 |
+| ④        | ゴールド層へ書込     | `insert_to_gold()` でMERGE処理                |
 
 **設定値:**
 
-| 項目         | 値                                                            |
-| ------------ | ------------------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary`           |
-| 時間カラム   | `collection_year_month`                                       |
-| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month` |
+| 項目         | 値                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_monthly_summary`, `iot_app_db.gold_sensor_data_monthly_summary` |
+| 時間カラム   | `collection_year_month`                                                                            |
+| 時間式       | `DATE_FORMAT(event_date, 'yyyy/MM') AS collection_year_month`                                      |
 
 ---
 
@@ -381,37 +416,50 @@ run_aggregation(
 **トリガー:** 年初バッチスケジュール（毎年1月1日深夜実行）
 
 **前提条件:**
+
 - シルバー層テーブル `silver_sensor_data` に前年のデータが存在する
 
 #### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([年次集計処理開始]) --> GetYear[処理対象年を取得<br>default: 前年]
-    GetYear --> CheckSource{シルバー層に<br>対象年データが<br>存在するか}
+    Start([年次集計処理開始]) --> GetDate[処理対象年を取得<br>default: 前年]
+    GetDate --> CheckSource{シルバー層に<br>対象年データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
     LogNoData --> EndSuccess([処理終了<br>正常完了])
-
     CheckSource -->|データあり| ReadSilver["シルバー層データ読込<br>SELECT * FROM silver_sensor_data<br>WHERE YEAR(event_date) = 対象年"]
     ReadSilver --> CheckRead{読込結果}
-    CheckRead -->|成功| Transform[データ変換<br>センサーデータを年次で集約]
+
+    CheckRead -->|成功| Transform[データ変換<br>集約対象項目ごとに<br>統計値を算出]
     CheckRead -->|失敗| ErrorRead[エラーログ出力]
     ErrorRead --> RetryRead{リトライ<br>回数確認}
     RetryRead -->|3回未満| ReadSilver
     RetryRead -->|3回以上| AlertRead[エラー通知]
-    AlertRead --> EndError
-    Transform --> WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_yearly_summary]
+    AlertRead --> EndError([処理終了<br>異常終了])
+
+    Transform --> Validate{バリデーション<br>結果確認}
+    Validate -->|エラー| ErrorValidate[不正データをログ出力<br>スキップして続行]
+    ErrorValidate --> WriteGold
+
+    Validate -->|OK| WriteGold[ゴールド層へ書込<br>MERGE INTO gold_sensor_data_yearly_summary]
     WriteGold --> CheckWrite{書込結果}
 
-    CheckWrite -->|成功| UpdateMeta[メタデータ更新]
+    CheckWrite -->|成功| WriteOLTP[OLTP DBへ書き込み<br>INSERT INTO gold_sensor_data_yearly_summary]
+    WriteOLTP --> CheckWrite1{書込結果}
+    CheckWrite1 --> |成功| UpdateMeta[メタデータ更新<br>処理完了日時を記録]
     UpdateMeta --> EndSuccess
 
+    CheckWrite1 --> |失敗| ErrorWrite1[エラーログ出力]
+    ErrorWrite1 --> RetryWrite1{リトライ<br>回数確認}
+    RetryWrite1 -->|3回未満| WriteOLTP
+    RetryWrite1 -->|3回以上| AlertWrite[エラー通知]
+
     CheckWrite -->|失敗| ErrorWrite[エラーログ出力]
-    ErrorWrite --> Retry{リトライ確認}
-    Retry -->|3回未満| WriteGold
-    Retry -->|3回以上| Alert[エラー通知]
-    Alert --> EndError([処理終了<br>異常終了])
+    ErrorWrite --> RetryWrite{リトライ<br>回数確認}
+    RetryWrite -->|3回未満| WriteGold
+    RetryWrite -->|3回以上| AlertWrite[エラー通知]
+    AlertWrite --> EndError
 ```
 
 > **注記:** バリデーション処理（device_id・organization_id・event_date の NOT NULL チェック）は[共通集計処理](#共通集計処理の実装)内で日次と共通して実施します。
@@ -442,14 +490,15 @@ run_aggregation(
 | ①        | シルバー層データ読込 | `YEAR(event_date) = 対象年` でフィルタ |
 | ②        | 共通集計処理         | `aggregate_sensor_data()` を呼び出し   |
 | ③        | ゴールド層へ書込     | `merge_to_gold()` でMERGE処理          |
+| ④        | ゴールド層へ書込     | `insert_to_gold()` でMERGE処理         |
 
 **設定値:**
 
-| 項目         | 値                                                 |
-| ------------ | -------------------------------------------------- |
-| 出力テーブル | `iot_catalog.gold.gold_sensor_data_yearly_summary` |
-| 時間カラム   | `collection_year`                                  |
-| 時間式       | `YEAR(event_date) AS collection_year`              |
+| 項目         | 値                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| 出力テーブル | `iot_catalog.gold.gold_sensor_data_yearly_summary`, `iot_app_db.gold_sensor_data_yearly_summary` |
+| 時間カラム   | `collection_year`                                                                                |
+| 時間式       | `YEAR(event_date) AS collection_year`                                                            |
 
 ---
 
@@ -486,6 +535,7 @@ VALUES
     (7, 'STDDEV', '標準偏差',      FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999),
     (8, 'P95',    '上側5％境界値', FALSE, CURRENT_TIMESTAMP(), -999, CURRENT_TIMESTAMP(), -999);
 ```
+
 作成者ユーザID、更新者ユーザIDはシステム保守者を表す仮想のユーザIDを記入する。
 
 ### マスタテーブル結合方式
@@ -890,7 +940,7 @@ def run_aggregation(period: AggregationPeriod, target_filter: str):
 
 ## シーケンス図
 
-### 日次バッチ処理全体フロー
+### バッチ処理全体フロー
 
 ```mermaid
 sequenceDiagram
@@ -1394,6 +1444,19 @@ WHEN MATCHED THEN UPDATE SET *
 WHEN NOT MATCHED THEN INSERT *
 ```
 
+### INSERT処理の冪等性
+
+```sql
+-- INSERT文による冪等性の確保
+-- 同じデータで再実行してもデータ重複が発生しない
+INSERT INTO gold_sensor_data_daily_summary AS target
+VALUES (
+    ...
+)
+ON DUPLICATE KEY UPDATE gold_sensor_data_daily_summary
+...
+```
+
 ---
 
 ## パフォーマンス最適化
@@ -1480,7 +1543,7 @@ gold_summary_method_masterについては、恒久保持とし、データ削除
 ```sql
 -- 時次サマリ削除例（10年以上前）
 DELETE FROM iot_catalog.gold.gold_sensor_data_hourly_volume
-WHERE collection_datetime < DATE_SUB(CURRENT_DATE(), 3650)
+WHERE collection_datetime < CURRENT_TIMESTAMP() - INTERVAL 10 YEAR;
 
 -- 10年以上前のデータを削除（日次サマリ）
 DELETE FROM iot_catalog.gold.gold_sensor_data_daily_summary
@@ -1501,13 +1564,13 @@ WHERE collection_year < YEAR(DATE_SUB(CURRENT_DATE(), 3650));
 
 ### 削除スケジュール
 
-| 処理           | 実行頻度           | 実行時間                       |
-| -------------- | ------------------ | ------------------------------ |
-| 時次サマリ削除 | 時次（毎時）       | 定時バッチ実行時（集計処理後） |
-| 日次サマリ削除 | 月次（毎月1日）    | 深夜（集計処理後）             |
-| 月次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後）             |
-| 年次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後）             |
-| VACUUM処理     | 週次（毎週日曜）   | 深夜                           |
+| 処理           | 実行頻度           | 実行時間           |
+| -------------- | ------------------ | ------------------ |
+| 時次サマリ削除 | 日次（毎日）       | 深夜（集計処理後） |
+| 日次サマリ削除 | 月次（毎月1日）    | 深夜（集計処理後） |
+| 月次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後） |
+| 年次サマリ削除 | 年次（毎年1月1日） | 深夜（集計処理後） |
+| VACUUM処理     | 週次（毎週日曜）   | 深夜               |
 
 ---
 
@@ -1531,17 +1594,16 @@ WHERE collection_year < YEAR(DATE_SUB(CURRENT_DATE(), 3650));
 
 - [共通仕様書](../../common/common-specification.md) - エラーコード、トランザクション管理、セキュリティ等
 
+### データベース設計
+
+- [Unity Catalogデータベース設計書](../../common/unity-catalog-database-specification.md) - テーブル定義・DDL
+- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - テーブル定義・DDL
+
 ---
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                                                                       | 担当者       |
-| ---------- | ---- | ------------------------------------------------------------------------------ | ------------ |
-| 2026-01-29 | 2.6  | インクリメンタル処理例をdlt.readに修正、event_dateカラム使用に統一             | Kei Sugiyama |
-| 2026-01-29 | 2.5  | シーケンス図にgold_summary_method_master参照を追加                             | Kei Sugiyama |
-| 2026-01-29 | 2.4  | gold_summary_method_master初期データINSERT文追加                               | Kei Sugiyama |
-| 2026-01-29 | 2.3  | 日次・月次・年次集計処理の共通化（共通集計処理セクション追加）                 | Kei Sugiyama |
-| 2026-01-27 | 2.2  | 削除処理SQLの日数計算修正（1825→3650）、Python実装例のバリデーション整合性改善 | Kei Sugiyama |
-| 2026-01-27 | 2.1  | 日次・月次・年次すべてシルバー層から直接集計に処理フロー変更                   | Kei Sugiyama |
-| 2026-01-26 | 2.0  | Teams通知実装仕様追加、エラーメッセージ一覧追加                                | Kei Sugiyama |
-| 2026-01-26 | 1.0  | 初版作成                                                                       | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                      | 担当者       |
+| ---------- | ---- | --------------------------------------------- | ------------ |
+| 2026-01-26 | 1.0  | 初版作成                                      | Kei Sugiyama |
+| 2026-04-01 | 1.1  | データ登録対象にOLTP DBを追加、処理フロー修正 | Kei Sugiyama |
