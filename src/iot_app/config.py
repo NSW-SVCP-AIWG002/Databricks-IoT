@@ -13,6 +13,12 @@ class Config:
     APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
     APP_PORT = int(os.getenv("APP_PORT", 5000))
 
+    # Databricks Configuration
+    DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
+    DATABRICKS_SERVING_ENDPOINT_NAME = os.getenv(
+        "DATABRICKS_SERVING_ENDPOINT_NAME", "ai-orchestrator-chat"
+    )
+
     # MySQL Configuration
     MYSQL_HOST = os.getenv("MYSQL_HOST", "db")
     MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
