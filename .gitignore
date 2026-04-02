@@ -56,3 +56,8 @@ users.json
 # Python cache（src配下も含めて除外）
 __pycache__/
 *.py[cod]
+docs/03-features/ldp-pipeline/gold_layer/review/review-report-20260401.md
+.gitignore
+docs/03-features/batch/scheduled-email-job/README.md
+docs/03-features/batch/scheduled-email-job/job-specification.md
+docs/03-features/ldp-pipeline/gold_layer/review/review-report.md
