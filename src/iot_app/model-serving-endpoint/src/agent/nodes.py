@@ -258,6 +258,29 @@ def genieapi_node(state: AgentState) -> AgentState:
         if isinstance(df, pd.DataFrame) and df.empty:
             message = "GenieAPIのデータが取得できていません。\n\nお手数ですが、入力内容や条件をご確認いただき、再度お試しください。"
 
+        # HITL: GraphAPIが選択されており、データ取得が成功している場合にユーザー確認
+        if "GraphAPI" in api_list and isinstance(df, pd.DataFrame) and not df.empty:
+            user_response = interrupt({
+                "message": "以下のデータを取得しました。グラフを作成しますか？",
+                "preview": df.head(10).to_dict(orient="records"),
+                "sql_query": sql_query,
+                "genie_download_url": download_url,
+            })
+            if user_response == "いいえ":
+                # GraphAPIをselected_apisから除外してRouterへ戻す
+                updated_apis = [api for api in selected if api.get("api") != "GraphAPI"]
+                df_json = to_records_json_or_none(df)
+                df_summary = get_df_summary(df_json)
+                return {
+                    "messages": list(state.get("messages", [])) + [HumanMessage(content=prompt)] + [AIMessage(content=df_summary)] + [AIMessage(content=message)],
+                    "sql_query": sql_query,
+                    "genie_conversation_info": conversation_info,
+                    "genie_download_url": download_url,
+                    "dataframe": df_json,
+                    "selected_apis": updated_apis,
+                }
+            # "はい" の場合はそのまま通常処理へ（check_genie_response が GraphAPI へルーティング）
+
         df = to_records_json_or_none(df)
         df_summary = get_df_summary(df)
 
