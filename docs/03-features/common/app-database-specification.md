@@ -597,9 +597,9 @@
 **初期データ:**
 | alert_level_id | alert_level_name |
 | -------------- | ---------------- |
-| 1              | Critical         |
-| 2              | Warning          |
-| 3              | Info             |
+| 1              | 重大             |
+| 2              | 警告             |
+| 3              | 情報             |
 
 ---
 
@@ -639,13 +639,14 @@
 
 **概要**: デバイスの接続状態を保持するテーブル
 
-| #   | カラム物理名       | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
-| --- | ------------------ | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
-| 1   | device_id          | デバイスID   | VARCHAR(100) | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
-| 2   | last_received_time | 最終受信時刻 | TIMESTAMP    | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 |
-| 3   | delete_flag        | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
-| 4   | create_date        | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
-| 5   | update_date        | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
+| #   | カラム物理名            | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値 | 説明                                                        |
+| --- | ----------------------- | -------------------- | ------------ | -------- | --- | --- | ------------ | ----------------------------------------------------------- |
+| 1   | device_id               | デバイスID           | INT          | NOT NULL | ○   | ○   | -            | デバイス固有のID                                            |
+| 2   | latest_status           | 最新ステータス       | VARCHAR(50)  | NULL     | -   | -   | -            | デバイスの最新状態（例: ALERT / NORMAL）                    |
+| 3   | latest_event_timestamp  | 最新イベント日時     | DATETIME     | NULL     | -   | -   | -            | 最新センサーイベントの発生日時                              |
+| 4   | alert_count             | アラート件数         | INT          | NULL     | -   | -   | -            | 累積アラート発生件数                                        |
+| 5   | last_alert_timestamp    | 最終アラート日時     | DATETIME     | NULL     | -   | -   | -            | 最後にアラートが発生した日時                                |
+| 6   | updated_at              | 更新日時             | DATETIME     | NULL     | -   | -   | -            | レコード更新日時（silverパイプラインによりUPSERT時に更新） |
 
 **外部キー:**
 - `device_id` → `device_master.device_id`
@@ -749,20 +750,7 @@
 | #   | カラム物理名              | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
 | --- | ------------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
 | 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement）  |
-| #   | カラム物理名              | カラム論理名         | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                               |
-| --- | ------------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | -------------------------------------------------- |
-| 1   | alert_history_id          | アラート履歴ID       | INT         | NOT NULL | ○   | -   | -                 | アラート履歴の一意識別子（主キー、AutoIncrement）  |
 | 2   | alert_history_uuid        | アラート履歴UUID     | VARCHAR(36) | NOT NULL | -   | -   | -                 | 参照モーダル表示でアラート履歴を特定するためのUUID |
-| 3   | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
-| 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
-| 5   | alert_recovery_datetime   | アラート復旧日時     | DATETIME    | NULL     | -   | -   | -                 | アラートの復旧日時                                 |
-| 6   | alert_status_id           | アラートステータスID | INT         | NOT NULL | -   | ○   | -                 | アラートステータスの一意識別子（外部キー）         |
-| 7   | alert_value               | アラート発生値       | FLOAT       | NULL     | -   | -   | -                 | アラート発生時の値                                 |
-| 8   | create_date               | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                   |
-| 9   | creator                   | 作成者               | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                         |
-| 10  | update_date               | 更新日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                               |
-| 11  | modifier                  | 更新者               | INT         | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                         |
-| 12  | delete_flag               | 削除フラグ           | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE            |
 | 3   | alert_id                  | アラートID           | INT         | NOT NULL | -   | ○   | -                 | アラート設定の一意識別子（外部キー）               |
 | 4   | alert_occurrence_datetime | アラート発生日時     | DATETIME    | NOT NULL | -   | -   | -                 | アラートの発生日時                                 |
 | 5   | alert_recovery_datetime   | アラート復旧日時     | DATETIME    | NULL     | -   | -   | -                 | アラートの復旧日時                                 |

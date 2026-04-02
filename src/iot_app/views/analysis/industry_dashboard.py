@@ -12,7 +12,7 @@
 import json
 import logging
 
-from flask import Blueprint, abort, g, make_response, render_template, request
+from flask import Blueprint, abort, g, jsonify, make_response, redirect, render_template, request, url_for
 
 from iot_app.services.industry_dashboard_service import (
     check_device_access,
@@ -24,13 +24,14 @@ from iot_app.services.industry_dashboard_service import (
     get_graph_data,
     get_latest_sensor_data,
     get_recent_alerts_with_count,
+    search_organizations_by_name,
     validate_date_range,
 )
 
 analysis_bp = Blueprint("analysis", __name__)
 logger = logging.getLogger(__name__)
 
-_ITEM_PER_PAGE = 5
+_ITEM_PER_PAGE = 10
 _STORE_MONITORING_COOKIE = "store_monitoring_search_params"
 _DEVICE_DETAILS_COOKIE = "device_details_search_params"
 _COOKIE_MAX_AGE = 86400
@@ -44,7 +45,7 @@ def _get_store_monitoring_search_params():
             return json.loads(cookie_data)
         except (ValueError, TypeError):
             pass
-    return {"organization_name": "", "device_name": "", "page": 1}
+    return {"organization_name": "", "organization_id": "", "device_name": "", "page": 1, "alert_page": 1}
 
 
 def _get_device_details_search_params():
@@ -67,6 +68,30 @@ def _set_cookie(response, name, params):
         httponly=True,
         samesite="Lax",
     )
+
+
+# ---------------------------------------------------------------------------
+# 店舗名オートコンプリート
+# ---------------------------------------------------------------------------
+
+
+@analysis_bp.route(
+    "/analysis/industry-dashboard/store-monitoring/organizations", methods=["GET"]
+)
+def store_monitoring_organizations():
+    """店舗名オートコンプリート用API（部分一致候補をJSON返却）"""
+    try:
+        accessible_org_ids = get_accessible_organizations(
+            g.current_user.organization_id
+        )
+        name = request.args.get("q", "")
+        results = search_organizations_by_name(name, accessible_org_ids)
+        return jsonify(results)
+    except Exception as e:
+        if hasattr(e, "code"):
+            raise
+        logger.error("店舗名オートコンプリートエラー: user_id=%s, error=%s", g.current_user.user_id, str(e))
+        return jsonify([]), 500
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +131,10 @@ def store_monitoring():
         )
         logger.info("店舗モニタリング デバイス一覧取得完了")
 
-        # 初期表示時: 先頭デバイスのセンサー情報を自動表示
+        # 初期表示・ページング時: 先頭デバイスのセンサー情報を自動表示
         selected_device = None
         sensor_data = None
-        if is_initial and devices:
+        if devices:
             selected_device = check_device_access(devices[0].device_uuid, accessible_org_ids)
             if selected_device:
                 sensor_data = get_latest_sensor_data(selected_device.device_id)
@@ -132,7 +157,8 @@ def store_monitoring():
         )
 
         if is_initial:
-            _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
+            response.delete_cookie(_STORE_MONITORING_COOKIE)
+        _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
         logger.info("店舗モニタリング表示成功: user_id=%s", g.current_user.user_id)
         return response
 
@@ -145,48 +171,23 @@ def store_monitoring():
 
 @analysis_bp.route("/analysis/industry-dashboard/store-monitoring", methods=["POST"])
 def store_monitoring_search():
-    """店舗モニタリング検索"""
+    """店舗モニタリング検索（PRG: Cookie保存後GETへリダイレクト）"""
     logger.info("店舗モニタリング検索開始: user_id=%s", g.current_user.user_id)
     try:
-        accessible_org_ids = get_accessible_organizations(
-            g.current_user.organization_id
-        )
-
         search_params = {
             "organization_name": request.form.get("organization_name", ""),
+            "organization_id": request.form.get("organization_id", ""),
             "device_name": request.form.get("device_name", ""),
             "page": 1,
             "alert_page": 1,
         }
 
-        logger.info("店舗モニタリング検索 アラート一覧取得開始")
-        alerts, alerts_total = get_recent_alerts_with_count(
-            search_params, accessible_org_ids, page=1, per_page=_ITEM_PER_PAGE
-        )
-        logger.info("店舗モニタリング検索 アラート一覧取得完了")
-
-        logger.info("店舗モニタリング検索 デバイス一覧取得開始")
-        devices, devices_total = get_device_list_with_count(
-            search_params, accessible_org_ids, 1, _ITEM_PER_PAGE
-        )
-        logger.info("店舗モニタリング検索 デバイス一覧取得完了")
-
         response = make_response(
-            render_template(
-                "analysis/industry_dashboard/store_monitoring.html",
-                alerts=alerts,
-                alerts_total=alerts_total,
-                devices=devices,
-                devices_total=devices_total,
-                page=1,
-                alert_page=1,
-                per_page=_ITEM_PER_PAGE,
-                search_params=search_params,
-            )
+            redirect(url_for("analysis.store_monitoring", page=1, alert_page=1))
         )
-
+        response.delete_cookie(_STORE_MONITORING_COOKIE)
         _set_cookie(response, _STORE_MONITORING_COOKIE, search_params)
-        logger.info("店舗モニタリング検索成功: user_id=%s", g.current_user.user_id)
+        logger.info("店舗モニタリング検索成功（PRGリダイレクト）: user_id=%s", g.current_user.user_id)
         return response
 
     except Exception as e:
@@ -314,6 +315,7 @@ def device_details(device_uuid):
         )
 
         if is_initial:
+            response.delete_cookie(_DEVICE_DETAILS_COOKIE)
             _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
         logger.info("デバイス詳細表示成功: device_uuid=%s", device_uuid)
         return response
@@ -376,6 +378,7 @@ def device_details_search(device_uuid):
             )
         )
 
+        response.delete_cookie(_DEVICE_DETAILS_COOKIE)
         _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
         logger.info("デバイス詳細検索成功: device_uuid=%s", device_uuid)
         return response

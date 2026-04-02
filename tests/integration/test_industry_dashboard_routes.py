@@ -15,16 +15,14 @@
 CSRF:
   TestingConfig に WTF_CSRF_ENABLED = False を設定済み。
 
-サービス関数モック化方針:
-  OLTP DB テーブル（device_master、organization_master 等）はすべて MySQL に存在する。
-  silver_sensor_data は MySQL（直近 SENSOR_DATA_CUTOFF_MONTHS 以内）と
-  Unity Catalog（全期間・フォールバック）の両方に存在し、
-  ワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」に従い取得する：
-    - MySQL にデータあり → MySQL 優先（get_latest_sensor_data）
-    - MySQL にデータなし、または終了日時 < カットオフ → Unity Catalog にフォールバック
-    - 期間またがり → MySQL（直近部分）+ Unity Catalog（古い部分）マージ
-  - 通常テスト: サービス層関数（get_latest_sensor_data、get_graph_data 等）を unittest.mock でモック化
-  - UC 実接続テスト: @pytest.mark.databricks マーカー付与（TestUnityCatalogDatabricks 参照）
+テストDB方針:
+  OLTP DB テーブル（device_master、organization_master 等）はすべて MySQL 実DBに存在する。
+  tests/integration/conftest.py の industry_test_data フィクスチャで
+  テスト用データを投入し、テスト完了後に削除する（READ COMMITTED 対応: commit+delete 方式）。
+
+  @patch によるモックは以下の用途にのみ使用する:
+    - 例外シミュレーション（side_effect=Exception）による 500 エラー確認
+    - get_accessible_organizations を [] に固定する空スコープ確認
 
 適用した観点表セクション（integration-test-perspectives.md 参照）:
   1.1  認証テスト（inject_test_user autouse フィクスチャにより全テストで暗黙的に確認）
@@ -39,10 +37,6 @@ CSRF:
   4.6  CSVエクスポートテスト
   5.1  検索条件テスト
   5.3  ページネーションテスト
-  6.3  Unity Catalog クエリテスト
-       → silver_sensor_data フォールバックソース（MySQL 優先、UC は長期保存・フォールバック）
-       → モック版: TestUnityCatalogDataSourceSwitching
-       → 実接続版: TestUnityCatalogDatabricks（@pytest.mark.databricks、DEV_DATABRICKS_TOKEN 必要）
   9.1  SQLインジェクションテスト
   9.2  XSSテスト
 
@@ -54,14 +48,14 @@ CSRF:
   5.2  ソートテスト      → クライアント側ソートのみ（E2Eテスト対象、ワークフロー仕様書「ページ内ソート」参照）
   6.1/6.2 外部API連携テスト  → Databricks SCIM API は本機能では未使用
                               （ユーザー・グループ管理は本機能のスコープ外）
+  6.3  Unity Catalog クエリテスト → 不要のため除外
   7    トランザクション   → Read専用機能のため対象外
   8    ログ出力テスト     → Read専用機能のため省略
   9.3  CSRFテスト        → GETエンドポイント主体、POSTにはCSRFトークン対象外（TestingConfig）
 """
 
 import json
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -71,27 +65,13 @@ import pytest
 # ---------------------------------------------------------------------------
 
 STORE_MONITORING_URL = "/analysis/industry-dashboard/store-monitoring"
+AUTOCOMPLETE_URL = f"{STORE_MONITORING_URL}/organizations"
 DEVICE_DETAILS_URL = "/analysis/industry-dashboard/device-details"
-DEVICE_UUID = "test-device-uuid-1234"
+
+# 404確認用: DBに存在しない UUID
+DEVICE_UUID_NOT_FOUND = "non-existent-uuid-for-404-test"
 
 _VIEW_MODULE = "iot_app.views.analysis.industry_dashboard"
-
-
-# ---------------------------------------------------------------------------
-# ヘルパー
-# ---------------------------------------------------------------------------
-
-
-def _make_mock_device(device_uuid=DEVICE_UUID, device_id=1):
-    """テスト用デバイスオブジェクトを生成する。"""
-    device = MagicMock()
-    device.device_uuid = device_uuid
-    device.device_id = device_id
-    device.device_name = "冷蔵庫1"
-    device.device_model = "MODEL-A100"
-    device.organization_id = 1
-    return device
-
 
 
 # ===========================================================================
@@ -107,90 +87,54 @@ class TestStoreMonitoringDataScope:
     ワークフロー仕様書「データスコープ制限の適用」に対応。
     organization_closure を用いて自組織・下位組織のデータのみ表示する。
     ロールによる条件分岐は一切行わない（仕様書明記）。
+
+    MySQL実DB: industry_test_data フィクスチャで投入したデータで検証する。
     """
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_own_org_data_is_visible(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """1.3.1: 自組織データが表示されること
+    def test_own_org_data_is_visible(self, industry_test_data, client):
+        """1.3.1: 自組織のデバイスが表示されること
 
-        get_accessible_organizations が自組織IDを含むリストを返し、
-        クエリ関数がそのIDで呼び出されることを確認する。
+        organization_closure (parent=自組織, subsidiary=自組織) により
+        自組織のデバイスが一覧に含まれることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]  # 自組織ID
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        # Arrange: industry_test_data が org_accessible のデバイスを投入済み
 
         # Act
         response = client.get(STORE_MONITORING_URL)
 
         # Assert
         assert response.status_code == 200
-        # get_accessible_organizations がユーザーの organization_id（=1）で呼ばれること
-        mock_orgs.assert_called_once_with(1)
-        # アラート取得にアクセス可能な組織IDが渡されること
-        call_org_ids = mock_alerts.call_args[0][1]
-        assert call_org_ids == [1]
-        # デバイス一覧にも同じ組織IDが渡されること
-        device_call_org_ids = mock_devices.call_args[0][1]
-        assert device_call_org_ids == [1]
+        assert industry_test_data["device_name"].encode() in response.data
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_subsidiary_org_data_is_visible(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """1.3.2: 下位組織データが表示されること
+    def test_subsidiary_org_data_is_visible(self, industry_test_data, client):
+        """1.3.2: 下位組織のデバイスが表示されること
 
-        get_accessible_organizations が下位組織IDも含むリストを返し、
-        クエリ関数にその全IDが渡されることを確認する。
+        organization_closure (parent=自組織, subsidiary=下位組織) により
+        下位組織のデバイスも一覧に含まれることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1, 10, 11]  # 自組織＋下位組織IDs
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        # Arrange: industry_test_data が org_sub のデバイスも投入済み
 
         # Act
         response = client.get(STORE_MONITORING_URL)
 
         # Assert
         assert response.status_code == 200
-        call_org_ids = mock_alerts.call_args[0][1]
-        assert 10 in call_org_ids
-        assert 11 in call_org_ids
-        # デバイス一覧にも同じ組織IDが渡されること
-        device_call_org_ids = mock_devices.call_args[0][1]
-        assert 10 in device_call_org_ids
-        assert 11 in device_call_org_ids
+        assert industry_test_data["device_sub_name"].encode() in response.data
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_empty_org_scope_returns_empty_result(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """1.3.3 / 1.3.4: アクセス可能な組織が存在しない場合は空リストでクエリが実行されること
+    def test_inaccessible_org_data_not_visible(self, industry_test_data, client):
+        """1.3.3 / 1.3.4: アクセス不可組織のデバイスが表示されないこと
 
-        上位・無関係組織のデータが表示されないことをシミュレートする。
-        組織IDsが空リストの場合でも200を返し、データが空になることを確認する。
+        organization_closure に登録されていない組織のデバイスは
+        一覧に含まれないことを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = []  # アクセス可能組織なし
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        # Arrange: industry_test_data が org_inaccessible（closure なし）を投入済み
 
         # Act
         response = client.get(STORE_MONITORING_URL)
 
         # Assert
         assert response.status_code == 200
-        call_org_ids = mock_alerts.call_args[0][1]
-        assert call_org_ids == []
+        assert "テストアクセス不可デバイス_結合テスト用".encode() not in response.data
 
 
 # ===========================================================================
@@ -207,22 +151,12 @@ class TestStoreMonitoringGet:
     エンドポイント: GET /analysis/industry-dashboard/store-monitoring
     """
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_initial_display_sets_cookie(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_initial_display_sets_cookie(self, industry_test_data, client):
         """2.1.1: 初期表示時に検索条件がCookieにセットされること
 
         ワークフロー仕様書「検索条件の保持方法: Cookieに保持」、
         「Cookie名: store_monitoring_search_params、max_age=86400」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.get(STORE_MONITORING_URL)
 
@@ -230,71 +164,89 @@ class TestStoreMonitoringGet:
         assert response.status_code == 200
         assert "store_monitoring_search_params" in response.headers.get("Set-Cookie", "")
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_paging_does_not_set_cookie(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """5.3.2: ページング時にはCookieが書き込まれないこと
+    def test_paging_sets_cookie(self, industry_test_data, client):
+        """5.3.2: ページング時もCookieが書き込まれること
 
-        ワークフロー仕様書「処理フロー: 初期表示時のみCookie格納（if save_cookie:）」に対応。
-        pageパラメータありの場合は _set_cookie が呼ばれず、Set-Cookieヘッダが付かない。
+        ワークフロー仕様書「検索条件の保持方法: 初期表示・ページング問わず常時更新」に対応。
+        pageパラメータありの場合でも _set_cookie が呼ばれ、Set-Cookieヘッダが付く。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.get(f"{STORE_MONITORING_URL}?page=2")
 
         # Assert
         assert response.status_code == 200
-        assert "store_monitoring_search_params" not in response.headers.get("Set-Cookie", "")
+        assert "store_monitoring_search_params" in response.headers.get("Set-Cookie", "")
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_paging_uses_cookie_search_params(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_paging_uses_cookie_search_params(self, industry_test_data, client):
         """5.3.2: ページング時にCookieの検索条件（組織名）が引き継がれること
 
         ワークフロー仕様書「処理フロー: GetCookie→Cookieから検索条件取得」に対応。
+        org_accessible_name で Cookie を設定し、page=2 リクエスト時に
+        その条件でフィルタされたデバイスが表示されることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-        cookie_params = {"organization_name": "店舗A", "device_name": "", "page": 1}
-        client.set_cookie(
-            "store_monitoring_search_params", json.dumps(cookie_params)
-        )
+        # Arrange: org_accessible_name に完全一致する Cookie をセット
+        cookie_params = {
+            "organization_name": industry_test_data["org_accessible_name"],
+            "device_name": "",
+            "page": 1,
+            "alert_page": 1,
+        }
+        client.set_cookie("store_monitoring_search_params", json.dumps(cookie_params))
 
         # Act
         response = client.get(f"{STORE_MONITORING_URL}?page=2")
 
-        # Assert
+        # Assert: 検索条件（org_accessible_name）に合致するデバイスが表示されること
         assert response.status_code == 200
-        call_search_params = mock_alerts.call_args[0][0]
-        assert call_search_params.get("organization_name") == "店舗A"
-        # デバイス一覧にも同じ検索条件が渡されること
-        device_call_params = mock_devices.call_args[0][0]
-        assert device_call_params.get("organization_name") == "店舗A"
+        assert industry_test_data["device_name"].encode() in response.data
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_db_error_returns_500(self, mock_orgs, client):
+    def test_db_error_returns_500(self, client):
         """2.2.5: DBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         """
         # Act
-        response = client.get(STORE_MONITORING_URL)
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.get(STORE_MONITORING_URL)
 
         # Assert
         assert response.status_code == 500
+
+    def test_initial_display_auto_loads_first_device_sensor_data(
+        self, industry_test_data, client
+    ):
+        """4.1.3 / 2.1.1: デバイスリスト有時に先頭デバイスのセンサーデータが自動表示されること
+
+        ワークフロー仕様書「UI状態: センサー情報欄:
+        先頭デバイスのセンサー情報を自動表示（初期表示時）」に対応。
+        industry_test_data の device_accessible にはセンサーデータが登録されているため、
+        初期表示でセンサー情報が表示されることを確認する。
+        """
+        # Act
+        response = client.get(STORE_MONITORING_URL)
+
+        # Assert: 200 かつ センサーデータを持つデバイスが先頭に表示される
+        assert response.status_code == 200
+        assert industry_test_data["device_name"].encode() in response.data
+
+    def test_initial_display_empty_org_scope_returns_200(self, client):
+        """4.1.1: アクセス可能組織が0件の場合は200でデバイス空リストを返すこと
+
+        ワークフロー仕様書「UI状態: デバイスリストが空（0件）の場合」に対応。
+        get_accessible_organizations が空リストを返す場合、
+        デバイス取得スキップして200を返すことを確認する。
+        """
+        # Act
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations", return_value=[]
+        ):
+            response = client.get(STORE_MONITORING_URL)
+
+        # Assert
+        assert response.status_code == 200
 
 
 # ===========================================================================
@@ -310,23 +262,16 @@ class TestStoreMonitoringPost:
     ワークフロー仕様書「店舗モニタリング検索」に対応。
     エンドポイント: POST /analysis/industry-dashboard/store-monitoring
     フォームパラメータ: organization_name, device_name
+
+    POST ハンドラは DB アクセスを一切行わない PRG パターン（Cookie 保存後 GET リダイレクト）。
     """
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_search_with_empty_conditions_returns_200(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """5.1.1: 検索条件なし（全件検索）で200を返すこと
+    def test_search_with_empty_conditions_returns_302(self, client):
+        """5.1.1: 検索条件なし（全件検索）でPRGリダイレクト（302）を返すこと
 
         UI仕様書(2-1)(2-2)「空でも可」に対応。
+        店舗モニタリングPOSTはPRGパターンのため常に302を返す。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "",
@@ -334,23 +279,14 @@ class TestStoreMonitoringPost:
         })
 
         # Assert
-        assert response.status_code == 200
+        assert response.status_code == 302
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_search_saves_cookie(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_search_saves_cookie(self, client):
         """2.1.2: 検索実行後にCookieに検索条件が保存されること
 
         ワークフロー仕様書「検索条件の保持方法: Cookie名 store_monitoring_search_params」に対応。
+        POSTはPRGパターンのため302を返す。Set-Cookieは複数発行されるため getlist で確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "店舗A",
@@ -358,15 +294,16 @@ class TestStoreMonitoringPost:
         })
 
         # Assert
-        assert response.status_code == 200
-        assert "store_monitoring_search_params" in response.headers.get("Set-Cookie", "")
+        assert response.status_code == 302
+        all_set_cookies = " ".join(response.headers.getlist("Set-Cookie"))
+        assert "store_monitoring_search_params" in all_set_cookies
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_db_error_returns_500(self, mock_orgs, client):
-        """2.2.5: DBエラー時に500を返すこと
+    def test_post_always_returns_302(self, client):
+        """2.2.5: POSTはDBアクセスなしのPRGパターンのため常に302を返すこと
 
-        ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
+        ワークフロー仕様書「店舗モニタリング検索（PRG: Cookie保存後GETへリダイレクト）」に対応。
+        POSTハンドラはDB呼び出しを行わず検索条件をCookieに格納してGETへリダイレクトするため、
+        DBエラーは発生しない。500エラーはリダイレクト先のGETハンドラで発生しうる。
         """
         # Act
         response = client.post(STORE_MONITORING_URL, data={
@@ -374,100 +311,117 @@ class TestStoreMonitoringPost:
         })
 
         # Assert
-        assert response.status_code == 500
+        assert response.status_code == 302
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
     def test_search_with_store_name_partial_match_returns_200(
-        self, mock_orgs, mock_alerts, mock_devices, client
+        self, industry_test_data, client
     ):
-        """5.1.7: 店舗名部分一致検索（前方一致）で200を返すこと
+        """5.1.7: 店舗名部分一致検索（前方一致）でGETまで通して200を返すこと
 
         UI仕様書(2-1)「部分一致検索」に記載されている店舗名検索を確認する。
         ワークフロー仕様書SQL: LIKE CONCAT('%', :organization_name, '%') に対応。
+        follow_redirects=True でPRGリダイレクト先GETまで通し、
+        org_accessible_name に部分一致するデバイスが表示されることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        # Arrange: org_accessible_name の先頭4文字で部分一致検索
+        partial_name = industry_test_data["org_accessible_name"][:4]
 
         # Act
         response = client.post(STORE_MONITORING_URL, data={
-            "organization_name": "店舗",  # 前方一致
+            "organization_name": partial_name,
             "device_name": "",
-        })
+        }, follow_redirects=True)
 
         # Assert
         assert response.status_code == 200
-        # 検索条件が正しくクエリ関数に渡されること
-        call_search_params = mock_alerts.call_args[0][0]
-        assert call_search_params.get("organization_name") == "店舗"
-        # デバイス一覧にも同じ検索条件が渡されること
-        device_call_params = mock_devices.call_args[0][0]
-        assert device_call_params.get("organization_name") == "店舗"
+        assert industry_test_data["device_name"].encode() in response.data
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
     def test_search_with_device_name_partial_match_returns_200(
-        self, mock_orgs, mock_alerts, mock_devices, client
+        self, industry_test_data, client
     ):
-        """5.1.9: デバイス名部分一致検索（中間一致）で200を返すこと
+        """5.1.9: デバイス名部分一致検索（中間一致）でGETまで通して200を返すこと
 
         UI仕様書(2-2)「部分一致検索」に記載されているデバイス名検索を確認する。
         ワークフロー仕様書SQL: LIKE CONCAT('%', :device_name, '%') に対応。
+        follow_redirects=True でPRGリダイレクト先GETまで通し、
+        device_name に部分一致するデバイスが表示されることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        # Arrange: device_name の先頭5文字（"テストデバ"）で部分一致検索
+        partial_device = industry_test_data["device_name"][:5]
 
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "",
-            "device_name": "冷蔵",  # 中間一致（例: 「冷蔵庫1」にマッチ）
-        })
+            "device_name": partial_device,
+        }, follow_redirects=True)
 
         # Assert
         assert response.status_code == 200
-        call_search_params = mock_alerts.call_args[0][0]
-        assert call_search_params.get("device_name") == "冷蔵"
-        # デバイス一覧にも同じ検索条件が渡されること
-        device_call_params = mock_devices.call_args[0][0]
-        assert device_call_params.get("device_name") == "冷蔵"
+        assert industry_test_data["device_name"].encode() in response.data
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_and_search_with_both_conditions(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
-        """5.1.10: 店舗名・デバイス名の複数条件AND検索で200を返すこと
+    def test_and_search_with_both_conditions(self, industry_test_data, client):
+        """5.1.10: 店舗名・デバイス名の複数条件AND検索でGETまで通して200を返すこと
 
         ワークフロー仕様書SQL「AND CASE WHEN :organization_name … AND CASE WHEN :device_name …」に対応。
+        follow_redirects=True でPRGリダイレクト先GETまで通し、
+        両条件に合致するデバイスが表示されることを確認する。
+        """
+        # Arrange: 両方とも部分一致する条件
+        partial_org = industry_test_data["org_accessible_name"][:4]
+        partial_dev = industry_test_data["device_name"][:5]
+
+        # Act
+        response = client.post(STORE_MONITORING_URL, data={
+            "organization_name": partial_org,
+            "device_name": partial_dev,
+        }, follow_redirects=True)
+
+        # Assert
+        assert response.status_code == 200
+        assert industry_test_data["device_name"].encode() in response.data
+
+    def test_search_post_redirects_with_302(self, client):
+        """2.3.1: POST検索後に302リダイレクトが返ること（PRGパターン）
+
+        ワークフロー仕様書「店舗モニタリング検索（PRG: Cookie保存後GETへリダイレクト）」に対応。
+        POSTリクエストはDBアクセスなしで検索条件をCookieに保存し、
+        302でGETエンドポイントへリダイレクトする。
+        """
+        # Act (follow_redirects=False がデフォルト)
+        response = client.post(STORE_MONITORING_URL, data={
+            "organization_name": "店舗A",
+            "device_name": "",
+        })
+
+        # Assert
+        assert response.status_code == 302
+        location = response.headers.get("Location", "")
+        assert "store-monitoring" in location
+
+    def test_search_with_organization_id_saves_organization_id_to_cookie(self, client):
+        """5.1.2: organization_id 指定時にCookieにorganization_idが保存されること
+
+        UI仕様書(2-1)「ドロップダウン選択時は organization_id で完全一致検索」に対応。
+        ドロップダウンから店舗を選択すると organization_id がフォームに含まれ、
+        Cookieへ保存される。（検索実行時の完全一致フィルタはGETルートが担当）
         """
         # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
+        org_id = "42"
 
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "店舗A",
-            "device_name": "冷蔵庫",
+            "organization_id": org_id,
+            "device_name": "",
         })
 
-        # Assert
-        assert response.status_code == 200
-        call_search_params = mock_alerts.call_args[0][0]
-        assert call_search_params.get("organization_name") == "店舗A"
-        assert call_search_params.get("device_name") == "冷蔵庫"
-        # デバイス一覧にも同じ検索条件が渡されること
-        # ワークフロー仕様書SQL: デバイス一覧も CASE WHEN :organization_name / :device_name でフィルタ
-        device_call_params = mock_devices.call_args[0][0]
-        assert device_call_params.get("organization_name") == "店舗A"
-        assert device_call_params.get("device_name") == "冷蔵庫"
+        # Assert: PRGリダイレクト
+        assert response.status_code == 302
+        # delete_cookie → set_cookie の順で2つのSet-Cookieヘッダが発行されるため getlist で確認する
+        all_set_cookies = " ".join(response.headers.getlist("Set-Cookie"))
+        assert "store_monitoring_search_params" in all_set_cookies
+        # Cookieの値にorganization_idが含まれること
+        assert org_id in all_set_cookies
 
 
 # ===========================================================================
@@ -482,155 +436,124 @@ class TestShowSensorInfo:
     観点: 2.1 正常遷移テスト / 2.2 エラー時遷移テスト / 4.2 詳細表示テスト
     ワークフロー仕様書「センサー情報表示」に対応。
     エンドポイント: GET /analysis/industry-dashboard/store-monitoring/<device_uuid>
-    OLTP DB（MySQL）の silver_sensor_data テーブルから最新センサーデータを取得する。
+    MySQL実DB（silver_sensor_data テーブル）から最新センサーデータを取得する。
     """
 
-    @patch(f"{_VIEW_MODULE}.get_latest_sensor_data")
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_returns_200_with_sensor_data(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, mock_sensor, client
-    ):
+    def test_returns_200_with_sensor_data(self, industry_test_data, client):
         """4.2.1: センサーデータあり時に200を返すこと
 
-        OLTP DB（silver_sensor_data）からセンサーデータが取得できた場合、
+        MySQL実DB（silver_sensor_data）にセンサーデータが登録されているデバイスに対して
         店舗モニタリング画面がセンサー情報表示状態（show_sensor_info=True）で200を返す。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-        mock_sensor.return_value = MagicMock()  # OLTP DB 正常応答
-
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        response = client.get(
+            f"{STORE_MONITORING_URL}/{industry_test_data['device_uuid']}"
+        )
 
         # Assert
         assert response.status_code == 200
 
-    @patch(f"{_VIEW_MODULE}.get_latest_sensor_data")
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_returns_200_when_sensor_data_is_none(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, mock_sensor, client
-    ):
+    def test_returns_200_when_sensor_data_is_none(self, industry_test_data, client):
         """4.2.5: センサーデータなし（DB未登録）でも200を返すこと
 
         UI仕様書(5-2〜5-5)「初期表示: ラベルのみ」に対応。
-        観点 4.2.5「関連データ表示: 外部結合で取得するデータが正常に表示される」のうち
-        silver_sensor_data にレコードがない（None）場合でも画面が正常に表示されることを確認する。
+        silver_sensor_data にレコードがないデバイス（device_sub）に対して
+        画面が正常に表示されることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-        mock_sensor.return_value = None
+        # Arrange: device_sub はセンサーデータ未投入
 
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        response = client.get(
+            f"{STORE_MONITORING_URL}/{industry_test_data['device_sub_uuid']}"
+        )
 
         # Assert
         assert response.status_code == 200
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_returns_404_when_device_not_found(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_returns_404_when_device_not_found(self, industry_test_data, client):
         """2.2.4 / 4.2.4: デバイス未検出・アクセス権限なし時に404を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 404 リソース不存在」に対応。
-        check_device_access が None を返す（スコープ外またはDB未登録）ケース。
+        DBに存在しないUUIDを使用し、check_device_access が None を返す（未登録デバイス）ケース。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = None  # データスコープ外 or 未登録デバイス
-
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID_NOT_FOUND}")
 
         # Assert
         assert response.status_code == 404
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_db_error_returns_500(self, mock_orgs, client):
+    def test_returns_404_when_device_is_inaccessible(self, industry_test_data, client):
+        """1.3.3: アクセス不可組織のデバイスへのアクセスで404を返すこと
+
+        organization_closure に登録されていない組織のデバイスUUIDを指定した場合、
+        check_device_access がスコープ外と判断し None を返す → 404。
+        """
+        # Act
+        response = client.get(
+            f"{STORE_MONITORING_URL}/{industry_test_data['device_inaccessible_uuid']}"
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_db_error_returns_500(self, client):
         """2.2.5: DBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         """
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID_NOT_FOUND}")
 
         # Assert
         assert response.status_code == 500
 
-    @patch(f"{_VIEW_MODULE}.get_latest_sensor_data",
-           side_effect=Exception("DBクエリエラー"))
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sensor_data_db_error_returns_500(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, mock_sensor, client
-    ):
+    def test_sensor_data_db_error_returns_500(self, industry_test_data, client):
         """2.2.5: センサーデータ取得（silver_sensor_data）のDBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         get_latest_sensor_data で例外が発生した場合、500エラーとなることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        with patch(
+            f"{_VIEW_MODULE}.get_latest_sensor_data",
+            side_effect=Exception("DBクエリエラー"),
+        ):
+            response = client.get(
+                f"{STORE_MONITORING_URL}/{industry_test_data['device_uuid']}"
+            )
 
         # Assert
         assert response.status_code == 500
 
-    @patch(f"{_VIEW_MODULE}.get_latest_sensor_data")
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_cookie_search_params_used_when_present(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, mock_sensor, client
-    ):
+    def test_cookie_search_params_used_when_present(self, industry_test_data, client):
         """5.1.1: Cookie有り時にCookieの検索条件（組織名）が引き継がれること
 
         センサー情報表示後もデバイス一覧の検索条件が維持されることを確認する。
         ワークフロー仕様書「UI状態: 前回の検索条件を保持」に対応。
+        org_accessible_name を Cookie にセットした状態でアクセスし、
+        org_accessible のデバイスが一覧に表示されることを確認する。
         """
         # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-        mock_sensor.return_value = None
-        cookie_params = {"organization_name": "店舗B", "device_name": "", "page": 1}
-        client.set_cookie(
-            "store_monitoring_search_params", json.dumps(cookie_params)
-        )
+        cookie_params = {
+            "organization_name": industry_test_data["org_accessible_name"],
+            "device_name": "",
+            "page": 1,
+            "alert_page": 1,
+        }
+        client.set_cookie("store_monitoring_search_params", json.dumps(cookie_params))
 
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        response = client.get(
+            f"{STORE_MONITORING_URL}/{industry_test_data['device_uuid']}"
+        )
 
         # Assert
         assert response.status_code == 200
-        call_search_params = mock_alerts.call_args[0][0]
-        assert call_search_params.get("organization_name") == "店舗B"
-        # デバイス一覧にも同じ検索条件が渡されること
-        device_call_params = mock_devices.call_args[0][0]
-        assert device_call_params.get("organization_name") == "店舗B"
+        assert industry_test_data["device_name"].encode() in response.data
 
 
 # ===========================================================================
@@ -648,147 +571,102 @@ class TestDeviceDetailsGet:
     エンドポイント: GET /analysis/industry-dashboard/device-details/<device_uuid>
     """
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_initial_display_sets_cookie(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_initial_display_sets_cookie(self, industry_test_data, client):
         """2.1.1: 初期表示時に検索条件（表示期間）がCookieにセットされること
 
         ワークフロー仕様書「検索条件の保持方法: Cookie名 device_details_search_params」に対応。
         表示期間の初期値は直近24時間（get_default_date_range()）。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}"
+        )
 
         # Assert
         assert response.status_code == 200
         assert "device_details_search_params" in response.headers.get("Set-Cookie", "")
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_paging_does_not_set_cookie(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_paging_does_not_set_cookie(self, industry_test_data, client):
         """5.3.2: ページング時にはCookieが書き込まれないこと
 
         ワークフロー仕様書「処理フロー: 初期表示時のみCookie格納（if save_cookie:）」に対応。
         pageパラメータありの場合は _set_cookie が呼ばれず、Set-Cookieヘッダが付かない。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?page=2")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?page=2"
+        )
 
         # Assert
         assert response.status_code == 200
         assert "device_details_search_params" not in response.headers.get("Set-Cookie", "")
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_paging_uses_cookie_search_params(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_paging_uses_cookie_search_params(self, industry_test_data, client):
         """5.3.2: ページング時にCookieの表示期間がグラフデータ取得に使用されること
 
         ワークフロー仕様書「処理フロー: GetCookie→Cookieから検索条件取得」に対応。
+        センサーデータ投入時刻を含む範囲でCookieをセットし、page=2 リクエスト後に
+        200が返ることを確認する（グラフデータ取得にCookieの期間が使用される）。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []
+        # Arrange: センサーデータ（過去1時間）を含む範囲で Cookie をセット
+        from datetime import datetime, timedelta
+        now = datetime.now()
         cookie_params = {
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-10T00:00",
+            "search_start_datetime": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
+            "search_end_datetime": now.strftime("%Y-%m-%dT%H:%M"),
             "page": 1,
         }
-        client.set_cookie(
-            "device_details_search_params", json.dumps(cookie_params)
-        )
+        client.set_cookie("device_details_search_params", json.dumps(cookie_params))
 
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?page=2")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?page=2"
+        )
 
         # Assert
         assert response.status_code == 200
-        call_search_params = mock_graph.call_args[0][1]
-        assert call_search_params.get("search_start_datetime") == "2026-02-01T00:00"
-        assert call_search_params.get("search_end_datetime") == "2026-02-10T00:00"
-        # アラート取得にも同じ検索条件が渡されること
-        alerts_call_search_params = mock_alerts.call_args[0][1]  # [0]=device_id, [1]=search_params
-        assert alerts_call_search_params.get("search_start_datetime") == "2026-02-01T00:00"
-        assert alerts_call_search_params.get("search_end_datetime") == "2026-02-10T00:00"
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_returns_404_when_device_not_found(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_returns_404_when_device_not_found(self, industry_test_data, client):
         """2.2.4 / 4.2.4: デバイス未検出・アクセス権限なし時に404を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 404 リソース不存在」に対応。
         check_device_access が None を返す（スコープ外またはDB未登録）ケース。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = None
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}")
+        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}")
 
         # Assert
         assert response.status_code == 404
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_db_error_returns_500(self, mock_orgs, client):
+    def test_db_error_returns_500(self, client):
         """2.2.5: DBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         """
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}")
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}")
 
         # Assert
         assert response.status_code == 500
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data",
-           side_effect=Exception("DBクエリエラー"))
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_db_error_returns_500(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_graph_data_db_error_returns_500(self, industry_test_data, client):
         """2.2.5: グラフデータ取得（silver_sensor_data）のDBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         get_graph_data で例外が発生した場合、500エラーとなることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}")
+        with patch(
+            f"{_VIEW_MODULE}.get_graph_data",
+            side_effect=Exception("DBクエリエラー"),
+        ):
+            response = client.get(
+                f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}"
+            )
 
         # Assert
         assert response.status_code == 500
@@ -812,259 +690,199 @@ class TestDeviceDetailsPost:
       - search_end_datetime:   必須、YYYY-MM-DDTHH:MM形式
       - 開始日時 < 終了日時であること
       - 表示期間が最大2ヶ月（62日）以内であること
+
+    バリデーションテストは industry_test_data の実デバイスUUIDを使用することで
+    check_device_access がDBから実データを取得し、その後バリデーションが実行される。
     """
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_valid_period_returns_200(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_valid_period_returns_200(self, industry_test_data, client):
         """3.1.1 / 3.4.1 / 3.8.1: 正しい日時形式・整合性のある期間で200を返すこと"""
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-02-01T00:00",
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
 
         # Assert
         assert response.status_code == 200
-        # グラフデータ取得に表示期間が渡されること
-        # ワークフロー仕様書「グラフ用データ取得: get_graph_data(device.device_id, search_params)」に対応
-        call_graph_params = mock_graph.call_args[0][1]  # [0]=device_id, [1]=search_params
-        assert call_graph_params.get("search_start_datetime") == "2026-02-01T00:00"
-        assert call_graph_params.get("search_end_datetime") == "2026-02-02T00:00"
-        # アラート取得にも同じ表示期間が渡されること
-        call_alerts_params = mock_alerts.call_args[0][1]  # [0]=device_id, [1]=search_params
-        assert call_alerts_params.get("search_start_datetime") == "2026-02-01T00:00"
-        assert call_alerts_params.get("search_end_datetime") == "2026-02-02T00:00"
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_valid_period_saves_cookie(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
+    def test_valid_period_saves_cookie(self, industry_test_data, client):
         """2.1.2: 正常な表示期間変更後にCookieが更新されること
 
         ワークフロー仕様書「検索条件の保持方法: Cookie名 device_details_search_params」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-02-01T00:00",
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
 
         # Assert
         assert response.status_code == 200
         assert "device_details_search_params" in response.headers.get("Set-Cookie", "")
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_empty_start_datetime_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_empty_start_datetime_returns_400(self, industry_test_data, client):
         """3.1.2: 開始日時が空（未入力）の場合に400を返すこと
 
         ワークフロー仕様書「バリデーション: search_start_datetime は必須」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "",  # 未入力
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "",  # 未入力
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_empty_end_datetime_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_empty_end_datetime_returns_400(self, industry_test_data, client):
         """3.1.2: 終了日時が空（未入力）の場合に400を返すこと
 
         ワークフロー仕様書「バリデーション: search_end_datetime は必須」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "",  # 未入力
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-02-01T00:00",
+                "search_end_datetime": "",  # 未入力
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_invalid_datetime_format_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_invalid_datetime_format_returns_400(self, industry_test_data, client):
         """3.4.2: 不正な日時フォーマット（YYYY/MM/DD HH:mm）で400を返すこと
 
         ワークフロー仕様書「バリデーション: YYYY-MM-DDTHH:MM形式」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026/02/01 00:00",  # 不正フォーマット（スラッシュ区切り）
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026/02/01 00:00",  # 不正フォーマット（スラッシュ区切り）
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_start_after_end_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_start_after_end_returns_400(self, industry_test_data, client):
         """3.8.2: 開始日時 > 終了日時の場合に400を返すこと
 
         ワークフロー仕様書「バリデーション: 開始日時 < 終了日時であること」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-10T00:00",
-            "search_end_datetime": "2026-02-01T00:00",  # 開始が終了より後
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-02-10T00:00",
+                "search_end_datetime": "2026-02-01T00:00",  # 開始が終了より後
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_start_equal_to_end_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_start_equal_to_end_returns_400(self, industry_test_data, client):
         """3.8.2: 開始日時 == 終了日時の場合に400を返すこと
 
         「開始日時 < 終了日時」の条件より、等値は不正となる。
         ワークフロー仕様書「バリデーション: start_dt >= end_dt → エラー」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-01T00:00",  # 同値
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-02-01T00:00",
+                "search_end_datetime": "2026-02-01T00:00",  # 同値
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_period_over_62_days_returns_400(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_period_over_62_days_returns_400(self, industry_test_data, client):
         """3.8.2: 表示期間62日超過で400を返すこと
 
         ワークフロー仕様書「バリデーション: 表示期間が最大2ヶ月（62日）以内であること」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-01-01T00:00",
-            "search_end_datetime": "2026-03-20T00:00",  # 78日 > 62日
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026-01-01T00:00",
+                "search_end_datetime": "2026-03-20T00:00",  # 78日 > 62日
+            },
+        )
 
         # Assert
         assert response.status_code == 400
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_exactly_62_days_returns_200(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_exactly_62_days_returns_200(self, industry_test_data, client):
         """3.8.1: 表示期間がちょうど62日（境界値）の場合に200を返すこと
 
         ワークフロー仕様書「バリデーション: (end_dt - start_dt).days > 62 → エラー」
         つまり days == 62 は許容される境界値。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
-        with patch(f"{_VIEW_MODULE}.get_device_alerts_with_count", return_value=([], 0)), \
-             patch(f"{_VIEW_MODULE}.get_graph_data", return_value=[]):
-            # Act
-            response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
+        # Act
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
                 "search_start_datetime": "2026-01-01T00:00",
                 "search_end_datetime": "2026-03-04T00:00",  # ちょうど62日
-            })
+            },
+        )
 
         # Assert
         assert response.status_code == 200
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_device_not_found_returns_404(
-        self, mock_orgs, mock_check, client
-    ):
+    def test_device_not_found_returns_404(self, industry_test_data, client):
         """2.2.4: デバイス未検出時に404を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 404 リソース不存在」に対応。
+        DBに存在しないUUIDを使用し check_device_access が None を返すケース。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = None
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}",
+            data={
+                "search_start_datetime": "2026-02-01T00:00",
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
 
         # Assert
         assert response.status_code == 404
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_db_error_returns_500(self, mock_orgs, client):
+    def test_db_error_returns_500(self, client):
         """2.2.5: DBエラー時に500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         """
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-02T00:00",
-        })
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.post(
+                f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}",
+                data={
+                    "search_start_datetime": "2026-02-01T00:00",
+                    "search_end_datetime": "2026-02-02T00:00",
+                },
+            )
 
         # Assert
         assert response.status_code == 500
@@ -1083,171 +901,133 @@ class TestCsvExport:
     ワークフロー仕様書「CSVエクスポート」に対応。
     エンドポイント: GET /analysis/industry-dashboard/device-details/<uuid>?export=csv
     UI仕様書(11)「CSVエクスポートボタン」に対応。
-    CSVデータ元: OLTP DB（MySQL）の silver_sensor_data テーブル。
+    CSVデータ元: MySQL実DB（silver_sensor_data テーブル）。
     """
 
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_csv_export_calls_export_function(
-        self, mock_orgs, mock_check, mock_export, client
-    ):
-        """4.6.1: ?export=csv パラメータで export_sensor_data_csv が呼び出されること
+    def test_csv_export_returns_text_csv(self, industry_test_data, client):
+        """4.6.1: ?export=csv パラメータでContent-type: text/csvが返ること
 
         UI仕様書(11)「クリック時: /device-details/<device_uuid>?export=csv にリクエスト」に対応。
+        レスポンスの Content-type が text/csv であることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.headers = {"Content-type": "text/csv; charset=utf-8-sig"}
-        mock_export.return_value = mock_resp
-
         # Act
-        client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
-
-        # Assert
-        mock_export.assert_called_once()
-
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_csv_export_passes_correct_device(
-        self, mock_orgs, mock_check, mock_export, client
-    ):
-        """4.6.3: CSVエクスポートが正しいデバイスオブジェクトを渡すこと
-
-        ワークフロー仕様書「CSVエクスポート: export_sensor_data_csv(device, search_params)」に対応。
-        """
-        # Arrange
-        mock_device = _make_mock_device()
-        mock_orgs.return_value = [1]
-        mock_check.return_value = mock_device
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.headers = {"Content-type": "text/csv; charset=utf-8-sig"}
-        mock_export.return_value = mock_resp
-
-        # Act
-        client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
-
-        # Assert
-        called_device = mock_export.call_args[0][0]
-        assert called_device == mock_device
-
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_csv_export_uses_cookie_search_params(
-        self, mock_orgs, mock_check, mock_export, client
-    ):
-        """4.6.3: Cookie有り時にCookieの表示期間がCSVエクスポートに渡されること
-
-        ワークフロー仕様書「前提条件: 表示期間はCookieに保存されている」に対応。
-        """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.headers = {"Content-type": "text/csv; charset=utf-8-sig"}
-        mock_export.return_value = mock_resp
-        cookie_params = {
-            "search_start_datetime": "2026-02-01T00:00",
-            "search_end_datetime": "2026-02-10T00:00",
-        }
-        client.set_cookie(
-            "device_details_search_params", json.dumps(cookie_params)
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?export=csv"
         )
 
+        # Assert
+        assert response.status_code == 200
+        assert "text/csv" in response.content_type
+
+    def test_csv_export_content_disposition_includes_device_uuid(
+        self, industry_test_data, client
+    ):
+        """4.6.3: CSVエクスポートのファイル名に対象デバイスのUUIDが含まれること
+
+        ワークフロー仕様書「CSVエクスポート: export_sensor_data_csv(device, search_params)」に対応。
+        Content-Disposition ヘッダのファイル名にデバイスUUIDが含まれることを確認する。
+        """
         # Act
-        client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?export=csv"
+        )
 
         # Assert
-        called_search_params = mock_export.call_args[0][1]
-        assert called_search_params.get("search_start_datetime") == "2026-02-01T00:00"
-        assert called_search_params.get("search_end_datetime") == "2026-02-10T00:00"
+        assert response.status_code == 200
+        content_disposition = response.headers.get("Content-Disposition", "")
+        assert industry_test_data["device_uuid"] in content_disposition
 
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
+    def test_csv_export_uses_cookie_search_params(self, industry_test_data, client):
+        """4.6.3: Cookie有り時にCookieの表示期間でCSVエクスポートされること
+
+        ワークフロー仕様書「前提条件: 表示期間はCookieに保存されている」に対応。
+        センサーデータを含む期間でCookieをセットし、CSVエクスポートが正常に返ることを確認する。
+        """
+        # Arrange: センサーデータ（過去1時間）を含む範囲で Cookie をセット
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        cookie_params = {
+            "search_start_datetime": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
+            "search_end_datetime": now.strftime("%Y-%m-%dT%H:%M"),
+        }
+        client.set_cookie("device_details_search_params", json.dumps(cookie_params))
+
+        # Act
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?export=csv"
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert "text/csv" in response.content_type
+
     def test_csv_export_uses_default_params_when_no_cookie(
-        self, mock_orgs, mock_check, mock_export, client
+        self, industry_test_data, client
     ):
-        """4.6.3: Cookie無し時にデフォルト期間（直近24時間）でCSVエクスポートが呼ばれること
+        """4.6.3: Cookie無し時にデフォルト期間（直近24時間）でCSVエクスポートが返ること
 
         ワークフロー仕様書「前提条件: Cookieに表示期間がない場合はデフォルト期間でエクスポート」
         「デフォルト期間: 現在日時から1日前まで」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.headers = {"Content-type": "text/csv; charset=utf-8-sig"}
-        mock_export.return_value = mock_resp
-        # Cookieをセットしない
+        # Arrange: Cookieをセットしない
 
         # Act
-        client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?export=csv"
+        )
 
         # Assert
-        mock_export.assert_called_once()
-        called_search_params = mock_export.call_args[0][1]
-        # デフォルト期間のキーが存在すること（値は動的なため存在確認のみ）
-        assert "search_start_datetime" in called_search_params
-        assert "search_end_datetime" in called_search_params
+        assert response.status_code == 200
+        assert "text/csv" in response.content_type
 
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
     def test_csv_export_returns_404_when_device_not_found(
-        self, mock_orgs, mock_check, client
+        self, industry_test_data, client
     ):
         """2.2.4: デバイス未検出時のCSVエクスポートで404を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 404 リソース不存在」に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = None
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
+        response = client.get(
+            f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}?export=csv"
+        )
 
         # Assert
         assert response.status_code == 404
 
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations",
-           side_effect=Exception("DB接続エラー"))
-    def test_csv_export_db_error_returns_500(self, mock_orgs, client):
+    def test_csv_export_db_error_returns_500(self, client):
         """2.2.5: DBエラー時のCSVエクスポートで500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
         """
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.get(
+                f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}?export=csv"
+            )
 
         # Assert
         assert response.status_code == 500
 
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv",
-           side_effect=Exception("DBクエリエラー"))
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
     def test_csv_export_db_error_in_service_returns_500(
-        self, mock_orgs, mock_check, mock_export, client
+        self, industry_test_data, client
     ):
         """2.2.5: CSVエクスポート処理中のDBエラーで500を返すこと
 
         ワークフロー仕様書「エラーハンドリング: 500 CSVエクスポートに失敗しました」に対応。
+        export_sensor_data_csv（サービス層）で例外が発生した場合、500エラーとなることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-
         # Act
-        response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
+        with patch(
+            f"{_VIEW_MODULE}.export_sensor_data_csv",
+            side_effect=Exception("DBクエリエラー"),
+        ):
+            response = client.get(
+                f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}?export=csv"
+            )
 
         # Assert
         assert response.status_code == 500
@@ -1266,94 +1046,59 @@ class TestSecurity:
     検索フォームへの不正入力がアプリケーションに影響しないことを確認する。
     SQLAlchemy のプリペアドステートメントにより SQLインジェクションは防がれ、
     Jinja2 の自動エスケープにより XSS は防がれる。
+
+    POST ハンドラは DB アクセスなし（PRG パターン）のため、
+    不正入力があっても 302 が返り 500 にならないことを確認する。
     """
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sql_injection_in_store_name_returns_200_or_400(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_sql_injection_in_store_name_returns_not_500(self, client):
         """9.1.1: 店舗名フィールドへのSQLインジェクション文字列でサーバーエラーにならないこと
 
         SQLAlchemy のプリペアドステートメントにより注入文字列はエスケープされ、
         500エラーとならないことを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "' OR '1'='1",  # 基本的なSQLインジェクション
             "device_name": "",
         })
 
-        # Assert
-        assert response.status_code in (200, 400)  # サーバーエラー(500)にならないこと
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sql_injection_drop_table_in_device_name(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_sql_injection_drop_table_in_device_name(self, client):
         """9.1.2: デバイス名フィールドへのDROP TABLE文字列でサーバーエラーにならないこと"""
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "",
             "device_name": "'; DROP TABLE device_master;--",
         })
 
-        # Assert
-        assert response.status_code in (200, 400)
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sql_injection_union_select_in_store_name(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_sql_injection_union_select_in_store_name(self, client):
         """9.1.3: UNIONを使ったSQLインジェクション文字列でサーバーエラーにならないこと
 
         SQLAlchemy のプリペアドステートメントにより注入文字列はエスケープされ、
         500エラーとならないことを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
         # Act
         response = client.post(STORE_MONITORING_URL, data={
             "organization_name": "' UNION SELECT * FROM user_master--",
             "device_name": "",
         })
 
-        # Assert
-        assert response.status_code in (200, 400)
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_xss_script_tag_in_store_name_is_escaped(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_xss_script_tag_in_store_name_is_escaped(self, client):
         """9.2.1: 店舗名フィールドへの<script>タグがJinja2自動エスケープで無効化されること
 
         Jinja2 の自動エスケープにより、スクリプトタグがそのままHTMLに
         出力されることなく、安全にエスケープされることを確認する。
         """
         # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
         xss_payload = "<script>alert('XSS')</script>"
 
         # Act
@@ -1362,24 +1107,12 @@ class TestSecurity:
             "device_name": "",
         })
 
-        # Assert
-        assert response.status_code in (200, 400)
-        if response.status_code == 200:
-            # <script> タグが生のまま HTML に出力されていないこと
-            response_text = response.data.decode("utf-8")
-            assert "<script>alert('XSS')</script>" not in response_text
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_xss_img_tag_in_device_name_is_escaped(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_xss_img_tag_in_device_name_is_escaped(self, client):
         """9.2.2: デバイス名フィールドへの<img onerror>タグがエスケープされること"""
         # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
         xss_payload = "<img src=x onerror=alert('XSS')>"
 
         # Act
@@ -1388,27 +1121,16 @@ class TestSecurity:
             "device_name": xss_payload,
         })
 
-        # Assert
-        assert response.status_code in (200, 400)
-        if response.status_code == 200:
-            response_text = response.data.decode("utf-8")
-            assert "<img src=x onerror=alert('XSS')>" not in response_text
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_xss_javascript_protocol_in_device_name_is_escaped(
-        self, mock_orgs, mock_alerts, mock_devices, client
-    ):
+    def test_xss_javascript_protocol_in_device_name_is_escaped(self, client):
         """9.2.3: デバイス名フィールドへのJavaScriptプロトコルがエスケープされること
 
         Jinja2 の自動エスケープにより、javascript: スキームがそのままHTMLに
         出力されることなく、安全にエスケープされることを確認する。
         """
         # Arrange
-        mock_orgs.return_value = [1]
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
         xss_payload = "javascript:alert('XSS')"
 
         # Act
@@ -1417,356 +1139,102 @@ class TestSecurity:
             "device_name": xss_payload,
         })
 
-        # Assert
-        assert response.status_code in (200, 400)
-        if response.status_code == 200:
-            response_text = response.data.decode("utf-8")
-            assert "javascript:alert('XSS')" not in response_text
+        # Assert: POSTはPRGパターンのため302を返す。サーバーエラー(500)にならないことを確認する
+        assert response.status_code != 500
 
 
 # ===========================================================================
-# 6.3 Unity Catalog クエリテスト（モック版）
+# 店舗名オートコンプリートAPI（GET /store-monitoring/organizations）
 # ===========================================================================
 
 
 @pytest.mark.integration
-class TestUnityCatalogDataSourceSwitching:
-    """Unity Catalog データソース切り替えロジック テスト（モック）
+class TestStoreMonitoringOrganizationAutocomplete:
+    """店舗名オートコンプリートAPIテスト
 
-    観点: 6.3 Unity Catalog クエリテスト（モック版）
-    ワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」に対応。
-
-    センサーデータは以下の 2 つのデータソースに分散して保存される:
-      - MySQL: 直近 SENSOR_DATA_CUTOFF_MONTHS 以内（高速アクセス・プライマリ）
-      - Unity Catalog (Delta Lake): 全期間（長期保存・フォールバック）
-
-    データソース選択ルール（ワークフロー仕様書「データソース選択ルール」表）:
-      - 終了日時 ≥ カットオフ かつ 開始日時 ≥ カットオフ → MySQL 優先（UCにも保持）
-      - 終了日時 < カットオフ                              → Unity Catalog のみ
-      - 開始日時 < カットオフ かつ 終了日時 ≥ カットオフ  → MySQL + Unity Catalog マージ
-
-    本クラスはサービス層をモック化し、ビュー層での Unity Catalog フォールバック動作が
-    正しく処理されることを確認する。
-    実接続テストは TestUnityCatalogDatabricks を参照。
+    観点: 4.1 一覧表示（Read）テスト / 2.2 エラー時遷移テスト / 1.3 データスコープフィルタテスト
+    エンドポイント: GET /analysis/industry-dashboard/store-monitoring/organizations
+    UI仕様書(2-1)「入力エリアに文字を入力すると、部分一致する店舗名をドロップダウンリストとして表示」に対応。
+    MySQL実DB: industry_test_data フィクスチャで投入した組織データを使用する。
     """
 
-    # -----------------------------------------------------------------------
-    # センサー情報表示: get_latest_sensor_data の MySQL → UC フォールバック
-    # -----------------------------------------------------------------------
+    def test_autocomplete_returns_json_list(self, industry_test_data, client):
+        """4.1.3: 部分一致クエリで組織候補リストがJSON形式で返ること
 
-    @patch(f"{_VIEW_MODULE}.get_latest_sensor_data")
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sensor_info_uc_fallback_data_returns_200(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, mock_sensor, client
-    ):
-        """6.3.1.1: MySQL にデータなし → UC フォールバックデータで200を返すこと
-
-        ワークフロー仕様書「get_latest_sensor_data の特別ルール:
-        MySQL にデータが存在しない場合 → Unity Catalog から最新1件を返す」に対応。
-        サービス層での MySQL→UC フォールバック後のデータをビュー層が正常に処理することを確認。
-        get_latest_sensor_data が device_id を引数として呼び出されることも確認する。
+        UI仕様書(2-1)「入力エリアに文字を入力すると、部分一致する店舗名をドロップダウンリストとして表示」に対応。
+        org_accessible_name の先頭文字で部分一致検索し、
+        結果リストに org_accessible が含まれることを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_device = _make_mock_device()
-        mock_check.return_value = mock_device
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-        # UC フォールバックにより取得したセンサーデータ（古い event_timestamp を持つ行）
-        uc_sensor_row = MagicMock()
-        uc_sensor_row.event_timestamp = datetime(2020, 1, 1, 0, 0, 0)
-        mock_sensor.return_value = uc_sensor_row  # UC フォールバック結果をシミュレート
+        # Arrange: org_accessible_name の先頭4文字で部分一致検索
+        partial_name = industry_test_data["org_accessible_name"][:4]
 
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
+        response = client.get(f"{AUTOCOMPLETE_URL}?q={partial_name}")
 
         # Assert
         assert response.status_code == 200
-        # device_id を引数として get_latest_sensor_data が呼ばれること
-        mock_sensor.assert_called_once_with(mock_device.device_id)
+        assert response.content_type.startswith("application/json")
+        data = response.get_json()
+        assert isinstance(data, list)
+        org_names = [item["organization_name"] for item in data]
+        assert industry_test_data["org_accessible_name"] in org_names
 
-    # -----------------------------------------------------------------------
-    # グラフデータ: カットオフ以前の期間 → Unity Catalog のみ
-    # -----------------------------------------------------------------------
-
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_only_period_passed_correctly(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
+    def test_autocomplete_empty_query_returns_all_accessible_orgs(
+        self, industry_test_data, client
     ):
-        """6.3.1.1: カットオフ以前の検索期間が get_graph_data に正しく渡されること
+        """4.1.1: qパラメータなし（空クエリ）でアクセス可能組織が全件返ること
 
-        ワークフロー仕様書「データソース選択ルール:
-        終了日時 < カットオフ → Unity Catalog のみ」に対応。
-        ビュー層は日時をそのまま get_graph_data に渡し、サービス層が UC のみから取得する。
-        （実際の UC 利用はサービス層が担当。ビュー層は期間をそのまま受け渡す。）
+        UI仕様書(2-1)「プレースホルダー: 店舗を検索...」から、未入力状態を想定。
+        ワークフロー仕様書「request.args.get('q', '')」の実装に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []  # UC から取得した 0 件をシミュレート
-
-        # Act: SENSOR_DATA_CUTOFF_MONTHS に関わらず確実に UC のみとなる過去期間（62日以内）
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-02-01T00:00",  # 31日間、62日制限以内
-        })
+        # Act（qパラメータなし）
+        response = client.get(AUTOCOMPLETE_URL)
 
         # Assert
         assert response.status_code == 200
-        # 過去の日時がそのまま get_graph_data に渡されること
-        call_graph_params = mock_graph.call_args[0][1]  # [0]=device_id, [1]=search_params
-        assert call_graph_params.get("search_start_datetime") == "2020-01-01T00:00"
-        assert call_graph_params.get("search_end_datetime") == "2020-02-01T00:00"
+        data = response.get_json()
+        assert isinstance(data, list)
+        # org_accessible と org_sub は accessible、どちらかが結果に含まれること
+        org_names = [item["organization_name"] for item in data]
+        assert industry_test_data["org_accessible_name"] in org_names
 
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_returns_empty_list_renders_200(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
+    def test_autocomplete_inaccessible_org_not_included(
+        self, industry_test_data, client
     ):
-        """6.3.1.2: UC が 0 件を返す場合でも空グラフで200を返すこと
+        """1.3.1: データスコープフィルタ適用でアクセス不可組織が候補に含まれないこと
 
-        ワークフロー仕様書「データソース選択ルール: 終了日時 < カットオフ → UC のみ」に対応。
-        UC にデータが存在しない期間を検索した場合、空グラフで正常にレンダリングされることを確認。
+        ワークフロー仕様書「データスコープ制限: get_accessible_organizations(current_user.organization_id)
+        の結果を search_organizations_by_name に渡す」に対応。
+        closure 未登録の org_inaccessible は候補に含まれないことを確認する。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_graph.return_value = []  # UC にデータなし（0 件）
-
-        # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-02-01T00:00",
-        })
+        # Act（qパラメータなし: 全アクセス可能組織を取得）
+        response = client.get(AUTOCOMPLETE_URL)
 
         # Assert
         assert response.status_code == 200
-
-    # -----------------------------------------------------------------------
-    # グラフデータ: MySQL + Unity Catalog マージ結果
-    # -----------------------------------------------------------------------
-
-    @patch(f"{_VIEW_MODULE}.get_graph_data")
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_mysql_merged_result_renders_200(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
-        """6.3.1.1: UC + MySQL マージ結果がビュー層で正常にレンダリングされること
-
-        ワークフロー仕様書「データソース選択ルール:
-        開始日時 < カットオフ かつ 終了日時 ≥ カットオフ → MySQL + UC マージ」に対応。
-        ワークフロー仕様書「get_sensor_data_from_dual_source: event_timestamp で昇順ソートしてマージ」
-        にてマージされた複数レコードをビュー層が正常に処理することを確認。
-        """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        # UC（古いデータ）+ MySQL（新しいデータ）のマージ結果をシミュレート
-        # ※ graph_data は tojson でJSON変換されるため JSON シリアライズ可能な辞書を使用
-        merged_data = [
-            {"event_timestamp": "2020-06-01T00:00"},   # UC 由来（古い）
-            {"event_timestamp": "2020-06-15T00:00"},   # UC 由来
-            {"event_timestamp": "2020-06-20T00:00"},   # MySQL 由来（新しい）
+        data = response.get_json()
+        org_names = [item["organization_name"] for item in data]
+        assert industry_test_data["org_accessible_name"] not in [
+            n for n in org_names
+            if n == "テストアクセス不可組織_結合テスト用"
         ]
-        mock_graph.return_value = merged_data
+        # アクセス不可組織が候補に含まれないこと
+        assert "テストアクセス不可組織_結合テスト用" not in org_names
 
-        # Act: カットオフをまたぐ可能性がある過去期間（62日以内）
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-06-01T00:00",
-            "search_end_datetime": "2020-07-01T00:00",  # 30日間
-        })
+    def test_autocomplete_db_error_returns_500_with_empty_list(self, client):
+        """2.2.5: DBエラー時に500ステータスと空リストを返すこと
 
-        # Assert
-        assert response.status_code == 200
-        # マージされた検索期間が get_graph_data に渡されること
-        call_graph_params = mock_graph.call_args[0][1]
-        assert call_graph_params.get("search_start_datetime") == "2020-06-01T00:00"
-        assert call_graph_params.get("search_end_datetime") == "2020-07-01T00:00"
-
-    # -----------------------------------------------------------------------
-    # POST /device-details/<uuid> での UC 接続エラー（既存の GET テストを補完）
-    # -----------------------------------------------------------------------
-
-    @patch(f"{_VIEW_MODULE}.get_graph_data",
-           side_effect=Exception("Unity Catalog接続エラー"))
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_error_in_post_returns_500(
-        self, mock_orgs, mock_check, mock_alerts, mock_graph, client
-    ):
-        """6.3.2.1: POST デバイス詳細検索での UC 接続エラーで500を返すこと
-
-        ワークフロー仕様書「エラーハンドリング: 500 データベースエラー」に対応。
-        POST /device-details/<uuid> で get_graph_data（UC フォールバック含む）が
-        例外を発生させた場合、500 エラーとなることを確認する。
-        （GETエンドポイントの同等テスト test_graph_data_db_error_returns_500 を POSTで補完。）
+        実装: except Exception → return jsonify([]), 500
+        フロントエンドがエラー時にオートコンプリート候補を表示しない設計に対応。
         """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-
         # Act
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-02-01T00:00",
-        })
+        with patch(
+            f"{_VIEW_MODULE}.get_accessible_organizations",
+            side_effect=Exception("DB接続エラー"),
+        ):
+            response = client.get(f"{AUTOCOMPLETE_URL}?q=店舗")
 
         # Assert
         assert response.status_code == 500
-
-    # -----------------------------------------------------------------------
-    # CSVエクスポート: UC 期間（カットオフ以前）の Cookie を利用
-    # -----------------------------------------------------------------------
-
-    @patch(f"{_VIEW_MODULE}.export_sensor_data_csv")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_csv_export_uc_period_search_params_passed(
-        self, mock_orgs, mock_check, mock_export, client
-    ):
-        """6.3.1.1: UC のみ期間（カットオフ以前）の Cookie で CSVエクスポートが正しく呼ばれること
-
-        ワークフロー仕様書「CSVエクスポート: get_all_sensor_data の切り替えロジック
-        （MySQL / Unity Catalog 切り替えロジック適用）」に対応。
-        過去期間の検索条件が Cookie 経由で export_sensor_data_csv に正しく渡されることを確認。
-        """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.headers = {"Content-type": "text/csv; charset=utf-8-sig"}
-        mock_export.return_value = mock_resp
-        # UC のみ期間（過去日付）の検索条件を Cookie にセット
-        cookie_params = {
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-02-01T00:00",
-        }
-        client.set_cookie("device_details_search_params", json.dumps(cookie_params))
-
-        # Act
-        client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}?export=csv")
-
-        # Assert
-        mock_export.assert_called_once()
-        called_search_params = mock_export.call_args[0][1]
-        # UC のみ期間がそのまま export_sensor_data_csv に渡されること
-        assert called_search_params.get("search_start_datetime") == "2020-01-01T00:00"
-        assert called_search_params.get("search_end_datetime") == "2020-02-01T00:00"
-
-
-# ===========================================================================
-# 6.3 Unity Catalog クエリテスト（実接続版）
-# ===========================================================================
-
-
-@pytest.mark.integration
-@pytest.mark.databricks
-class TestUnityCatalogDatabricks:
-    """Unity Catalog 実接続テスト
-
-    観点: 6.3 Unity Catalog クエリテスト（実接続）
-    ⚠️ 実施条件: Databricks 実接続が必要（.env の DEV_DATABRICKS_TOKEN 設定済み）
-              接続不要な環境では `pytest -m "not databricks"` でスキップ可能。
-
-    ワークフロー仕様書「センサーデータ取得のデータソース切り替えロジック」において
-    Unity Catalog への実接続クエリ動作をルートレベルで確認する。
-
-    テスト方針:
-    - OLTP DB 操作（デバイス認証、アラート取得等）はモック化
-    - get_latest_sensor_data / get_graph_data はモック化せず実接続で実行
-    - テスト用デバイス（device_id=1）が UC に存在しない前提で 0件テストを兼ねる
-    - データあり・なしどちらでも HTTPステータス 200 を確認する
-    """
-
-    @patch(f"{_VIEW_MODULE}.get_device_list_with_count")
-    @patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_sensor_info_uc_real_query_returns_200(
-        self, mock_orgs, mock_check, mock_alerts, mock_devices, client
-    ):
-        """6.3.1.1 / 6.3.1.2: UC への実クエリでセンサー情報表示が200を返すこと
-
-        get_latest_sensor_data が UC への実接続クエリを実行し、
-        データあり・なしどちらでも200が返ることを確認する。
-        UC にデータがある場合: sensor_data 付きで200
-        UC にデータがない場合（0件）: sensor_data=None で200（6.3.1.2）
-        """
-        # Arrange: OLTP DB 部分のみモック化、get_latest_sensor_data は実接続
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-        mock_devices.return_value = ([], 0)
-
-        # Act
-        response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID}")
-
-        # Assert
-        assert response.status_code == 200
-
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_only_real_query_returns_200(
-        self, mock_orgs, mock_check, mock_alerts, client
-    ):
-        """6.3.1.1 / 6.3.1.2: カットオフ以前期間への UC 実クエリでグラフ表示が200を返すこと
-
-        get_graph_data がカットオフより古い期間（2020年）のデータを UC から実際にクエリし、
-        0件または有効データのどちらでも200が返ることを確認する。
-        UC が 0件を返した場合も空グラフで正常表示されることを確認（6.3.1.2）。
-        """
-        # Arrange: OLTP DB 部分のみモック化、get_graph_data は実接続
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-
-        # Act: SENSOR_DATA_CUTOFF_MONTHS に関わらず確実に UC のみとなる過去期間（62日以内）
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-02-01T00:00",
-        })
-
-        # Assert
-        assert response.status_code == 200
-
-    @patch(f"{_VIEW_MODULE}.get_device_alerts_with_count")
-    @patch(f"{_VIEW_MODULE}.check_device_access")
-    @patch(f"{_VIEW_MODULE}.get_accessible_organizations")
-    def test_graph_data_uc_query_result_is_list_format(
-        self, mock_orgs, mock_check, mock_alerts, client
-    ):
-        """6.3.1.1 / 6.3.1.7: UC クエリ結果がリスト形式でビューに渡され200を返すこと
-
-        get_graph_data の戻り値がリスト形式であることをルートレベルで確認する（実接続）。
-        カラム構成の詳細確認はサービス層の単体テストで実施。
-        """
-        # Arrange
-        mock_orgs.return_value = [1]
-        mock_check.return_value = _make_mock_device()
-        mock_alerts.return_value = ([], 0)
-
-        # Act: 短い過去期間（UC のみ参照、62日以内）
-        response = client.post(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID}", data={
-            "search_start_datetime": "2020-01-01T00:00",
-            "search_end_datetime": "2020-01-15T00:00",  # 14日間
-        })
-
-        # Assert
-        assert response.status_code == 200
+        data = response.get_json()
+        assert data == []

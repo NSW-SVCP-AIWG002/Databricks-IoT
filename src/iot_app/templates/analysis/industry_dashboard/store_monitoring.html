@@ -15,8 +15,9 @@
   </div>
   <div class="search-form__body" id="search-form-body">
     <form method="POST" action="{{ url_for('analysis.store_monitoring_search') }}">
+      <input type="hidden" id="organization_id" name="organization_id" value="{{ search_params.get('organization_id', '') }}">
       <div class="ids-search-fields">
-        <div class="form-group">
+        <div class="form-group" style="position:relative;">
           <label class="form-label" for="organization_name">店舗名</label>
           <input
             type="text"
@@ -26,7 +27,9 @@
             placeholder="店舗を検索..."
             maxlength="200"
             value="{{ search_params.get('organization_name', '') }}"
+            autocomplete="off"
           >
+          <ul id="organization_name_dropdown" class="ids-autocomplete-dropdown" style="display:none;"></ul>
         </div>
         <div class="form-group">
           <label class="form-label" for="device_name">デバイス名</label>
@@ -57,7 +60,7 @@
     <div class="card">
       <div class="ids-section-header">
         <h2 class="ids-section-header__title">アラート一覧</h2>
-        <span class="ids-section-header__count">{{ alerts_total }}件</span>
+        <span class="ids-section-header__count">合計：{{ alerts_total }}件</span>
       </div>
       <div class="table-container">
         <table class="table" style="min-width:800px;">
@@ -82,8 +85,9 @@
               <td>{{ alert.alert_name }}</td>
               <td>
                 <span class="table__badge
-                  {% if alert.alert_level_name == 'Critical' %}table__badge--danger
-                  {% elif alert.alert_level_name == 'Warning' %}table__badge--warning
+                  {% if alert.alert_level_name == '重大' %}table__badge--danger
+                  {% elif alert.alert_level_name == '警告' %}table__badge--warning
+                  {% elif alert.alert_level_name == '情報' %}table__badge--info
                   {% else %}table__badge--info{% endif %}">
                   {{ alert.alert_level_name }}
                 </span>
@@ -140,7 +144,7 @@
     <div class="card">
       <div class="ids-section-header">
         <h2 class="ids-section-header__title">デバイス一覧</h2>
-        <span class="ids-section-header__count">{{ devices_total }}台</span>
+        <span class="ids-section-header__count">合計：{{ devices_total }}台</span>
       </div>
       <div class="table-container">
         <table class="table" style="min-width:800px;">
@@ -158,11 +162,7 @@
               <td>{{ device.organization_name if device.organization_name else '' }}</td>
               <td>{{ device.device_name }}</td>
               <td>
-                <span class="table__badge
-                  {% if device.status == '接続済み' %}table__badge--success
-                  {% else %}table__badge{% endif %}">
-                  {{ device.status if device.status else '未接続' }}
-                </span>
+                <span class="table__badge">未接続</span>
               </td>
               <td>
                 <div class="table__actions">
@@ -288,6 +288,13 @@
 {% block extra_js %}
 <script>
   (function() {
+    var navEntries = performance.getEntriesByType('navigation');
+    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+      window.location.replace('{{ url_for("analysis.store_monitoring") }}');
+    }
+  })();
+
+  (function() {
     var toggle = document.getElementById('search-form-toggle');
     var icon   = document.getElementById('search-toggle-icon');
     var container = document.getElementById('search-form-container');
@@ -296,6 +303,73 @@
     toggle.addEventListener('click', function() {
       var collapsed = container.classList.toggle('search-form--collapsed');
       icon.textContent = collapsed ? '\u25b6' : '\u25bc';
+    });
+  })();
+
+  (function() {
+    var input    = document.getElementById('organization_name');
+    var hidden   = document.getElementById('organization_id');
+    var dropdown = document.getElementById('organization_name_dropdown');
+    if (!input || !hidden || !dropdown) return;
+
+    var debounceTimer = null;
+
+    function closeDropdown() {
+      dropdown.style.display = 'none';
+      dropdown.innerHTML = '';
+    }
+
+    function selectItem(orgId, orgName) {
+      input.value  = orgName;
+      hidden.value = orgId;
+      closeDropdown();
+    }
+
+    function fetchCandidates(q) {
+      var url = '{{ url_for("analysis.store_monitoring_organizations") }}?q=' + encodeURIComponent(q);
+      fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          dropdown.innerHTML = '';
+          if (!data || data.length === 0) {
+            closeDropdown();
+            return;
+          }
+          data.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'ids-autocomplete-dropdown__item';
+            li.textContent = item.organization_name;
+            li.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              selectItem(item.organization_id, item.organization_name);
+            });
+            dropdown.appendChild(li);
+          });
+          dropdown.style.display = 'block';
+        })
+        .catch(function() { closeDropdown(); });
+    }
+
+    input.addEventListener('focus', function() {
+      fetchCandidates(input.value);
+    });
+
+    input.addEventListener('input', function() {
+      hidden.value = '';
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        fetchCandidates(input.value);
+      }, 200);
+    });
+
+    input.addEventListener('blur', function() {
+      setTimeout(closeDropdown, 150);
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        closeDropdown();
+      }
     });
   })();
 </script>

@@ -56,7 +56,7 @@
 .ids-content-layout {
   display: flex;
   gap: var(--spacing-4);
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 /* 左カラム: アラート一覧 + デバイス一覧 */
@@ -66,6 +66,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-4);
+}
+
+/* アラート一覧・デバイス一覧: 固定高さ（FHD基準） */
+.ids-content-main .card {
+  height: 360px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.ids-content-main .card .table-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* 右カラム: センサー情報パネル */
@@ -83,8 +98,9 @@
   border-radius: var(--border-radius-base);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-4);
-  max-height: calc(100vh - 200px);
+  height: 100%;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .ids-sensor-panel__title {
@@ -123,6 +139,15 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* IDS-002: デバイス詳細 — ページ全体ラッパー                          */
+/* ------------------------------------------------------------------ */
+.ids-dd-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 48px); /* main-content padding 上下24px×2=48px分を差し引き */
+}
+
+/* ------------------------------------------------------------------ */
 /* IDS-002: デバイス詳細 — ページヘッダー                              */
 /* ------------------------------------------------------------------ */
 .ids-dd-header {
@@ -130,6 +155,10 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-4);
+}
+
+.ids-dd-header h1 {
+  margin: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,6 +175,9 @@
 .ids-device-info {
   width: 280px;
   flex-shrink: 0;
+  height: 280px;
+  overflow: hidden;
+  margin-bottom: 0;
 }
 
 .ids-device-info__list {
@@ -172,6 +204,17 @@
 .ids-alert-section {
   flex: 1;
   min-width: 0;
+  height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.ids-alert-section .table-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -216,6 +259,8 @@
 
 .ids-period-control__csv {
   margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 /* ------------------------------------------------------------------ */
@@ -224,12 +269,23 @@
 .ids-graph-layout {
   display: flex;
   gap: var(--spacing-4);
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
 .ids-graph-section {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#time-series-chart {
+  flex: 1;
+  min-height: 150px;
 }
 
 .ids-graph-section__header {
@@ -247,14 +303,13 @@
 /* IDS-002: 凡例パネル                                                  */
 /* ------------------------------------------------------------------ */
 .ids-legend {
-  width: 220px;
+  width: 300px;
   flex-shrink: 0;
   background-color: var(--color-white);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--border-radius-base);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-3);
-  max-height: 450px;
   overflow-y: auto;
 }
 
@@ -276,6 +331,7 @@
   color: var(--color-gray-700);
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
 }
 
 .ids-legend__item:first-of-type {
@@ -298,4 +354,36 @@
 /* ------------------------------------------------------------------ */
 .table__body tr.ids-row--selected {
   background-color: var(--color-brand-blue);
+}
+
+/* ------------------------------------------------------------------ */
+/* 店舗名オートコンプリートドロップダウン                               */
+/* ------------------------------------------------------------------ */
+.ids-autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background-color: var(--color-white, #fff);
+  border: 1px solid var(--color-gray-300, #ccc);
+  border-top: none;
+  border-radius: 0 0 var(--border-radius-sm, 4px) var(--border-radius-sm, 4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ids-autocomplete-dropdown__item {
+  padding: var(--spacing-2, 8px) var(--spacing-3, 12px);
+  cursor: pointer;
+  font-size: var(--font-size-base, 14px);
+  color: var(--color-gray-800, #333);
+}
+
+.ids-autocomplete-dropdown__item:hover {
+  background-color: var(--color-gray-100, #f5f5f5);
 }
