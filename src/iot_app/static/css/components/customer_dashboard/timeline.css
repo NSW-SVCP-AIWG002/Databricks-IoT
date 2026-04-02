@@ -1,118 +1,13 @@
 /* ==========================================================================
-   顧客作成ダッシュボード + 時系列グラフガジェット CSS
+   時系列グラフガジェット CSS
    参照設計書:
      docs/03-features/flask-app/customer-dashboard/timeline/ui-specification.md
-     docs/03-features/flask-app/customer-dashboard/common/ui-specification.md
+   共通定義: common.css を参照
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   customer-dashboard: ページ全体レイアウト
+   gadget: ガジェット固有設定
    -------------------------------------------------------------------------- */
-
-.customer-dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  padding: var(--spacing-4);
-}
-
-/* ツールバー（タイトル + アクションボタン群） */
-.customer-dashboard__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--spacing-2);
-}
-
-.customer-dashboard__title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  margin: 0;
-}
-
-.customer-dashboard__toolbar-actions {
-  display: flex;
-  gap: var(--spacing-2);
-}
-
-/* データソース選択フォーム */
-.customer-dashboard__datasource {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--spacing-4);
-  flex-wrap: wrap;
-}
-
-.customer-dashboard__datasource-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
-  min-width: 160px;
-}
-
-/* ガジェットエリア */
-.customer-dashboard__content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-4);
-  align-items: flex-start;
-}
-
-/* ガジェット未登録メッセージ */
-.customer-dashboard__empty {
-  width: 100%;
-  padding: var(--spacing-8);
-  text-align: center;
-  color: var(--color-secondary);
-  font-size: var(--font-size-base);
-}
-
-/* --------------------------------------------------------------------------
-   gadget: ガジェット共通
-   -------------------------------------------------------------------------- */
-
-.gadget {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-/* 2x2: 標準サイズ（約400px × 340px） */
-.gadget--2x2 {
-  width: 400px;
-  min-height: 340px;
-}
-
-/* 2x4: 横長サイズ（約832px × 340px）*/
-.gadget--2x4 {
-  width: 832px;
-  min-height: 340px;
-}
-
-/* ガジェットヘッダー */
-.gadget__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-2) var(--spacing-3);
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.gadget__title {
-  flex: 1;
-  text-align: center;
-  font-size: var(--font-size-base);
-  font-weight: bold;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 
 .gadget__setting-btn {
   background: none;
@@ -128,31 +23,16 @@
   opacity: 0.8;
 }
 
-/* ガジェット共通ツールバー（デバイス名 + CSVボタン） */
+/* ガジェット共通ツールバー（固有設定のみ） */
 .gadget__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: var(--spacing-1) var(--spacing-3);
   background: #f5f5f5;
   border-bottom: 1px solid #ddd;
-  font-size: var(--font-size-sm);
 }
 
-.gadget__device-name {
-  color: var(--color-secondary);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* ガジェットボディ */
+/* ガジェットボディ（padding追加） */
 .gadget__body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   padding: var(--spacing-2);
-  overflow: hidden;
 }
 
 /* --------------------------------------------------------------------------
