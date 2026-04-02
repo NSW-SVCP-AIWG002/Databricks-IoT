@@ -248,8 +248,8 @@
 | (7.6)  | 地域                 | region                      | Select       | I/O | ○    | -      | -      | DB: `region_master.region_name` -                                                                                                                        | -                                        |
 | (7.7)  | 住所                 | address                     | Textarea     | I/O | -    | 500    | -      | -                                                                                                                                                        |                                          |
 | (7.8)  | ステータス           | status                      | Select       | I/O | ○    | -      | -      | DB: `user_master.status` (1:アクティブ, 0:ロック済み)                                                                                                    | 選択肢: アクティブ/ロック済み            |
-| (7.9)  | アラート通知設定     | alert_notification_setting  | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
-| (7.10) | システム通知設定     | system_notification_setting | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
+| (7.9)  | アラート通知設定     | alert_notification_flag  | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
+| (7.10) | システム通知設定     | system_notification_flag | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
 
 | (7.11) | 登録/更新ボタン      | submit_button            | Button       | I   | -    | -      | -      | 固定値: 「登録」または「更新」                                                                                                                           | プライマリボタン、登録時は「登録」、更新時は「更新」        |
 | (7.12) | キャンセルボタン     | cancel_button            | Button       | I   | -    | -      | -      | 固定値: 「キャンセル」                                                                                                                                   | セカンダリボタン                                            |
@@ -397,7 +397,7 @@
 **3-3: CSVエクスポートボタン**
 - 概要: 現在の検索条件でユーザー一覧をCSVダウンロード
 - スタイル: セカンダリボタン
-- クリック時: `/admin/users?export=csv`にリクエスト
+- クリック時: `POST /admin/users/export`にリクエスト（現在の検索条件をPOSTボディで送信）
 
 ---
 
