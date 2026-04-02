@@ -51,6 +51,7 @@ logger = get_logger(__name__)
 GADGET_TYPE_SLUG = {
     '棒グラフ':    'bar-chart',
     '時系列グラフ': 'timeline',
+    '円グラフ':    'circle-chart',
 }
 
 
@@ -95,6 +96,7 @@ def customer_dashboard():
     gadget_type_ids = {
         '棒グラフ':    get_gadget_type_id_by_name('棒グラフ'),
         '時系列グラフ': get_gadget_type_id_by_name('時系列グラフ'),
+        '円グラフ':    get_gadget_type_id_by_name('円グラフ'),
     }
 
     devices = []
@@ -545,9 +547,11 @@ def gadget_create(gadget_type):
     """ガジェット登録モーダル表示（ガジェット種別ごとのハンドラーにディスパッチ）"""
     from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    from iot_app.views.analysis.customer_dashboard import circle_chart as circle_chart_view
     _CREATE_HANDLERS = {
-        'timeline':   timeline_view.handle_gadget_create,
-        'bar-chart':  bar_chart_view.handle_gadget_create,
+        'timeline':      timeline_view.handle_gadget_create,
+        'bar-chart':     bar_chart_view.handle_gadget_create,
+        'circle-chart':  circle_chart_view.handle_gadget_create,
     }
     handler = _CREATE_HANDLERS.get(gadget_type)
     if handler is None:
@@ -566,9 +570,11 @@ def gadget_register(gadget_type):
     """ガジェット登録実行（ガジェット種別ごとのハンドラーにディスパッチ）"""
     from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    from iot_app.views.analysis.customer_dashboard import circle_chart as circle_chart_view
     _REGISTER_HANDLERS = {
-        'timeline':   timeline_view.handle_gadget_register,
-        'bar-chart':  bar_chart_view.handle_gadget_register,
+        'timeline':      timeline_view.handle_gadget_register,
+        'bar-chart':     bar_chart_view.handle_gadget_register,
+        'circle-chart':  circle_chart_view.handle_gadget_register,
     }
     handler = _REGISTER_HANDLERS.get(gadget_type)
     if handler is None:
@@ -716,9 +722,11 @@ def gadget_data(gadget_uuid):
     """ガジェットデータ取得（AJAX）"""
     from iot_app.views.analysis.customer_dashboard import bar_chart as bar_chart_view
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
+    from iot_app.views.analysis.customer_dashboard import circle_chart as circle_chart_view
     _DATA_HANDLERS = {
         '時系列グラフ': timeline_view.handle_gadget_data,
-        '棒グラフ':   bar_chart_view.handle_gadget_data,
+        '棒グラフ':    bar_chart_view.handle_gadget_data,
+        '円グラフ':    circle_chart_view.handle_gadget_data,
     }
     gadget_type = get_gadget_type(gadget_uuid)
     if gadget_type is None:
@@ -738,7 +746,7 @@ def gadget_csv_export(gadget_uuid):
     from iot_app.views.analysis.customer_dashboard import timeline as timeline_view
     _CSV_HANDLERS = {
         '時系列グラフ': timeline_view.handle_gadget_csv_export,
-        '棒グラフ':   bar_chart_view.handle_gadget_csv_export,
+        '棒グラフ':    bar_chart_view.handle_gadget_csv_export,
     }
     gadget_type = get_gadget_type(gadget_uuid)
     if gadget_type is None:

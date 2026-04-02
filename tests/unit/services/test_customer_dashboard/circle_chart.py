@@ -324,7 +324,7 @@ class TestCircleChartGadgetFormGroupId:
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
                 'group_id': '1',
-                'device_mode': 'device_tree',
+                'device_mode': 'variable',
                 'measurement_item_ids': ['1'],
             })
             form.measurement_item_ids.choices = [(i, f'item{i}') for i in _ALL_ITEM_IDS]
@@ -359,8 +359,8 @@ class TestCircleChartGadgetFormDeviceId:
     UI仕様書 § バリデーション（登録画面）
       - デバイス選択: 必須（デバイス固定モード時）→ エラー「デバイスを選択してください」
     UI仕様書 § (2) 表示デバイス選択
-      - デバイス固定: device_mode = 'device_specified'
-      - デバイス可変: device_mode = 'device_tree'
+      - デバイス固定: device_mode = 'fixed'
+      - デバイス可変: device_mode = 'variable'
     """
 
     def test_invalid_when_fixed_mode_and_device_id_empty(self, app):
@@ -371,7 +371,7 @@ class TestCircleChartGadgetFormDeviceId:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_specified',
+                'device_mode': 'fixed',
                 'device_id': '',
             })
             result = form.validate()
@@ -387,7 +387,7 @@ class TestCircleChartGadgetFormDeviceId:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_specified',
+                'device_mode': 'fixed',
                 'device_id': None,
             })
             result = form.validate()
@@ -403,7 +403,7 @@ class TestCircleChartGadgetFormDeviceId:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_specified',
+                'device_mode': 'fixed',
                 'device_id': '42',
                 'group_id': '1',
                 'measurement_item_ids': ['1'],
@@ -423,7 +423,7 @@ class TestCircleChartGadgetFormDeviceId:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_tree',
+                'device_mode': 'variable',
                 'device_id': '',
                 'group_id': '1',
                 'measurement_item_ids': ['1'],
@@ -441,7 +441,7 @@ class TestCircleChartGadgetFormDeviceId:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_specified',
+                'device_mode': 'fixed',
                 'device_id': '',
             })
             form.validate()
@@ -1224,7 +1224,7 @@ class TestErrorHandling_ValidationError:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_tree',
+                'device_mode': 'variable',
                 'group_id': '1',
                 'measurement_item_ids': [],
             })
@@ -1246,7 +1246,7 @@ class TestErrorHandling_ValidationError:
         with app.test_request_context():
             form = CircleChartGadgetForm(data={
                 'gadget_name': '円グラフ',
-                'device_mode': 'device_tree',
+                'device_mode': 'variable',
                 'group_id': '1',
                 'measurement_item_ids': ['1', '2', '3', '4', '5', '6'],
             })
@@ -1406,7 +1406,7 @@ class TestErrorHandling_NotFoundError:
         # Assert
         assert result is None  # None を受けたビュー層が abort(404) を呼ぶ
 
-    @patch(f'{COMMON_SERVICE_MODULE}.db')
+    @patch('iot_app.services.customer_dashboard.circle_chart.db')
     def test_get_gadget_by_uuid_returns_none_when_not_found(self, mock_db):
         """1.3.5.3 get_gadget_by_uuid: 存在しない gadget_uuid で None を返す
         ワークフロー仕様書 § ガジェットデータ取得 実装例
@@ -1577,7 +1577,8 @@ class TestLogLevel_CircleChart:
         # Act / Assert
         with app.test_request_context('/analysis/customer-dashboard/gadgets/test-uuid/data'):
             with patch('iot_app.common.error_handlers.logger') as mock_logger:
-                handle_4xx(error)
+                with patch('iot_app.common.error_handlers.render_template', return_value=''):
+                    handle_4xx(error)
             mock_logger.warning.assert_called_once()
 
     def test_info_level_logged_on_normal_completion(self, app):
@@ -1589,12 +1590,14 @@ class TestLogLevel_CircleChart:
         from iot_app.common.logger import get_logger
         logger = get_logger('test.circle_chart')
         # Act / Assert
+        import logging as stdlib_logging
+        logger.logger.setLevel(stdlib_logging.DEBUG)
         with app.test_request_context('/analysis/customer-dashboard'):
-            with patch.object(logger.logger, 'info') as mock_info:
+            with patch.object(logger.logger, '_log') as mock_log:
                 logger.info('リクエスト完了', extra={'httpStatus': 200, 'processingTime': 42})
-            mock_info.assert_called_once()
-            call_args = mock_info.call_args
-            assert call_args[0][0] == 'リクエスト完了'
+            mock_log.assert_called_once()
+            call_args = mock_log.call_args
+            assert call_args[0][1] == 'リクエスト完了'
 
     def test_debug_level_logged_for_detail_info(self, app):
         """1.4.1.4 DEBUGレベル: 詳細情報出力時に DEBUG レベルでログが出力される
@@ -1605,10 +1608,12 @@ class TestLogLevel_CircleChart:
         from iot_app.common.logger import get_logger
         logger = get_logger('test.circle_chart')
         # Act / Assert
+        import logging as stdlib_logging
+        logger.logger.setLevel(stdlib_logging.DEBUG)
         with app.test_request_context('/analysis/customer-dashboard'):
-            with patch.object(logger.logger, 'debug') as mock_debug:
+            with patch.object(logger.logger, '_log') as mock_log:
                 logger.debug('SELECT クエリ実行', extra={'sql': 'SELECT ...'})
-            mock_debug.assert_called_once()
+            mock_log.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1639,15 +1644,17 @@ class TestLogRequiredFields_CircleChart:
         from iot_app.common.logger import get_logger
         logger = get_logger('test.after_request')
         # Act
+        import logging as stdlib_logging
+        logger.logger.setLevel(stdlib_logging.DEBUG)
         with app.test_request_context('/analysis/customer-dashboard/gadgets/test-uuid/data'):
-            with patch.object(logger.logger, 'info') as mock_info:
+            with patch.object(logger.logger, '_log') as mock_log:
                 logger.info(
                     'リクエスト完了',
                     extra={'httpStatus': 200, 'processingTime': 123}
                 )
         # Assert
-        mock_info.assert_called_once()
-        _, kwargs = mock_info.call_args
+        mock_log.assert_called_once()
+        _, kwargs = mock_log.call_args
         assert kwargs['extra']['processingTime'] == 123
 
 
