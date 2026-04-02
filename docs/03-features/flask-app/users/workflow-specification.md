@@ -169,7 +169,7 @@ flowchart TD
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
     CheckPage -->|あり<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
 
-    ClearCookie --> InitParams[検索条件を初期化<br>page=1, sort_by=user_id, order=asc]
+    ClearCookie --> InitParams[検索条件を初期化<br>page=1, sort_by=user_name, order=asc]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
 
     InitParams --> Scope[データスコープ制限適用<br>v_user_master_by_userにuser_idを渡して絞り込み]
@@ -221,7 +221,7 @@ def users_list():
 
     try:
         users, total = search_users(search_params, g.current_user.user_id)  # → user_service
-        _, user_types, _ = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（検索フォームのユーザー種別選択肢）
+        _, user_types, _, sort_items = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service
     except Exception:
         abort(500)
 
@@ -231,6 +231,7 @@ def users_list():
         total=total,
         search_params=search_params,
         user_types=user_types,
+        sort_items=sort_items,
     ))
     if save_cookie:
         response = clear_search_conditions_cookie(response, 'users')
@@ -364,7 +365,7 @@ def get_default_search_params() -> dict:
     return {
         'page': 1,
         'per_page': ITEM_PER_PAGE,
-        'sort_by': 'user_id',
+        'sort_by': 'user_name',
         'order': 'asc',
         'user_name': '',
         'email_address': '',
@@ -571,8 +572,8 @@ class UserSearchForm(FlaskForm):
     organization_id = SelectField('組織', coerce=int)
     region_id       = SelectField('地域', coerce=int)
     status          = SelectField('ステータス', coerce=int)
-    sort_by         = HiddenField(default='user_id')
-    order           = HiddenField(default='asc')
+    sort_by         = SelectField('ソート項目', coerce=str)   # 選択肢は sort_item_master から動的取得（空白=デフォルトソート）
+    order           = SelectField('ソート順', coerce=str, choices=[('', ''), ('asc', '昇順'), ('desc', '降順')])
 ```
 
 ```python
@@ -587,7 +588,7 @@ def search_users_view():
     search_params = {
         'page': 1,
         'per_page': ITEM_PER_PAGE,
-        'sort_by': form.sort_by.data or 'user_id',
+        'sort_by': form.sort_by.data or 'user_name',   # 空白選択時はデフォルトソート（ユーザー名昇順）
         'order': form.order.data or 'asc',
         'user_name': form.user_name.data or '',
         'email_address': form.email_address.data or '',
@@ -599,7 +600,7 @@ def search_users_view():
 
     try:
         users, total = search_users(search_params, g.current_user.user_id)  # → user_service
-        _, user_types, _ = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（検索フォームのユーザー種別選択肢）
+        _, user_types, _, sort_items = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service
     except Exception:
         abort(500)
 
@@ -609,6 +610,7 @@ def search_users_view():
         total=total,
         search_params=search_params,
         user_types=user_types,
+        sort_items=sort_items,
     ))
     response = clear_search_conditions_cookie(response, 'users')
     response = set_search_conditions_cookie(response, 'users', search_params)
@@ -726,7 +728,7 @@ flowchart TD
 
 ```python
 # services/user_service.py
-def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, list, list]:
+def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, list, list, list]:
     """登録・更新フォーム用マスターデータを取得する
 
     Args:
@@ -734,7 +736,7 @@ def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, 
         login_user_type_id: ログインユーザーのユーザー種別ID（自分より下位のロールのみ表示）
 
     Returns:
-        (organizations, user_types, regions)
+        (organizations, user_types, regions, sort_items)
     """
     organizations = db.session.query(OrganizationMasterByUser).filter(
         OrganizationMasterByUser.user_id == user_id,
@@ -750,7 +752,14 @@ def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, 
         Region.delete_flag == False,
     ).order_by(Region.region_id).all()
 
-    return organizations, user_types, regions
+    # TODO: ユーザー一覧画面の view_id を sort_item_master 初期データに追加後、定数化すること
+    USER_LIST_VIEW_ID = None  # TODO: view_id 未定義。app-database-specification.md の sort_item_master 初期データに追加が必要
+    sort_items = db.session.query(SortItem).filter(
+        SortItem.view_id == USER_LIST_VIEW_ID,
+        SortItem.delete_flag == False,
+    ).order_by(SortItem.sort_order).all()
+
+    return organizations, user_types, regions, sort_items
 ```
 
 ```python
@@ -759,7 +768,7 @@ def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, 
 @require_permission('user:write')
 def create_user_form():
     try:
-        organizations, user_types, regions = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service
+        organizations, user_types, regions, _ = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（sort_itemsは登録フォームでは不要）
     except Exception:
         abort(500)
 
@@ -864,11 +873,10 @@ class UserCreateForm(FlaskForm):
     ])
     user_name = StringField('ユーザー名', validators=[
         DataRequired(message='ユーザー名は必須です'),
-        Length(max=100, message='ユーザー名は20文字以内で入力してください')
+        Length(max=20, message='ユーザー名は20文字以内で入力してください')
     ])
     user_type_id    = SelectField('ユーザー種別', coerce=int, validators=[DataRequired(message='ユーザー種別は必須です')])
     organization_id = SelectField('所属組織', validators=[DataRequired(message='所属組織は必須です')])
-    language_code   = SelectField('言語', coerce=str, validators=[DataRequired(message='言語は必須です')])
     region_id       = SelectField('地域', coerce=int, validators=[DataRequired(message='地域は必須です')])
     address         = StringField('住所', validators=[Length(max=500, message='住所は500文字以内で入力してください')])
     status          = SelectField('ステータス', coerce=int, validators=[DataRequired(message='ステータスは必須です')])
@@ -899,12 +907,12 @@ def _insert_unity_catalog_user(user_id: int, databricks_user_id: str, user_data:
         """
         INSERT INTO iot_catalog.oltp_db.user_master (
             user_id, databricks_user_id, user_name, organization_id, email_address,
-            user_type_id, language_code, region_id, address, status,
+            user_type_id, region_id, address, status,
             alert_notification_flag, system_notification_flag,
             create_date, creator, update_date, modifier, delete_flag
         ) VALUES (
             :user_id, :databricks_user_id, :user_name, :organization_id, :email_address,
-            :user_type_id, :language_code, :region_id, :address, :status,
+            :user_type_id, :region_id, :address, :status,
             :alert_notification_flag, :system_notification_flag,
             CURRENT_TIMESTAMP(), :creator_id, CURRENT_TIMESTAMP(), :creator_id, FALSE
         )
@@ -916,7 +924,6 @@ def _insert_unity_catalog_user(user_id: int, databricks_user_id: str, user_data:
             'organization_id':            user_data['organization_id'],
             'email_address':              user_data['email_address'],
             'user_type_id':               user_data['user_type_id'],
-            'language_code':              user_data['language_code'],
             'region_id':                  user_data['region_id'],
             'address':                    user_data['address'],
             'status':                     user_data['status'],
@@ -953,7 +960,7 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
             email_address=user_data['email_address'],
             user_type_id=user_data['user_type_id'],
             organization_id=user_data['organization_id'],
-            language_code=user_data['language_code'],
+            language_code='ja',
             region_id=user_data['region_id'],
             address=user_data['address'],
             status=user_data['status'],
@@ -1027,7 +1034,6 @@ def create_user_view():
         'user_name': form.user_name.data,
         'user_type_id': form.user_type_id.data,
         'organization_id': form.organization_id.data,
-        'language_code': form.language_code.data or 'ja',
         'region_id': form.region_id.data,
         'address': form.address.data,
         'status': form.status.data if form.status.data is not None else 1,
@@ -1154,7 +1160,7 @@ def edit_user_form(databricks_user_id):
         abort(404)
 
     try:
-        organizations, user_types, regions = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（フロー3と共用）
+        organizations, user_types, regions, _ = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（フロー3と共用、sort_itemsは更新フォームでは不要）
     except Exception:
         abort(500)
 
@@ -1231,10 +1237,10 @@ flowchart TD
 ```python
 # forms/user.py
 class UserUpdateForm(FlaskForm):
-    user_name                = StringField('ユーザー名', validators=[DataRequired(message='ユーザー名は必須です'), Length(max=100)])
-    region_id                = SelectField('地域', coerce=int, validators=[DataRequired(message='地域は必須です')])
-    address                  = StringField('住所', validators=[Length(max=500)])
-    status                   = SelectField('ステータス', coerce=int, validators=[DataRequired(message='ステータスは必須です')])
+    user_name                   = StringField('ユーザー名', validators=[DataRequired(message='ユーザー名は必須です'), Length(max=20)])
+    region_id                   = SelectField('地域', coerce=int, validators=[DataRequired(message='地域は必須です')])
+    address                     = StringField('住所', validators=[Length(max=500)])
+    status                      = SelectField('ステータス', coerce=int, validators=[DataRequired(message='ステータスは必須です')])
     alert_notification_flag  = BooleanField('アラート通知')
     system_notification_flag = BooleanField('システム通知')
 
@@ -1687,7 +1693,7 @@ def get_all_users_for_export(search_params: dict, user_id: int) -> list:
         query = query.filter(UserMasterByUser.region_id == search_params['region_id'])
     if search_params.get('status') is not None:
         query = query.filter(UserMasterByUser.status == search_params['status'])
-    sort_col = getattr(UserMasterByUser, search_params.get('sort_by', 'user_id'))
+    sort_col = getattr(UserMasterByUser, search_params.get('sort_by', 'user_name'))
     query = query.order_by(sort_col.asc() if search_params.get('order', 'asc') == 'asc' else sort_col.desc())
     return query.all()  # limitなし・全件取得
 
