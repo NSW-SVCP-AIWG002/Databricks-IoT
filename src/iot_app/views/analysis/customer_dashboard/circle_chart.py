@@ -116,6 +116,7 @@ def handle_gadget_create(gadget_type):
     form.measurement_item_ids.choices = [
         (item.measurement_item_id, item.display_name) for item in measurement_items
     ]
+    form.gadget_name.data = '円グラフ'
     if groups:
         form.group_id.data = groups[0].dashboard_group_id
 

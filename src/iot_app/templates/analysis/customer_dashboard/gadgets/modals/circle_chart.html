@@ -15,14 +15,14 @@
 
   <div class="modal__body">
 
-    <!-- (1) タイトル -->
-    <div class="form__group">
+    <!-- (1) タイトル行 -->
+    <div class="gadget-register__title-row">
       <label class="form__label form__label--required" for="gadget_name">タイトル</label>
       {{ form.gadget_name(class="form__input", id="gadget_name", maxlength=20) }}
       <span class="form__error form__error--reserved">{% if form.gadget_name.errors %}{{ form.gadget_name.errors[0] }}{% endif %}</span>
     </div>
 
-    <!-- (2) 表示デバイス選択 -->
+    <!-- (2) 上部行：デバイスモード選択 + 表示項目ラベル -->
     <div class="gadget-register__top-row">
       <div class="gadget-register__device-mode-area">
         <label class="form__label">表示デバイス選択</label>
@@ -36,18 +36,22 @@
         </div>
         <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'fixed' }}">
       </div>
+      <div class="gadget-register__measurement-title">
+        <label class="form__label form__label--required">表示項目選択</label>
+        <span class="form__error form__error--reserved">{% if form.measurement_item_ids.errors %}{{ form.measurement_item_ids.errors[0] }}{% endif %}</span>
+      </div>
     </div>
 
-    <!-- (5) デバイス名（デバイス固定モード時のみ） -->
+    <!-- (5) デバイス名行 -->
     <div class="gadget-register__device-name-row" id="device-name-area"
          style="visibility: {% if (form.device_mode.data or 'fixed') == 'fixed' %}visible{% else %}hidden{% endif %};">
       <span class="circle-chart-register__device-name" id="selected-device-name">-</span>
     </div>
 
-    <!-- メインエリア（2カラム） -->
+    <!-- メインエリア（3カラム） -->
     <div class="gadget-register__body">
 
-      <!-- 左カラム：(6) ガジェットイメージ + (4) 表示デバイス指定 -->
+      <!-- 左カラム：ガジェットイメージ -->
       <div class="gadget-register__left">
         <div class="gadget-register__preview">
           <div class="gadget-register__preview-circle">
@@ -61,8 +65,10 @@
             </svg>
           </div>
         </div>
+      </div>
 
-        <!-- (4) 表示デバイス指定（デバイス固定モード時のみ） -->
+      <!-- 中カラム：表示デバイス指定（デバイス固定モード時のみ） -->
+      <div class="gadget-register__middle">
         <div id="device-fixed-area"
              style="visibility: {% if (form.device_mode.data or 'fixed') == 'fixed' %}visible{% else %}hidden{% endif %};">
           <p class="gadget-register__section-title">表示デバイス指定</p>
@@ -93,9 +99,8 @@
         </div>
       </div>
 
-      <!-- 右カラム：(3) 表示項目選択 -->
+      <!-- 右カラム：表示項目選択 -->
       <div class="gadget-register__right">
-        <label class="form__label form__label--required">表示項目選択</label>
         <div class="circle-chart-register__measurement-list">
           <table class="table">
             <thead>
@@ -127,23 +132,26 @@
             </tbody>
           </table>
         </div>
-        <span class="form__error form__error--reserved">{% if form.measurement_item_ids.errors %}{{ form.measurement_item_ids.errors[0] }}{% endif %}</span>
       </div>
 
     </div>
 
     <!-- (7) グループ選択 -->
-    <div class="form__group">
-      <label class="form__label form__label--required" for="group_id">グループ選択</label>
-      <select class="form__select" name="group_id" id="group_id">
-        {% for gr in groups %}
-        <option value="{{ gr.dashboard_group_id }}"
-                {% if form.group_id.data == gr.dashboard_group_id %}selected{% endif %}>
-          {{ gr.dashboard_group_name }}
-        </option>
-        {% endfor %}
-      </select>
-      <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+    <div class="form__row">
+      <div class="form__group form__group--half">
+        <div class="form__group--inline">
+          <label class="form__label form__label--required" for="group_id">グループ選択</label>
+          <select class="form__select" name="group_id" id="group_id">
+            {% for gr in groups %}
+            <option value="{{ gr.dashboard_group_id }}"
+                    {% if form.group_id.data == gr.dashboard_group_id %}selected{% endif %}>
+              {{ gr.dashboard_group_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+      </div>
     </div>
 
   </div>
