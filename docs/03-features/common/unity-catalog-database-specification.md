@@ -311,7 +311,7 @@ TBLPROPERTIES (
 | --- | ------------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
 | 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
 | 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
-| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時          |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」          |
 | 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
 | 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
 | 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
