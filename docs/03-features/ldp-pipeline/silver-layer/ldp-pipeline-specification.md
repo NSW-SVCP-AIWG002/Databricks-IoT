@@ -113,7 +113,7 @@
 
 | 機能ID   | 機能名       | 処理内容                        |
 | -------- | ------------ | ------------------------------- |
-| FR-002-2 | データ処理   | テレメトリデータ→シルバー層変換 |
+| FR-002-1 | データ処理   | テレメトリデータ→シルバー層変換 |
 | FR-003-1 | 異常検出     | センサー値閾値比較              |
 | FR-003-2 | アラート通知 | メール送信                      |
 | FR-003-3 | 履歴記録     | OLTP DB更新                     |
@@ -1576,30 +1576,32 @@ def enqueue_email_notification(batch_df, batch_id):
 def update_device_status(batch_df, batch_id):
     """デバイスステータス更新（foreachBatchで呼び出し）"""
 
-    alert_records = batch_df.filter(F.col("alert_triggered") == True).collect()
+    # バッチ内の全レコードを対象に、デバイスごとの最新 event_timestamp を取得
+    latest_per_device = (
+        batch_df
+        .groupBy("device_id")
+        .agg(F.max("event_timestamp").alias("last_received_time"))
+        .collect()
+    )
 
-    if not alert_records:
+    if not latest_per_device:
         return
 
     with get_mysql_connection() as conn:
         with conn.cursor() as cursor:
-            for record in alert_records:
+            for record in latest_per_device:
                 # デバイスステータス更新（UPSERT）
+                # last_received_time が NULL の場合は未接続、値がある場合は接続済みと判定する
                 cursor.execute("""
                     INSERT INTO device_status_data
-                        (device_id, latest_status, latest_event_timestamp,
-                         alert_count, last_alert_timestamp, updated_at)
-                    VALUES (%s, 'ALERT', %s, 1, %s, NOW())
+                        (device_id, last_received_time, create_date, update_date)
+                    VALUES (%s, %s, NOW(), NOW())
                     ON DUPLICATE KEY UPDATE
-                        latest_status = 'ALERT',
-                        latest_event_timestamp = VALUES(latest_event_timestamp),
-                        alert_count = alert_count + 1,
-                        last_alert_timestamp = VALUES(last_alert_timestamp),
-                        updated_at = NOW()
+                        last_received_time = VALUES(last_received_time),
+                        update_date = NOW()
                 """, (
                     record["device_id"],
-                    record["event_timestamp"],
-                    record["event_timestamp"]
+                    record["last_received_time"]
                 ))
 
             conn.commit()

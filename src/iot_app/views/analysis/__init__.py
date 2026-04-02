@@ -1,0 +1,1 @@
+from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # noqa: F401

@@ -93,3 +93,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+}
