@@ -51,11 +51,9 @@ Databricks IoTシステムの開発プロジェクトにおける技術要件を
 - **アクセス方式**: SQL Warehouse経由
 - **接続ドライバー**: databricks-sql-connector (Python)
 
-#### Databricks User認証 + Entra ID
-- **認証基盤**: Entra ID (Azure Active Directory) によるユーザ認証・トークン発行
-- **認証方式**: Databricks標準ログイン画面（Entra ID連携）
-  - **重要**: ログイン認証はDatabricks標準機能であり、Flaskアプリでは実装しない
-- **Flaskアプリの役割**: リバースプロキシが付与するヘッダ情報からユーザーを識別
+#### 認証基盤
+- **認証共通モジュール**: 「Azure環境(Easy Auth)」、「AWS環境(ALB＋cognito)」、「オンプレミス環境(自前認証)」の三パターンに対応可能
+- **Databricks接続**: OAuth トークン フェデレーションによるユーザー単位認証とデータスコープ制御
 - **ヘッダ付与**: リバースプロキシによるユーザ識別子・アクセストークン
 - **権限管理**: サービスプリンシパル権限 + ユーザー認可API
 - **ユーザ管理**: Entra ID + Databricks SCIM API 間の同期
@@ -100,7 +98,7 @@ Databricks IoTシステムの開発プロジェクトにおける技術要件を
 #### 機能
 - **プロトコル**: MQTT
 - **双方向通信**: 上り（デバイス → クラウド）、下り（クラウド → デバイス）
-- **デバイス管理**: Azure管理画面から事前に設定（Databricks Appsからの操作は行わない）
+- **デバイス管理**: Azure管理画面から事前に設定
 
 #### 接続方法
 - Python SDK: `azure-iot-hub`
@@ -485,7 +483,6 @@ def import_csv():
 **CSVエクスポート**: 個別のエンドポイントは不要。各マスタの一覧APIに `?export=csv` パラメータを追加することで実現（CSVエクスポート実装セクション参照）。
 
 #### 制約事項
-- **ファイルサイズ制限**: 10MB以下（App Compute制約）
 - **対応文字コード**: UTF-8（BOM付き/なし）、Shift-JIS、EUC-JP（自動検出）
 - **CSV形式**: カンマ区切り、ヘッダー行必須
 - **スコープ制限**: インポート/エクスポートともにロール別データスコープを適用
@@ -617,11 +614,11 @@ databricks bundle deploy --target production
 
 本システムは、3つの環境で構成されます。Azure環境は検証・本番の2つのインスタンスが存在します。
 
-| 環境 | 構成 | Azure環境 | 用途 |
-|------|------|-----------|------|
-| **ローカル開発環境** | Flask Webアプリケーションのみ | 不要 | 開発者のローカルマシンでのアプリケーション開発 |
-| **検証環境** | Azure環境全体 | Azure（検証用Resource Group） | 結合テスト、E2Eテスト |
-| **本番環境** | Azure環境全体 | Azure（本番用Resource Group） | 本番運用 |
+| 環境                 | 構成                          | Azure環境                     | 用途                                           |
+| -------------------- | ----------------------------- | ----------------------------- | ---------------------------------------------- |
+| **ローカル開発環境** | Flask Webアプリケーションのみ | 不要                          | 開発者のローカルマシンでのアプリケーション開発 |
+| **検証環境**         | Azure環境全体                 | Azure（検証用Resource Group） | 結合テスト、E2Eテスト                          |
+| **本番環境**         | Azure環境全体                 | Azure（本番用Resource Group） | 本番運用                                       |
 
 #### 環境変数
 - **ローカル開発環境**: `.env` ファイル
@@ -672,7 +669,6 @@ class ProductionConfig(Config):
 
 #### Python環境
 - **Python**: 3.11
-  - **Databricks Apps側の動作環境と合わせるため3.11必須**
 - **venv**: 仮想環境管理
 - **pip**: パッケージ管理
 
@@ -733,7 +729,6 @@ flask run
 - 開発環境の再現性向上
 - 依存関係の統一管理
 - チーム内での環境差異を最小化
-- Databricks Apps (App Compute) の実行環境に近い構成を実現
 
 **重要**: Docker環境は**ローカル開発のみ**を対象とします。検証・本番環境ではDatabricks App Computeを使用します。
 
@@ -748,7 +743,7 @@ flask run
 ```yaml
 services:
   flask-app:
-    - Python 3.11 (Databricks Apps互換)
+    - Python 3.11 
     - Flask 3.0+
     - ポート: 5000
 
@@ -911,7 +906,6 @@ docs/
 - MySQL互換データベース (OLTP DB)
 
 **開発時の留意点**:
-- コンテナ内のPython 3.11はDatabricks Apps互換
 - リバースプロキシ未使用のため、ブラウザ拡張機能でヘッダ偽装が必要
 - サンプルデータまたはモックデータを使用
 - 本番デプロイ時はDatabricks CLIまたはGitリポジトリ連携を使用
@@ -927,7 +921,7 @@ docs/
 
 ### TR-SEC-001: 認証・認可
 
-**重要**: ログイン認証はDatabricks標準機能であり、Flaskアプリでは実装しない。アプリではリバースプロキシが付与するヘッダ情報からユーザーを識別する。
+**重要**: ログイン認証は共通認証モジュール（Azure/AWS/オンプレミス対応）で実装。Databricks接続はOAuth トークン フェデレーションによりユーザー単位の認証とデータスコープ制御を実現。アプリではリバースプロキシが付与するヘッダ情報からユーザーを識別し、OAuth Token Exchangeを実行。
 
 #### 実装
 ```python
@@ -936,8 +930,8 @@ from flask import request
 def get_current_user():
     """リバースプロキシヘッダからユーザー情報取得
 
-    注意: 認証はDatabricks標準機能で行われる。
-    この関数は認証済みユーザーの識別のみを行う。
+    注意: 認証は共通認証モジュール（Azure/AWS/オンプレミス）で行われる。
+    この関数は認証済みユーザーの識別とOAuth Token Exchangeの準備を行う。
     """
     user_id = request.headers.get('X-Databricks-User-Id')
     access_token = request.headers.get('X-Databricks-Access-Token')
@@ -948,9 +942,13 @@ def get_current_user():
 
 #### Databricks API認証戦略
 
-**決定理由**: Databricks Groups APIは管理者権限が必要なため、操作内容によって認証情報を使い分ける必要がある
+**決定理由**: Databricks Groups APIは管理者権限が必要。Unity Catalog接続はOAuth トークン フェデレーションを使用。操作内容によって認証情報を使い分ける必要がある
 
 **認証情報の使い分け**:
+- **Unity Catalog接続**: OAuth トークン フェデレーション（ユーザー単位認証）
+  - 対象: SELECT/INSERT/UPDATE/DELETE等のデータ操作
+  - 理由: データスコープ制御を実現するため
+  - IdP発行トークン → Token Exchange → Unity Catalog接続
 - **Databricks Groups API呼び出し**: サービスプリンシパルの認証情報を使用
   - 対象: ユーザー、組織管理のCUD操作時のグループ作成/更新/削除
   - 理由: Databricksワークスペースのグループ制御には管理者ロールが必須
@@ -1541,15 +1539,15 @@ app/
 
 ## 編集履歴
 
-| 日付 | バージョン | 編集者 | 変更内容 |
-|------|------------|--------|----------|
-| 2025-11-14 | 1.0 | Claude | 初版作成（Databricks IoTシステムの技術要件を定義） |
-| 2025-11-14 | 2.0 | Claude | 画像1・画像2の情報を反映。TR-SEC-004（ロールベースアクセス制御実装）追加、TR-SEC-005（データスコープ制限実装）追加、TR-BE-004（CSVインポート/エクスポート機能）追加 |
-| 2025-11-20 | 3.0 | Claude | インフラネットワーク資料反映。ネットワーク構成セクション追加、Entra ID認証基盤、Private Link通信、Event Hubs Capture、ADLS、コンピュートプレーン構造を追加 |
-| 2025-11-21 | 3.1 | Claude | functional-requirements.mdとの整合性確認: CSVインポート/エクスポート機能の機能IDをFR-006に更新、ダッシュボードがFR-006-1として分析機能内に統合された旨を反映 |
-| 2025-11-25 | 3.2 | Claude | スケジュールバッチ機能削除に伴う更新: TR-BE-004のCSVインポート/エクスポート機能の機能IDをFR-006からFR-005に変更 |
-| 2025-11-25 | 3.3 | Claude | 機能分類再編成: TR-BE-004のCSVインポート/エクスポート機能の機能IDをFR-005からFR-004-8（マスタ管理機能内）に変更 |
-| 2025-11-25 | 3.4 | Claude | ログイン画面の整理: Databricks User認証セクションに「Flaskアプリでは実装しない」を明記、TR-SEC-001にログイン認証はDatabricks標準機能である旨を追加、get_current_user関数にコメント追加 |
-| 2025-11-26 | 3.5 | Claude | Azure環境統合の明確化: システム構成にAzure環境統合を明記、TR-DEPLOY-003に3環境構成表を追加、TR-DEV-003にローカル開発環境はWebアプリのみである旨を明記 |
-| 2025-11-26 | 3.6 | Claude | Flask Blueprint構成を画面カテゴリベースに更新: frontend.mdの構成に合わせて、dashboard/admin/alert/notice/account/transferの6つのBlueprintに整理、画面ID（DSH/ADM/ALT/NTC/ACC/TRF）との対応を明記 |
-| 2025-12-04 | 3.7 | Claude | OLTP DB認証戦略の整理: TR-SEC-001のOLTP DBアクセス方式を「ログインユーザーの認証情報」から「共通アカウント」に変更、データスコープ制限はアプリケーション層で実装する旨を明記 |
+| 日付       | バージョン | 編集者 | 変更内容                                                                                                                                                                                         |
+| ---------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2025-11-14 | 1.0        | Claude | 初版作成（Databricks IoTシステムの技術要件を定義）                                                                                                                                               |
+| 2025-11-14 | 2.0        | Claude | 画像1・画像2の情報を反映。TR-SEC-004（ロールベースアクセス制御実装）追加、TR-SEC-005（データスコープ制限実装）追加、TR-BE-004（CSVインポート/エクスポート機能）追加                              |
+| 2025-11-20 | 3.0        | Claude | インフラネットワーク資料反映。ネットワーク構成セクション追加、Entra ID認証基盤、Private Link通信、Event Hubs Capture、ADLS、コンピュートプレーン構造を追加                                       |
+| 2025-11-21 | 3.1        | Claude | functional-requirements.mdとの整合性確認: CSVインポート/エクスポート機能の機能IDをFR-006に更新、ダッシュボードがFR-006-1として分析機能内に統合された旨を反映                                     |
+| 2025-11-25 | 3.2        | Claude | スケジュールバッチ機能削除に伴う更新: TR-BE-004のCSVインポート/エクスポート機能の機能IDをFR-006からFR-005に変更                                                                                  |
+| 2025-11-25 | 3.3        | Claude | 機能分類再編成: TR-BE-004のCSVインポート/エクスポート機能の機能IDをFR-005からFR-004-8（マスタ管理機能内）に変更                                                                                  |
+| 2025-11-25 | 3.4        | Claude | ログイン画面の整理: Databricks User認証セクションに「Flaskアプリでは実装しない」を明記、TR-SEC-001にログイン認証はDatabricks標準機能である旨を追加、get_current_user関数にコメント追加           |
+| 2025-11-26 | 3.5        | Claude | Azure環境統合の明確化: システム構成にAzure環境統合を明記、TR-DEPLOY-003に3環境構成表を追加、TR-DEV-003にローカル開発環境はWebアプリのみである旨を明記                                            |
+| 2025-11-26 | 3.6        | Claude | Flask Blueprint構成を画面カテゴリベースに更新: frontend.mdの構成に合わせて、dashboard/admin/alert/notice/account/transferの6つのBlueprintに整理、画面ID（DSH/ADM/ALT/NTC/ACC/TRF）との対応を明記 |
+| 2025-12-04 | 3.7        | Claude | OLTP DB認証戦略の整理: TR-SEC-001のOLTP DBアクセス方式を「ログインユーザーの認証情報」から「共通アカウント」に変更、データスコープ制限はアプリケーション層で実装する旨を明記                     |

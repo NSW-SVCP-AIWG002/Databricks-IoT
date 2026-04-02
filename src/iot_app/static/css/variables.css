@@ -1,0 +1,35 @@
+:root {
+  /* ===== カラー ===== */
+  --color-primary: #2272B4;
+  --color-primary-hover: #1e639b;
+  --color-danger: #F44336;
+  --color-danger-hover: #da190b;
+  --color-success: #28A745;
+  --color-secondary: #6c757d;
+  --color-secondary-hover: #555b61;
+
+  /* ===== グローバルメニュー背景色 ===== */
+  --nav-bkg-color-a: #2A3847;   /* ノンアクティブ */
+  --nav-bkg-color-b: #2E3D4D;   /* ホバー中 */
+  --nav-bkg-color-c: #596775;   /* 現在地 */
+
+  /* ===== スペーシング（8pxベース） ===== */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+
+
+  /* ===== ボタン制御 ===== */
+  --border-radius-base: 5px;
+
+  /* ===== フォント ===== */
+  --font-family-base: 'メイリオ', 'Meiryo', sans-serif;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+}
+

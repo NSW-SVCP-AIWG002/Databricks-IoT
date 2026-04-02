@@ -116,13 +116,13 @@
 
 | No  | ルート名         | エンドポイント | メソッド | 用途             | レスポンス形式 |
 | --- | ---------------- | -------------- | -------- | ---------------- | -------------- |
-| 1   | チャット画面表示 | `/chat`        | GET      | チャット画面表示 | HTML           |
+| 1   | チャット画面表示 | `/analysis/chat`        | GET      | チャット画面表示 | HTML           |
 
 ### APIルート
 
 | No  | ルート名    | エンドポイント | メソッド | 用途                   | レスポンス形式 |
 | --- | ----------- | -------------- | -------- | ---------------------- | -------------- |
-| 2   | 質問送信API | `/api/chat`    | POST     | 質問を送信し回答を取得 | JSON           |
+| 2   | 質問送信API | `/api/analysis/chat`    | POST     | 質問を送信し回答を取得 | JSON           |
 
 **Blueprint構成:** `chat_bp`
 
@@ -132,7 +132,7 @@
 
 ### チャット画面初期表示
 
-**トリガー:** URL直接アクセス時（`/chat`へのアクセス）
+**トリガー:** URL直接アクセス時（`/analysis/chat`へのアクセス）
 
 **前提条件:**
 
@@ -142,7 +142,7 @@
 
 ```mermaid
 flowchart TD
-    Start([URL直接アクセス<br>/chat]) --> Auth[AuthMiddleware<br>before_request]
+    Start([URL直接アクセス<br>/analysis/chat]) --> Auth[AuthMiddleware<br>before_request]
     Auth --> CheckIdP{AuthProvider<br>IdP認証チェック}
     CheckIdP -->|未認証| ClearSession[セッションクリア]
     ClearSession --> LoginRedirect[IdPログインへリダイレクト]
@@ -174,7 +174,7 @@ from flask import Blueprint, render_template, g, session
 
 chat_bp = Blueprint('chat', __name__)
 
-@chat_bp.route('/chat', methods=['GET'])
+@chat_bp.route('/analysis/chat', methods=['GET'])
 def show_chat():
     """チャット画面を表示
 
@@ -241,7 +241,7 @@ flowchart TD
 **リクエスト:**
 
 ```json
-POST /api/chat
+POST /api/analysis/chat
 Content-Type: application/json
 
 {
@@ -312,7 +312,7 @@ import requests
 from flask import jsonify, request, g
 from config import Config
 
-@chat_bp.route('/api/chat', methods=['POST'])
+@chat_bp.route('/api/analysis/chat', methods=['POST'])
 def send_question():
     """質問を送信してAIオーケストレータから回答を取得
 
@@ -452,7 +452,7 @@ flowchart TD
 2. 新しいUUID（`crypto.randomUUID()`）を生成し、SessionStorageに保存
 3. チャット画面の表示をクリア
 
-**注:** サーバーサイドAPIの呼び出しは不要。`thread_id`はフロントエンドで管理し、次回の`/api/chat`リクエスト時に新しい`thread_id`が送信されることで、オーケストレータ側のLangGraph Checkpointerが新しい会話として処理する。
+**注:** サーバーサイドAPIの呼び出しは不要。`thread_id`はフロントエンドで管理し、次回の`/api/analysis/chat`リクエスト時に新しい`thread_id`が送信されることで、オーケストレータ側のLangGraph Checkpointerが新しい会話として処理する。
 
 ---
 
@@ -481,7 +481,7 @@ flowchart TD
 │     df: [...], fig_data: {...}, sql_query: "..."} │
 │  ]                                              │
 └──────────────────────┬──────────────────────────┘
-                       │ POST /api/chat
+                       │ POST /api/analysis/chat
                        │ {question, thread_id}
                        ▼
 ┌─────────────────────────────────────────────────┐
@@ -708,7 +708,7 @@ sequenceDiagram
     ユーザー->>Browser: 質問入力・送信ボタンクリック
     Browser->>Browser: バリデーション
     Browser->>Browser: ローディング表示
-    Browser->>Flask: POST /api/chat<br>{question: "..."}
+    Browser->>Flask: POST /api/analysis/chat<br>{question: "..."}
 
     Note over Flask: AuthMiddleware (before_request)
     Flask->>Flask: AuthProvider.get_user_info(request)<br>IdP認証チェック
@@ -739,14 +739,14 @@ sequenceDiagram
         alt はい（グラフ作成）
             ユーザー->>Browser: 「はい」ボタン押下
             Browser->>Browser: ローディング表示
-            Browser->>Flask: POST /api/chat<br>{question: "はい", thread_id: 同一ID}
+            Browser->>Flask: POST /api/analysis/chat<br>{question: "はい", thread_id: 同一ID}
             Flask->>Endpoint: POST /invocations（HITL再開）
             Note over Endpoint: Command(resume="はい")
             Endpoint->>Endpoint: GraphAPI<br>グラフコード生成・実行
         else いいえ（グラフスキップ）
             ユーザー->>Browser: 「いいえ」ボタン押下
             Browser->>Browser: ローディング表示
-            Browser->>Flask: POST /api/chat<br>{question: "いいえ", thread_id: 同一ID}
+            Browser->>Flask: POST /api/analysis/chat<br>{question: "いいえ", thread_id: 同一ID}
             Flask->>Endpoint: POST /invocations（HITL再開）
             Note over Endpoint: Command(resume="いいえ")<br>GraphAPIスキップ
         end
@@ -844,8 +844,8 @@ flowchart TD
     Start([リトライボタン押下]) --> HideRetry[リトライボタン非表示]
     HideRetry --> RemoveError[エラーメッセージ削除]
     RemoveError --> ShowLoading[ローディング表示]
-    ShowLoading --> DisableInput[入力エリア・送信ボタン無効化]
-    DisableInput --> Resend["同一質問テキストで再送信<br>POST /api/chat<br>{question: 元の質問, thread_id: 同一ID}"]
+    ShowLoading --> DisableInput[入力エリア・送信ボタン・リトライボタン・新しい会話を開始ボタン無効化]
+    DisableInput --> Resend["同一質問テキストで再送信<br>POST /api/analysis/chat<br>{question: 元の質問, thread_id: 同一ID}"]
     Resend --> CheckResponse{レスポンス判定}
     CheckResponse -->|成功| DisplayAnswer[回答表示<br>SessionStorageに保存]
     CheckResponse -->|エラー| ShowError[エラーメッセージ表示<br>リトライボタン再表示]
@@ -1010,7 +1010,7 @@ sequenceDiagram
 
     Note over ユーザー,Endpoint: 1回目リクエスト（HITL中断）
     ユーザー->>Browser: 質問送信
-    Browser->>Flask: POST /api/chat {question, thread_id}
+    Browser->>Flask: POST /api/analysis/chat {question, thread_id}
     Flask->>Endpoint: POST /invocations
 
     Note over Endpoint: Planner → GenieAPI実行
@@ -1025,7 +1025,7 @@ sequenceDiagram
 
     alt はいを選択
         ユーザー->>Browser: 「はい」ボタン押下
-        Browser->>Flask: POST /api/chat {question: "はい", thread_id: 同一ID}
+        Browser->>Flask: POST /api/analysis/chat {question: "はい", thread_id: 同一ID}
         Flask->>Endpoint: POST /invocations
         Note over Endpoint: snapshot.next存在 → HITL再開モード
         Note over Endpoint: Command(resume="はい")
@@ -1035,7 +1035,7 @@ sequenceDiagram
         Browser-->>ユーザー: 回答+グラフ表示
     else いいえを選択
         ユーザー->>Browser: 「いいえ」ボタン押下
-        Browser->>Flask: POST /api/chat {question: "いいえ", thread_id: 同一ID}
+        Browser->>Flask: POST /api/analysis/chat {question: "いいえ", thread_id: 同一ID}
         Flask->>Endpoint: POST /invocations
         Note over Endpoint: snapshot.next存在 → HITL再開モード
         Note over Endpoint: Command(resume="いいえ")
