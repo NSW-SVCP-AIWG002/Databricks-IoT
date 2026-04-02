@@ -22,10 +22,11 @@
     - [シルバー層テーブル](#シルバー層テーブル)
       - [1. センサーデータ (silver\_sensor\_data)](#1-センサーデータ-silver_sensor_data)
     - [ゴールド層テーブル](#ゴールド層テーブル)
-      - [1. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#1-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
-      - [2. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#2-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
-      - [3. センサーデータ年次サマリ (gold\_sensor\_data\_yearly\_summary)](#3-センサーデータ年次サマリ-gold_sensor_data_yearly_summary)
-      - [4. サマリー計算手法マスタ（gold\_summary\_method\_master）](#4-サマリー計算手法マスタgold_summary_method_master)
+      - [1. センサーデータ時次サマリ (gold\_sensor\_data\_hourly\_summary)](#1-センサーデータ時次サマリ-gold_sensor_data_hourly_summary)
+      - [2. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#2-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
+      - [3. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#3-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
+      - [4. センサーデータ年次サマリ (gold\_sensor\_data\_yearly\_summary)](#4-センサーデータ年次サマリ-gold_sensor_data_yearly_summary)
+      - [5. サマリー計算手法マスタ（gold\_summary\_method\_master）](#5-サマリー計算手法マスタgold_summary_method_master)
     - [外部DBのマスタ類を同期するテーブル](#外部dbのマスタ類を同期するテーブル)
       - [1. デバイスマスタ（device\_master）](#1-デバイスマスタdevice_master)
       - [2. 組織マスタ（organization\_master）](#2-組織マスタorganization_master)
@@ -37,9 +38,10 @@
   - [動的ビュー](#動的ビュー)
     - [動的ビュー一覧](#動的ビュー一覧)
       - [1. センサーデータビュー (sensor\_data\_view)](#1-センサーデータビュー-sensor_data_view)
-      - [2. 日次サマリビュー（daily\_summary\_view）](#2-日次サマリビューdaily_summary_view)
-      - [3. 月次サマリビュー（monthly\_summary\_view）](#3-月次サマリビューmonthly_summary_view)
-      - [4. 年次サマリビュー（yearly\_summary\_view）](#4-年次サマリビューyearly_summary_view)
+      - [2. 時次サマリビュー（hourly\_summary\_view）](#2-時次サマリビューhourly_summary_view)
+      - [3. 日次サマリビュー（daily\_summary\_view）](#3-日次サマリビューdaily_summary_view)
+      - [4. 月次サマリビュー（monthly\_summary\_view）](#4-月次サマリビューmonthly_summary_view)
+      - [5. 年次サマリビュー（yearly\_summary\_view）](#5-年次サマリビューyearly_summary_view)
     - [行レベルセキュリティの実装](#行レベルセキュリティの実装)
       - [Row Access Policyの定義](#row-access-policyの定義)
       - [動作イメージ](#動作イメージ)
@@ -128,6 +130,7 @@ iot_catalog/                                        # Unity Catalogカタログ
 │   └── silver_sensor_data                          # JSON形式にパースしたセンサーデータ
 │
 ├── gold/                                           # ゴールド層スキーマ
+│   ├── gold_sensor_data_hourly_summary             # センサーデータ時次サマリ
 │   ├── gold_sensor_data_daily_summary              # センサーデータ日次サマリ
 │   ├── gold_sensor_data_monthly_summary            # センサーデータ月次サマリ
 │   ├── gold_sensor_data_yearly_summary             # センサーデータ年次サマリ
@@ -173,9 +176,10 @@ iot_catalog/                                        # Unity Catalogカタログ
 
 | #   | テーブル物理名                   | テーブル論理名           | 説明                                 |
 | --- | -------------------------------- | ------------------------ | ------------------------------------ |
-| 1   | gold_sensor_data_daily_summary   | センサーデータ日次サマリ | センサーデータを日次集計したテーブル |
-| 2   | gold_sensor_data_monthly_summary | センサーデータ月次サマリ | センサーデータを月次集計したテーブル |
-| 3   | gold_sensor_data_yearly_summary  | センサーデータ年次サマリ | センサーデータを年次集計したテーブル |
+| 1   | gold_sensor_data_hourly_summary  | センサーデータ時次サマリ | センサーデータを時次集計したテーブル |
+| 2   | gold_sensor_data_daily_summary   | センサーデータ日次サマリ | センサーデータを日次集計したテーブル |
+| 3   | gold_sensor_data_monthly_summary | センサーデータ月次サマリ | センサーデータを月次集計したテーブル |
+| 4   | gold_sensor_data_yearly_summary  | センサーデータ年次サマリ | センサーデータを年次集計したテーブル |
 
 ### ビュー
 
@@ -299,7 +303,47 @@ TBLPROPERTIES (
 
 ### ゴールド層テーブル
 
-#### 1. センサーデータ日次サマリ (gold_sensor_data_daily_summary)
+#### 1. センサーデータ時次サマリ (gold_sensor_data_hourly_summary)
+
+**概要**: センサーデータを時次で集計したテーブル
+
+| #   | カラム物理名         | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
+| --- | ------------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
+| 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
+| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」          |
+| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
+| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
+| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
+| 7   | data_count          | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
+| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
+
+**クラスタリングキー**: `collection_datetime`, `device_id`
+
+**テーブルプロパティ**:
+```sql
+CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_sensor_data_hourly_summary (
+    device_id INT NOT NULL, 
+    organization_id INT NOT NULL, 
+    collection_datetime DATETIME NOT NULL, 
+    summary_item INT NOT NULL,
+    summary_method_id INT NOT NULL, 
+    summary_value DOUBLE NOT NULL, 
+    data_count INT NOT NULL, 
+    create_time TIMESTAMP NOT NULL 
+)
+USING DELTA
+CLUSTER BY (collection_datetime, device_id)
+TBLPROPERTIES (
+    'delta.autoOptimize.optimizeWrite' = 'true',
+    'delta.autoOptimize.autoCompact' = 'true',
+    'delta.logRetentionDuration' = 'interval 7 days',
+    'delta.deletedFileRetentionDuration' = 'interval 7 days',
+    'delta.tuneFileSizesForRewrites' = 'true'
+);
+```
+
+#### 2. センサーデータ日次サマリ (gold_sensor_data_daily_summary)
 
 **概要**: センサーデータを日次で集計したテーブル
 
@@ -340,7 +384,7 @@ TBLPROPERTIES (
 );
 ```
 
-#### 2. センサーデータ月次サマリ (gold_sensor_data_monthly_summary)
+#### 3. センサーデータ月次サマリ (gold_sensor_data_monthly_summary)
 
 **概要**: センサーデータを月次で集計したテーブル
 
@@ -381,7 +425,7 @@ TBLPROPERTIES (
 );
 ```
 
-#### 3. センサーデータ年次サマリ (gold_sensor_data_yearly_summary)
+#### 4. センサーデータ年次サマリ (gold_sensor_data_yearly_summary)
 
 **概要**: センサーデータを年次で集計したテーブル
 
@@ -422,7 +466,7 @@ TBLPROPERTIES (
 );
 ```
 
-#### 4. サマリー計算手法マスタ（gold_summary_method_master）
+#### 5. サマリー計算手法マスタ（gold_summary_method_master）
 
 **概要**: サマリ作成時にどの計算手法にのっとって作成されたものかを表現するマスタ
 
@@ -668,7 +712,41 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 - `sensor_data_json`: 構造化済みカラムで十分なため除外
 - `create_time`: ダッシュボード表示に不要なため除外
 
-#### 2. 日次サマリビュー（daily_summary_view）
+
+#### 2. 時次サマリビュー（hourly_summary_view）
+
+```SQL
+CREATE OR REPLACE VIEW iot_catalog.views.hourly_summary_view (
+    device_id, 
+    organization_id, 
+    collection_datetime, 
+    summary_item,
+    summary_method_id, 
+    summary_value, 
+    data_count 
+)
+FROM iot_catalog.gold.gold_sensor_data_hourly_summary;
+
+-- Genieによる検索精度を上げるため、日本語でコメントをつける
+COMMENT ON VIEW iot_catalog.views.hourly_summary_view IS '時次サマリ、1時間ごとのサマリ、時別のサマリ';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.device_id IS 'デバイスID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.organization_id IS '組織ID、所属組織のID、組織のID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.collection_datetime IS '集計時、集約時、時刻';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_item IS '集約対象';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_method_id IS '集約方法ID';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.summary_value IS '集約結果、計算結果、集約値';
+COMMENT ON COLUMN iot_catalog.views.hourly_summary_view.data_count IS 'データ件数、データの件数、データ数';
+
+-- 既存のPolicyを各ビューに適用
+ALTER VIEW iot_catalog.views.hourly_summary_view
+SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
+```
+
+**ゴールド層の時次サマリテーブルからの除外カラム**:
+
+- `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
+
+#### 3. 日次サマリビュー（daily_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.daily_summary_view AS
@@ -701,7 +779,7 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
 - `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
 
-#### 3. 月次サマリビュー（monthly_summary_view）
+#### 4. 月次サマリビュー（monthly_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.monthly_summary_view AS
@@ -734,7 +812,7 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
 - `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
 
-#### 4. 年次サマリビュー（yearly_summary_view）
+#### 5. 年次サマリビュー（yearly_summary_view）
 
 ```SQL
 CREATE OR REPLACE VIEW iot_catalog.views.yearly_summary_view AS

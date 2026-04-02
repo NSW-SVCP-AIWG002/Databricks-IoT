@@ -80,10 +80,7 @@ from abc import ABC, abstractmethod
 from typing import TypedDict, Optional
 
 class UserInfo(TypedDict):
-    user_id: str
     email: str
-    name: Optional[str]
-    groups: list[str]
 
 class AuthProvider(ABC):
     """認証プロバイダー抽象基底クラス"""
@@ -119,17 +116,23 @@ class AuthProvider(ABC):
 
 ### 2.3 認証方式の選択
 
-環境変数`AUTH_TYPE`により認証プロバイダーを選択します。
+`AUTH_TYPE` は `config.py` の `Config` クラスで `os.getenv('AUTH_TYPE')` として定義し（デフォルト値なし・必須設定）、`factory.py` は `current_app.config` 経由で参照します。
+
+```python
+# src/config.py
+class Config:
+    AUTH_TYPE = os.getenv('AUTH_TYPE')  # 必須設定: 'azure' / 'aws' / 'local'
+```
 
 ```python
 # auth/factory.py
-import os
+from flask import current_app
 from auth.providers.azure_easy_auth import AzureEasyAuthProvider
 from auth.providers.aws_cognito import AWSCognitoProvider
 from auth.providers.local_idp import LocalIdPProvider
 
 def get_auth_provider():
-    auth_type = os.getenv('AUTH_TYPE', 'azure')
+    auth_type = current_app.config['AUTH_TYPE']
 
     providers = {
         'azure': AzureEasyAuthProvider,
@@ -226,7 +229,11 @@ flowchart TD
     ClearSession1 --> RedirectLogin[IdPログインページへ]
     RedirectLogin --> End1([認証エラー])
 
-    CheckIdP -->|Yes| SyncSession[Flaskセッション同期<br>_sync_session]
+    CheckIdP -->|Yes| LookupUser[DBユーザー情報取得<br>find_user_by_email]
+    LookupUser -->|ユーザー未登録| Error403[403エラーページ表示<br>errors/403.html]
+    Error403 --> End403([アクセス拒否])
+    LookupUser -->|DBエラー等| ClearSession1
+    LookupUser -->|成功| SyncSession[Flaskセッション同期<br>_sync_session]
     SyncSession --> CheckDBToken{Databricksトークン<br>有効?}
 
     CheckDBToken -->|Yes| Execute[ビジネスロジック実行]
@@ -604,6 +611,7 @@ class TokenExchanger:
 # auth/middleware.py
 from flask import g, request, redirect, url_for, abort, session
 from auth.factory import get_auth_provider
+from auth.services import find_user_by_email
 from auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
 
 auth_provider = get_auth_provider()
@@ -623,14 +631,24 @@ def authenticate_request():
         session.clear()
         return redirect(auth_provider.logout_url())
 
-    # 3. Flaskセッション同期（IdP認証成功 = セッション有効）
-    _sync_session(idp_user_info)
+    # 3. アプリユーザー情報取得（emailを基にMySQLから取得）
+    try:
+        app_user = find_user_by_email(idp_user_info['email'])
+    except UnauthorizedError:
+        # IdPで認証済みだがアプリ未登録 → 403エラーページを直接返却
+        # ※ abort(403) は使用しない。他の403（ロール不足）はモーダル表示だが、
+        #   このケースはページ表示前に発生するため、middleware内で直接レンダリングする。
+        logger.warning("アクセス拒否：アプリ未登録ユーザー", extra={"email": idp_user_info.get("email")})
+        return render_template("errors/403.html"), 403
 
-    # 4. グローバルコンテキストに保存（セッションから取得）
-    g.current_user_id = session.get('user_id')
-    g.current_user_type_id = session.get('user_type_id')
+    # 4. Flaskセッション同期（IdP認証成功 = セッション有効）
+    _sync_session(idp_user_info, app_user)
 
-    # 5. パスワード期限切れチェック（オンプレミス環境のみ）
+    # 5. グローバルコンテキストに保存（セッションから取得）
+    g.current_user.user_id = session.get('user_id')
+    g.current_user.user_type_id = session.get('user_type_id')
+
+    # 6. パスワード期限切れチェック（オンプレミス環境のみ）
     if auth_provider.requires_additional_setup():
         # 許可パス（パスワード変更画面・ログアウト）へのアクセスは許可
         allowed_paths = ['/account/password/change', '/auth/logout']
@@ -642,12 +660,12 @@ def authenticate_request():
             flash('パスワードの有効期限が切れました。パスワードを変更してください。', 'warning')
             return redirect(url_for('account.password_change'))
 
-    # 6. Token Exchange（有効なDatabricksトークンを確保）
+    # 7. Token Exchange（有効なDatabricksトークンを確保）
     try:
         from auth.token_exchange import TokenExchanger
         token_exchanger = TokenExchanger()
         databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
-        g.databricks_token = databricks_token
+        g.current_user.databricks_token = databricks_token
     except JWTRetrievalError:
         # JWT取得失敗 → IdPセッション切れと判断、Flaskセッションクリア
         session.clear()
@@ -658,17 +676,28 @@ def authenticate_request():
 
     return None
 
+# ────────────────────────────────────────────────────────────────
+# 【ログアウトURLの取得規約】
+#
+# ログアウト先URLは必ず auth_provider.logout_url() を使用すること。
+# IdP種別（Azure / AWS / オンプレ）によりURLが異なるため、
+# 直接ハードコード（例: '/.auth/logout'）は禁止。
+# ────────────────────────────────────────────────────────────────
 
-def _sync_session(idp_user_info):
-    """IdP認証情報をFlaskセッションに同期
+
+def _sync_session(idp_user_info, app_user):
+    """IdP認証情報・アプリユーザー情報をFlaskセッションに同期
 
     全環境で共通して呼び出される。IdP認証成功時にFlaskセッションを
-    最新のIdP情報で更新することで、両セッションの整合性を保つ。
+    最新の情報で更新することで、セッションの整合性を保つ。
 
     Args:
-        idp_user_info: AuthProviderから取得したユーザー情報
+        idp_user_info: AuthProviderから取得したIdP認証情報
+        app_user: find_user_by_emailから取得したアプリユーザー情報
     """
     session['email'] = idp_user_info['email']
+    session['user_id'] = app_user['user_id']
+    session['user_type_id'] = app_user['user_type_id']
     session.permanent = True
 ```
 
@@ -678,13 +707,14 @@ def _sync_session(idp_user_info):
 
 #### 3.7.1 認証関連エラー分類
 
-| エラー種別         | HTTPステータス            | 対応                                             |
-| ------------------ | ------------------------- | ------------------------------------------------ |
-| 未認証             | 401 Unauthorized          | ログインページへリダイレクト                     |
-| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示                     |
-| Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                       |
-| セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                     |
-| パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ） |
+| エラー種別         | HTTPステータス            | 対応                                                   |
+| ------------------ | ------------------------- | ------------------------------------------------------ |
+| 未認証             | 401 Unauthorized          | ログインページへリダイレクト                           |
+| ユーザー未登録     | 403 Forbidden             | 403エラーページ表示（IdP認証済みだがアプリDB未登録）※1 |
+| 権限不足           | 403 Forbidden             | エラーメッセージモーダル表示（ロール不足）※2           |
+| Token Exchange失敗 | 500 Internal Server Error | エラーページ表示、ログ記録                             |
+| セッション期限切れ | 401 Unauthorized          | ログインページへリダイレクト                           |
+| パスワード期限切れ | -（リダイレクト）         | パスワード変更画面へリダイレクト（オンプレのみ）       |
 
 #### 3.7.2 エラー通知（Teams）
 
@@ -732,10 +762,10 @@ class JWTExpiredError(AuthError):
     pass
 
 class JWTRetrievalError(AuthError):
-    """JWT取得失敗エラー（IdPセッション切れ等）
+    """JWT取得失敗エラー（認証基盤の異常）
 
-    Azure/AWSでリクエストヘッダーにJWTがない場合に発生。
-    呼び出し元でFlaskセッションをクリアし、IdPログインへリダイレクトする。
+    Azure/AWSでリクエストヘッダーにJWTがない場合に発生（Easy Auth設定ミス等）。
+    呼び出し元でFlaskセッションをクリアし、500エラーページへ遷移する。
     """
     pass
 
@@ -767,6 +797,16 @@ class PasswordResetError(AuthError):
 
 #### 3.7.4 Flaskエラーハンドラ
 
+> **※1 ユーザー未登録（403）の特例処理**
+>
+> 「IdP認証済みだがアプリDB未登録」ケースは、ページ表示前（middleware内）で発生するため、
+> `abort(403)` を呼ばず `middleware.py` 内で `render_template("errors/403.html"), 403` を直接返す。
+> これにより、下記 `handle_forbidden`（ロール不足用モーダル）は経由しない。
+>
+> **※2 権限不足（403）の共通処理**
+>
+> ロール不足でビュー操作を拒否する場合は `abort(403)` を使用し、下記 `handle_forbidden` 経由でモーダル表示する。
+
 ```python
 # common/error_handlers.py
 from flask import render_template, redirect, url_for, flash
@@ -782,6 +822,8 @@ def register_error_handlers(app):
 
     @app.errorhandler(ForbiddenError)
     def handle_forbidden(e):
+        # ロール不足時: 既存ページ上でモーダル表示（abort(403) 経由のみ到達）
+        # ※ アプリDB未登録ユーザーはmiddlewareで直接処理されここには到達しない
         return render_template('errors/403.html'), 403
 
     @app.errorhandler(TokenExchangeError)
@@ -954,7 +996,7 @@ class UnityCatalogConnector:
         """Unity Catalog接続を取得
 
         注意: access_tokenはAuthMiddlewareで事前に取得・検証済みの
-        g.databricks_tokenを使用する。これにより期限切れトークンの
+        g.current_user.databricks_tokenを使用する。これにより期限切れトークンの
         使用を防止する。
         """
         access_token = getattr(g, 'databricks_token', None)
@@ -1079,10 +1121,7 @@ class AzureEasyAuthProvider(AuthProvider):
         claims = {c['typ']: c['val'] for c in principal_data.get('claims', [])}
 
         return UserInfo(
-            user_id=claims.get('oid', ''),
             email=claims.get('preferred_username', ''),
-            name=claims.get('name', ''),
-            groups=claims.get('groups', [])
         )
 
     def get_jwt_for_token_exchange(self, request) -> str:
@@ -1219,10 +1258,7 @@ class AWSCognitoProvider(AuthProvider):
         payload = self._decode_jwt_payload(oidc_data)
 
         return UserInfo(
-            user_id=payload.get('sub', ''),
             email=payload.get('email', ''),
-            name=payload.get('name', payload.get('cognito:username', '')),
-            groups=payload.get('cognito:groups', [])
         )
 
     def get_jwt_for_token_exchange(self, request) -> str:
@@ -1445,14 +1481,11 @@ class LocalIdPProvider(AuthProvider):
 
     def get_user_info(self, request) -> UserInfo:
         """セッションからユーザー情報を取得"""
-        if 'user_id' not in session:
+        if 'email' not in session:
             raise UnauthorizedError('Not logged in')
 
         return UserInfo(
-            user_id=session.get('user_id', ''),
             email=session.get('email', ''),
-            name=session.get('name', ''),
-            groups=session.get('groups', [])
         )
 
     def get_jwt_for_token_exchange(self, request) -> str:

@@ -13,6 +13,6 @@ alwaysApply: true
   - `02-requirements/` - 要件定義
   - `03-features/` - 機能別実装ガイド
   - `04-development/` - 開発進捗・手順
-  - `06-testing/` - テスト仕様
-  - `07-operations/` - 運用手順
+  - `05-testing/` - テスト仕様
+  - `06-operations/` - 運用手順
 - 実装時は必ず関連するドキュメントを確認し、最新の進捗状況を `04-development/` で把握してから作業を開始してください。

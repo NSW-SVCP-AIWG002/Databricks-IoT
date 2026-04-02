@@ -14,7 +14,7 @@
 | 機能名   | 対話型AI機能       |
 | カテゴリ | 分析機能（FR-006） |
 | 画面ID   | CHT-001            |
-| URL      | `/chat`            |
+| URL      | `/analysis/chat`            |
 
 ## 機能仕様
 
@@ -156,14 +156,14 @@ sequenceDiagram
         Flask-->>ユーザー: HITL中断表示（はい/いいえ）
 
         alt はい（グラフ作成）
-            ユーザー->>Flask: POST /api/chat {question: "はい", thread_id}
+            ユーザー->>Flask: POST /api/analysis/chat {question: "はい", thread_id}
             Flask->>Endpoint: POST /invocations（HITL再開）
             Note over Endpoint: Command(resume="はい")
             Endpoint->>LLM: グラフコード生成依頼
             LLM-->>Endpoint: Pythonコード
             Endpoint->>Endpoint: コード実行<br>グラフ生成
         else いいえ（グラフスキップ）
-            ユーザー->>Flask: POST /api/chat {question: "いいえ", thread_id}
+            ユーザー->>Flask: POST /api/analysis/chat {question: "いいえ", thread_id}
             Flask->>Endpoint: POST /invocations（HITL再開）
             Note over Endpoint: Command(resume="いいえ")<br>GraphAPIスキップ
         end
