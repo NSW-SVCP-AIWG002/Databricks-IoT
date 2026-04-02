@@ -50,7 +50,7 @@
    - 12.2 [API識別子（UUID）](#api識別子uuid)
 13. [設定ファイル管理項目](#設定ファイル管理項目)
    - 13.1 [概要](#概要-1)
-   - 13.2 [統合設定ファイル全体構造](#統合設定ファイル全体構造)
+   - 13.2 [設定ファイル全体構造](#設定ファイル全体構造)
 14. [関連ドキュメント](#関連ドキュメント)
 
 ---
@@ -75,19 +75,15 @@
 
 すべてのFlaskルートで使用する共通HTTPステータスコードを定義します。
 
-| コード | 説明                  | 使用場面                           | Flask実装                            |
-| ------ | --------------------- | ---------------------------------- | ------------------------------------ |
-| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                  |
-| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                         |
-| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error       |
-| 401    | Unauthorized          | 認証エラー                         | ログインページへリダイレクト         |
-| 403    | Forbidden             | 権限不足                           | `render_template('errors/403.html')` |
-| 404    | Not Found             | リソース未検出                     | `render_template('errors/404.html')` |
-| 409    | Conflict              | 競合エラー（重複登録など）         | `render_template()` with error       |
-| 422    | Unprocessable Entity  | バリデーションエラー               | `render_template()` with form errors |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')` |
-| 502    | Bad Gateway           | 外部API連携エラー                  | `render_template('errors/502.html')` |
-| 503    | Service Unavailable   | メンテナンス中                     | `render_template('errors/503.html')` |
+| コード | 説明                  | 使用場面                           | Flask実装                              |
+| ------ | --------------------- | ---------------------------------- | -------------------------------------- |
+| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                    |
+| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                           |
+| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error modal   |
+| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
+| 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
+| 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
+| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')`   |
 
 **注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
 
@@ -97,21 +93,24 @@
 
 アプリケーション内部で使用するエラーコードを定義します。
 
-| コード             | 説明                 | HTTPステータス | 表示方法                          |
-| ------------------ | -------------------- | -------------- | --------------------------------- |
-| AUTH_FAILED        | 認証失敗             | 401            | ログインページへリダイレクト      |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                      |
-| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ          |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ          |
-| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ          |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                      |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                      |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                      |
+| コード             | 説明                 | HTTPステータス | 表示方法                             |
+| ------------------ | -------------------- | -------------- | ------------------------------------ |
+| AUTH_FAILED        | 認証失敗             | 401            | ログイン画面へリダイレクト |
+| PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ表示（errors/500.html）                  |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーページ表示（errors/500.html）                  |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ表示（errors/500.html）                  |
 
 **Flask実装例:**
 
 ```python
+# パラメータ不正エラー
+if not valid_parameter:
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': 'パラメータが不正です'}), 400
 # パラメータ不正エラー
 if not valid_parameter:
     # エラーメッセージモーダルを表示
@@ -124,9 +123,15 @@ if not user:
     # エラーメッセージモーダルを表示
     return render_template('users/list.html',
                          error_modal={'message': '指定されたユーザーが見つかりません'}), 404
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': '指定されたユーザーが見つかりません'}), 404
 
 # 権限エラー
 if not current_user.has_permission('user:delete'):
+    # エラーメッセージモーダルを表示
+    return render_template('users/list.html',
+                         error_modal={'message': 'この操作を実行する権限がありません'}), 403
     # エラーメッセージモーダルを表示
     return render_template('users/list.html',
                          error_modal={'message': 'この操作を実行する権限がありません'}), 403
@@ -137,9 +142,8 @@ try:
 except Exception as e:
     db.session.rollback()
     logger.error(f"Database error: {e}")
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'データベースエラーが発生しました'}), 500
+    # エラーページを表示
+    return render_template('errors/500.html'), 500
 ```
 
 ---
@@ -152,14 +156,12 @@ except Exception as e:
 
 | エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
 | -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
-| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示         | 400, 422       | 開始前                 |
-| 認証エラー           | 認証失敗                       | ログインページへリダイレクト | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーページまたはFlash      | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash      | 404            | 読み取りのみ           |
-| 競合エラー           | データの重複・競合             | フォームにエラー表示         | 409            | 開始後（ロールバック） |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ   | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ   | 502            | 開始後（ロールバック） |
-| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ   | 504            | 開始後（ロールバック） |
+| パラメータ不正       | 入力パラメータの形式・値が不正 | エラーメッセージモーダル表示 | 400            | 開始前                 |
+| 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 
@@ -622,19 +624,6 @@ def create_user():
 | `sales_company`      | 販売会社         | 販社ユーザー   |
 | `service_company`    | サービス利用会社 | サービス利用者 |
 
-#### 管理者と販社ユーザーの違い
-
-**管理者（management_company）:**
-- サービスを売り出す主体
-- NSWと契約している会社
-- デバイスは管理者が提供、またはNSWが提供
-- エンドユーザー（サービス利用者）に対してサービスを直接提供する権限を持つ
-
-**販社ユーザー（sales_company）:**
-- 管理者からエンドユーザーにサービスを提供する仲介役
-- 管理者が提供するサービスをエンドユーザー（サービス利用会社）に販売・提供する
-- 管理者の配下で活動し、管理者が管理するデバイスを利用
-
 **組織階層:**
 ```
 NSW（システム保守会社）
@@ -676,6 +665,9 @@ SORT_ORDER = [{sort_order_id: -1, sort_order_name:""},
             ]
 sort_item = [{sort_item_id: NNN, sort_item_name: SSS }, ...] # sort_item_masterを検索した結果を格納した辞書配列
 ```
+
+> **注:** `SORT_ORDER` は設定ファイルでの管理対象外です。実装時は共通関数内で固定値として定義してください。
+
 検索実行時、画面から受け取ったsort_item_idは検索クエリのパラメータとして、sort_order_idは検索関数内でASCまたはDESCに置換して検索クエリに渡されます。
 
 **sort_order_idを置換する過程の実装例**
@@ -806,6 +798,238 @@ csrf = CSRFProtect(app)
   {# フォームフィールド #}
 </form>
 ```
+
+---
+
+## セッション・Cookie管理
+
+### 基本方針
+
+一覧画面における**検索条件の格納**は、**Set-Cookieヘッダー**を使用して行います。
+
+検索条件の格納とクリアは、以下の共通関数を使用して統一的に処理します：
+- `set_search_conditions_cookie()` - 検索条件の格納
+- `get_search_conditions_cookie()` - 検索条件の取得
+- `clear_search_conditions_cookie()` - 検索条件のクリア
+
+### 共通関数仕様
+
+**保存対象:**
+- 検索フォームの入力値（キーワード、フィルター条件）
+- ソート項目
+- ソート順序（昇順/降順）
+- ページ番号（page）
+- 表示件数（per_page）
+
+**Cookie設定:**
+- 有効期限: 24時間（86400秒）
+- セキュリティ属性: `httponly=True`, `secure=True`, `samesite='Lax'`
+- Cookie名規則: `search_conditions_{画面名}`（例: `search_conditions_users`）
+
+### Cookie操作タイミング
+
+本システムでは、以下の3つのタイミングでCookie操作を行います：
+
+#### 1. 初期表示時（GET、pageパラメータなし）
+- **操作:** Cookie検索条件をクリア → デフォルト検索条件で検索 → Cookieに検索条件を格納
+- **目的:** 画面初回アクセス時に最新のデフォルト状態から開始する
+
+```mermaid
+flowchart LR
+    A[GET /admin/users] --> B[Cookieクリア]
+    B --> C[デフォルト検索条件設定]
+    C --> D[DB検索実行]
+    D --> E[レンダリング]
+    E --> F[Cookieに検索条件を格納]
+    F --> G[HTMLレスポンス返却]
+```
+
+#### 2. ページング時（GET、pageパラメータあり）
+- **操作:** Cookieから検索条件取得 → pageパラメータでページ番号を上書き → Cookie更新せず
+- **目的:** 検索条件を維持したままページ遷移する
+
+#### 3. 検索実行時（POST）
+- **操作:** Cookieの検索条件をクリア → 新しい検索条件で検索（page=1にリセット） → Cookieに検索条件を格納
+- **目的:** 新しい検索条件を適用し、1ページ目から表示する
+
+```mermaid
+flowchart LR
+    A[POST /admin/users<br/>検索ボタンクリック] --> B[Cookieクリア]
+    B --> C[新しい検索条件設定<br/>page=1にリセット]
+    C --> D[DB検索実行]
+    D --> E[レンダリング]
+    E --> F[Cookieに検索条件を格納]
+    F --> G[HTMLレスポンス返却]
+```
+
+### 共通関数実装例
+
+**1. set_search_conditions_cookie()**
+
+検索条件をCookieに保存する関数
+
+```python
+import json
+from flask import make_response
+
+def set_search_conditions_cookie(response, screen_name, conditions):
+    """
+    検索条件をCookieに保存する共通関数
+
+    Args:
+        response: Flaskのレスポンスオブジェクト
+        screen_name: 画面名（例: "users", "devices"）
+        conditions: 保存する検索条件（辞書型）
+
+    Returns:
+        更新されたレスポンスオブジェクト
+    """
+    cookie_name = f"search_conditions_{screen_name}"
+    cookie_value = json.dumps(conditions, ensure_ascii=False)
+
+    response.set_cookie(
+        cookie_name,
+        value=cookie_value,
+        max_age=86400,  # 24時間
+        httponly=True,  # JavaScriptからアクセス不可
+        secure=True,    # HTTPS必須
+        samesite='Lax'  # CSRF対策
+    )
+
+    return response
+```
+
+**2. get_search_conditions_cookie()**
+
+Cookieから検索条件を取得する関数
+
+```python
+import json
+from flask import request
+
+def get_search_conditions_cookie(screen_name):
+    """
+    Cookieから検索条件を取得する共通関数
+
+    Args:
+        screen_name: 画面名（例: "users", "devices"）
+
+    Returns:
+        検索条件の辞書（Cookieが存在しない場合は空の辞書）
+    """
+    cookie_name = f"search_conditions_{screen_name}"
+    cookie_value = request.cookies.get(cookie_name)
+
+    if cookie_value:
+        try:
+            return json.loads(cookie_value)
+        except json.JSONDecodeError:
+            return {}
+
+    return {}
+```
+
+**3. clear_search_conditions_cookie()**
+
+検索条件のCookieを削除する関数
+
+```python
+def clear_search_conditions_cookie(response, screen_name):
+    """
+    検索条件のCookieを削除する共通関数
+
+    Args:
+        response: Flaskのレスポンスオブジェクト
+        screen_name: 画面名（例: "users", "devices"）
+
+    Returns:
+        更新されたレスポンスオブジェクト
+    """
+    cookie_name = f"search_conditions_{screen_name}"
+    response.delete_cookie(cookie_name)
+
+    return response
+```
+
+### 使用例
+
+**初期表示時（pageパラメータなし）:**
+
+```python
+@app.route('/admin/users', methods=['GET'])
+def list_users():
+    if 'page' not in request.args:
+        # 初期表示: Cookieクリア → デフォルト検索 → Cookie格納
+        search_params = {
+            'page': 1,
+            'per_page': 20,
+            'sort_by': 'user_id',
+            'order': 'asc',
+            'user_name': '',
+            'email_address': ''
+        }
+        save_cookie = True
+    else:
+        # ページング: Cookieから取得 → pageのみ上書き
+        search_params = get_search_conditions_cookie('users') or get_default_search_params()
+        search_params['page'] = request.args.get('page', 1, type=int)
+        save_cookie = False
+
+    # DB検索実行
+    users, total = search_users(search_params)
+
+    # レンダリング
+    response = make_response(render_template(
+        'admin/users/list.html',
+        users=users,
+        total=total,
+        search_params=search_params
+    ))
+
+    # 初期表示時のみCookie格納
+    if save_cookie:
+        # 先にCookieクリア（初期表示時）
+        response = clear_search_conditions_cookie(response, 'users')
+        # 新しい検索条件を格納
+        response = set_search_conditions_cookie(response, 'users', search_params)
+
+    return response
+```
+
+**検索実行時（POST）:**
+
+```python
+@app.route('/admin/users', methods=['POST'])
+def search_users_post():
+    # フォームから検索条件を取得
+    search_params = {
+        'page': 1,  # 検索実行時は必ず1ページ目にリセット
+        'per_page': request.form.get('per_page', 20, type=int),
+        'sort_by': request.form.get('sort_by', 'user_id'),
+        'order': request.form.get('order', 'asc'),
+        'user_name': request.form.get('user_name', ''),
+        'email_address': request.form.get('email_address', '')
+    }
+
+    # DB検索実行
+    users, total = search_users(search_params)
+
+    # レンダリング
+    response = make_response(render_template(
+        'admin/users/list.html',
+        users=users,
+        total=total,
+        search_params=search_params
+    ))
+
+    # Cookieクリア → 新しい検索条件を格納
+    response = clear_search_conditions_cookie(response, 'users')
+    response = set_search_conditions_cookie(response, 'users', search_params)
+
+    return response
+```
+
+**詳細な処理フローは、各機能の `workflow-specification.md` を参照してください。**
 
 ---
 
@@ -1157,6 +1381,13 @@ def create_user():
 | リソース不在エラー     | 読み取り処理中                          | ❌ 不要           | データ変更なし         |
 | **データベースエラー** | SQL実行時                               | ✅ **実施**       | データ整合性保持       |
 | **外部API連携エラー**  | API呼び出し時（トランザクション開始後） | ✅ **実施**       | データ整合性保持       |
+| エラー種別             | 発生タイミング                          | ロールバック実施 | 理由                   |
+| ---------------------- | --------------------------------------- | ---------------- | ---------------------- |
+| パラメータ不正         | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
+| 認証・認可エラー       | トランザクション開始前                  | ❌ 不要           | トランザクション未開始 |
+| リソース不在エラー     | 読み取り処理中                          | ❌ 不要           | データ変更なし         |
+| **データベースエラー** | SQL実行時                               | ✅ **実施**       | データ整合性保持       |
+| **外部API連携エラー**  | API呼び出し時（トランザクション開始後） | ✅ **実施**       | データ整合性保持       |
 
 **注:** エラー分類の詳細は[エラーハンドリング方針](#エラーハンドリング方針)セクションを参照してください。
 
@@ -1327,10 +1558,12 @@ db.session.commit()
 
 ### ログ保存先
 
-| 環境     | 保存先                              | 備考                               |
-| -------- | ----------------------------------- | ---------------------------------- |
-| 開発環境 | stdout（JSON）+ `app.log`（テキスト） | ローカル開発時の可読性確保 |
-| stg / 本番環境 | stdout（JSON）→ Azure Log Analytics | フィールド単位のクエリ・アラート設定 |
+| 環境     | 保存先                                        | 備考                               |
+| -------- | --------------------------------------------- | ---------------------------------- |
+| 開発環境 | Databricks Apps標準ログ                       | Databricks Apps環境                |
+| 本番環境 | Databricks Apps標準ログ + Azure Log Analytics | クエリ・分析可能、アラート設定済み |
+
+**注:** Databricks Appsの標準ログ出力先は、Databricksの仕様に従ってください。
 
 ---
 
@@ -1363,82 +1596,56 @@ db.session.commit()
 
 ### 概要
 
-データベースのマスタテーブルではなく、**設定ファイル（YAML）で管理する項目**を定義します。
+データベースのマスタテーブルではなく、**設定ファイル（constants.py）で管理する項目**を定義します。
 
 **設定ファイル管理の利点:**
-- デプロイ不要でアプリケーション再起動のみで設定変更可能
+- Pythonコードとして直接参照でき、型安全性が高い
 - バージョン管理が容易
 - 環境ごとの設定差分管理が簡単
 - データベースマイグレーション不要
+- 外部ライブラリ（PyYAML等）への依存が不要
 
 **設定ファイル格納場所:**
 ```
-config/
-└── application_settings.yaml  # アプリケーション設定（全項目統合）
+common/
+└── src/iot_app/common/constants.py    # アプリケーション設定（全項目統合）
 ```
 
-### 統合設定ファイル全体構造
+### 設定ファイル全体構造
 
-`config/application_settings.yaml` には、以下の全設定項目を統合して管理します。
+`src/iot_app/common/constants.py` には、以下の全設定項目を統合して管理します。
 
-```yaml
+```python
 # アラート比較演算子
-alert_operators:
-  - operator_id: gt
-    operator_symbol: ">"
-  - operator_id: lt
-    operator_symbol: "<"
-  - operator_id: gte
-    operator_symbol: ">="
-  - operator_id: lte
-    operator_symbol: "<="
-  - operator_id: eq
-    operator_symbol: "="
-  - operator_id: neq
-    operator_symbol: "!="
+ALERT_OPERATORS = [
+    {"operator_id": "gt", "operator_symbol": ">"},
+    {"operator_id": "lt", "operator_symbol": "<"},
+    {"operator_id": "gte", "operator_symbol": ">="},
+    {"operator_id": "lte", "operator_symbol": "<="},
+    {"operator_id": "eq", "operator_symbol": "=="},
+]
 
 # 判定時間（分）
-judgment_times: [1, 5, 10, 15, 30, 60]
-
-# ソート順序
-sort_orders:
-  - sort_order_id: asc
-    sort_order_name: 昇順
-
-  - sort_order_id: desc
-    sort_order_name: 降順
+JUDGMENT_TIMES = [1, 5, 10, 15, 30, 60]
 
 # ページネーション設定
-pagination:
-  default_items_per_page: 25
+PAGINATION = {
+    "default_items_per_page": 25,
+}
 
 # マスタデフォルト値
-master_defaults:
-  user_status:
-    active: 1
-    locked: 0
+MASTER_DEFAULTS = {
+    "user_status": {
+        "active": 1,
+        "locked": 0,
+    },
+}
 ```
 
 **Flaskでの読み込み実装例:**
 
 ```python
-import yaml
-from pathlib import Path
-
-def load_application_settings():
-    """
-    application_settings.yamlを読み込む共通関数
-
-    Returns:
-        dict: アプリケーション設定の辞書
-    """
-    config_path = Path(__file__).parent / 'config' / 'application_settings.yaml'
-
-    with open(config_path, 'r', encoding='utf-8') as f:
-        settings = yaml.safe_load(f)
-
-    return settings
-
+from iot_app.common.constants import ALERT_OPERATORS, JUDGMENT_TIMES, PAGINATION, MASTER_DEFAULTS
 ```
 
 ---
