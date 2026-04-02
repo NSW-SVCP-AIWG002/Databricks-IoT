@@ -1,5 +1,6 @@
 :root {
   /* ===== カラー ===== */
+  --color-white: #fff;
   --color-primary: #2272B4;
   --color-primary-hover: #1e639b;
   --color-danger: #F44336;

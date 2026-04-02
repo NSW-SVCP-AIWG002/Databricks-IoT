@@ -265,8 +265,6 @@
 
 /* ── ガジェット (8) ─────────────────────────────── */
 .gadget {
-  width: 480px;
-  height: 480px;
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow: hidden;
@@ -277,8 +275,14 @@
   position: relative;
 }
 
-.gadget--wide {
-  width: 968px; /* 480 + 8(gap) + 480 */
+.gadget--2x2 {
+  width: 480px;
+  height: 480px;
+}
+
+.gadget--2x4 {
+  width: 960px;
+  height: 480px;
 }
 
 /* 編集モード中のガジェットスタイル */
@@ -302,9 +306,11 @@
 .gadget__header {
   display: flex;
   align-items: center;
-  padding: var(--spacing-2) var(--spacing-3);
+  justify-content: center;
+  padding: var(--spacing-1) var(--spacing-3);
   background-color: #f5f5f5;
   border-bottom: 1px solid #ddd;
+  position: relative;
 }
 
 .gadget__drag-handle {
@@ -345,9 +351,29 @@
   white-space: nowrap;
 }
 
+.gadget__body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .gadget__chart {
   flex: 1;
   overflow: hidden;
+}
+
+/* ── ガジェットツールバー（デバイス名 + CSVボタン） ── */
+.gadget__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+}
+
+.gadget__device-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-secondary);
 }
 
 /* ── 設定メニュー（⚙ドロップダウン） ───────────── */
@@ -453,23 +479,7 @@
   font-size: var(--font-size-sm);
 }
 
-/* ── ボタン共通 ─────────────────────────────────── */
-.button {
-  padding: var(--spacing-1) var(--spacing-4);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: var(--font-size-base);
-  font-family: var(--font-family-base);
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.button--primary {
-  background-color: var(--color-primary);
-  color: #fff;
-}
-
+/* ── ボタン共通（固有設定のみ。共通定義は button.css を参照） ── */
 .button--primary:hover:not(:disabled) {
   background-color: var(--color-primary-hover);
 }
@@ -479,22 +489,9 @@
   cursor: not-allowed;
 }
 
-.button--secondary {
-  background-color: var(--color-secondary);
-  color: #fff;
-}
-
-.button--secondary:hover {
-  background-color: var(--color-secondary-hover);
-}
-
-.button--danger {
-  background-color: var(--color-danger);
-  color: #fff;
-}
-
-.button--danger:hover {
-  background-color: var(--color-danger-hover);
+.gadget__subheader .button {
+  height: auto;
+  padding: var(--spacing-1) var(--spacing-3);
 }
 
 /* ── ガジェット追加モーダル ─────────────────────── */
