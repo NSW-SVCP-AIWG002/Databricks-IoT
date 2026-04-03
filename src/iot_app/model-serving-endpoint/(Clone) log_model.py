@@ -1,7 +1,26 @@
 # Databricks notebook source
-%pip install mlflow==3.6.0
-%pip install databricks-sdk==0.73.0
-%pip install -r requirements.txt
+import os
+# STEP 2 でアップロードしたパスに合わせて変更
+os.chdir("/Workspace/Users/kei.sugiyama@nsw.co.jp/ai_orchestrator")
+print(os.getcwd())
+print(os.listdir("."))
+
+# COMMAND ----------
+
+# MAGIC %pip install "mlflow[databricks]==3.6.0" databricks-sdk==0.73.0 "typing_extensions>=4.13.0" -r requirements.txt
+
+# COMMAND ----------
+
+# DBTITLE 1,Restart Python
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Model logging
+import os
+import sys
+os.chdir("/Workspace/Users/kei.sugiyama@nsw.co.jp/ai_orchestrator")
+sys.path.insert(0, "/Workspace/Users/kei.sugiyama@nsw.co.jp/ai_orchestrator")
 
 import mlflow
 import pandas as pd
@@ -38,7 +57,6 @@ with mlflow.start_run():
     )
     run_id = mlflow.active_run().info.run_id
 
-registered_model_name = "prd_im_dlh.genie.langgraph_agent"
+registered_model_name = "iot_catalog.ai.ai_orchestrator"
 result = mlflow.register_model(model_uri=f"runs:/{run_id}/model", name=registered_model_name)
 print("Registered:", result.name, result.version)
-

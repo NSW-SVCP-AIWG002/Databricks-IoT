@@ -1,10 +1,13 @@
 import json
+import os
 import re
 
 from typing import Any, List, Dict, Sequence, Union
 
+from databricks.sdk import WorkspaceClient
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from databricks_langchain import ChatDatabricks
+from conf.logging_config import log_message
 
 def _clean_json_string(text_json: str | None) -> str | None:
     if not text_json:
@@ -62,9 +65,15 @@ def post_chat(
       - 応答テキスト中から JSON オブジェクト/配列を抽出できれば、その dict
       - JSON がなければ {"message": <生テキスト>} を返す
     """
+    _ws = WorkspaceClient(
+        host=os.environ.get("DATABRICKS_HOST"),
+        client_id=os.environ.get("DATABRICKS_CLIENT_ID"),
+        client_secret=os.environ.get("DATABRICKS_CLIENT_SECRET"),
+    )
     llm = ChatDatabricks(
-    endpoint=endpoint,
-    temperature=0.1,
+        workspace_client=_ws,
+        endpoint=endpoint,
+        temperature=0.1,
     )
     # print(f"post_chat called: system_prompt len={len(system_prompt)}, prompt={prompt[:50]}...")
     
@@ -83,13 +92,13 @@ def post_chat(
     try:
         resp = llm_with_temp.invoke(llm_messages)
     except Exception as e:
-        print(f"Error in ChatDatabricks.invoke: {e}")
+        log_message(f"Error in ChatDatabricks.invoke: {e}", level="ERROR")
         # 既存 post_chat が {} を返していた動きに合わせる
         return {}
 
     # ChatDatabricks の resp は ChatMessage（content は str か list）
     text = resp.content if isinstance(resp.content, str) else str(resp.content)
-    print(f"LLM raw response (first 200 chars): {text}")
+    log_message(f"LLM raw response (first 200 chars): {text[:200]}")
 
     # 4) JSON 抜き出し
     json_str = _clean_json_string(text)
@@ -98,7 +107,7 @@ def post_chat(
             parsed = json.loads(json_str)
             return parsed
         except Exception as e:
-            print("Response is not JSON format, returning as text message")
+            log_message("Response is not JSON format, returning as text message", level="WARNING")
 
     # JSON でなければそのまま message として返す
     return {"message": text}
