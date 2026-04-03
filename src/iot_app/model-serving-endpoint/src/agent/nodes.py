@@ -4,6 +4,7 @@ import time
 import pandas as pd
 
 from databricks import sql
+from langgraph.errors import GraphInterrupt
 from langgraph.types import interrupt
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 
@@ -291,6 +292,8 @@ def genieapi_node(state: AgentState) -> AgentState:
             "genie_download_url": download_url,
             "dataframe": df,
         }
+    except GraphInterrupt:
+        raise
     except Exception:
         traceback.print_exc()
         message = "GenieAPIのデータ取得で問題が発生しました。\n\nお手数ですが、入力内容や条件をご確認いただき、再度お試しください。"
@@ -384,6 +387,8 @@ def graphapi_node(state: AgentState) -> AgentState:
             "genie_conversation_info": conversation_info,
             "genie_download_url": download_url,
         }
+    except GraphInterrupt:
+        raise
     except Exception:
         traceback.print_exc()
         message = "Genie,GraphAPIでエラーが発生しました。\n\nお手数ですが、入力内容や条件をご確認いただき、再度お試しください"
