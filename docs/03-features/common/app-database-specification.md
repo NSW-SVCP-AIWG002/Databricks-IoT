@@ -2513,13 +2513,18 @@ CREATE INDEX IX_user_master_language_code ON user_master(language_code);
 CREATE INDEX IX_organization_closure_subsidiary_id ON organization_closure(subsidiary_organization_id);
 
 -- デバイスマスタ
+CREATE UNIQUE INDEX UX_device_master_uuid ON device_master(device_uuid);
 CREATE INDEX IX_device_master_organization_id ON device_master(organization_id);
 CREATE INDEX IX_device_master_type_id ON device_master(device_type_id);
 CREATE UNIQUE INDEX UX_device_master_mac_address ON device_master(mac_address) WHERE mac_address IS NOT NULL;
 
 -- アラート設定マスタ
+CREATE UNIQUE INDEX UX_alert_setting_uuid ON alert_setting_master(alert_uuid);
 CREATE INDEX IX_alert_setting_device_id ON alert_setting_master(device_id);
 CREATE INDEX IX_alert_setting_level ON alert_setting_master(alert_level);
+
+-- アラート履歴
+CREATE UNIQUE INDEX UX_alert_history_uuid ON alert_history(alert_history_uuid);
 
 -- デバイス在庫情報マスタ
 CREATE INDEX IX_device_inventory_device_id ON device_inventory_master(device_inventory_id);
