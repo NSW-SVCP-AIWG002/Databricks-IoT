@@ -21,4 +21,5 @@ def find_user_by_email(email: str) -> dict:
     return {
         'user_id': user.user_id,
         'user_type_id': user.user_type_id,
+        'organization_id': user.organization_id,
     }
