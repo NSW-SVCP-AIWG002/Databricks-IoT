@@ -276,6 +276,7 @@ flowchart TD
 | ------------------------ | ------------------------------------------ |
 | `/static/*`              | 静的ファイル（CSS、JS、画像等）            |
 | `/auth/login`            | ログインページ（オンプレミス環境のみ）     |
+| `/auth/logout`           | ログアウト（Token Exchange不要のため除外） |
 | `/auth/password-reset/*` | パスワードリセット（オンプレミス環境のみ） |
 | `/.well-known/*`         | OpenID Connect設定（オンプレミス環境のみ） |
 | `/health`                | ヘルスチェックエンドポイント               |
@@ -285,6 +286,7 @@ flowchart TD
 EXCLUDED_PATHS = [
     '/static',
     '/auth/login',
+    '/auth/logout',
     '/auth/password-reset',
     '/.well-known',
     '/health',

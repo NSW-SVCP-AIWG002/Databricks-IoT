@@ -117,6 +117,8 @@ def get_df_summary(json_str: str) -> str:
     Returns:
         str: フォーマットされたDataFrameの要約情報
     """
+    if not json_str:
+        return "データが取得できませんでした。"
     # 1. JSON文字列をPythonのリスト/辞書にパース
     data = json.loads(json_str)
     

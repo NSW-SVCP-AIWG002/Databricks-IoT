@@ -83,8 +83,8 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
             thread_id STRING,
             checkpoint STRING,
             metadata STRING,
-            ts STRING,
-            parent_ts STRING
+            timestamp STRING,
+            parent_timestamp STRING
         ) USING DELTA
         """)
         DatabricksUnityCatalogCheckpointer._table_checked = True
@@ -99,12 +99,12 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
             self._ensure_table_exists(cursor)
             if checkpoint_id:
                 cursor.execute(
-                    f"SELECT checkpoint, metadata, parent_ts FROM {CheckpointConfig.table_name} WHERE thread_id = ? AND ts = ?",
+                    f"SELECT checkpoint, metadata, parent_timestamp FROM {CheckpointConfig.table_name} WHERE thread_id = ? AND timestamp = ?",
                     (thread_id, checkpoint_id),
                     )
             else:
                 cursor.execute(
-                    f"SELECT checkpoint, metadata, parent_ts FROM {CheckpointConfig.table_name} WHERE thread_id = ? ORDER BY ts DESC LIMIT 1",
+                    f"SELECT checkpoint, metadata, parent_timestamp FROM {CheckpointConfig.table_name} WHERE thread_id = ? ORDER BY timestamp DESC LIMIT 1",
                     (thread_id,),
                 )
             
@@ -116,15 +116,15 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
             # self.serde.loads を使うと Checkpoint オブジェクトへの復元
             checkpoint = self.serde.loads(row.checkpoint)
             metadata = self.serde.loads(row.metadata)
-            parent_ts = row.parent_ts
+            parent_timestamp = row.parent_timestamp
 
             # 親の設定を作成
             parent_config = None
-            if parent_ts:
+            if parent_timestamp:
                 parent_config = {
                     "configurable": {
                         "thread_id": thread_id,
-                        "checkpoint_id": parent_ts,
+                        "checkpoint_id": parent_timestamp,
                     }
                 }
 
@@ -146,7 +146,7 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
         try:
             self._ensure_table_exists(cursor)
             cursor.execute(
-                f"SELECT ts, checkpoint, metadata, parent_ts FROM {CheckpointConfig.table_name} WHERE thread_id = ? ORDER BY ts DESC",
+                f"SELECT timestamp, checkpoint, metadata, parent_timestamp FROM {CheckpointConfig.table_name} WHERE thread_id = ? ORDER BY timestamp DESC",
                 (thread_id,),
             )
             rows = cursor.fetchall()
@@ -154,10 +154,10 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
             tuples = []
             for row in rows:
                 tuples.append(CheckpointTuple(
-                    config={"configurable": {"thread_id": thread_id, "checkpoint_id": row.ts}},
+                    config={"configurable": {"thread_id": thread_id, "checkpoint_id": row.timestamp}},
                     checkpoint=self.serde.loads(row.checkpoint),
                     metadata=self.serde.loads(row.metadata),
-                    parent_config={"configurable": {"thread_id": thread_id, "checkpoint_id": row.parent_ts}} if row.parent_ts else None,
+                    parent_config={"configurable": {"thread_id": thread_id, "checkpoint_id": row.parent_timestamp}} if row.parent_timestamp else None,
                 ))
             return tuples
         finally:
@@ -214,7 +214,7 @@ class DatabricksUnityCatalogCheckpointer(BaseCheckpointSaver):
             cursor.execute(
                 f"""
                 INSERT INTO {CheckpointConfig.table_name}
-                (thread_id, checkpoint, metadata, ts, parent_ts)
+                (thread_id, checkpoint, metadata, timestamp, parent_timestamp)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
