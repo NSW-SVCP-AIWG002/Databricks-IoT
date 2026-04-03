@@ -1,96 +1,6 @@
 /* ============================================================
-   顧客作成ダッシュボード - 共通レイアウト
+   ガジェット共通（固有設定のみ。共通定義は common.css を参照）
    ============================================================ */
-
-.customer-dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  padding: var(--spacing-4);
-}
-
-.customer-dashboard__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.customer-dashboard__title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-}
-
-.customer-dashboard__toolbar-actions {
-  display: flex;
-  gap: var(--spacing-2);
-}
-
-.customer-dashboard__datasource {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-3) var(--spacing-4);
-  background: #f8f9fa;
-  border-radius: 4px;
-}
-
-.customer-dashboard__datasource-field {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-}
-
-.customer-dashboard__content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.customer-dashboard__empty {
-  padding: var(--spacing-8);
-  text-align: center;
-  color: var(--color-secondary);
-}
-
-/* ============================================================
-   ガジェット共通
-   ============================================================ */
-
-.gadget {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.gadget--2x2 {
-  width: 480px;
-  height: 480px;
-}
-
-.gadget--2x4 {
-  width: 960px;
-  height: 480px;
-}
-
-.gadget__header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-2) var(--spacing-4);
-  background: var(--color-primary);
-  color: #fff;
-  position: relative;
-}
-
-.gadget__title {
-  font-weight: bold;
-  font-size: var(--font-size-base);
-  text-align: center;
-  flex: 1;
-}
 
 .gadget__setting-btn {
   position: absolute;
@@ -104,23 +14,8 @@
 }
 
 .gadget__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: var(--spacing-2) var(--spacing-4);
   border-bottom: 1px solid #eee;
-}
-
-.gadget__device-name {
-  font-size: var(--font-size-sm);
-  color: var(--color-secondary);
-}
-
-.gadget__body {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
 /* ============================================================
@@ -208,7 +103,7 @@
 }
 
 .bar-chart__datetime-input {
-  width: 160px;
+  width: 170px;
   font-size: var(--font-size-sm);
   padding: 2px var(--spacing-2) 2px 24px;
 }
@@ -267,13 +162,11 @@
   flex: 0 0 220px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
 }
 
 .gadget-register__minmax {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
 }
 
 .gadget-register__minmax .form__input {
@@ -290,14 +183,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
-  padding-left: var(--spacing-4);
 }
 
 .gadget-register__middle .form__group {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
 }
 
 .gadget-register__right {
@@ -305,16 +195,19 @@
   min-width: 0;
 }
 
+#bar-chart-register-form .gadget-register__right {
+  display: block;
+}
+
 /* ガジェットイメージプレビュー */
 .gadget-register__preview {
   width: 100%;
-  height: 140px;
+  height: 126px;
   border: 1px solid #ddd;
   border-radius: 4px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: var(--spacing-3);
   gap: var(--spacing-2);
 }
 
@@ -433,6 +326,7 @@
 .form__group--third {
   flex: 1;
 }
+
 
 /* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
 .gadget--2x2 .bar-chart__unit-selector {

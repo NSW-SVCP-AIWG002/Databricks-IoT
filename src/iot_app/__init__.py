@@ -53,6 +53,13 @@ def create_app():
 
     db.init_app(app)
 
+    # Blueprint 登録
+    from iot_app.views.analysis.chat.views import chat_bp
+    app.register_blueprint(chat_bp)
+    # db.create_all() が全テーブルを認識できるようモデルを明示インポート
+    with app.app_context():
+        from iot_app.models import customer_dashboard, organization, device, measurement  # noqa: F401
+
     # ログハンドラー設定
     configure_logging(app, config_name)
 

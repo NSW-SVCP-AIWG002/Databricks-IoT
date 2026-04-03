@@ -49,8 +49,9 @@ const CustomerDashboard = (function () {
         return;
       }
       if (!res.ok) {
-        // 4xx → モーダル内にエラー表示
-        content.innerHTML = `<div style="padding:24px;color:red;">エラーが発生しました（${res.status}）</div>`;
+        // 4xx → サーバーが返すエラーフラグメントをモーダルに表示
+        content.innerHTML = await res.text();
+        _bindModalEvents(content);
         return;
       }
       content.innerHTML = await res.text();
@@ -94,6 +95,9 @@ const CustomerDashboard = (function () {
 
     // 棒グラフ登録モーダル専用
     _bindBarChartRegisterEvents(container);
+
+    // 時系列グラフ登録モーダル専用
+    bindTimelineGadgetRegister(container);
   }
 
   /**
