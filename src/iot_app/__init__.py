@@ -129,6 +129,7 @@ def create_app():
     @app.route('/')
     def index():
         from flask import redirect
+        return redirect('/analysis/industry-dashboard/store-monitoring')
 
     # 分析機能 Blueprint
     from iot_app.views.analysis import customer_dashboard_bp

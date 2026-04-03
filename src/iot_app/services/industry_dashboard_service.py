@@ -19,7 +19,7 @@ from iot_app.models.alert import (
     AlertStatusMaster,
 )
 from iot_app.models.contract import ContractStatusMaster  # noqa: F401
-from iot_app.models.device import Device, DeviceTypeMaster
+from iot_app.models.device import DeviceMaster, DeviceTypeMaster
 from iot_app.models.device_status import DeviceStatusData
 from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData  # noqa: F401
 from iot_app.models.organization import OrganizationClosure, OrganizationMaster
@@ -163,30 +163,30 @@ def check_device_access(device_uuid, accessible_org_ids):
         return None
     return (
         db.session.query(
-            Device.device_id,
-            Device.device_uuid,
-            Device.device_name,
-            Device.device_model,
-            Device.organization_id,
+            DeviceMaster.device_id,
+            DeviceMaster.device_uuid,
+            DeviceMaster.device_name,
+            DeviceMaster.device_model,
+            DeviceMaster.organization_id,
             DeviceTypeMaster.device_type_name,
             OrganizationMaster.organization_name,
         )
         .join(
             DeviceTypeMaster,
-            (Device.device_type_id == DeviceTypeMaster.device_type_id)
+            (DeviceMaster.device_type_id == DeviceTypeMaster.device_type_id)
             & (DeviceTypeMaster.delete_flag == False),  # noqa: E712
             isouter=True,
         )
         .join(
             OrganizationMaster,
-            (Device.organization_id == OrganizationMaster.organization_id)
+            (DeviceMaster.organization_id == OrganizationMaster.organization_id)
             & (OrganizationMaster.delete_flag == False),  # noqa: E712
             isouter=True,
         )
         .filter(
-            Device.device_uuid == device_uuid,
-            Device.organization_id.in_(accessible_org_ids),
-            Device.delete_flag == False,  # noqa: E712
+            DeviceMaster.device_uuid == device_uuid,
+            DeviceMaster.organization_id.in_(accessible_org_ids),
+            DeviceMaster.delete_flag == False,  # noqa: E712
         )
         .first()
     )
@@ -218,7 +218,7 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
         db.session.query(
             AlertHistory.alert_history_id,
             AlertHistory.alert_occurrence_datetime,
-            Device.device_name,
+            DeviceMaster.device_name,
             AlertSettingMaster.alert_name,
             AlertLevelMaster.alert_level_name,
             AlertStatusMaster.alert_status_name,
@@ -243,14 +243,14 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
             isouter=True,
         )
         .join(
-            Device,
-            (AlertSettingMaster.device_id == Device.device_id)
-            & (Device.delete_flag == False),  # noqa: E712
+            DeviceMaster,
+            (AlertSettingMaster.device_id == DeviceMaster.device_id)
+            & (DeviceMaster.delete_flag == False),  # noqa: E712
             isouter=True,
         )
         .join(
             OrganizationMaster,
-            (Device.organization_id == OrganizationMaster.organization_id)
+            (DeviceMaster.organization_id == OrganizationMaster.organization_id)
             & (OrganizationMaster.delete_flag == False),  # noqa: E712
             isouter=True,
         )
@@ -258,7 +258,7 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
 
     q = q.filter(
         AlertHistory.delete_flag == False,  # noqa: E712
-        Device.organization_id.in_(accessible_org_ids),
+        DeviceMaster.organization_id.in_(accessible_org_ids),
         AlertHistory.alert_occurrence_datetime >= cutoff,
     )
 
@@ -267,13 +267,13 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
     device_name = search_params.get("device_name", "")
 
     if organization_id:
-        q = q.filter(Device.organization_id == organization_id)
+        q = q.filter(DeviceMaster.organization_id == organization_id)
     elif organization_name:
         q = q.filter(
             OrganizationMaster.organization_name.like(f"%{organization_name}%")
         )
     if device_name:
-        q = q.filter(Device.device_name.like(f"%{device_name}%"))
+        q = q.filter(DeviceMaster.device_name.like(f"%{device_name}%"))
 
     total = min(q.count(), _ALERT_MAX_TOTAL)
     offset = (page - 1) * per_page
@@ -309,25 +309,25 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
         return [], 0
 
     q = db.session.query(
-        Device.device_id,
-        Device.device_uuid,
-        Device.device_name,
-        Device.organization_id,
+        DeviceMaster.device_id,
+        DeviceMaster.device_uuid,
+        DeviceMaster.device_name,
+        DeviceMaster.organization_id,
         OrganizationMaster.organization_name,
     ).join(
         OrganizationMaster,
-        (Device.organization_id == OrganizationMaster.organization_id)
+        (DeviceMaster.organization_id == OrganizationMaster.organization_id)
         & (OrganizationMaster.delete_flag == False),  # noqa: E712
         isouter=True,
     ).join(
         DeviceStatusData,
-        Device.device_id == DeviceStatusData.device_id,
+        DeviceMaster.device_id == DeviceStatusData.device_id,
         isouter=True,
     )
 
     q = q.filter(
-        Device.delete_flag == False,  # noqa: E712
-        Device.organization_id.in_(accessible_org_ids),
+        DeviceMaster.delete_flag == False,  # noqa: E712
+        DeviceMaster.organization_id.in_(accessible_org_ids),
     )
 
     organization_id = search_params.get("organization_id", "")
@@ -335,18 +335,18 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
     device_name = search_params.get("device_name", "")
 
     if organization_id:
-        q = q.filter(Device.organization_id == organization_id)
+        q = q.filter(DeviceMaster.organization_id == organization_id)
     elif organization_name:
         q = q.filter(
             OrganizationMaster.organization_name.like(f"%{organization_name}%")
         )
     if device_name:
-        q = q.filter(Device.device_name.like(f"%{device_name}%"))
+        q = q.filter(DeviceMaster.device_name.like(f"%{device_name}%"))
 
     total = q.count()
     offset = (page - 1) * per_page
     results = (
-        q.order_by(Device.organization_id.asc(), Device.device_id.asc()).limit(per_page).offset(offset).all()
+        q.order_by(DeviceMaster.organization_id.asc(), DeviceMaster.device_id.asc()).limit(per_page).offset(offset).all()
     )
 
     return results, total
@@ -570,7 +570,7 @@ def export_sensor_data_csv(device, search_params):
     """センサーデータをUTF-8 BOM付きCSVとしてエクスポートする。
 
     Args:
-        device: Deviceオブジェクト
+        device: DeviceMasterオブジェクト
         search_params: 検索条件辞書 (search_start_datetime, search_end_datetime)
 
     Returns:

@@ -5,6 +5,7 @@
 主な役割:
   - before_request フックで flask.g に認証済みユーザーをセットする。
   - 業種別ダッシュボード結合テスト用の実DBテストデータを投入・クリーンアップする。
+  - measurement_item_master が空の場合に必要なマスタデータを自動シードする。
 """
 
 import uuid
@@ -12,6 +13,80 @@ from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+
+
+# ------------------------------------------------------------
+# measurement_item_master シードデータ（02_master_data.sql と同一）
+# ------------------------------------------------------------
+_MEASUREMENT_ITEMS = [
+    (1,  '共通外気温度[℃]',            'external_temp',                    '共通外気温度',            '℃'),
+    (2,  '第1冷凍設定温度[℃]',         'set_temp_freezer_1',               '第1冷凍設定温度',         '℃'),
+    (3,  '第1冷凍庫内センサー温度[℃]', 'internal_sensor_temp_freezer_1',   '第1冷凍庫内センサー温度', '℃'),
+    (4,  '第1冷凍表示温度[℃]',         'internal_temp_freezer_1',          '第1冷凍表示温度',         '℃'),
+    (5,  '第1冷凍DF温度[℃]',           'df_temp_freezer_1',                '第1冷凍DF温度',           '℃'),
+    (6,  '第1冷凍凝縮温度[℃]',         'condensing_temp_freezer_1',        '第1冷凍凝縮温度',         '℃'),
+    (7,  '第1冷凍微調整後庫内温度[℃]', 'adjusted_internal_temp_freezer_1', '第1冷凍微調整後庫内温度', '℃'),
+    (8,  '第2冷凍設定温度[℃]',         'set_temp_freezer_2',               '第2冷凍設定温度',         '℃'),
+    (9,  '第2冷凍庫内センサー温度[℃]', 'internal_sensor_temp_freezer_2',   '第2冷凍庫内センサー温度', '℃'),
+    (10, '第2冷凍表示温度[℃]',         'internal_temp_freezer_2',          '第2冷凍表示温度',         '℃'),
+    (11, '第2冷凍DF温度[℃]',           'df_temp_freezer_2',                '第2冷凍DF温度',           '℃'),
+    (12, '第2冷凍凝縮温度[℃]',         'condensing_temp_freezer_2',        '第2冷凍凝縮温度',         '℃'),
+    (13, '第2冷凍微調整後庫内温度[℃]', 'adjusted_internal_temp_freezer_2', '第2冷凍微調整後庫内温度', '℃'),
+    (14, '第1冷凍圧縮機回転数[rpm]',   'compressor_freezer_1',             '第1冷凍圧縮機回転数',     'rpm'),
+    (15, '第2冷凍圧縮機回転数[rpm]',   'compressor_freezer_2',             '第2冷凍圧縮機回転数',     'rpm'),
+    (16, '第1ファンモータ回転数[rpm]', 'fan_motor_1',                      '第1ファンモータ回転数',   'rpm'),
+    (17, '第2ファンモータ回転数[rpm]', 'fan_motor_2',                      '第2ファンモータ回転数',   'rpm'),
+    (18, '第3ファンモータ回転数[rpm]', 'fan_motor_3',                      '第3ファンモータ回転数',   'rpm'),
+    (19, '第4ファンモータ回転数[rpm]', 'fan_motor_4',                      '第4ファンモータ回転数',   'rpm'),
+    (20, '第5ファンモータ回転数[rpm]', 'fan_motor_5',                      '第5ファンモータ回転数',   'rpm'),
+    (21, '防露ヒータ出力(1)[%]',       'defrost_heater_output_1',          '防露ヒータ出力(1)',       '%'),
+    (22, '防露ヒータ出力(2)[%]',       'defrost_heater_output_2',          '防露ヒータ出力(2)',       '%'),
+]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def seed_measurement_items():
+    """measurement_item_master が空の場合にマスタデータを自動シードする。
+
+    結合テストセッション開始時に一度だけ実行し、テーブルが空であれば
+    02_master_data.sql と同一のデータを投入する。
+    セッション終了後、自身が挿入したレコードのみ削除する（既存データは保護）。
+
+    session スコープのため app フィクスチャに依存せず独立したアプリコンテキストを使用する。
+    """
+    import os
+    os.environ.setdefault("FLASK_ENV", "testing")
+
+    from iot_app import create_app, db
+    from iot_app.models.measurement import MeasurementItemMaster
+
+    _app = create_app()
+    seeded = False
+
+    with _app.app_context():
+        existing = db.session.query(MeasurementItemMaster).count()
+        if existing == 0:
+            for (mid, name, col, disp, unit) in _MEASUREMENT_ITEMS:
+                db.session.add(MeasurementItemMaster(
+                    measurement_item_id=mid,
+                    measurement_item_name=name,
+                    silver_data_column_name=col,
+                    display_name=disp,
+                    unit_name=unit,
+                    creator=0,
+                    modifier=0,
+                ))
+            db.session.commit()
+            seeded = True
+
+        yield
+
+        if seeded:
+            seeded_ids = [row[0] for row in _MEASUREMENT_ITEMS]
+            db.session.query(MeasurementItemMaster).filter(
+                MeasurementItemMaster.measurement_item_id.in_(seeded_ids)
+            ).delete(synchronize_session=False)
+            db.session.commit()
 
 
 @pytest.fixture(autouse=True)
@@ -34,8 +109,15 @@ def inject_test_user(app):
         g.current_user_id = 1
         g.databricks_token = ""
 
+    # authenticate_request を一時的に除外（テスト中はDB認証をスキップ）
+    from iot_app.auth.middleware import authenticate_request
+    funcs = app.before_request_funcs.setdefault(None, [])
+    auth_was_present = authenticate_request in funcs
+    if auth_was_present:
+        funcs.remove(authenticate_request)
+
     # before_request_funcs の先頭に挿入（ミドルウェアより先に実行）
-    app.before_request_funcs.setdefault(None, []).insert(0, _set_current_user)
+    funcs.insert(0, _set_current_user)
 
     yield
 
@@ -44,8 +126,12 @@ def inject_test_user(app):
     if _set_current_user in funcs:
         funcs.remove(_set_current_user)
 
+    # authenticate_request を復元
+    if auth_was_present and authenticate_request not in funcs:
+        funcs.append(authenticate_request)
 
-@pytest.fixture(scope="class")
+
+@pytest.fixture()
 def industry_test_data(app):
     """業種別ダッシュボード結合テスト用実DBフィクスチャ。
 
@@ -76,7 +162,7 @@ def industry_test_data(app):
         AlertStatusMaster,
     )
     from iot_app.models.contract import ContractStatusMaster
-    from iot_app.models.device import Device
+    from iot_app.models.device import DeviceMaster
     from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData
     from iot_app.models.organization import (
         OrganizationClosure,
@@ -103,9 +189,25 @@ def industry_test_data(app):
 
     assert org_type is not None, "organization_type_master にレコードがありません"
     assert contract_status is not None, "contract_status_master にレコードがありません"
-    assert measurement_item is not None, "measurement_item_master にレコードがありません"
     assert alert_level is not None, "alert_level_master にレコードがありません"
     assert alert_status is not None, "alert_status_master にレコードがありません"
+
+    # measurement_item_master が空の場合（他テストの clean_db で削除された場合を含む）
+    # フィクスチャ内で最小限のレコードを自己作成し、テスト後にクリーンアップする
+    _created_measurement_item = False
+    if measurement_item is None:
+        measurement_item = MeasurementItemMaster(
+            measurement_item_id=1,
+            measurement_item_name='共通外気温度[℃]',
+            silver_data_column_name='external_temp',
+            display_name='共通外気温度',
+            unit_name='℃',
+            creator=0,
+            modifier=0,
+        )
+        db.session.add(measurement_item)
+        db.session.flush()
+        _created_measurement_item = True
 
     # ------------------------------------------------------------------ #
     # テストデータ投入
@@ -171,45 +273,45 @@ def industry_test_data(app):
 
     # デバイス
     # device_master の実スキーマは ORM モデルと乖離があるため raw SQL で INSERT する。
-    # 実DB制約: device_type_id NOT NULL, device_stock_id NOT NULL
+    # 実DB制約: device_type_id NOT NULL, device_inventory_id NOT NULL
     from sqlalchemy import text as _text
 
     test_uuid = f"test-acc-{uid}"
     test_sub_uuid = f"test-sub-{uid}"
     test_inacc_uuid = f"test-inacc-{uid}"
 
-    # 既存の device_type_id / device_stock_id を動的に取得
+    # 既存の device_type_id / device_inventory_id を動的に取得
     _dtype_row = db.session.execute(
         _text("SELECT device_type_id FROM device_type_master WHERE delete_flag=0 LIMIT 1")
     ).first()
-    _stock_row = db.session.execute(
-        _text("SELECT device_stock_id FROM device_stock_info_master LIMIT 1")
+    _inv_row = db.session.execute(
+        _text("SELECT device_inventory_id FROM device_inventory_master LIMIT 1")
     ).first()
     assert _dtype_row, "device_type_master にレコードがありません"
-    assert _stock_row, "device_stock_info_master にレコードがありません"
+    assert _inv_row, "device_inventory_master にレコードがありません"
     _dtype_id = _dtype_row[0]
-    _stock_id = _stock_row[0]
+    _inv_id = _inv_row[0]
 
     _insert_device_sql = _text(
         "INSERT INTO device_master "
         "(device_uuid, organization_id, device_type_id, device_name, device_model, "
-        "device_stock_id, creator, modifier) "
-        "VALUES (:uuid, :org, :dtype, :name, :model, :stock, :c, :m)"
+        "device_inventory_id, creator, modifier) "
+        "VALUES (:uuid, :org, :dtype, :name, :model, :inv, :c, :m)"
     )
     r1 = db.session.execute(_insert_device_sql, {
         "uuid": test_uuid, "org": org_accessible.organization_id,
         "dtype": _dtype_id, "name": "テストデバイス_結合テスト用",
-        "model": "TEST-MODEL-001", "stock": _stock_id, "c": _C, "m": _C,
+        "model": "TEST-MODEL-001", "inv": _inv_id, "c": _C, "m": _C,
     })
     r2 = db.session.execute(_insert_device_sql, {
         "uuid": test_sub_uuid, "org": org_sub.organization_id,
         "dtype": _dtype_id, "name": "テストサブデバイス_結合テスト用",
-        "model": "TEST-MODEL-002", "stock": _stock_id, "c": _C, "m": _C,
+        "model": "TEST-MODEL-002", "inv": _inv_id, "c": _C, "m": _C,
     })
     r3 = db.session.execute(_insert_device_sql, {
         "uuid": test_inacc_uuid, "org": org_inaccessible.organization_id,
         "dtype": _dtype_id, "name": "テストアクセス不可デバイス_結合テスト用",
-        "model": "TEST-MODEL-003", "stock": _stock_id, "c": _C, "m": _C,
+        "model": "TEST-MODEL-003", "inv": _inv_id, "c": _C, "m": _C,
     })
     device_acc_id = r1.lastrowid
     device_sub_id = r2.lastrowid
@@ -326,5 +428,8 @@ def industry_test_data(app):
             org_inaccessible.organization_id,
         ])
     ).delete(synchronize_session=False)
+
+    if _created_measurement_item:
+        db.session.query(MeasurementItemMaster).filter_by(measurement_item_id=1).delete()
 
     db.session.commit()
