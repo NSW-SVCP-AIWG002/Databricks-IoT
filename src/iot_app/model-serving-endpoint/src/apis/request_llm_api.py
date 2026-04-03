@@ -155,5 +155,5 @@ def generate_llm_response(prompt, messages, api_list, df_json, selected):
         temperature=0.1,
     )
     
-    message = result["message"]  
+    message = result.get("message") or str(result)  
     return message
