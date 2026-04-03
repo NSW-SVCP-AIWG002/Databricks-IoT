@@ -34,7 +34,6 @@ Silver層から以下のテーブルを入力として使用:
 | テーブル名 | 用途 |
 |-----------|------|
 | silver_sensor_data | センサーデータ（構造化済み） |
-| silver_alert_abnormal_state | 異常状態管理 |
 
 ### 1.5 出力データ（Gold層テーブル）
 
@@ -42,10 +41,11 @@ Silver層から以下のテーブルを入力として使用:
 
 | テーブル名 | 用途 | 集計単位 |
 |-----------|------|---------|
-| gold_sensor_hourly | 時間別センサー集計 | 1時間 |
-| gold_sensor_daily | 日別センサー集計 | 1日 |
-| gold_device_latest_status | デバイス最新ステータス | - |
-| gold_alert_summary | アラートサマリー | 日別 |
+| gold_sensor_data_hourly_summary | 時間別センサー集計 | 1時間 |
+| gold_sensor_data_daily_summary | 日別センサー集計 | 1日 |
+| gold_sensor_data_monthly_summary | 月別センサー集計 | 1月 |
+| gold_sensor_data_yearly_summary | 年別センサー集計 | 1年 |
+
 
 ## 2. 解析した不足情報
 

@@ -1,10 +1,10 @@
 import os
 from types import SimpleNamespace
 
-from flask import g, request, session, abort, render_template, current_app
+from flask import g, request, session, abort, render_template, current_app, redirect, url_for
 
 from iot_app.auth.services import find_user_by_email
-from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, JWTExpiredError, TokenExchangeError
 from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,6 +15,7 @@ auth_provider = None
 EXCLUDED_PATHS = [
     '/static',
     '/auth/login',
+    '/auth/logout',
     '/auth/password-reset',
     '/.well-known',
     '/health',
@@ -66,7 +67,6 @@ def authenticate_request():
     if auth_provider.requires_additional_setup():
         allowed_paths = ['/account/password/change', '/auth/logout']
         if request.path not in allowed_paths and session.get('password_expired'):
-            from flask import redirect, url_for
             return redirect(url_for('account.password_change'))
 
     if current_app.config.get('AUTH_TYPE') == 'dev':
@@ -83,6 +83,8 @@ def authenticate_request():
             g.current_user.databricks_token = token_exchanger.ensure_valid_token(auth_provider, request)
         except JWTRetrievalError:
             abort(500)
+        except JWTExpiredError:
+            return redirect(f'/.auth/refresh?post_login_redirect_uri={request.path}')
         except TokenExchangeError:
             abort(500)
 

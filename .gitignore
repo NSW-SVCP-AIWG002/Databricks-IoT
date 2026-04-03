@@ -58,3 +58,5 @@ __pycache__/
 *.py[cod]
 docs/03-features/ldp-pipeline/gold_layer/review/review-report-20260401.md
 docs/03-features/ldp-pipeline/gold_layer/review/review-report.md
+docs/03-features/ldp-pipeline/gold_layer/review.md
+.gitignore
