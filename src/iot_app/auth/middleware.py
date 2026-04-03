@@ -32,6 +32,7 @@ def _sync_session(idp_user_info: dict, app_user: dict):
     session['email'] = idp_user_info['email']
     session['user_id'] = app_user['user_id']
     session['user_type_id'] = app_user['user_type_id']
+    session['organization_id'] = app_user['organization_id']
     session.permanent = True
 
 
@@ -61,6 +62,7 @@ def authenticate_request():
     g.current_user = SimpleNamespace()
     g.current_user.user_id = session.get('user_id')
     g.current_user.user_type_id = session.get('user_type_id')
+    g.current_user.organization_id = session.get('organization_id')
 
     if auth_provider.requires_additional_setup():
         allowed_paths = ['/account/password/change', '/auth/logout']

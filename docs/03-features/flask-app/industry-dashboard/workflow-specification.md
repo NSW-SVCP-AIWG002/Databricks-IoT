@@ -64,6 +64,7 @@
       - [エラーハンドリング](#エラーハンドリング-5)
   - [使用データベース詳細](#使用データベース詳細)
     - [使用テーブル一覧](#使用テーブル一覧)
+  - [センサーデータ取得のデータソース切り替えロジック](#センサーデータ取得のデータソース切り替えロジック)
   - [セキュリティ実装](#セキュリティ実装)
     - [認証・認可実装](#認証認可実装)
     - [ログ出力ルール](#ログ出力ルール)
@@ -102,18 +103,18 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 店舗モニタリング初期表示 | `/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
-| 2 | 店舗モニタリング検索 | `/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
-| 3 | センサー情報表示 | `/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
-| 4 | デバイス詳細初期表示 | `/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
-| 5 | デバイス詳細検索 | `/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
-| 6 | CSVエクスポート | `/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
+| 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
+| 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
+| 3 | センサー情報表示 | `/analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
+| 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
+| 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
+| 6 | CSVエクスポート | `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
 
 **注:**
 - **レスポンス形式**:
   - `HTML`: Jinja2テンプレートをレンダリングして返す（`render_template()`）
   - `CSV`: CSVファイルをダウンロードレスポンスとして返す
-- **Flask Blueprint構成**: `dashboard_bp` として実装
+- **Flask Blueprint構成**: `analysis_bp` として実装
 
 ## ルート呼び出しマッピング
 
@@ -121,21 +122,21 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
-| 検索ボタン押下 | フォーム送信 | `POST /industry-dashboard/store-monitoring` | `organization_name, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
-| ページボタン押下 | リンククリック | `GET /industry-dashboard/store-monitoring` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
-| センサー情報表示ボタン押下 | ボタンクリック | `GET /industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
-| デバイス詳細ボタン押下 | ボタンクリック | `GET /industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
+| 検索ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/store-monitoring` | `organization_name, organization_id, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
+| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/store-monitoring` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
+| センサー情報表示ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
+| デバイス詳細ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
 
 ### デバイス詳細画面
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | デバイス詳細ボタン押下 | `GET /industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
-| 表示期間変更ボタン押下 | フォーム送信 | `POST /industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | HTML（検索結果画面） | エラーメッセージ表示 |
-| ページボタン押下 | リンククリック | `GET /industry-dashboard/device-details/<device_uuid>` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
-| デバイス変更ボタン押下 | ボタンクリック | `GET /industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
-| CSVエクスポート | ボタンクリック | `GET /industry-dashboard/device-details/<device_uuid>?export=csv` | 検索条件 | CSVダウンロード | エラーメッセージ表示 |
+| 画面初期表示 | デバイス詳細ボタン押下 | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
+| 表示期間変更ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | HTML（検索結果画面） | エラーメッセージ表示 |
+| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
+| デバイス変更ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
+| CSVエクスポート | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | 検索条件 | CSVダウンロード | エラーメッセージ表示 |
 
 ---
 
@@ -153,17 +154,17 @@
 
 ```mermaid
 flowchart TD
-    Start([GET /industry-dashboard/store-monitoring]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Start([GET /analysis/industry-dashboard/store-monitoring]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| CheckPage{request.args に<br>'page' パラメータあり?}
+    CheckAuth -->|認証OK| CheckPage{request.args に<br>'page' または 'alert_page' パラメータあり?}
 
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
     CheckPage -->|あり<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
 
-    ClearCookie --> InitParams[検索条件を初期化<br>page=1]
-    GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
+    ClearCookie --> InitParams[検索条件を初期化<br>page=1, alert_page=1]
+    GetCookie --> OverridePage[Cookie検索条件に<br>page/alert_pageパラメータを上書き<br>page=request.args.get'page'<br>alert_page=request.args.get'alert_page']
 
     InitParams --> Scope[データスコープ制限適用<br>organization_closureテーブルから下位組織IDリスト取得]
     OverridePage --> Scope
@@ -183,13 +184,10 @@ flowchart TD
     CheckDeviceCount -->|失敗| Error500
 
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
-    CheckDeviceQuery -->|成功| CheckInitial{初期表示?<br>page not in args}
+    CheckDeviceQuery -->|成功| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
     CheckDeviceQuery -->|失敗| Error500
 
-    CheckInitial -->|Yes 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
-    CheckInitial -->|No ページング| Template[Jinja2テンプレートレンダリング<br>render_template<br>dashboard/store_monitoring.html]
-
-    SaveCookie --> Template
+    SaveCookie --> Template[Jinja2テンプレートレンダリング<br>render_template<br>dashboard/store_monitoring.html]
     Template --> Response[HTMLレスポンス返却]
 
     LoginRedirect --> End([処理完了])
@@ -201,7 +199,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 店舗モニタリング初期表示 | `GET /industry-dashboard/store-monitoring` | クエリパラメータ: `page` |
+| 店舗モニタリング初期表示 | `GET /analysis/industry-dashboard/store-monitoring` | クエリパラメータ: `page`, `alert_page` |
 
 #### バリデーション
 
@@ -252,7 +250,7 @@ def get_accessible_organizations(current_user_organization_id):
 
 アラート履歴テーブルからアラート履歴を取得します。
 
-**使用テーブル:** alert_history、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master
+**使用テーブル:** alert_history、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master、 organization_master
 
 **SQL詳細:**
 - アラート一覧件数取得DBクエリ
@@ -267,6 +265,9 @@ LEFT JOIN alert_setting_master am
 LEFT JOIN device_master dm
   ON am.device_id = dm.device_id
   AND dm.delete_flag = FALSE
+LEFT JOIN organization_master om
+  ON dm.organization_id = om.organization_id
+  AND om.delete_flag = FALSE
 WHERE
   ah.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
@@ -296,6 +297,9 @@ LEFT JOIN alert_level_master al
 LEFT JOIN device_master dm
   ON am.device_id = dm.device_id
   AND dm.delete_flag = FALSE
+LEFT JOIN organization_master om
+  ON dm.organization_id = om.organization_id
+  AND om.delete_flag = FALSE
 WHERE
   ah.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
@@ -336,12 +340,13 @@ LEFT JOIN organization_master om
   ON dm.organization_id = om.organization_id
   AND om.delete_flag = FALSE
 LEFT JOIN device_status_data ds
-  ON dm.device_status_id = ds.device_status_id
+  ON dm.device_id = ds.device_id
 WHERE
   dm.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
 ORDER BY
   dm.organization_id ASC
+  , dm.device_id ASC
 LIMIT :item_per_page OFFSET 0
 ```
 
@@ -349,16 +354,18 @@ LIMIT :item_per_page OFFSET 0
 
 **実装例:**
 ```python
-@dashboard_bp.route('/industry-dashboard/store-monitoring', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring', methods=['GET'])
 @require_auth
 def store_monitoring():
     """店舗モニタリング初期表示・ページング"""
 
     # 初期表示 vs ページング判定
-    if 'page' not in request.args:
+    if 'page' not in request.args and 'alert_page' not in request.args:
         search_params = {
             'organization_name': '',
-            'device_name': ''
+            'device_name': '',
+            'page': 1,
+            'alert_page': 1,
         }
         save_cookie = True
     else:
@@ -368,7 +375,8 @@ def store_monitoring():
             search_params = json.loads(cookie_data)
         else:
             search_params = get_default_search_params()
-        search_params['page'] = request.args.get('page', 1, type=int)
+        search_params['page'] = request.args.get('page', search_params.get('page', 1), type=int)
+        search_params['alert_page'] = request.args.get('alert_page', search_params.get('alert_page', 1), type=int)
         save_cookie = False
 
     page = search_params.get('page', 1)
@@ -378,14 +386,14 @@ def store_monitoring():
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # アラート一覧取得
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30)
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
 
     # デバイス一覧取得
     devices, devices_total = get_device_list_with_count(search_params, accessible_org_ids, page, per_page)
 
     # レンダリング
     response = make_response(render_template(
-        'dashboard/store_monitoring.html',
+        'analysis/industry_dashboard/store_monitoring.html',
         alerts=alerts,
         alerts_total=alerts_total,
         devices=devices,
@@ -395,15 +403,14 @@ def store_monitoring():
         search_params=search_params
     ))
 
-    # 初期表示時のみCookie格納
-    if save_cookie:
-        response.set_cookie(
-            'store_monitoring_search_params',
-            json.dumps(search_params),
-            max_age=86400,
-            httponly=True,
-            samesite='Lax'
-        )
+    # 初期表示・ページング問わずCookie格納
+    response.set_cookie(
+        'store_monitoring_search_params',
+        json.dumps(search_params),
+        max_age=86400,
+        httponly=True,
+        samesite='Lax'
+    )
 
     return response
 ```
@@ -429,7 +436,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 #### 検索条件の保持方法
 
-Cookieに検索条件を保持する
+Cookieに検索条件を保持する（初期表示・ページング問わず常時更新）
 
 #### UI状態
 
@@ -438,7 +445,7 @@ Cookieに検索条件を保持する
   - デバイス名: 空
 - アラート一覧: 過去30日以内の直近30件表示（1ページあたり10件表示）
 - デバイス一覧: デバイスデータ表示
-- センサー情報欄: 非表示（デバイス未選択状態）
+- センサー情報欄: 先頭デバイスのセンサー情報を自動表示（初期表示時）
 - ページネーション: 1ページ目を選択状態
 
 ---
@@ -458,35 +465,15 @@ flowchart TD
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| ClearCookie[Cookieの検索条件をクリア]
-    ClearCookie --> GetParams[フォームから検索条件を取得<br>organization_name, device_name]
-    GetParams --> Convert[検索条件をクエリパラメータに変換<br>page: 1（リセット）]
-    Convert --> Scope[データスコープ制限を適用]
-
-    Scope --> AlertCount[アラート一覧件数取得<br>DB alert_history]
-    AlertCount --> CheckAlertCount{DBクエリ結果}
-
-    CheckAlertCount{DBクエリ結果} -->|成功| AlertQuery[アラート一覧取得<br>DB alert_history]
-    CheckAlertCount{DBクエリ結果} -->|失敗| Error500[500エラーモーダル表示]
-
-    AlertQuery --> CheckAlertQuery{DBクエリ結果}
-    CheckAlertQuery -->|成功| DeviceCount[デバイス一覧件数取得<br>DB device_master]
-    CheckAlertQuery -->|失敗| Error500
-
-    DeviceCount --> CheckDeviceCount{DBクエリ結果}
-    CheckDeviceCount -->|成功| DeviceQuery[デバイス一覧取得<br>DB device_master]
-    CheckDeviceCount -->|失敗| Error500
-
-    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
-    CheckDeviceQuery -->|成功| Template[Jinja2テンプレートレンダリング]
-    CheckDeviceQuery -->|失敗| Error500
-
-    Template --> PutParams[Cookieに検索条件を格納<br>max_age=86400]
-    PutParams --> Response[HTMLレスポンス返却]
+    CheckAuth -->|認証OK| ClearCookie[既存Cookieをクリア<br>response.delete_cookie]
+    ClearCookie --> GetParams[フォームから検索条件を取得<br>organization_name, organization_id, device_name]
+    GetParams --> SetPage[page=1, alert_page=1 にリセット]
+    SetPage --> SaveCookie[Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
+    SaveCookie --> Redirect[GETへリダイレクト<br>redirect url_for store_monitoring page=1 alert_page=1]
+    Redirect --> Response[リダイレクトレスポンス返却]
 
     LoginRedirect --> End([処理完了])
     Response --> End
-    Error500 --> End
 ```
 
 #### 処理詳細（サーバーサイド）
@@ -515,8 +502,10 @@ WHERE
   ah.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
   AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
-  AND CASE WHEN :organization_name IS NULL THEN TRUE
-    ELSE om.organization_name LIKE CONCAT('%', :organization_name, '%') END
+  AND CASE
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
+    ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
     ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
 LIMIT 30
@@ -551,8 +540,10 @@ WHERE
   ah.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
   AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
-  AND CASE WHEN :organization_name IS NULL THEN TRUE
-    ELSE om.organization_name LIKE CONCAT('%', :organization_name, '%') END
+  AND CASE
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
+    ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
     ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
 ORDER BY
@@ -577,8 +568,10 @@ LEFT JOIN organization_master om
 WHERE
   dm.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
-  AND CASE WHEN :organization_name IS NULL THEN TRUE
-    ELSE om.organization_name LIKE CONCAT('%', :organization_name, '%') END
+  AND CASE
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
+    ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
     ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
 ```
@@ -596,55 +589,43 @@ LEFT JOIN organization_master om
   ON dm.organization_id = om.organization_id
   AND om.delete_flag = FALSE
 LEFT JOIN device_status_data ds
-  ON dm.device_status_id = ds.device_status_id
+  ON dm.device_id = ds.device_id
 WHERE
   dm.delete_flag = FALSE
   AND dm.organization_id IN (:accessible_org_ids)
-  AND CASE WHEN :organization_name IS NULL THEN TRUE
-    ELSE om.organization_name LIKE CONCAT('%', :organization_name, '%') END
+  AND CASE
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
+    ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
     ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
 ORDER BY
     dm.organization_id ASC
+    , dm.device_id ASC
 LIMIT :item_per_page OFFSET (:page - 1) * :item_per_page
 ```
 
 **実装例:**
 ```python
-@dashboard_bp.route('/industry-dashboard/store-monitoring', methods=['POST'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring', methods=['POST'])
 @require_auth
 def store_monitoring_search():
-    """店舗モニタリング検索"""
+    """店舗モニタリング検索（PRG: Cookie保存後GETへリダイレクト）"""
 
     # フォームから検索条件を取得
     search_params = {
         'organization_name': request.form.get('organization_name', ''),
+        'organization_id': request.form.get('organization_id', ''),
         'device_name': request.form.get('device_name', ''),
-        'page': 1
+        'page': 1,
+        'alert_page': 1,
     }
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # アラート一覧取得
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, limit=30)
-
-    # デバイス一覧取得
-    devices, devices_total = get_device_list_with_count(search_params, accessible_org_ids, page, per_page)
-
-    # レンダリング
-    response = make_response(render_template(
-        'dashboard/store_monitoring.html',
-        alerts=alerts,
-        alerts_total=alerts_total,
-        devices=devices,
-        devices_total=devices_total,
-        page=1,
-        per_page=ITEM_PER_PAGE,
-        search_params=search_params
-    ))
-
-    # Cookieに検索条件を格納
+    # PRGパターン: Cookieに検索条件を格納してGETへリダイレクト
+    response = make_response(
+        redirect(url_for('analysis.store_monitoring', page=1, alert_page=1))
+    )
+    response.delete_cookie('store_monitoring_search_params')
     response.set_cookie(
         'store_monitoring_search_params',
         json.dumps(search_params),
@@ -677,14 +658,14 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 #### 検索条件の保持方法
 
-Cookieに検索条件を保持する
+CookieにPOSTパラメータを格納してGETへリダイレクト（PRGパターン）。表示はGETルートが担当する
 
 #### UI状態
 
-- 検索条件: 入力値を保持（フォームに再設定）
+- GETへリダイレクト後、検索条件: 入力値を保持（フォームに再設定）
 - アラート一覧: 検索結果データ表示
 - デバイス一覧: 検索結果データ表示
-- センサー情報欄: 非表示（リセット）
+- センサー情報欄: 検索結果の先頭デバイスのセンサー情報を自動表示（検索結果が0件の場合は非表示）
 - ページネーション: 1ページ目にリセット
 
 ---
@@ -712,7 +693,7 @@ flowchart TD
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
     CheckDeviceQuery -->|失敗| Error500[500エラーモーダル表示]
 
-    CheckDeviceQuery -->|成功| SensorQuery[最新センサーデータ取得<br>Unity Catalog sensor_data_view]
+    CheckDeviceQuery -->|成功| SensorQuery[最新センサーデータ取得<br>OLTP DB silver_sensor_data]
     SensorQuery --> CheckSensorQuery{DBクエリ結果}
     CheckSensorQuery -->|失敗| Error500
 
@@ -729,7 +710,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| センサー情報表示 | `GET /industry-dashboard/store-monitoring/<device_uuid>` | パスパラメータ: `device_uuid` |
+| センサー情報表示 | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | パスパラメータ: `device_uuid` |
 
 #### 処理詳細（サーバーサイド）
 
@@ -748,24 +729,24 @@ def check_device_access(device_uuid, accessible_org_ids):
 
 **② 最新センサーデータ取得**
 
-**使用テーブル:** sensor_data_view (Unity Catalog)
+**使用テーブル:** MySQL の `silver_sensor_data`
 
 **SQL詳細:**
 ```sql
 SELECT
   *
 FROM
-  iot_catalog.views.sensor_data_view
+  silver_sensor_data
 WHERE
   device_id = :device_id
 ORDER BY
-    event_timestamp DESC
+  event_timestamp DESC
 LIMIT 1
 ```
 
 **実装例:**
 ```python
-@dashboard_bp.route('/industry-dashboard/store-monitoring/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/store-monitoring/<device_uuid>', methods=['GET'])
 @require_auth
 def show_sensor_info(device_uuid):
     """センサー情報表示"""
@@ -788,16 +769,16 @@ def show_sensor_info(device_uuid):
     page = search_params.get('page', 1)
 
     # アラート一覧取得
-    alerts = get_recent_alerts(accessible_org_ids, limit=30)
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
 
     # デバイス一覧取得
     devices, total = get_device_list(search_params, accessible_org_ids, page, ITEM_PER_PAGE)
 
-    # 最新センサーデータ取得（Unity Catalog）
+    # 最新センサーデータ取得（MySQLから取得）
     sensor_data = get_latest_sensor_data(device.device_id)
 
     return render_template(
-        'dashboard/store_monitoring.html',
+        'analysis/industry_dashboard/store_monitoring.html',
         alerts=alerts,
         devices=devices,
         total=total,
@@ -851,7 +832,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ```mermaid
 flowchart TD
-    Start([GET /industry-dashboard/device-details/<device_uuid>]) --> Auth[認証チェック]
+    Start([GET /analysis/industry-dashboard/device-details/<device_uuid>]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
@@ -881,7 +862,7 @@ flowchart TD
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
     CheckAlertQuery -->|失敗| Error500
 
-    CheckAlertQuery -->|成功| GraphQuery[グラフ用データ取得<br>Unity Catalog sensor_data_view<br>表示期間を適用]
+    CheckAlertQuery -->|成功| GraphQuery[グラフ用データ取得<br>OLTP DB silver_sensor_data<br>表示期間を適用]
     GraphQuery --> CheckGraphQuery{DBクエリ結果}
     CheckGraphQuery -->|失敗| Error500
 
@@ -902,7 +883,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| デバイス詳細初期表示 | `GET /industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid`、クエリパラメータ: `page` |
+| デバイス詳細初期表示 | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid`、クエリパラメータ: `page` |
 
 #### 処理詳細（サーバーサイド）
 
@@ -918,21 +899,21 @@ def get_default_date_range():
     end_datetime = datetime.now()
     start_datetime = end_datetime - timedelta(hours=24)
     return {
-        'search_start_datetime': start_datetime.strftime('%Y/%m/%dT%H:%M'),
-        'search_end_datetime': end_datetime.strftime('%Y/%m/%dT%H:%M')
+        'search_start_datetime': start_datetime.strftime('%Y-%m-%dT%H:%M'),
+        'search_end_datetime': end_datetime.strftime('%Y-%m-%dT%H:%M')
     }
 ```
 
 **② グラフ用データ取得**
 
-時系列グラフ描画用に、表示期間内の全センサーデータを取得します。
+時系列グラフ描画用に、表示期間内の全センサーデータを取得します。MySQLのみを参照し、MySQLにデータがない場合は空リストを返します。
 
 **SQL詳細:**
 ```sql
 SELECT
   *
 FROM
-  iot_catalog.views.sensor_data_view
+  silver_sensor_data
 WHERE
   device_id = :device_id
   AND event_timestamp BETWEEN :search_start_datetime AND :search_end_datetime
@@ -942,7 +923,7 @@ ORDER BY
 
 **実装例:**
 ```python
-@dashboard_bp.route('/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
 @require_auth
 def device_details(device_uuid):
     """デバイス詳細初期表示・ページング"""
@@ -972,19 +953,20 @@ def device_details(device_uuid):
     page = search_params['page']
     per_page = ITEM_PER_PAGE
 
-    # CSVエクスポート処理
+    # CSVエクスポート処理（表示期間はCookieから取得）
     if request.args.get('export') == 'csv':
-        return export_sensor_data_csv(device, search_params)
+        csv_search_params = _get_device_details_search_params()  # Cookieから検索条件取得（Cookieなしの場合はデフォルト24時間）
+        return export_sensor_data_csv(device, csv_search_params)
 
     # アラート一覧取得
     alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params)
 
-    # グラフ用データ取得
+    # グラフ用データ取得（MySQLから取得）
     graph_data = get_graph_data(device.device_id, search_params)
 
     # レンダリング
     response = make_response(render_template(
-        'dashboard/device_details.html',
+        'analysis/industry_dashboard/device_details.html',
         device=device,
         alerts=alerts,
         alerts_total=alerts_total,
@@ -1092,7 +1074,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| デバイス詳細検索 | `POST /industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid` |
+| デバイス詳細検索 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | パスパラメータ: `device_uuid` |
 
 #### バリデーション
 
@@ -1113,7 +1095,7 @@ def validate_date_range(start_datetime_str, end_datetime_str):
     try:
         start_dt = datetime.strptime(start_datetime_str, '%Y-%m-%dT%H:%M')
         end_dt = datetime.strptime(end_datetime_str, '%Y-%m-%dT%H:%M')
-    except ValueError:
+    except (ValueError, TypeError):
         errors.append('日時の形式が正しくありません')
         return errors
 
@@ -1130,7 +1112,7 @@ def validate_date_range(start_datetime_str, end_datetime_str):
 
 **実装例:**
 ```python
-@dashboard_bp.route('/industry-dashboard/device-details/<device_uuid>', methods=['POST'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['POST'])
 @require_auth
 def device_details_search(device_uuid):
     """デバイス詳細検索（表示期間変更）"""
@@ -1150,9 +1132,7 @@ def device_details_search(device_uuid):
     # バリデーション
     errors = validate_date_range(search_start_datetime, search_end_datetime)
     if errors:
-        flash(errors[0], 'error')
-        # 前回の検索条件で再表示
-        return redirect(url_for('dashboard.device_details', device_uuid=device_uuid))
+        abort(400)
 
     search_params = {
         'search_start_datetime': search_start_datetime,
@@ -1166,12 +1146,12 @@ def device_details_search(device_uuid):
     # アラート一覧取得
     alerts = get_device_alerts(device.device_id, search_params)
 
-    # グラフ用データ取得
+    # グラフ用データ取得（MySQLから取得）
     graph_data = get_graph_data(device.device_id, search_params)
 
     # レンダリング
     response = make_response(render_template(
-        'dashboard/device_details.html',
+        'analysis/industry_dashboard/device_details.html',
         device=device,
         alerts=alerts,
         graph_data=graph_data,
@@ -1259,8 +1239,8 @@ Cookieに検索条件を保持する
 **前提条件:**
 - デバイス詳細画面が表示されている
 - 表示期間が設定されている（表示期間内のデータをエクスポート）
-  - 表示期間はCookieに保存されている
-  - Cookieに表示期間がない場合はデフォルト期間（現在日時から1日前まで）でエクスポート
+  - 表示期間はCookieに保存されている（表示期間変更ボタンで設定した検索条件を使用）
+  - Cookieに表示期間がない場合はデフォルト期間（直近24時間）でエクスポート
 
 #### 処理詳細（サーバーサイド）
 
@@ -1271,7 +1251,7 @@ def export_sensor_data_csv(device, search_params):
     import csv
     from io import StringIO
 
-    # 表示期間内の全センサーデータを取得
+    # 表示期間内の全センサーデータを取得（MySQLから取得）
     sensor_data_list = get_all_sensor_data(device.device_id, search_params)
 
     # CSV形式で出力
@@ -1284,13 +1264,13 @@ def export_sensor_data_csv(device, search_params):
         '外気温度',
         '第1冷凍 設定温度',
         '第1冷凍 庫内センサー温度',
-        '第1冷凍 庫内温度',
+        '第1冷凍 表示温度',
         '第1冷凍 DF温度',
         '第1冷凍 凝縮温度',
         '第1冷凍 微調整後庫内温度',
         '第2冷凍 設定温度',
         '第2冷凍 庫内センサー温度',
-        '第2冷凍 庫内温度',
+        '第2冷凍 表示温度',
         '第2冷凍 DF温度',
         '第2冷凍 凝縮温度',
         '第2冷凍 微調整後庫内温度',
@@ -1305,41 +1285,48 @@ def export_sensor_data_csv(device, search_params):
         '防露ヒータ出力(2)'
     ])
 
-    # データ行
-    for data in sensor_data_list:
+    # データ行（get_all_sensor_data はdictのリストを返す）
+    def _val(v):
+        return '' if v is None else v
+
+    for row in sensor_data_list:
         writer.writerow([
-            data.event_timestamp.strftime('%Y-%m-%d %H:%M:%S') if data.event_timestamp else '',
-            data.external_temp or '',
-            data.set_temp_freezer_1 or '',
-            data.internal_sensor_temp_freezer_1 or '',
-            data.internal_temp_freezer_1 or '',
-            data.df_temp_freezer_1 or '',
-            data.condensing_temp_freezer_1 or '',
-            data.adjusted_internal_temp_freezer_1 or '',
-            data.set_temp_freezer_2 or '',
-            data.internal_sensor_temp_freezer_2 or '',
-            data.internal_temp_freezer_2 or '',
-            data.df_temp_freezer_2 or '',
-            data.condensing_temp_freezer_2 or '',
-            data.adjusted_internal_temp_freezer_2 or '',
-            data.compressor_freezer_1 or '',
-            data.compressor_freezer_2 or '',
-            data.fan_motor_1 or '',
-            data.fan_motor_2 or '',
-            data.fan_motor_3 or '',
-            data.fan_motor_4 or '',
-            data.fan_motor_5 or '',
-            data.defrost_heater_output_1 or '',
-            data.defrost_heater_output_2 or ''
+            row['event_timestamp'] if row.get('event_timestamp') is not None else '',
+            _val(row.get('external_temp')),
+            _val(row.get('set_temp_freezer_1')),
+            _val(row.get('internal_sensor_temp_freezer_1')),
+            _val(row.get('internal_temp_freezer_1')),
+            _val(row.get('df_temp_freezer_1')),
+            _val(row.get('condensing_temp_freezer_1')),
+            _val(row.get('adjusted_internal_temp_freezer_1')),
+            _val(row.get('set_temp_freezer_2')),
+            _val(row.get('internal_sensor_temp_freezer_2')),
+            _val(row.get('internal_temp_freezer_2')),
+            _val(row.get('df_temp_freezer_2')),
+            _val(row.get('condensing_temp_freezer_2')),
+            _val(row.get('adjusted_internal_temp_freezer_2')),
+            _val(row.get('compressor_freezer_1')),
+            _val(row.get('compressor_freezer_2')),
+            _val(row.get('fan_motor_1')),
+            _val(row.get('fan_motor_2')),
+            _val(row.get('fan_motor_3')),
+            _val(row.get('fan_motor_4')),
+            _val(row.get('fan_motor_5')),
+            _val(row.get('defrost_heater_output_1')),
+            _val(row.get('defrost_heater_output_2')),
         ])
 
-    # レスポンス作成
-    output = make_response(si.getvalue())
+    # レスポンス作成（UTF-8 BOM付きバイト列に変換）
+    csv_data = si.getvalue().encode("utf-8-sig")
     filename = f"sensor_data_{device.device_uuid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    output.headers["Content-Disposition"] = f"attachment; filename={filename}"
-    output.headers["Content-type"] = "text/csv; charset=utf-8-sig"
 
-    return output
+    return Response(
+        csv_data,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-type": "text/csv; charset=utf-8-sig",
+        },
+    )
 ```
 
 #### エラーハンドリング
@@ -1366,7 +1353,21 @@ def export_sensor_data_csv(device, search_params):
 | 6 | alert_setting_master | アラート設定マスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラート名表示 |
 | 7 | alert_level_master | アラートレベルマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートレベル表示 |
 | 8 | alert_status_master | アラートステータスマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートステータス表示 |
-| 9 | sensor_data_view | センサーデータビュー | Unity Catalog | SELECT | センサー情報表示、デバイス詳細 | センサーデータ取得 |
+| 9 | silver_sensor_data | センサーデータ | MySQL | SELECT | センサー情報表示、デバイス詳細 | センサーデータ取得 |
+
+---
+
+## センサーデータ取得仕様
+
+### 概要
+
+センサーデータは MySQL の `silver_sensor_data` テーブルのみを参照します。MySQL にデータが存在しない場合はデータなしとして扱います。
+
+| 機能 | データソース | 備考 |
+|------|------------|------|
+| 最新センサーデータ取得 | MySQL | データなしの場合は None を返す |
+| グラフ用データ取得 | MySQL | データなしの場合は空リストを返す |
+| CSVエクスポート | MySQL | データなしの場合は空リストを返す |
 
 ---
 
@@ -1429,7 +1430,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@dashboard_bp.route('/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
+@analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['GET'])
 @require_auth
 def device_details(device_uuid):
     logger.info(f'デバイス詳細表示開始: user_id={g.current_user.user_id}, device_uuid={device_uuid}')

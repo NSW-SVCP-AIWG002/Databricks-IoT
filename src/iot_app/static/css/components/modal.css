@@ -54,11 +54,25 @@
   }
 }
 
-.modal--small    { max-width: 400px; }
-.modal--medium   { max-width: 600px; }
-.modal--large    { max-width: 800px; }
-.modal--fullscreen { max-width: 90%; width: 90%; }
+/* サイズバリエーション */
+.modal--small {
+  max-width: 400px;
+}
 
+.modal--medium {
+  max-width: 600px;
+}
+
+.modal--large {
+  max-width: 800px;
+}
+
+.modal--fullscreen {
+  max-width: 90%;
+  width: 90%;
+}
+
+/* モーダルヘッダー */
 .modal__header {
   display: flex;
   flex-direction: column;
@@ -85,6 +99,15 @@
   margin-left: var(--spacing-4);
 }
 
+/* タイトルカラーバリエーション（ステータスメッセージモーダル） */
+.modal__title--success {
+  color: var(--color-success);
+}
+
+.modal__title--error {
+  color: var(--color-danger);
+}
+
 .modal__description {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
@@ -99,10 +122,12 @@
   margin-top: var(--spacing-4);
 }
 
+/* モーダルボディ */
 .modal__body {
   padding: var(--spacing-0) var(--spacing-5);
 }
 
+/* モーダルフッター */
 .modal__footer {
   display: flex;
   align-items: center;
