@@ -159,13 +159,17 @@ class LangGraphServingModel(PythonModel):
 
     def _extract_interrupt(self, chunk: dict) -> dict | None:
         """チャンクから中断ペイロードを抽出"""
+        log_message(f"[DEBUG] _extract_interrupt chunk keys: {list(chunk.keys())}")
+
         # トップレベルの __interrupt__
         if "__interrupt__" in chunk and chunk["__interrupt__"]:
+            log_message("[DEBUG] Found __interrupt__ at top level")
             return chunk["__interrupt__"][-1].value
 
         # ネストされた __interrupt__
-        for v in chunk.values():
+        for k, v in chunk.items():
             if isinstance(v, dict) and "__interrupt__" in v and v["__interrupt__"]:
+                log_message(f"[DEBUG] Found __interrupt__ nested under key: {k}")
                 return v["__interrupt__"][-1].value
 
         return None
