@@ -48,7 +48,6 @@
     - [36. センサーデータ時次サマリ（gold\_sensor\_data\_hourly\_summary）](#36-センサーデータ時次サマリgold_sensor_data_hourly_summary)
     - [37. センサーデータ日次サマリ（gold\_sensor\_data\_daily\_summary）](#37-センサーデータ日次サマリgold_sensor_data_daily_summary)
     - [38. センサーデータ月次サマリ（gold\_sensor\_data\_monthly\_summary）](#38-センサーデータ月次サマリgold_sensor_data_monthly_summary)
-    - [39. センサーデータ年次サマリ（gold\_sensor\_data\_yearly\_summary）](#39-センサーデータ年次サマリgold_sensor_data_yearly_summary)
   - [VIEW定義](#view定義)
     - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
     - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
@@ -135,10 +134,6 @@
 - センサーデータ月次サマリ ← 組織マスタ
 - センサーデータ月次サマリ ← サマリー計算手法マスタ
 - センサーデータ月次サマリ ← 測定項目マスタ
-- センサーデータ年次サマリ ← デバイスマスタ
-- センサーデータ年次サマリ ← 組織マスタ
-- センサーデータ年次サマリ ← サマリー計算手法マスタ
-- センサーデータ年次サマリ ← 測定項目マスタ
 
 ---
 
@@ -184,7 +179,6 @@
 | 36  | gold_sensor_data_hourly_summary  | センサーデータ時次サマリ       | シルバー化処理されたテレメトリデータを時単位で集計したデータを管理             |
 | 37  | gold_sensor_data_daily_summary   | センサーデータ日次サマリ       | シルバー化処理されたテレメトリデータを日単位で集計したデータを管理             |
 | 38  | gold_sensor_data_monthly_summary | センサーデータ月次サマリ       | シルバー化処理されたテレメトリデータを月単位で集計したデータを管理             |
-| 39  | gold_sensor_data_yearly_summary  | センサーデータ年次サマリ       | シルバー化処理されたテレメトリデータを年単位で集計したデータを管理             |
 
 ---
 
@@ -1495,40 +1489,6 @@
 **インデックス:**
 
 - PRIMARY KEY: `device_id`, `organization_id`, `collection_year_month`, `measurement_item_id`, `summary_method_id`(複合キー)
-- INDEX: `device_id`
-
-**外部キー:**
-
-- `device_id` → `device_master.device_id`
-- `organization_id` → `organization_master.organization_id`
-- `measurement_item_id` → `measurement_item_master.measurement_item_id`
-- `summary_method_id` → `gold_summary_method_master.summary_method_id`
-
-**ビジネスルール:**
-
-- Databricks上に実装されたゴールド層LDPパイプラインの処理によってデータが登録される
-- データ保持期間は3年として、collection_datetimeが最新時刻から3年以上前のレコードはゴールド層LDPパイプライン内の処理によって随時削除される
-
----
-
-### 39. センサーデータ年次サマリ（gold_sensor_data_yearly_summary）
-
-**概要**: UnityCatalogのシルバー化処理が施されたデータを1年ごとに集計を行った結果を保持するテーブル
-
-| #   | カラム物理名        | カラム論理名 | データ型 | NULL     | PK  | FK  | デフォルト値 | 説明                                         |
-| --- | ------------------- | ------------ | -------- | -------- | --- | --- | ------------ | -------------------------------------------- |
-| 1   | device_id           | デバイスID   | INT      | NOT NULL | 〇  | 〇  |              | システム内でのIoTデバイスの一意識別子        |
-| 2   | organization_id     | 組織ID       | INT      | NOT NULL | 〇  | 〇  |              | 所属組織ID                                   |
-| 3   | collection_year     | 集約年       | INT      | NOT NULL | 〇  |     |              | センサーデータを集約した日付。形式は「YYYY」 |
-| 4   | measurement_item_id | 測定項目ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約対象の測定項目ID                         |
-| 5   | summary_method_id   | 集約方法ID   | INT      | NOT NULL | 〇  | 〇  |              | 集約方法ID（平均、分散など）                 |
-| 6   | summary_value       | 集約値       | DOUBLE   | NOT NULL |     |     |              | 集約結果                                     |
-| 7   | data_count          | データ数     | INT      | NOT NULL |     |     |              | 集約したデータ数                             |
-| 8   | create_date         | 作成日時     | DATETIME | NOT NULL |     |     |              | レコード作成日時                             |
-
-**インデックス:**
-
-- PRIMARY KEY: `device_id`, `organization_id`, `collection_year`, `measurement_item_id`, `summary_method_id`(複合キー)
 - INDEX: `device_id`
 
 **外部キー:**

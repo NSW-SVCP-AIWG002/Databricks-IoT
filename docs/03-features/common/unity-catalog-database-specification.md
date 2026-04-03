@@ -25,8 +25,7 @@
       - [1. センサーデータ時次サマリ (gold\_sensor\_data\_hourly\_summary)](#1-センサーデータ時次サマリ-gold_sensor_data_hourly_summary)
       - [2. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#2-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
       - [3. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#3-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
-      - [4. センサーデータ年次サマリ (gold\_sensor\_data\_yearly\_summary)](#4-センサーデータ年次サマリ-gold_sensor_data_yearly_summary)
-      - [5. サマリー計算手法マスタ（gold\_summary\_method\_master）](#5-サマリー計算手法マスタgold_summary_method_master)
+      - [4. サマリー計算手法マスタ（gold\_summary\_method\_master）](#4-サマリー計算手法マスタgold_summary_method_master)
     - [外部DBのマスタ類を同期するテーブル](#外部dbのマスタ類を同期するテーブル)
       - [1. デバイスマスタ（device\_master）](#1-デバイスマスタdevice_master)
       - [2. 組織マスタ（organization\_master）](#2-組織マスタorganization_master)
@@ -41,7 +40,6 @@
       - [2. 時次サマリビュー（hourly\_summary\_view）](#2-時次サマリビューhourly_summary_view)
       - [3. 日次サマリビュー（daily\_summary\_view）](#3-日次サマリビューdaily_summary_view)
       - [4. 月次サマリビュー（monthly\_summary\_view）](#4-月次サマリビューmonthly_summary_view)
-      - [5. 年次サマリビュー（yearly\_summary\_view）](#5-年次サマリビューyearly_summary_view)
     - [行レベルセキュリティの実装](#行レベルセキュリティの実装)
       - [Row Access Policyの定義](#row-access-policyの定義)
       - [動作イメージ](#動作イメージ)
@@ -133,14 +131,13 @@ iot_catalog/                                        # Unity Catalogカタログ
 │   ├── gold_sensor_data_hourly_summary             # センサーデータ時次サマリ
 │   ├── gold_sensor_data_daily_summary              # センサーデータ日次サマリ
 │   ├── gold_sensor_data_monthly_summary            # センサーデータ月次サマリ
-│   ├── gold_sensor_data_yearly_summary             # センサーデータ年次サマリ
 │   └── gold_summary_method_master                  # サマリ作成時の算術マスタ
 │
 ├── views/                                          # 動的ビュースキーマ
 │   ├── sensor_data_view                            # センサーデータビュー
+│   ├── hourly_summary_view                         # 時次サマリビュー
 │   ├── daily_summary_view                          # 日次サマリビュー
-│   ├── monthly_summary_view                        # 月次サマリビュー
-│   └── yearly_summary_view                         # 年次サマリビュー
+│   └── monthly_summary_view                        # 月次サマリビュー
 │
 ├── ai_chat/                                        # LangGraph Checkpointer用スキーマ
 │   └── check_point_data                            # チェックポイントテーブル
@@ -179,16 +176,15 @@ iot_catalog/                                        # Unity Catalogカタログ
 | 1   | gold_sensor_data_hourly_summary  | センサーデータ時次サマリ | センサーデータを時次集計したテーブル |
 | 2   | gold_sensor_data_daily_summary   | センサーデータ日次サマリ | センサーデータを日次集計したテーブル |
 | 3   | gold_sensor_data_monthly_summary | センサーデータ月次サマリ | センサーデータを月次集計したテーブル |
-| 4   | gold_sensor_data_yearly_summary  | センサーデータ年次サマリ | センサーデータを年次集計したテーブル |
 
 ### ビュー
 
 | #   | テーブル物理名       | テーブル論理名       | 説明                             |
 | --- | -------------------- | -------------------- | -------------------------------- |
 | 1   | sensor_data_view     | センサーデータビュー | ダッシュボード表示用の動的ビュー |
-| 2   | daily_summary_view   | 日次サマリビュー     | 日次集計データ参照用             |
-| 3   | monthly_summary_view | 月次サマリビュー     | 月次集計データ参照用             |
-| 4   | yearly_summary_view  | 年次サマリビュー     | 年次集計データ参照用             |
+| 2   | hourly_summary_view  | 時次サマリビュー     | 時次集計データ参照用             |
+| 3   | daily_summary_view   | 日次サマリビュー     | 日次集計データ参照用             |
+| 4   | monthly_summary_view | 月次サマリビュー     | 月次集計データ参照用             |
 
 ### AIチャット用スキーマ
 
@@ -425,48 +421,7 @@ TBLPROPERTIES (
 );
 ```
 
-#### 4. センサーデータ年次サマリ (gold_sensor_data_yearly_summary)
-
-**概要**: センサーデータを年次で集計したテーブル
-
-| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                  |
-| --- | ----------------- | ------------ | --------- | -------- | --- | --- | ------------------------------------- |
-| 1   | device_id         | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子 |
-| 2   | organization_id   | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                            |
-| 3   | collection_year   | 集約年       | INT       | NOT NULL | 〇  |     | センサーデータを集約した年（YYYY）    |
-| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                        |
-| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）          |
-| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                              |
-| 7   | data_count        | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                      |
-| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                      |
-
-**クラスタリングキー**: `collection_year`, `device_id`
-
-**テーブルプロパティ**:
-
-```sql
-CREATE TABLE IF NOT EXISTS iot_catalog.gold.gold_sensor_data_yearly_summary (
-    device_id INT NOT NULL, 
-    organization_id INT NOT NULL, 
-    collection_year INT NOT NULL, 
-    summary_item INT NOT NULL,
-    summary_method_id INT NOT NULL, 
-    summary_value DOUBLE NOT NULL, 
-    data_count INT NOT NULL, 
-    create_time TIMESTAMP NOT NULL 
-)
-USING DELTA
-CLUSTER BY (collection_year, device_id)
-TBLPROPERTIES (
-    'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact' = 'true',
-    'delta.logRetentionDuration' = 'interval 7 days',
-    'delta.deletedFileRetentionDuration' = 'interval 7 days',
-    'delta.tuneFileSizesForRewrites' = 'true'
-);
-```
-
-#### 5. サマリー計算手法マスタ（gold_summary_method_master）
+#### 4. サマリー計算手法マスタ（gold_summary_method_master）
 
 **概要**: サマリ作成時にどの計算手法にのっとって作成されたものかを表現するマスタ
 
@@ -814,40 +769,6 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 
 - `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
 
-#### 5. 年次サマリビュー（yearly_summary_view）
-
-```SQL
-CREATE OR REPLACE VIEW iot_catalog.views.yearly_summary_view AS
-SELECT
-    device_id
-    , organization_id 
-    , collection_year
-    , summary_item 
-    , summary_method_id 
-    , summary_value  
-    , data_count 
-FROM iot_catalog.gold.gold_sensor_data_yearly_summary;
-
--- Genieによる検索精度を上げるため、日本語でコメントをつける
-COMMENT ON VIEW iot_catalog.views.yearly_summary_view IS '日次サマリ、日ごとのサマリ、日別のサマリ';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.device_id IS 'デバイスID';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.organization_id IS '組織ID、所属組織のID、組織のID';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.collection_year IS '集計年';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.summary_item IS '集約対象';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.summary_method_id IS '集約方法ID';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.summary_value IS '集約結果、計算結果、集約値';
-COMMENT ON COLUMN iot_catalog.views.yearly_summary_view.data_count IS 'データ件数、データの件数、データ数';
-
--- 既存のPolicyを各ビューに適用
-ALTER VIEW iot_catalog.views.yearly_summary_view
-SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
-```
-
-**ゴールド層の年次サマリテーブルからの除外カラム**:
-
-- `create_time`: ダッシュボード表示、AIによる走査対象に不要のため除外
-
-
 ### 行レベルセキュリティの実装
 
 #### Row Access Policyの定義
@@ -983,9 +904,9 @@ VACUUM iot_catalog.ai_chat.checkpoints;
 | テーブル                         | クラスタリングキー                   | 目的                           |
 | -------------------------------- | ------------------------------------ | ------------------------------ |
 | silver_sensor_data               | `DATE(event_timestamp)`, `device_id` | 時系列クエリの最適化           |
+| gold_sensor_data_hourly_summary  | `collection_datetime`, `device_id`   | 集計単位でのアクセス最適化     |
 | gold_sensor_data_daily_summary   | `collection_date`, `device_id`       | 集計単位でのアクセス最適化     |
 | gold_sensor_data_monthly_summary | `collection_year_month`, `device_id` | 集計単位でのアクセス最適化     |
-| gold_sensor_data_yearly_summary  | `collection_year`, `device_id`       | 集計単位でのアクセス最適化     |
 | check_point_data                 | `thread_id`                          | 会話履歴単位でのアクセス最適化 |
 
 ---
@@ -1048,4 +969,4 @@ Unity CatalogはOLTP DB（MySQL互換）と連携して動作します。
 | 1.5  | 2026-02-02 | Kei Sugiyama | 異常状態テーブル・メール送信キューをOLTP DBに移設（シルバー層から削除） |
 | 1.6  | 2026-02-16 | Kei Sugiyama | 対話型AIチャット機能で使用するテーブルの設計内容反映                    |
 | 1.7  | 2026-02-24 | Kei Sugiyama | 対話型AIチャット機能　レビュー指摘修正                                  |
-
+| 1.8  | 2026-04-02 | Kei Sugiyama | Gold層パイプラインレビュー指摘修正                                      |
