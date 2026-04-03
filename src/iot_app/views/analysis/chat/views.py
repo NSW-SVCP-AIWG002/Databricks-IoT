@@ -191,6 +191,8 @@ def send_question():
         }), 500
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         # logger.error("外部API例外", exc_info=True, extra={
         #     "service": "ai_orchestrator",
         #     "error_type": type(e).__name__,
