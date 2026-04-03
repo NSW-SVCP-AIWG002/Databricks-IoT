@@ -1,7 +1,7 @@
 import os
 from types import SimpleNamespace
 
-from flask import g, request, session, abort, render_template, current_app
+from flask import g, request, session, abort, render_template, current_app, redirect, url_for
 
 from iot_app.auth.services import find_user_by_email
 from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, JWTExpiredError, TokenExchangeError
@@ -65,7 +65,6 @@ def authenticate_request():
     if auth_provider.requires_additional_setup():
         allowed_paths = ['/account/password/change', '/auth/logout']
         if request.path not in allowed_paths and session.get('password_expired'):
-            from flask import redirect, url_for
             return redirect(url_for('account.password_change'))
 
     if current_app.config.get('AUTH_TYPE') == 'dev':
