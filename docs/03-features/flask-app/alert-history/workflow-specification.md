@@ -126,7 +126,7 @@ flowchart TD
     ClearCookie --> InitParams[検索条件を初期化<br>page=1, sort_by=alert_occurrence_datetime, order=dsc]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
 
-    InitParams --> Scope[データスコープ制限適用<br>organization_closureテーブルから下位組織IDリスト取得]
+    InitParams --> Scope[データスコープ制限適用<br>v_alert_history_by_userにuser_idを渡して絞り込み]
     OverridePage --> Scope
 
     Scope --> Count[検索結果件数取得DBクエリ実行]
@@ -195,7 +195,7 @@ def require_auth(f):
         if not user_id:
             abort(401)
 
-        user = User.query.filter_by(user_id=user_id, delete_flag=0).first()
+        user = User.query.filter_by(user_id=user_id, delete_flag=FALSE).first()
         if not user:
             abort(403)
 
@@ -235,47 +235,15 @@ order = request.args.get('order', 'desc')
 
 **③ データスコープ制限の適用**
 
-組織階層に基づいてデータスコープ制限を適用します。
+`v_alert_history_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
 
-**処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
-  - **ロールによる条件分岐は一切行わない**
-
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
-
-**変数・パラメータ:**
-- `accessible_org_ids`: list - アクセス可能な組織IDリスト
-
-**実装例:**
-```python
-def apply_data_scope_filter(query, current_user):
-    # organization_closure テーブルから下位組織リストを取得（全ユーザー共通）
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
-
-    # 下位組織IDのリストを抽出
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        # アクセス可能な組織がない場合は空の結果を返す
-        # （通常は発生しない - 最低でも自組織は含まれる）
-        return query.filter(User.organization_id.in_([]))
-
-    # 組織IDリストでフィルタリング
-    return query.filter(User.organization_id.in_(org_ids))
-```
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
 
 **④ データベースクエリ実行**
 
 アラート履歴データを取得します。
 
-**使用テーブル:** alert_history, alert_status_master, alert_setting_master, alert_level_master, device_master
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、alert_status_master（アラートステータスマスタ）、alert_level_master（アラートレベルマスタ）
 
 **SQL詳細:**
 - 検索結果件数取得DBクエリ
@@ -283,32 +251,27 @@ def apply_data_scope_filter(query, current_user):
 SELECT
   COUNT(alert_history_id) AS data_count
 FROM
-  alert_history ah
-LEFT JOIN alert_setting_master am
-  ON ah.alert_id = am.alert_id
-  AND am.delete_flag = FALSE
-LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
-  AND dm.delete_flag = FALSE
+  v_alert_history_by_user
 WHERE
-  ah.alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime
-  AND ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  user_id = :user_id
+  AND delete_flag = FALSE
+  AND alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime
 ```
 
 - 検索結果取得DBクエリ
 ```sql
 SELECT
   ah.alert_occurrence_datetime,
-  dm.device_name,
-  dm.device_location,
-  am.alert_name,
+  ah.device_id,
+  ah.alert_id,
+  ah.alert_history_uuid,
+  ah.alert_status_id,
+  ah.alert_value,
+  asm.alert_status_name,
   al.alert_level_id,
-  al.alert_level_name,
-  asm.alert_status_id,
-  asm.alert_status_name
+  al.alert_level_name
 FROM
-  alert_history ah
+  v_alert_history_by_user ah
 LEFT JOIN alert_status_master asm
   ON ah.alert_status_id = asm.alert_status_id
   AND asm.delete_flag = FALSE
@@ -318,13 +281,10 @@ LEFT JOIN alert_setting_master am
 LEFT JOIN alert_level_master al
   ON am.alert_level_id = al.alert_level_id
   AND al.delete_flag = FALSE
-LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
-  AND dm.delete_flag = FALSE
 WHERE
-  ah.alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime
+  ah.user_id = :user_id
   AND ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  AND ah.alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime
 ORDER BY
   ah.alert_occurrence_datetime DESC,
   ah.alert_history_id DESC -- 第二ソートキー
@@ -332,129 +292,127 @@ LIMIT :item_per_page OFFSET 0
 ```
 
 **実装例:**
+
+- `get_default_search_params()` / `search_alert_histories()` は `alert_history_service.py` に定義
+- Cookie操作は `common` の `get_search_conditions_cookie` / `set_search_conditions_cookie` / `clear_search_conditions_cookie` を使用
+
 ```python
-offset = (page - 1) * per_page
+# services/alert_history_service.py
 
-# ベースクエリ
-query = AlertHistory.query.filter_by(delete_flag=0)
+def get_default_search_params() -> dict:
+    """アラート履歴一覧検索のデフォルトパラメータを返す"""
+    now = datetime.now()
+    return {
+        'page': 1,
+        'per_page': ITEM_PER_PAGE,
+        'sort_by': 'alert_occurrence_datetime',
+        'order': 'desc',
+        'start_datetime': (now - timedelta(days=INIT_START_DATETIME)).replace(hour=0, minute=0, second=0).strftime('%Y/%m/%d %H:%M'),
+        'end_datetime': now.replace(hour=23, minute=59, second=59).strftime('%Y/%m/%d %H:%M'),
+        'device_name': '',
+        'device_location': '',
+        'alert_name': '',
+        'alert_level_id': None,
+        'alert_status_id': None,
+    }
 
-# データスコープ制限適用
-query = apply_data_scope_filter(query, g.current_user)
 
-# ソート適用
-if order == 'asc':
-    query = query.order_by(getattr(AlertHistory, sort_by).asc())
-else:
-    query = query.order_by(getattr(AlertHistory, sort_by).desc())
+def search_alert_histories(search_params: dict, user_id: int) -> tuple[list, int]:
+    """アラート履歴一覧をスコープ制限付きで検索する
 
-# ページング適用
-alert_histories = query.limit(per_page).offset(offset).all()
-total = query.count()
+    Args:
+        search_params: 検索条件（page, per_page, sort_by, order, 各検索項目）
+        user_id: ログインユーザーID（スコープ制限に使用）
+
+    Returns:
+        (alert_histories, total): アラート履歴リストと総件数のタプル
+    """
+    page = search_params['page']
+    per_page = search_params['per_page']
+    sort_by = search_params['sort_by']
+    order = search_params['order']
+    offset = (page - 1) * per_page
+
+    query = db.session.query(AlertHistoryByUser).filter(
+        AlertHistoryByUser.user_id == user_id,
+        AlertHistoryByUser.delete_flag == False,
+    )
+
+    sort_col = getattr(AlertHistoryByUser, sort_by)
+    if search_params.get('start_datetime') and search_params.get('end_datetime'):
+        query = query.filter(AlertHistoryByUser.alert_occurrence_datetime.between(
+            search_params['start_datetime'], search_params['end_datetime']
+        ))
+    if search_params.get('alert_level_id') is not None:
+        query = query.filter(AlertHistoryByUser.alert_level_id == search_params['alert_level_id'])
+    if search_params.get('alert_status_id') is not None:
+        query = query.filter(AlertHistoryByUser.alert_status_id == search_params['alert_status_id'])
+
+    query = query.order_by(sort_col.asc() if order == 'asc' else sort_col.desc())
+
+    total = query.count()
+    alert_histories = query.limit(per_page).offset(offset).all()
+    return alert_histories, total
 ```
 
 **⑤ HTMLレンダリング**
 
-Jinja2テンプレートをレンダリングしてHTMLレスポンスを返却します。  
+Jinja2テンプレートをレンダリングしてHTMLレスポンスを返却します。
 検索条件欄に初期値を設定します。
 
 **実装例:**
 ```python
-return render_template('alert/alert-history/list.html',
-                      alert_histories=alert_histories,
-                      total=total,
-                      page=page,
-                      per_page=per_page,
-                      sort_by=sort_by,
-                      order=order,
-                      search_params={
-                          'start_datetime': start_datetime,
-                          'end_datetime': end_datetime,
-                          'device_name': device_name,
-                          'device_location': device_location,
-                          'alert_name': alert_name,
-                          'alert_level_id': alert_level_id,
-                          'alert_level_name': alert_level_name,
-                          'alert_status_id': alert_status_id,
-                          'alert_status_name': alert_status_name
-                      })
+# views/alert/alert_history.py（alert_histories_list 内）
+return response  # make_response + render_template は下記ルート実装例を参照
 ```
 
 **初期表示とページングの実装例**
 ```python
+# views/alert/alert_history.py
 @alert_bp.route('/alert/alert-history', methods=['GET'])
 @require_auth
 def alert_histories_list():
     """初期表示・ページング（統合）"""
 
-    # 初期表示 vs ページング判定
     if 'page' not in request.args:
-        # 初期表示: デフォルト値
-        search_params = {
-            'start_datetime': start_datetime,
-            'end_datetime': end_datetime,
-            'device_name': '',
-            'device_location': '',
-            'alert_name': '',
-            'alert_level_id': None,
-            'alert_level_name': 'すべて',
-            'alert_status_id': None,
-            'alert_status_name': 'すべて'
-        }
+        # 初期表示: デフォルト検索条件
+        search_params = get_default_search_params()  # → alert_history_service
         save_cookie = True
     else:
-        # ページング: Cookieから取得
-        cookie_data = request.cookies.get('user_search_params')
-        if cookie_data:
-            search_params = json.loads(cookie_data)
-        else:
-            search_params = get_default_search_params()
-
+        # ページング: Cookie から検索条件取得 → page 上書き
+        search_params = get_search_conditions_cookie('alert_history') or get_default_search_params()
         search_params['page'] = request.args.get('page', 1, type=int)
         save_cookie = False
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    try:
+        alert_histories, total = search_alert_histories(search_params, g.current_user.user_id)  # → alert_history_service
+    except Exception:
+        abort(500)
 
-    # DB検索実行
-    alert_histories, total = search_alert_histories(search_params, accessible_org_ids)
-
-    # レンダリング
     response = make_response(render_template(
         'alert/alert-history/list.html',
         alert_histories=alert_histories,
         total=total,
-        page=page,
-        per_page=per_page,
-        sort_by=sort_by,
-        order=order,
-        search_params=search_params
+        search_params=search_params,
     ))
-
-    # 初期表示時のみCookie格納
     if save_cookie:
-        response.set_cookie(
-            'alert_history_search_params',
-            json.dumps(search_params),
-            max_age=86400,  # 24時間
-            httponly=True,
-            samesite='Lax'
-        )
-
+        response = clear_search_conditions_cookie(response, 'alert_history')
+        response = set_search_conditions_cookie(response, 'alert_history', search_params)
     return response
 ```
 
 #### 表示メッセージ
 
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| ERR_001 | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
+| メッセージID | 表示内容                   | 表示タイミング | 表示場所     |
+| ------------ | -------------------------- | -------------- | ------------ |
+| ERR_DB_001   | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
 
 #### エラーハンドリング
 
-| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
-|--------------|-----------|---------|---------|
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                   |
+| -------------- | ------------------ | -------------------------- | -------------------------- |
+| 401            | 認証エラー         | ログイン画面へリダイレクト | -                          |
+| 500            | データベースエラー | 500エラーページ表示        | データの取得に失敗しました |
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -505,7 +463,7 @@ flowchart TD
 #### 処理詳細（サーバーサイド）
 
 **検索クエリ実行**
-**使用テーブル:** alert_history, alert_status_master, alert_setting_master, alert_level_master, device_master
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、alert_status_master（アラートステータスマスタ）、alert_level_master（アラートレベルマスタ）
 
 **SQL詳細:**
 - 検索結果件数取得DBクエリ
@@ -513,43 +471,39 @@ flowchart TD
 SELECT
   COUNT(alert_history_id) AS data_count
 FROM
-  alert_history ah
-LEFT JOIN alert_status_master asm
-  ON ah.alert_status_id = asm.alert_status_id
-  AND asm.delete_flag = FALSE
+  v_alert_history_by_user ah
 LEFT JOIN alert_setting_master am
   ON ah.alert_id = am.alert_id
   AND am.delete_flag = FALSE
-LEFT JOIN alert_level_master al
-  ON am.alert_level_id = al.alert_level_id
-  AND al.delete_flag = FALSE
 LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
+  ON ah.device_id = dm.device_id
   AND dm.delete_flag = FALSE
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND CASE WHEN :start_datetime IS NULL OR :end_datetime IS NULL THEN TRUE ELSE alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime END
+  ah.user_id = :user_id
+  AND ah.delete_flag = FALSE
+  AND CASE WHEN :start_datetime IS NULL OR :end_datetime IS NULL THEN TRUE ELSE ah.alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime END
   AND CASE WHEN :device_name IS NULL THEN TRUE ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
   AND CASE WHEN :device_location IS NULL THEN TRUE ELSE dm.device_location LIKE CONCAT('%', :device_location, '%') END
   AND CASE WHEN :alert_name IS NULL THEN TRUE ELSE am.alert_name LIKE CONCAT('%', :alert_name, '%') END
-  AND CASE WHEN :alert_level_id IS NULL THEN TRUE ELSE al.alert_level_id = :alert_level_id END
-  AND CASE WHEN :alert_status_id IS NULL THEN TRUE ELSE asm.alert_status_id = :alert_status_id END
+  AND CASE WHEN :alert_level_id IS NULL THEN TRUE ELSE am.alert_level_id = :alert_level_id END
+  AND CASE WHEN :alert_status_id IS NULL THEN TRUE ELSE ah.alert_status_id = :alert_status_id END
 ```
 
 - 検索結果取得DBクエリ
 ```sql
 SELECT
   ah.alert_occurrence_datetime,
+  ah.alert_history_uuid,
+  ah.alert_status_id,
+  ah.alert_value,
   dm.device_name,
   dm.device_location,
   am.alert_name,
   al.alert_level_id,
   al.alert_level_name,
-  asm.alert_status_id,
   asm.alert_status_name
 FROM
-  alert_history ah
+  v_alert_history_by_user ah
 LEFT JOIN alert_status_master asm
   ON ah.alert_status_id = asm.alert_status_id
   AND asm.delete_flag = FALSE
@@ -560,17 +514,17 @@ LEFT JOIN alert_level_master al
   ON am.alert_level_id = al.alert_level_id
   AND al.delete_flag = FALSE
 LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
+  ON ah.device_id = dm.device_id
   AND dm.delete_flag = FALSE
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND CASE WHEN :start_datetime IS NULL OR :end_datetime IS NULL THEN TRUE ELSE alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime END
+  ah.user_id = :user_id
+  AND ah.delete_flag = FALSE
+  AND CASE WHEN :start_datetime IS NULL OR :end_datetime IS NULL THEN TRUE ELSE ah.alert_occurrence_datetime BETWEEN :start_datetime AND :end_datetime END
   AND CASE WHEN :device_name IS NULL THEN TRUE ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
   AND CASE WHEN :device_location IS NULL THEN TRUE ELSE dm.device_location LIKE CONCAT('%', :device_location, '%') END
   AND CASE WHEN :alert_name IS NULL THEN TRUE ELSE am.alert_name LIKE CONCAT('%', :alert_name, '%') END
-  AND CASE WHEN :alert_level_id IS NULL THEN TRUE ELSE al.alert_level_id = :alert_level_id END
-  AND CASE WHEN :alert_status_id IS NULL THEN TRUE ELSE asm.alert_status_id = :alert_status_id END
+  AND CASE WHEN :alert_level_id IS NULL THEN TRUE ELSE am.alert_level_id = :alert_level_id END
+  AND CASE WHEN :alert_status_id IS NULL THEN TRUE ELSE ah.alert_status_id = :alert_status_id END
 ORDER BY
   {sort_by} {order},
   ah.alert_history_id {order} -- 第二ソートキー
@@ -579,15 +533,15 @@ LIMIT :item_per_page OFFSET (:page -1) * :item_per_page
 
 #### 表示メッセージ
 
-| メッセージID | 表示内容 | 表示タイミング | 表示場所 |
-|-------------|---------|---------------|---------|
-| ERR_001 | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
+| メッセージID | 表示内容                   | 表示タイミング | 表示場所     |
+| ------------ | -------------------------- | -------------- | ------------ |
+| ERR_DB_001   | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
 
 #### エラーハンドリング
 
-| HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
-|--------------|-----------|---------|---------|
-| 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
+| HTTPステータス | エラー種別         | 処理内容            | 表示内容                   |
+| -------------- | ------------------ | ------------------- | -------------------------- |
+| 500            | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -671,12 +625,12 @@ flowchart TD
 def view_alert_history_detail(alert_history_uuid):
     try:
         # アラート履歴詳細情報取得（データスコープチェック含む）
-        query = AlertHistory.query.options(
-            joinedload(AlertHistory.alert_status)
-        ).filter_by(alert_history_uuid=alert_history_uuid, delete_flag=0)
-
-        query = apply_data_scope_filter(query, g.current_user)
-        alert_history = query.first_or_404()
+        # v_alert_history_by_user に user_id を渡すことでスコープ制限が自動適用される
+        alert_history = db.session.query(AlertHistoryByUser).filter(
+            AlertHistoryByUser.alert_history_uuid == alert_history_uuid,
+            AlertHistoryByUser.user_id == g.current_user.user_id,
+            AlertHistoryByUser.delete_flag == False,
+        ).first_or_404()
 
         return render_template('alert/alert-history/detail_modal.html', alert_history=alert_history)
 
@@ -694,15 +648,15 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ### 使用テーブル一覧
 
-| No | テーブル名 | 論理名 | 操作種別 | ワークフロー | 目的 | インデックス利用 |
-|----|-----------|--------|---------|------------|------|----------------|
-| 1 | alert_history | アラート履歴 | SELECT | 全ワークフロー | アラート履歴データ取得 | PRIMARY KEY (alert_history_id) |
-| 2 | alert_status_master | アラートステータスマスタ | SELECT | 全ワークフロー | アラートステータスの参照 | PRIMARY KEY (alert_status_id) |
-| 3 | alert_setting_master | アラート設定マスタ | SELECT | 全ワークフロー | アラート名・条件の参照 | PRIMARY KEY (alert_id) |
-| 4 | alert_level_master | アラートレベルマスタ | SELECT | 全ワークフロー | アラートレベルの参照 | PRIMARY KEY (alert_level_id) |
-| 5 | device_master | デバイスマスタ | SELECT | 全ワークフロー | デバイス名・設置場所の参照 | PRIMARY KEY (device_id) |
-| 6 | organization_closure | 組織閉包テーブル | SELECT | 全ワークフロー | データスコープ制限（下位組織取得） | PRIMARY KEY (parent_organization_id, subsidiary_organization_id) |
-| 7 | user_master | ユーザーマスタ | SELECT | 認証チェック | ユーザー情報・権限取得 | PRIMARY KEY (user_id) |
+| No  | テーブル名               | 論理名                       | 操作種別 | ワークフロー             | 目的                                                                                                   | インデックス利用                                                              |
+| --- | ------------------------ | ---------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 1   | v_alert_history_by_user  | アラート履歴一覧用VIEW       | SELECT   | 初期表示、検索、詳細表示 | アラート履歴データ取得（組織スコープ制限込み）                                                         | PRIMARY KEY (alert_history_id)                                                |
+| 2   | alert_status_master      | アラートステータスマスタ     | SELECT   | 全ワークフロー           | アラートステータスの参照                                                                               | PRIMARY KEY (alert_status_id)                                                 |
+| 3   | alert_setting_master     | アラート設定マスタ           | SELECT   | 全ワークフロー           | アラート名・条件の参照                                                                                 | PRIMARY KEY (alert_id)                                                        |
+| 4   | alert_level_master       | アラートレベルマスタ         | SELECT   | 全ワークフロー           | アラートレベルの参照                                                                                   | PRIMARY KEY (alert_level_id)                                                  |
+| 5   | device_master            | デバイスマスタ               | SELECT   | 全ワークフロー           | デバイス名・設置場所の参照                                                                             | PRIMARY KEY (device_id)                                                       |
+| 6   | organization_closure     | 組織閉包テーブル             | SELECT   | 全ワークフロー（VIEW経由） | データスコープ制限（VIEWの内部実装で使用。アプリから直接アクセスしない）                             | PRIMARY KEY (parent_organization_id, subsidiary_organization_id)              |
+| 7   | user_master              | ユーザーマスタ               | SELECT   | 認証チェック             | ユーザー情報・権限取得                                                                                 | PRIMARY KEY (user_id)                                                         |
 
 ### インデックス最適化
 
@@ -724,10 +678,8 @@ DBクエリ実行の直前、直後に操作ログを出力する
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
+- **全ユーザー共通**: 各リソース用VIEW（`v_alert_history_by_user` 等）に `user_id` を渡すことでスコープ制限を自動適用
+  - VIEWが内部で `organization_closure` を参照し、アクセス可能な組織配下のデータのみ返す
   - **ロールによる条件分岐は一切行わない**
 
 **注**: システム保守者・管理者が全データにアクセスできるのは、
@@ -735,43 +687,15 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 **実装例:**
 ```python
-def apply_data_scope_filter(query, current_user):
-    """組織階層に基づいたデータスコープ制限を適用
-
-    すべてのユーザーに対して同じフィルタリングロジックを適用。
-    ロールによる条件分岐は一切行わない。
-
-    システム保守者・管理者が全データにアクセスできるのは、
-    ルート組織に所属しており、すべての組織がその下位組織として
-    登録されているため。
-    """
-    # organization_closure テーブルから下位組織リストを取得（全ユーザー共通）
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
-
-    # 下位組織IDのリストを抽出
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        # アクセス可能な組織がない場合は空の結果を返す
-        return query.filter(User.organization_id.in_([]))
-
-    # 組織IDリストでフィルタリング
-    return query.filter(User.organization_id.in_(org_ids))
-
-# 使用例
+# 使用例: アラート履歴一覧取得
 @alert_bp.route('/alert/alert-history', methods=['GET'])
 @require_auth
 def list_alert_histories():
-    query = AlertHistory.query.filter_by(delete_flag=0)
-
-    # データスコープ制限適用
-    query = apply_data_scope_filter(query, g.current_user)
-
-    alert_histories = query.all()
+    # v_alert_history_by_user に user_id を渡すだけでスコープ制限が自動適用される
+    alert_histories = db.session.query(AlertHistoryByUser).filter(
+        AlertHistoryByUser.user_id == g.current_user.user_id,
+        AlertHistoryByUser.delete_flag == False,
+    ).all()
     return render_template('alert/alert-history/list.html', alert_histories=alert_histories)
 ```
 
@@ -803,8 +727,8 @@ def list_alert_histories():
 - [データベース設計](../../01-architecture/database.md) - テーブル定義、インデックス設計
 
 ### 共通仕様
-- [共通仕様書](../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
-- [UI共通仕様書](../common/ui-common-specification.md) - すべての画面に共通するUI仕様
+- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
+- [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
 

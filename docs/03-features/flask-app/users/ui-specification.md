@@ -240,7 +240,7 @@
 | (6.7)  | ステータス           | status                      | Badge        | O   | -    | -      | -      | DB: `user_master.is_active`                                                                                                                              | バッジ表示、ソート可                     |
 | (6.8)  | 操作                 | action_buttons              | Button       | I   | -    | -      | -      | 固定値: 「参照」「更新」                                                                                                                                 |                                          |
 | (6.9)  | ページネーション     | pagination                  | Pagination   | I/O | -    | -      | 1      | -                                                                                                                                                        | 中央揃え                                 |
-| (7.1)  | 機能説明             | explanation                 | Label        | O   | -    | -      | -      | 固定値：<br>登録時：ユーザー情報を登録します。以下のフォームを入力してください。<br>更新時：ユーザー情報を更新します。以下のフォームを更新してください。 | -                                        |
+| (7.1)  | 機能説明             | explanation                 | Label        | O   | -    | -      | -      | 固定値：<br>登録時：ユーザー情報を登録します。以下のフォームを入力してください。※1<br>更新時：ユーザー情報を更新します。以下のフォームを更新してください。 | -                                        |
 | (7.2)  | ユーザー名           | name                        | Text         | I/O | ○    | 100    | -      | -                                                                                                                                                        | -                                        |
 | (7.3)  | メールアドレス       | email                       | Text\Label   | I/O | ○    | 254    | -      | -                                                                                                                                                        | 登録時はText（email形式）、更新時はLabel |
 | (7.4)  | ユーザー種別         | role                        | Select/Label | I/O | ○    | -      | -      | DB: `user_type_master.user_type_name`-                                                                                                                   | 登録時はSelect、更新時はLabel            |
@@ -248,8 +248,8 @@
 | (7.6)  | 地域                 | region                      | Select       | I/O | ○    | -      | -      | DB: `region_master.region_name` -                                                                                                                        | -                                        |
 | (7.7)  | 住所                 | address                     | Textarea     | I/O | -    | 500    | -      | -                                                                                                                                                        |                                          |
 | (7.8)  | ステータス           | status                      | Select       | I/O | ○    | -      | -      | DB: `user_master.status` (1:アクティブ, 0:ロック済み)                                                                                                    | 選択肢: アクティブ/ロック済み            |
-| (7.9)  | アラート通知設定     | alert_notification_setting  | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
-| (7.10) | システム通知設定     | system_notification_setting | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
+| (7.9)  | アラート通知設定     | alert_notification_flag  | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
+| (7.10) | システム通知設定     | system_notification_flag | Checkbox     | I/O | -    | -      | 未選択 |                                                                                                                                                          |                                          |  |
 
 | (7.11) | 登録/更新ボタン      | submit_button            | Button       | I   | -    | -      | -      | 固定値: 「登録」または「更新」                                                                                                                           | プライマリボタン、登録時は「登録」、更新時は「更新」        |
 | (7.12) | キャンセルボタン     | cancel_button            | Button       | I   | -    | -      | -      | 固定値: 「キャンセル」                                                                                                                                   | セカンダリボタン                                            |
@@ -397,7 +397,7 @@
 **3-3: CSVエクスポートボタン**
 - 概要: 現在の検索条件でユーザー一覧をCSVダウンロード
 - スタイル: セカンダリボタン
-- クリック時: `/admin/users?export=csv`にリクエスト
+- クリック時: `POST /admin/users/export`にリクエスト（現在の検索条件をPOSTボディで送信）
 
 ---
 
@@ -598,6 +598,8 @@
 - ラベル：「ユーザー情報を登録します。以下のフォームを入力してください。」
 - 表示タイプ：ラベル
 - 更新時：表示文言が「ユーザー情報を更新します。以下のフォームを更新してください。」に変化
+
+※1 オンプレミス環境（`AUTH_TYPE=local`）では、ユーザー登録完了後に招待メールが自動送信されます。招待メールには、パスワード設定用のリンクが含まれます。詳細は[認証仕様書 5.6節](../../common/authentication-specification.md#56-ユーザー新規登録時の認証処理)を参照してください。
 
 **7-2: ユーザー名**
 - 概要: ユーザーの名称を入力
