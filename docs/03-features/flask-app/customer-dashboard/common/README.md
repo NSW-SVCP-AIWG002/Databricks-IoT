@@ -19,7 +19,7 @@
       - [インデックス](#インデックス-3)
       - [dashboard\_user\_setting（ダッシュボードユーザー設定）](#dashboard_user_settingダッシュボードユーザー設定)
       - [インデックス](#インデックス-4)
-      - [gold\_summary\_method\_master（集約方法マスタ）](#gold_summary_method_master集約方法マスタ)
+      - [gold\_summary\_method\_master（サマリー計算手法マスタ）](#gold_summary_method_masterサマリー計算手法マスタ)
       - [インデックス](#インデックス-5)
   - [Flaskルート一覧](#flaskルート一覧)
   - [アクセス権限](#アクセス権限)
@@ -192,7 +192,7 @@
 |---------------|--------|-----|------|
 | PRIMARY | user_id | 主キー | ユーザーの一意識別子 |
 
-#### gold_summary_method_master（集約方法マスタ）
+#### gold_summary_method_master（サマリー計算手法マスタ）
 
 | カラム名 | 論理名 | データ型 | 必須 | 備考 |
 |----------|-------|---------|------|------|
