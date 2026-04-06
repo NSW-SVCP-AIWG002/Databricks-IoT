@@ -712,6 +712,7 @@ SET ROW FILTER iot_catalog.security.organization_filter ON (organization_id);
 - `sensor_data_json`: 構造化済みカラムで十分なため除外
 - `create_time`: ダッシュボード表示に不要なため除外
 
+#### 2. 日次サマリビュー（daily_summary_view）
 
 #### 2. 時次サマリビュー（hourly_summary_view）
 

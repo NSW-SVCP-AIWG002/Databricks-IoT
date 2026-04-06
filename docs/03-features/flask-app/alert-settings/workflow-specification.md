@@ -1045,8 +1045,9 @@ def delete_alert_settings():
 - [データベース設計](../../01-architecture/database.md) - テーブル定義、インデックス設計
 
 ### 共通仕様
-- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
-- [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
+- [共通仕様書](../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
+- [認証仕様書](../common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
+- [UI共通仕様書](../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
 

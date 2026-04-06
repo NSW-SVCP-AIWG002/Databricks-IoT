@@ -9,6 +9,7 @@
 1. **データ集計**: シルバー層センサーデータの日次・月次・年次集計
 2. **サマリ生成**: 集約対象項目ごとの統計値（平均、最大、最小等）算出
 3. **長期保存**: 10年間のデータ保持
+4. **障害通知**: エラー発生時のTeams通知
 
 ---
 
@@ -35,6 +36,7 @@
 | gold_sensor_data_daily_summary   | iot_catalog.gold | センサーデータ日次サマリ | 1日      |
 | gold_sensor_data_monthly_summary | iot_catalog.gold | センサーデータ月次サマリ | 1か月    |
 | gold_sensor_data_yearly_summary  | iot_catalog.gold | センサーデータ年次サマリ | 1年      |
+| gold_summary_method_master       | iot_catalog.gold | サマリー計算手法マスタ   | -        |
 
 ---
 
@@ -42,42 +44,55 @@
 
 ### 日次サマリカラム一覧（gold_sensor_data_daily_summary）
 
-| #   | カラム物理名    | カラム論理名 | データ型  | NULL     | PK  | 説明                                 |
-| --- | --------------- | ------------ | --------- | -------- | --- | ------------------------------------ |
-| 1   | device_id       | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子              |
-| 2   | organization_id | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                           |
-| 3   | collection_date | 集約日       | DATE      | NOT NULL | ○   | センサーデータを集約した日           |
-| 4   | summary_item    | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）         |
-| 5   | summary_method  | 集約方法     | INT       | NOT NULL |     | 集約方法（1:平均、2:最大、3:最小等） |
-| 6   | summary_value   | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                             |
-| 7   | data_count      | データ数     | INT       | NOT NULL |     | 集約したデータ数                     |
-| 8   | create_time     | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                     |
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | 説明                                         |
+| --- | ----------------- | ------------ | --------- | -------- | --- | -------------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子                      |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                                   |
+| 3   | collection_date   | 集約日       | DATE      | NOT NULL | ○   | センサーデータを集約した日                   |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                     |
+| 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                             |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                             |
 
 ### 月次サマリカラム一覧（gold_sensor_data_monthly_summary）
 
-| #   | カラム物理名          | カラム論理名 | データ型   | NULL     | PK  | 説明                                    |
-| --- | --------------------- | ------------ | ---------- | -------- | --- | --------------------------------------- |
-| 1   | device_id             | デバイスID   | INT        | NOT NULL | ○   | IoTデバイスの一意識別子                 |
-| 2   | organization_id       | 組織ID       | INT        | NOT NULL | ○   | 所属組織ID                              |
-| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM） |
-| 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | ○   | 集約対象の項目（測定項目ID）            |
-| 5   | summary_method        | 集約方法     | INT        | NOT NULL |     | 集約方法（1:平均、2:最大、3:最小等）    |
-| 6   | summary_value         | 集約値       | DOUBLE     | NOT NULL |     | 集約結果                                |
-| 7   | data_count            | データ数     | INT        | NOT NULL |     | 集約したデータ数                        |
-| 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     | レコード作成日時                        |
+| #   | カラム物理名          | カラム論理名 | データ型   | NULL     | PK  | 説明                                         |
+| --- | --------------------- | ------------ | ---------- | -------- | --- | -------------------------------------------- |
+| 1   | device_id             | デバイスID   | INT        | NOT NULL | ○   | IoTデバイスの一意識別子                      |
+| 2   | organization_id       | 組織ID       | INT        | NOT NULL | ○   | 所属組織ID                                   |
+| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM）      |
+| 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
+| 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
+| 6   | summary_value         | 集約値       | DOUBLE     | NOT NULL |     | 集約結果                                     |
+| 7   | data_count            | データ数     | INT        | NOT NULL |     | 集約したデータ数                             |
+| 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     | レコード作成日時                             |
 
 ### 年次サマリカラム一覧（gold_sensor_data_yearly_summary）
 
-| #   | カラム物理名    | カラム論理名 | データ型  | NULL     | PK  | 説明                                 |
-| --- | --------------- | ------------ | --------- | -------- | --- | ------------------------------------ |
-| 1   | device_id       | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子              |
-| 2   | organization_id | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                           |
-| 3   | collection_year | 集約年       | INT       | NOT NULL | ○   | センサーデータを集約した年（YYYY）   |
-| 4   | summary_item    | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）         |
-| 5   | summary_method  | 集約方法     | INT       | NOT NULL |     | 集約方法（1:平均、2:最大、3:最小等） |
-| 6   | summary_value   | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                             |
-| 7   | data_count      | データ数     | INT       | NOT NULL |     | 集約したデータ数                     |
-| 8   | create_time     | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                     |
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | 説明                                         |
+| --- | ----------------- | ------------ | --------- | -------- | --- | -------------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子                      |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                                   |
+| 3   | collection_year   | 集約年       | INT       | NOT NULL | ○   | センサーデータを集約した年（YYYY）           |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                     |
+| 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                             |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                             |
+
+### サマリー計算手法マスタカラム一覧（gold_summary_method_master）
+
+| #   | カラム物理名        | カラム論理名   | データ型    | NULL     | PK  | 説明                                           |
+| --- | ------------------- | -------------- | ----------- | -------- | --- | ---------------------------------------------- |
+| 1   | summary_method_id   | 集約方法ID     | INT         | NOT NULL | ○   | システム内での一意識別子                       |
+| 2   | summary_method_code | 集約方法コード | VARCHAR(20) | NOT NULL |     | 集約方法をコードで表現したもの（MAX、MINなど） |
+| 3   | summary_method_name | 集約方法名     | VARCHAR(30) | NOT NULL |     | 集約方法名（最大値、最小値など）               |
+| 4   | delete_flag         | 削除フラグ     | BOOLEAN     | NOT NULL |     | 論理削除時使用                                 |
+| 5   | create_time         | 作成日時       | TIMESTAMP   | NOT NULL |     | レコード作成日時                               |
+| 6   | creator             | 作成者ID       | INT         | NOT NULL |     | レコード作成ユーザのユーザID                   |
+| 7   | update_time         | 更新日時       | TIMESTAMP   | NOT NULL |     | レコード更新日時                               |
+| 8   | updater             | 更新者ID       | INT         | NOT NULL |     | レコード更新ユーザのユーザID                   |
 
 ### クラスタリングキー
 
@@ -104,11 +119,12 @@ CLUSTER BY (collection_year, device_id)
 
 ### 書き込みテーブル（Unity Catalog）
 
-| カタログ    | スキーマ | テーブル名                       | 用途       |
-| ----------- | -------- | -------------------------------- | ---------- |
-| iot_catalog | gold     | gold_sensor_data_daily_summary   | 日次サマリ |
-| iot_catalog | gold     | gold_sensor_data_monthly_summary | 月次サマリ |
-| iot_catalog | gold     | gold_sensor_data_yearly_summary  | 年次サマリ |
+| カタログ    | スキーマ | テーブル名                       | 用途                   |
+| ----------- | -------- | -------------------------------- | ---------------------- |
+| iot_catalog | gold     | gold_sensor_data_daily_summary   | 日次サマリ             |
+| iot_catalog | gold     | gold_sensor_data_monthly_summary | 月次サマリ             |
+| iot_catalog | gold     | gold_sensor_data_yearly_summary  | 年次サマリ             |
+| iot_catalog | gold     | gold_summary_method_master       | サマリー計算手法マスタ |
 
 ---
 
@@ -124,19 +140,19 @@ flowchart TB
         subgraph Daily["日次集計"]
             D_Read[センサーデータ読込]
             D_Group[日次グループ化]
-            D_Agg[集約処理<br>avg/max/min/count]
+            D_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
         end
 
         subgraph Monthly["月次集計"]
-            M_Read[日次サマリ読込]
+            M_Read[センサーデータ読込]
             M_Group[月次グループ化]
-            M_Agg[集約処理<br>avg/max/min/count]
+            M_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
         end
 
         subgraph Yearly["年次集計"]
-            Y_Read[月次サマリ読込]
+            Y_Read[センサーデータ読込]
             Y_Group[年次グループ化]
-            Y_Agg[集約処理<br>avg/max/min/count]
+            Y_Agg[集約処理<br>avg/max/min/p25/median/p75/stddev/p95/count]
         end
     end
 
@@ -144,16 +160,20 @@ flowchart TB
         GoldDaily[(gold_sensor_data_daily_summary)]
         GoldMonthly[(gold_sensor_data_monthly_summary)]
         GoldYearly[(gold_sensor_data_yearly_summary)]
+        GoldMethod[(gold_summary_method_master)]
     end
 
     SensorData --> D_Read
     D_Read --> D_Group --> D_Agg --> GoldDaily
+    D_Agg -.-> |データ参照| GoldMethod
 
-    GoldDaily --> M_Read
+    SensorData --> M_Read
     M_Read --> M_Group --> M_Agg --> GoldMonthly
-
-    GoldMonthly --> Y_Read
+    M_Agg -.-> |データ参照| GoldMethod
+    
+    SensorData --> Y_Read
     Y_Read --> Y_Group --> Y_Agg --> GoldYearly
+    Y_Agg -.-> |データ参照| GoldMethod
 ```
 
 ---
@@ -185,28 +205,28 @@ flowchart TB
 | 21           | 防露ヒータ出力(1)[%]        | defrost_heater_output_1          |
 | 22           | 防露ヒータ出力(2)[%]        | defrost_heater_output_2          |
 
-## 集約方法（summary_method）
+## 集約方法（summary_method_id）
 
-| summary_method | 集約方法     | 説明                 | 集約結果格納先                   |
-| -------------- | ------------ | -------------------- | -------------------------------- |
-| 1              | AVG_DAY      | 平均値               | gold_sensor_data_daily_summary   |
-| 2              | MAX_DAY      | 最大値               | gold_sensor_data_daily_summary   |
-| 3              | MIN_DAY      | 最小値               | gold_sensor_data_daily_summary   |
-| 4              | P25          | 第1四分位数          | gold_sensor_data_daily_summary   |
-| 5              | MEDIAN       | 中央値               | gold_sensor_data_daily_summary   |
-| 6              | P75          | 第3四分位数          | gold_sensor_data_daily_summary   |
-| 7              | STDDEV       | 標準偏差             | gold_sensor_data_daily_summary   |
-| 8              | P95          | 上側5％値            | gold_sensor_data_daily_summary   |
-| 9              | AVG_MONTH    | 日次平均の月間の平均 | gold_sensor_data_monthly_summary |
-| 10             | MAX_MONTH    | 月間の最大値         | gold_sensor_data_monthly_summary |
-| 11             | MIN_MONTH    | 月間の最小値         | gold_sensor_data_monthly_summary |
-| 12             | STDDEV_MONTH | 日間の平均の標準偏差 | gold_sensor_data_monthly_summary |
-| 13              | AVG_YEAR     | 月次平均の年間の平均 | gold_sensor_data_yearly_summary  |
-| 14             | MAX_YEAR     | 年間の最大値         | gold_sensor_data_yearly_summary  |
-| 15             | MIN_YEAR     | 年間の最小値         | gold_sensor_data_yearly_summary  |
-| 16             | STDDEV_YEAR  | 月間の平均の標準偏差 | gold_sensor_data_yearly_summary  |
+集約方法はサマリー計算手法マスタ（gold_summary_method_master）で管理されます。日次・月次・年次サマリで共通の集約方法IDを使用します。
 
+| summary_method_id | summary_method_code | 集約方法名    | 計算ロジック                            |
+| ----------------- | ------------------- | ------------- | --------------------------------------- |
+| 1                 | AVG                 | 平均値        | `AVG(sensor_value)`                     |
+| 2                 | MAX                 | 最大値        | `MAX(sensor_value)`                     |
+| 3                 | MIN                 | 最小値        | `MIN(sensor_value)`                     |
+| 4                 | P25                 | 第1四分位数   | `PERCENTILE_APPROX(sensor_value, 0.25)` |
+| 5                 | MEDIAN              | 中央値        | `PERCENTILE_APPROX(sensor_value, 0.5)`  |
+| 6                 | P75                 | 第3四分位数   | `PERCENTILE_APPROX(sensor_value, 0.75)` |
+| 7                 | STDDEV              | 標準偏差      | `STDDEV(sensor_value)`                  |
+| 8                 | P95                 | 上側5％境界値 | `PERCENTILE_APPROX(sensor_value, 0.95)` |
 
+### 各サマリテーブルでの集約対象
+
+| サマリテーブル                   | 集約元データ       | 説明                             |
+| -------------------------------- | ------------------ | -------------------------------- |
+| gold_sensor_data_daily_summary   | silver_sensor_data | シルバー層の生データを日次で集約 |
+| gold_sensor_data_monthly_summary | silver_sensor_data | シルバー層の生データを月次で集約   |
+| gold_sensor_data_yearly_summary  | silver_sensor_data | シルバー層の生データを年次で集約   |
 
 ---
 
@@ -227,6 +247,40 @@ flowchart TB
 | 保持期間       | 10年間          |
 | タイムトラベル | 7日間           |
 | 削除方式       | DELETE + VACUUM |
+
+---
+
+## エラー通知
+
+エラー発生時、システム保守者が属するTeamsの管理チャネルに対して通知を行います。
+
+### 通知方式
+
+| 項目           | 内容                                  |
+| -------------- | ------------------------------------- |
+| 通知先         | システム保守者用Teams管理チャネル     |
+| 通知方式       | Teamsワークフロー（Incoming Webhook） |
+| メッセージ形式 | Adaptive Card                         |
+
+### 通知対象
+
+| 対象             | 通知有無 | 説明                          |
+| ---------------- | -------- | ----------------------------- |
+| データ読込エラー | ✓        | シルバー層からの読込失敗      |
+| データ変換エラー | ✓        | 集計処理中のエラー            |
+| データ書込エラー | ✓        | ゴールド層への書込失敗        |
+| タイムアウト     | ✓        | 処理時間超過                  |
+| 大量スキップ     | △        | 100件以上のレコードスキップ時 |
+
+### 通知内容
+
+- エラーコード・エラーメッセージ
+- 発生日時
+- 対象パイプライン名
+- 処理対象日
+- 詳細情報（スタックトレース）
+
+**詳細:** [LDPパイプライン仕様書 - エラー通知（Teams）](./ldp-pipeline-specification.md#エラー通知teams)
 
 ---
 
@@ -254,7 +308,6 @@ flowchart TB
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                 | 担当者 |
-| ---------- | ---- | ------------------------ | ------ |
-| 2026-01-26 | 1.0  | 初版作成                 | Claude |
-| 2026-01-26 | 2.0  | UC設計書に準拠して再設計 | Claude |
+| 日付       | 版数 | 変更内容                                                                | 担当者       |
+| ---------- | ---- | ----------------------------------------------------------------------- | ------------ |
+| 2026-01-26 | 1.0  | 初版作成                                                                | Kei Sugiyama |
