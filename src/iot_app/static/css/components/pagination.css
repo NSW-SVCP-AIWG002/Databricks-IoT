@@ -1,0 +1,70 @@
+/* ===== ページネーション ===== */
+
+/* ページネーション */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-2);
+}
+
+/* ページボタン */
+.pagination__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 4px 6px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.pagination__button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.pagination__button:hover:disabled {
+  cursor: not-allowed;
+  color: var(--color-gray-600);
+}
+
+/* アクティブページ */
+.pagination__button--active {
+  background-color: var(--color-brand-blue);
+  border-color: var(--color-primary);
+}
+
+.pagination__button--active:hover {
+  background-color: var(--color-brand-blue);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* 省略記号 */
+.pagination__ellipsis {
+  padding: 4px 6px;
+  color: var(--color-gray-600);
+  font-size: var(--font-size-sm);
+}
+
+/* ページネーション情報表示 */
+.pagination-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.pagination-info {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}

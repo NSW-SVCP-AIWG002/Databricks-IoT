@@ -13,6 +13,7 @@ from datetime import datetime
 
 from databricks import sql
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.config import Config
 
 from conf.settings import FileStoreConfig, GenieConfig, TokenContext
 from conf.logging_config import log_message
@@ -32,10 +33,15 @@ def create_workspace_client() -> WorkspaceClient:
         WorkspaceClient: 新しい接続インスタンス
     """
     auth_token = TokenContext.get("auth_token")
-    return WorkspaceClient(
+    # コンテナ環境変数の OAuth 認証情報（DATABRICKS_CLIENT_ID/SECRET）との競合を防ぐため
+    # Config を明示的に構築してユーザートークン（PAT）のみで認証する
+    cfg = Config(
         host=FileStoreConfig.DATABRICKS_HOST,
-        token=auth_token
+        token=auth_token,
+        client_id="",
+        client_secret="",
     )
+    return WorkspaceClient(config=cfg)
 
 def upload_large_csv_with_sdk(
     df: pd.DataFrame, 

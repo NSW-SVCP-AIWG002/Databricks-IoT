@@ -1,0 +1,13 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "Databricks IoT (Local MySQL)",
+      "driver": "MySQL",
+      "server": "db",
+      "port": 3306,
+      "database": "databricks_iot",
+      "username": "user",
+      "password": "password"
+    }
+  ]
+}

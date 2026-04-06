@@ -1,0 +1,53 @@
+/* ===== スピナー・ローディング ===== */
+
+/* スピナー基本 */
+.spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(236, 111, 120, 0.3);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* サイズバリエーション */
+.spinner--small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.spinner--large {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+/* フルスクリーンオーバーレイ */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-overlay .spinner {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: var(--color-white);
+}

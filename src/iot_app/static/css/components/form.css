@@ -1,0 +1,237 @@
+/* ===== フォーム要素 ===== */
+
+/* フォームグループ */
+.form-group {
+  margin-bottom: var(--spacing-4);
+}
+
+/* ラベル */
+.form-label {
+  display: block;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  margin-bottom: var(--spacing-1);
+}
+
+/* 必須バッジ */
+.form-label__required {
+  padding: var(--spacing-0) var(--spacing-1);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-danger);
+  border: none;
+  border-radius: var(--border-radius-base);
+  color: var(--color-white);
+  margin-left: var(--spacing-1);
+  vertical-align: middle;
+}
+
+/* テキスト入力 */
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-lg);
+  color: var(--color-gray-900);
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  outline: none;
+  transition: all var(--transition-base);
+}
+
+.form-input:hover {
+  border-color: var(--color-primary);
+}
+
+.form-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-shadow);
+}
+
+.form-input:disabled {
+  background-color: var(--color-gray-200);
+  border-color: var(--color-border);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* バリデーションエラー状態 */
+.form-input--error {
+  border-color: var(--color-danger);
+}
+
+.form-input--error:focus {
+  box-shadow: 0 0 0 2px var(--color-danger-focus-shadow);
+}
+
+/* バリデーション正常状態 */
+.form-input--valid {
+  border-color: var(--color-success);
+}
+
+/* エラーメッセージ */
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin-top: var(--spacing-1);
+}
+
+/* ヘルプテキスト */
+.form-help {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+  margin-top: var(--spacing-1);
+}
+
+/* セレクトボックス */
+.form-select {
+  width: 100%;
+  height: 40px;
+  padding: var(--spacing-2);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-shadow);
+}
+
+.form-select:disabled {
+  background-color: var(--color-gray-200);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 複数選択 */
+.form-select--multiple {
+  height: auto;
+}
+
+/* オプショングループ（チェックボックス・ラジオ） */
+.form-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.form-option {
+  display: flex;
+  align-items: center;
+}
+
+.form-option__input {
+  width: 16px;
+  height: 16px;
+  margin-right: var(--spacing-2);
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.form-option__label {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 日付入力 */
+.form-input[type="date"],
+.form-input[type="datetime-local"] {
+  /* 基本スタイルは .form-input を継承 */
+}
+
+/* ===== 検索フォーム ===== */
+
+/* 検索フォームコンテナ */
+.search-form {
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+}
+
+/* 検索フォームヘッダー */
+.search-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-3) var(--spacing-4);
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-form__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+}
+
+.search-form__toggle-icon {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+/* 検索フォームボディ */
+.search-form__body {
+  padding: var(--spacing-4);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+/* 折りたたみ時 */
+.search-form--collapsed .search-form__body {
+  display: none;
+}
+
+/* ===== 検索条件表示エリア ===== */
+
+.search-conditions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-3);
+}
+
+.search-conditions__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  white-space: nowrap;
+}
+
+.search-conditions__badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-search-badge);
+  border-radius: var(--border-radius-base);
+  color: var(--color-gray-700);
+}
+
+/* ===== 検索結果件数表示 ===== */
+
+.search-result-count {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-700);
+  margin-bottom: var(--spacing-3);
+}
+
+.search-result-count__label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-result-count__value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}

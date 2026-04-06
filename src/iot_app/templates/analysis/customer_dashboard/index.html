@@ -6,6 +6,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/common.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/bar_chart.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/timeline.css') }}">
+<<<<<<< HEAD
+=======
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/circle_chart.css') }}">
+>>>>>>> origin/main
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {% endblock %}
 
@@ -254,6 +258,10 @@
                     <a
                       class="button button--primary gadget__csv-btn"
                       href="{{ url_for('customer_dashboard.gadget_csv_export', gadget_uuid=gadget.gadget_uuid) }}?export=csv"
+<<<<<<< HEAD
+=======
+                      {% if gadget.gadget_type_id == gadget_type_ids['円グラフ'] %}style="visibility: hidden;"{% endif %}
+>>>>>>> origin/main
                     >CSVエクスポート</a>
                   </div>
 
@@ -262,6 +270,11 @@
                     {% include 'analysis/customer_dashboard/gadgets/bar_chart.html' %}
                   {% elif gadget.gadget_type_id == gadget_type_ids['時系列グラフ'] %}
                     {% include 'analysis/customer_dashboard/gadgets/timeline.html' %}
+<<<<<<< HEAD
+=======
+                  {% elif gadget.gadget_type_id == gadget_type_ids['円グラフ'] %}
+                    {% include 'analysis/customer_dashboard/gadgets/circle_chart.html' %}
+>>>>>>> origin/main
                   {% endif %}
 
                 </div>{# /gadget #}
@@ -305,6 +318,10 @@
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
+<<<<<<< HEAD
+=======
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/circle_chart.js') }}"></script>
+>>>>>>> origin/main
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},

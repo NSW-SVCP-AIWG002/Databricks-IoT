@@ -51,8 +51,8 @@
 
 | 画面ID | 画面名 | スラッグ | 表示方式 | 概要 |
 |--------|--------|---------|---------|------|
-| IDS-001 | 店舗モニタリング画面 | `/industry-dashboard/store-monitoring` | 画面 | ログイン後の初期画面（グローバルメニューからも遷移可能）、店舗のデバイス一覧やアラート一覧を表示 |
-| IDS-002 | デバイス詳細画面 | `/industry-dashboard/device-details/<device_uuid>` | 画面 | 店舗モニタリング画面から遷移、デバイスのセンサーデータやアラート履歴を表示 |
+| IDS-001 | 店舗モニタリング画面 | `/analysis/industry-dashboard/store-monitoring` | 画面 | ログイン後の初期画面（グローバルメニューからも遷移可能）、店舗のデバイス一覧やアラート一覧を表示 |
+| IDS-002 | デバイス詳細画面 | `/analysis/industry-dashboard/device-details/<device_uuid>` | 画面 | 店舗モニタリング画面から遷移、デバイスのセンサーデータやアラート履歴を表示 |
 
 ---
 
@@ -139,12 +139,12 @@ FROM iot_catalog.silver.silver_sensor_data sl
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 |
 |----|---------|---------------|---------|------|---------------|
-| 1 | 店舗モニタリング初期表示 | `/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML |
-| 2 | 店舗モニタリング検索 | `/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML |
-| 3 | センサー情報表示 | `/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML |
-| 4 | デバイス詳細初期表示 | `/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML |
-| 5 | デバイス詳細検索 | `/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | |
-| 6 | CSVエクスポート | `/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV |
+| 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML |
+| 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML |
+| 3 | センサー情報表示 | `/analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML |
+| 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML |
+| 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | |
+| 6 | CSVエクスポート | `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV |
 
 ---
 

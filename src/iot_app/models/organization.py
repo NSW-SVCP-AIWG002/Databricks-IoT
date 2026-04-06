@@ -16,6 +16,7 @@ class OrganizationTypeMaster(db.Model):
     delete_flag = db.Column(db.Boolean, nullable=False, default=False)
 
 
+<<<<<<< HEAD
 class ContractStatusMaster(db.Model):
     """契約状態マスタ"""
     __tablename__ = 'contract_status_master'
@@ -29,6 +30,8 @@ class ContractStatusMaster(db.Model):
     delete_flag = db.Column(db.Boolean, nullable=False, default=False)
 
 
+=======
+>>>>>>> origin/main
 class OrganizationMaster(db.Model):
     """組織マスタ"""
     __tablename__ = 'organization_master'
