@@ -36,19 +36,21 @@ def plot_code_node(prompt, sql_query, df):
         log_message(f"LLM時間: {end_llm - start_llm}秒")
 
         # json_res = json.loads(result[-1]['text'])
-        python_code = json_res["python_code"]
-        explain = json_res["explain"]
-        return {"plot_code": python_code, "explain" : explain}
+        python_code = json_res.get("python_code", "")
+        explain = json_res.get("explain", "")
+        return {"plot_code": python_code, "explain": explain}
     except Exception as e:
         traceback.print_exc()
-        return {"plot_code": f"コード生成エラー: {e}"}
+        return {"plot_code": f"コード生成エラー: {e}", "explain": ""}
 
 
 def clean_code(code):
     # 全角記号を半角に
     code = code.replace('、', ',').replace('。', '.').replace('：', ':').replace('（', '(').replace('）', ')')
     code = code.replace('\u3000', ' ')
-    return code
+    # import行を除去（ライブラリはexec_namespaceで提供済み）
+    lines = [line for line in code.splitlines() if not re.match(r'^\s*(import|from)\s', line)]
+    return '\n'.join(lines)
     
 
 # グラフ化コードを実行する関数
@@ -60,7 +62,7 @@ def create_plot(prompt, sql_query, df):
             end_plotcode = time.time()
             log_message(f"PlotCode時間: {end_plotcode - start_plotcode}秒")
             plot_code = result["plot_code"]
-            message = result["explain"]
+            message = result.get("explain", "")
             if "fig" in plot_code:
                 plot_code_clean = clean_code(plot_code)
                 # L1: コード静的解析
@@ -71,7 +73,15 @@ def create_plot(prompt, sql_query, df):
                 exec_namespace = {
                     "df": df, "go": go, "px": px,
                     "pd": pd, "np": np, "print": print,
-                    "__builtins__": {}
+                    "__builtins__": {
+                        "float": float, "int": int, "str": str, "bool": bool,
+                        "len": len, "range": range, "list": list, "dict": dict,
+                        "tuple": tuple, "set": set, "zip": zip, "enumerate": enumerate,
+                        "min": min, "max": max, "sum": sum, "abs": abs,
+                        "round": round, "sorted": sorted, "reversed": reversed,
+                        "isinstance": isinstance, "type": type, "print": print,
+                        "None": None, "True": True, "False": False,
+                    }
                 }
                 start_exec = time.time()
                 # L3: タイムアウト付き実行
