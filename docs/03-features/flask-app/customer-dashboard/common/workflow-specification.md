@@ -312,7 +312,10 @@ flowchart TD
 
     SetDeviceId --> Template
 
-    Template --> Response[HTMLレスポンス返却]
+    Template --> CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckCreator -->|作成者| Response[HTMLレスポンス返却]
+    CheckCreator -->|作成者以外| HiddenButton[編集モード切替ボタン<br>レイアウト保存ボタン<br>各種設定ボタン<br>非表示]
+    HiddenButton --> Response
 
     RenderEmpty --> Response
 
@@ -401,11 +404,13 @@ WHERE
 ```sql
 SELECT
   dashboard_id,
-  dashboard_name
+  dashboard_name,
+  creator
 FROM
   dashboard_master
 WHERE
   organization_id IN (:accessible_org_ids)
+  AND dashboard_id = :dashboard_id
   AND delete_flag = FALSE
 ORDER BY
   dashboard_id ASC
@@ -555,6 +560,11 @@ def customer_dashboard():
     if user_setting.organization_id != 0:
       # デバイス選択肢取得
       devices = get_devices(user_setting.organization_id)
+    
+    # ログインユーザーがダッシュボードの作成者かを確認
+    isCreator = False
+    if g.current_user.user_id == dashboard.creator:
+      isCreator = True
 
     return render_template(
         'customer_dashboard/index.html',
@@ -564,7 +574,8 @@ def customer_dashboard():
         gadgets=gadgets,
         organizations=organizations,
         devices=devices,
-        user_setting=user_setting
+        user_setting=user_setting,
+        isCreator=isCreator
     )
 ```
 
@@ -592,7 +603,15 @@ DBクエリ実行の直前、直後に操作ログを出力する
 - ガジェット: 保存されたレイアウトで配置
 - 組織選択: ユーザー設定で選択中の組織（または未選択）を設定
 - デバイス選択: ユーザー設定で選択中のデバイス（または非活性）を設定
-- 編集モード: OFF
+- 編集モード: 
+  - ログインユーザーが表示ダッシュボードの作成者: 表示（OFF状態）
+  - ログインユーザーが表示ダッシュボードの作成者以外: 非表示
+- レイアウト保存:
+  - ログインユーザーが表示ダッシュボードの作成者: 表示
+  - ログインユーザーが表示ダッシュボードの作成者以外: 非表示
+- 各種設定ボタン（ダッシュボード・ダッシュボードグループ・ガジェット）:
+  - ログインユーザーが表示ダッシュボードの作成者: 表示
+  - ログインユーザーが表示ダッシュボードの作成者以外: 非表示
 - 自動更新: ON
 - 最終更新時刻: 画面表示時の時刻
 
@@ -959,30 +978,26 @@ flowchart TD
     Start([更新ボタンクリック]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| DashboardQuery[ダッシュボード作成者を取得<br>DB dashboard_master]
 
-    CheckAuth -->|認証OK| UpdateDateQuery1[更新対象レコードの更新日時を取得<br>DB dashboard_master]
-    UpdateDateQuery1 --> CheckUpdateDateQuery1{DBクエリ結果}
-    CheckUpdateDateQuery1 -->|失敗| Error500[500エラーページ表示]
+    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
+    CheckDashboardQuery -->|成功| CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckDashboardQuery -->|失敗| Error500[500エラーページ表示]
 
-    CheckUpdateDateQuery1 -->|成功| Validate[バリデーション<br>ダッシュボードタイトル]
+    CheckCreator -->|作成者以外| Error403[403エラーモーダル表示]
+    CheckCreator -->|作成者| Validate[バリデーション<br>ダッシュボードタイトル]
+
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーモーダル表示]
-
     CheckValidate -->|OK| Scope[データスコープ制限チェック]
+
     Scope --> CheckScope{スコープOK?}
     CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckScope -->|スコープOK| Update[ダッシュボードタイトル更新<br>DB dashboard_master UPDATE]
 
-    CheckScope -->|スコープOK| UpdateDateQuery2[更新対象レコードの更新日時を取得<br>DB dashboard_master]
-    UpdateDateQuery2 --> CheckUpdateDateQuery2{DBクエリ結果}
-    CheckUpdateDateQuery2 -->|失敗| Error500
-
-    CheckUpdateDateQuery2 -->|成功| ComparisonUpdateDate{処理開始時の更新日時と比較}
-    ComparisonUpdateDate -->|不一致| Error409[409エラーモーダル表示]
-
-    ComparisonUpdateDate -->|一致| Update[ダッシュボードタイトル更新<br>DB dashboard_master UPDATE]
     Update --> CheckUpdate{DB操作結果}
-    CheckUpdate -->|失敗| Error500
     CheckUpdate -->|成功| Commit[トランザクションコミット]
+    CheckUpdate -->|失敗| Error500
 
     Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
@@ -990,8 +1005,8 @@ flowchart TD
     LoginRedirect --> End([処理完了])
     200OK --> End
     Error400 --> End
+    Error403 --> End
     Error404 --> End
-    Error409 --> End
     Error500 --> End
 ```
 
@@ -1007,6 +1022,23 @@ flowchart TD
 | ダッシュボードタイトル | 最大50文字 | ダッシュボードタイトルは50文字以内で入力してください |
 
 #### 処理詳細（サーバーサイド）
+
+**ダッシュボード作成者取得**
+
+**使用テーブル:** dashboard_master
+
+**SQL詳細**
+```sql
+SELECT
+  creator
+FROM
+  dashboard_master
+WHERE
+  dashboard_uuid = :dashboard_uuid
+  AND delete_flag = FALSE
+```
+
+**ダッシュボードタイトル更新**
 
 **使用テーブル:** dashboard_master
 
@@ -1029,17 +1061,14 @@ WHERE
 def dashboard_update(dashboard_uuid):
     """ダッシュボードタイトル更新実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボード更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ダッシュボード作成者取得
+    creator = get_dashboard_creator(dashboard_uuid)
 
-    # ② バリデーション
+    # ② ログインユーザーがダッシュボードの作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ バリデーション
     form = DashboardForm()
     if not form.validate_on_submit():
         dashboard = db.session.query(DashboardMaster).filter(
@@ -1051,28 +1080,13 @@ def dashboard_update(dashboard_uuid):
             form=form, dashboard=dashboard
         ), 400
 
-    # ③ データスコープ制限チェック
+    # ④ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
 
-    # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボード更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ⑤ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: dashboard_uuid={dashboard_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑥ ダッシュボードタイトル更新
+    # ⑤ ダッシュボードタイトル更新
     try:
         dashboard.dashboard_name = form.dashboard_name.data
         dashboard.update_date = datetime.now()
@@ -1100,8 +1114,8 @@ def dashboard_update(dashboard_uuid):
 |--------------|-----------|---------|---------|
 | 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたダッシュボードが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ダッシュボードタイトルの更新に失敗しました |
 
 #### ログ出力タイミング
@@ -1124,38 +1138,33 @@ flowchart TD
     Start([削除ボタンクリック]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| DashboardQuery[ダッシュボード作成者を取得<br>DB dashboard_master]
 
-    CheckAuth -->|認証OK| UpdateDateQuery1[更新対象レコードの更新日時を取得<br>DB dashboard_master<br>DB dashboard_group_master<br>DB dashboard_gadget_master]
-    UpdateDateQuery1 --> CheckUpdateDateQuery1{DBクエリ結果}
-    CheckUpdateDateQuery1 -->|失敗| Error500[500エラーページ表示]
+    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
+    CheckDashboardQuery -->|成功| CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckDashboardQuery -->|失敗| Error500[500エラーページ表示]
 
-    CheckUpdateDateQuery1 -->|成功| Scope[データスコープ制限チェック]
+    CheckCreator -->|作成者以外| Error403[403エラーモーダル表示]
+    CheckCreator -->|作成者| Scope[データスコープ制限チェック]
+
     Scope --> CheckScope{スコープOK?}
     CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckScope -->|スコープOK| DeleteGadgets[配下のガジェットを論理削除<br>DB dashboard_gadget_master UPDATE]
 
-    CheckScope -->|スコープOK| UpdateDateQuery2[更新対象レコードの更新日時を取得<br>DB dashboard_master<br>DB dashboard_group_master<br>DB dashboard_gadget_master]
-    UpdateDateQuery2 --> CheckUpdateDateQuery2{DBクエリ結果}
-    CheckUpdateDateQuery2 -->|失敗| Error500
-
-    CheckUpdateDateQuery2 -->|成功| ComparisonUpdateDate{処理開始時の更新日時と比較}
-    ComparisonUpdateDate -->|不一致| Error409[409エラーモーダル表示]
-
-    ComparisonUpdateDate -->|一致| DeleteGadgets[配下のガジェットを論理削除<br>DB dashboard_gadget_master UPDATE]
     DeleteGadgets --> DeleteGroups[配下のダッシュボードグループを論理削除<br>DB dashboard_group_master UPDATE]
     DeleteGroups --> DeleteDashboard[ダッシュボードを論理削除<br>DB dashboard_master UPDATE]
     DeleteDashboard --> CheckDelete{DB操作結果}
+    CheckDelete -->|成功| UpdateSetting[ユーザー設定更新<br>別のダッシュボードに切替<br>dashboard_id昇順の最初]
     CheckDelete -->|失敗| Error500
 
-    CheckDelete -->|成功| UpdateSetting[ユーザー設定更新<br>別のダッシュボードに切替<br>dashboard_id昇順の最初]
     UpdateSetting --> Commit[トランザクションコミット]
-
     Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功メッセージモーダル表示]
 
     LoginRedirect --> End([処理完了])
     200OK --> End
+    Error403 --> End
     Error404 --> End
-    Error409 --> End
     Error500 --> End
 ```
 
@@ -1221,38 +1230,20 @@ WHERE
 def dashboard_delete(dashboard_uuid):
     """ダッシュボード削除実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボード更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ダッシュボード作成者取得
+    creator = get_dashboard_creator(dashboard_uuid)
 
-    # ② データスコープ制限チェック
+    # ② ログインユーザーがダッシュボードの作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
 
-    # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボード更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ④ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: dashboard_uuid={dashboard_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑤ ダッシュボード削除
+    # ④ ダッシュボード削除
     try:
         # 配下のガジェットを論理削除
         delete_gadgets_by_dashboard(dashboard_uuid, g.current_user.user_id)
@@ -1294,8 +1285,8 @@ def dashboard_delete(dashboard_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたダッシュボードが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ダッシュボードの削除に失敗しました |
 
 #### ログ出力タイミング
@@ -1318,15 +1309,26 @@ flowchart TD
     Start([登録ボタンクリック]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| UserSettingQuery[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
 
-    CheckAuth -->|認証OK| Validate[バリデーション<br>ダッシュボードグループタイトル]
+    UserSettingQuery --> CheckUserSettingQuery{DBクエリ結果}
+    CheckUserSettingQuery -->|成功| DashboardQuery[ダッシュボード作成者を取得<br>DB dashboard_master]
+    CheckUserSettingQuery -->|失敗| Error500[500エラーページ表示]
+
+    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
+    CheckDashboardQuery -->|成功| CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckDashboardQuery -->|失敗| Error500
+
+    CheckCreator -->|作成者以外| Error403[403エラーモーダル表示]
+    CheckCreator -->|作成者| Validate[バリデーション<br>ダッシュボードグループタイトル]
+
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーモーダル表示]
-
     CheckValidate -->|OK| Insert[ダッシュボードグループ登録<br>DB dashboard_group_master INSERT]
+
     Insert --> CheckInsert{DB操作結果}
-    CheckInsert -->|失敗| Error500[500エラーページ表示]
     CheckInsert -->|成功| Commit[トランザクションコミット]
+    CheckInsert -->|失敗| Error500[500エラーページ表示]
 
     Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功モーダル表示]
@@ -1334,6 +1336,7 @@ flowchart TD
     LoginRedirect --> End([処理完了])
     200OK --> End
     Error400 --> End
+    Error403 --> End
     Error500 --> End
 ```
 
@@ -1386,15 +1389,26 @@ INSERT INTO dashboard_group_master (
 @require_auth
 def group_register():
     """ダッシュボードグループ登録実行"""
-    form = DashboardGroupForm()
-
-    if not form.validate_on_submit():
-        return render_template(
-            'customer_dashboard/modals/group_register.html',
-            form=form
-        ), 400
-
     try:
+        form = DashboardGroupForm()
+
+        # ダッシュボードユーザー設定取得
+        user_setting = get_dashboard_user_setting(g.current_user.user_id)
+
+        # ダッシュボード作成者取得
+        creator = get_dashboard_creator(user_setting.dashboard_id)
+
+        # ログインユーザーがダッシュボードの作成者かを確認
+        if g.current_user.user_id != creator:
+            abort(403)
+
+        # バリデーション
+        if not form.validate_on_submit():
+            return render_template(
+                'customer_dashboard/modals/group_register.html',
+                form=form
+            ), 400
+
         accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
         # 対象ダッシュボードのアクセス権限チェック
@@ -1444,6 +1458,7 @@ def group_register():
 |--------------|-----------|---------|---------|
 | 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示）| バリデーションエラーメッセージ |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 500 | データベースエラー | 500エラーページ表示 | ダッシュボードグループの登録に失敗しました |
 
 #### ログ出力タイミング
@@ -1495,17 +1510,14 @@ WHERE
 def group_update(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ダッシュボードグループ作成者取得
+    creator = get_dashboard_group_creator(dashboard_group_uuid)
 
-    # ② バリデーション
+    # ② ログインユーザーがダッシュボードグループの作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ バリデーション
     form = DashboardGroupForm()
     if not form.validate_on_submit():
         group = db.session.query(DashboardGroupMaster).filter(
@@ -1517,28 +1529,13 @@ def group_update(dashboard_group_uuid):
             form=form, group=group
         ), 400
 
-    # ③ データスコープ制限チェック
+    # ④ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
 
-    # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ⑤ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: dashboard_group_uuid={dashboard_group_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑥ ダッシュボードグループタイトル更新
+    # ⑤ ダッシュボードグループタイトル更新
     try:
         group.dashboard_group_name = form.dashboard_group_name.data
         group.update_date = datetime.now()
@@ -1566,8 +1563,8 @@ def group_update(dashboard_group_uuid):
 |--------------|-----------|---------|---------|
 | 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示）| バリデーションエラーメッセージ |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたダッシュボードグループが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ダッシュボードグループタイトルの更新に失敗しました |
 
 #### ログ出力タイミング
@@ -1590,35 +1587,31 @@ flowchart TD
     Start([削除ボタンクリック]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| DashboardGroupQuery[ダッシュボードグループ作成者を取得<br>DB dashboard_group_master]
 
-    CheckAuth -->|認証OK| UpdateDateQuery1[更新対象レコードの更新日時を取得<br>DB dashboard_group_master]
-    UpdateDateQuery1 --> CheckUpdateDateQuery1{DBクエリ結果}
-    CheckUpdateDateQuery1 -->|失敗| Error500[500エラーページ表示]
+    DashboardGroupQuery --> CheckDashboardGroupQuery{DBクエリ結果}
+    CheckDashboardGroupQuery -->|成功| CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckDashboardGroupQuery -->|失敗| Error500[500エラーページ表示]
 
-    CheckUpdateDateQuery1 -->|成功| Scope[データスコープ制限チェック]
+    CheckCreator -->|作成者以外| Error403[403エラーモーダル表示]
+    CheckCreator -->|作成者| Scope[データスコープ制限チェック]
+
     Scope --> CheckScope{スコープOK?}
     CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckScope -->|スコープOK| DeleteGadgets[配下のガジェットを論理削除<br>DB dashboard_gadget_master UPDATE]
 
-    CheckScope -->|スコープOK| UpdateDateQuery2[更新対象レコードの更新日時を取得<br>DB dashboard_group_master]
-    UpdateDateQuery2 --> CheckUpdateDateQuery2{DBクエリ結果}
-    CheckUpdateDateQuery2 -->|失敗| Error500
-
-    CheckUpdateDateQuery2 -->|成功| ComparisonUpdateDate{処理開始時の更新日時と比較}
-    ComparisonUpdateDate -->|不一致| Error409[409エラーモーダル表示]
-
-    ComparisonUpdateDate -->|一致| DeleteGadgets[配下のガジェットを論理削除<br>DB dashboard_gadget_master UPDATE]
     DeleteGadgets --> DeleteGroup[グループを論理削除<br>DB dashboard_group_master UPDATE]
     DeleteGroup --> CheckDelete{DB操作結果}
-    CheckDelete -->|失敗| Error500
     CheckDelete -->|成功| Commit[トランザクションコミット]
+    CheckDelete -->|失敗| Error500
 
     Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
     Redirect --> 200OK[成功メッセージモーダル表示]
 
     LoginRedirect --> End([処理完了])
     200OK --> End
+    Error403 --> End
     Error404 --> End
-    Error409 --> End
     Error500 --> End
 ```
 
@@ -1664,38 +1657,20 @@ WHERE
 def group_delete(dashboard_group_uuid):
     """ダッシュボードグループ削除実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ダッシュボードグループ作成者取得
+    creator = get_dashboard_group_creator(dashboard_group_uuid)
 
-    # ② データスコープ制限チェック
+    # ② ログインユーザーがダッシュボードグループの作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
 
-    # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ④ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: dashboard_group_uuid={dashboard_group_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑤ グループ削除
+    # ④ グループ削除
     try:
         # 配下のガジェットを論理削除
         delete_gadgets_by_group(dashboard_group_uuid, g.current_user.user_id)
@@ -1727,8 +1702,8 @@ def group_delete(dashboard_group_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたダッシュボードグループが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ダッシュボードグループの削除に失敗しました |
 
 #### ログ出力タイミング
@@ -1877,17 +1852,14 @@ WHERE
 def gadget_update(gadget_uuid):
     """ガジェットタイトル更新実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ガジェット更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ガジェット作成者取得
+    creator = get_gadget_creator(gadget_uuid)
 
-    # ② バリデーション
+    # ② ログインユーザーがガジェット作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ バリデーション
     form = GadgetForm()
     if not form.validate_on_submit():
         gadget = db.session.query(DashboardGadgetMaster).filter(
@@ -1899,28 +1871,13 @@ def gadget_update(gadget_uuid):
             form=form, gadget=gadget
         ), 400
 
-    # ③ データスコープ制限チェック
+    # ④ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
 
-    # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ガジェット更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ⑤ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: gadget_uuid={gadget_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑥ ガジェットタイトル更新
+    # ⑤ ガジェットタイトル更新
     try:
         gadget.gadget_name = form.gadget_name.data
         gadget.update_date = datetime.now()
@@ -1948,8 +1905,8 @@ def gadget_update(gadget_uuid):
 |--------------|-----------|---------|---------|
 | 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示）| バリデーションエラーメッセージ |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたガジェットが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ガジェットタイトルの更新に失敗しました |
 
 #### ログ出力タイミング
@@ -1992,38 +1949,20 @@ WHERE
 def gadget_delete(gadget_uuid):
     """ガジェット削除実行"""
 
-    # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
-    try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ガジェット更新日時取得エラー: {str(e)}')
-        abort(500)
+    # ① ガジェット作成者取得
+    creator = get_gadget_creator(gadget_uuid)
 
-    # ② データスコープ制限チェック
+    # ② ログインユーザーがガジェット作成者かを確認
+    if g.current_user.user_id != creator:
+        abort(403)
+
+    # ③ データスコープ制限チェック
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
 
-    # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
-    try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
-    except Exception as e:
-        logger.error(f'ガジェット更新日時再取得エラー: {str(e)}')
-        abort(500)
-
-    # ④ 更新日時の比較（楽観ロック）
-    if snapshot_update_date != current_update_date:
-        logger.warning(f'楽観ロック競合検出: gadget_uuid={gadget_uuid}, user_id={g.current_user.user_id}')
-        abort(409)
-
-    # ⑤ ガジェット削除
+    # ④ ガジェット削除
     try:
         gadget.delete_flag = True
         gadget.update_date = datetime.now()
@@ -2050,8 +1989,8 @@ def gadget_delete(gadget_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたガジェットが見つかりません |
-| 409 | 競合エラー | 409エラーモーダル表示 | 他のユーザーが先に更新しました。ページを更新してから再度お試しください。 |
 | 500 | データベースエラー | 500エラーページ表示 | ガジェットの削除に失敗しました |
 
 #### ログ出力タイミング
@@ -2087,16 +2026,30 @@ flowchart TD
     Start([レイアウト保存ボタンクリック]) --> Auth[認証チェック]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| UserSetting[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
 
-    CheckAuth -->|認証OK| GetLayout[JavaScriptからレイアウト情報を収集<br>各ガジェットのposition_x, position_y,<br>display_order]
+    UserSetting --> CheckUserSetting{DBクエリ結果}
+    CheckUserSetting -->|成功| DashboardQuery[ダッシュボード作成者を取得<br>DB dashboard_master]
+    CheckUserSetting -->|失敗| Error500[500エラーページ表示]
+
+    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
+    CheckDashboardQuery -->|成功| CheckCreator{ログインユーザーが<br>ダッシュボードの作成者?}
+    CheckDashboardQuery -->|失敗| Error500
+
+    CheckCreator -->|作成者以外| Error403[403エラーモーダル表示]
+    CheckCreator -->|作成者| GetLayout[JavaScriptからレイアウト情報を収集<br>各ガジェットのposition_x, position_y,<br>display_order]
+
     GetLayout --> SendAjax[AJAXリクエスト送信<br>POST /analysis/customer-dashboard/layout/save]
     SendAjax --> UpdateDB[レイアウト情報更新<br>DB dashboard_gadget_master UPDATE]
     UpdateDB --> CheckUpdate{DB操作結果}
-    CheckUpdate -->|失敗| Error500[500エラーレスポンス]
     CheckUpdate -->|成功| Commit[トランザクションコミット]
+    CheckUpdate -->|失敗| Error500[500エラーレスポンス]
+
     Commit --> Response[JSONレスポンス返却<br>成功メッセージ]
 
-    Response --> End([処理完了])
+    LoginRedirect --> End([処理完了])
+    Response --> End
+    Error403 --> End
     Error500 --> End
 ```
 
@@ -2128,6 +2081,17 @@ WHERE
 def layout_save():
     """レイアウト保存（AJAX）"""
     try:
+        # ダッシュボードユーザー設定取得
+        user_setting = get_dashboard_user_setting(g.current_user.user_id)
+        dashboard = get_dashboard_by_id(user_setting.dashboard_id)
+
+        # ダッシュボード作成者取得
+        creator = get_dashboard_creator(dashboard.dashboard_uuid)
+
+        # ログインユーザーがダッシュボードの作成者かを確認
+        if g.current_user.user_id != creator:
+            abort(403)
+
         layout_data = request.get_json()
         gadgets = layout_data.get('gadgets', [])
 
@@ -2161,6 +2125,7 @@ def layout_save():
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | 401エラーレスポンス | - |
+| 403 | 権限エラー | 403エラーモーダル表示 | この操作を実行する権限がありません |
 | 500 | データベースエラー | 500エラーレスポンス | レイアウトの保存に失敗しました |
 
 #### ログ出力タイミング

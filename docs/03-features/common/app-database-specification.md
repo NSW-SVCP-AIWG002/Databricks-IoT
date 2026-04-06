@@ -530,7 +530,7 @@
 | --- | ----------------------- | -------------------- | ----------- | -------- | --- | --- | ----------------- | ----------------------------------------------------- |
 | 1   | measurement_item_id     | 測定項目ID            | INT         | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、測定項目の一意識別子                           |
 | 2   | measurement_item_name   | 測定項目名            | VARCHAR(50) | NOT NULL | -   | -   | -                 | センサーで読み取る、機器に関する測定項目の名前             |
-| 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名       |
+| 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(63) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名       |
 | 4   | display_name            | 表示名               | VARCHAR(50) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する名前 |
 | 5   | unit_name               | 単位                 | VARCHAR(10) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する単位 |
 | 6   | create_date             | 作成日時             | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                         |
@@ -1166,7 +1166,7 @@
 | 8   | position_x         | X座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
 | 9   | position_y         | Y座標                  | INT         | NOT NULL | -   | -   | -                 | グリッド位置                                                                  |
 | 10  | gadget_size        | ガジェットサイズ        | INT         | NOT NULL | -   | -   | -                 | 0: 2x2（480×480px）、1: 2×4（960×480px）                                      |
-| 11  | display_order      | 表示順                 | INT         | NOT NULL | -   | -   | -                 | ダッシュボードグループの表示順                                                  |
+| 11  | display_order      | 表示順                 | INT         | NOT NULL | -   | -   | -                 | ガジェットの表示順                                                            |
 | 12  | create_date        | 作成日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                               |
 | 13  | creator            | 作成者                 | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                                                      |
 | 14  | update_date        | 更新日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                                            |
