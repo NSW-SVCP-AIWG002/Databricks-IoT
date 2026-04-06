@@ -98,6 +98,9 @@ const CustomerDashboard = (function () {
 
     // 時系列グラフ登録モーダル専用
     bindTimelineGadgetRegister(container);
+
+    // 円グラフ登録モーダル専用
+    bindCircleChartGadgetRegister(container);
   }
 
   /**
