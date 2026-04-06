@@ -95,12 +95,12 @@ flowchart TD
 
     CheckMaster -->|失敗| Error500
 
-    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master]
+    CheckMaster -->|成功| Count[検索結果件数取得DBクエリ実行<br>v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
 
-    CheckDB -->|成功| Query[検索結果取得DBクエリ実行<br>alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master]
+    CheckDB -->|成功| Query[検索結果取得DBクエリ実行<br>v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master]
     Query --> CheckDB2{DBクエリ結果}
     
     CheckDB2 -->|失敗| Error500[500エラーモーダル表示]
@@ -186,17 +186,14 @@ if sort_order not in ['asc', 'desc']:
 **③ 検索条件用マスタデータ取得**
 
 ```python
-from models import organization_master, organization_closure, alert_level_master, sort_item_master
+from models import organization_master_by_user, alert_level_master, sort_item_master
 
-# 組織マスタ取得（データスコープ制限適用）
+# 組織マスタ取得（v_organization_master_by_user VIEWを使用）
 organizations = (
-    organization_master.query
-    .join(organization_closure, organization_master.organization_id == organization_closure.subsidiary_organization_id)
-    .join(user_master, organization_closure.parent_organization_id == user_master.organization_id)
-    .filter(user_master.email_address == current_user.email_address)
-    .filter(user_master.delete_flag == False)
-    .filter(organization_master.delete_flag == False)
-    .order_by(organization_master.organization_name)
+    organization_master_by_user.query
+    .filter(organization_master_by_user.user_id == g.current_user.user_id)
+    .filter(organization_master_by_user.delete_flag == False)
+    .order_by(organization_master_by_user.organization_name)
     .all()
 )
 
@@ -220,32 +217,29 @@ sort_items = (
 
 **④ データベースクエリ実行**
 
+`v_alert_setting_master_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
+
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
+
 ```python
-from models import alert_setting_master, device_master, measurement_item_master, alert_level_master
+from models import alert_setting_master_by_user, measurement_item_master, alert_level_master
 from sqlalchemy.orm import aliased
 
 measurement_item_occur = aliased(measurement_item_master)
 measurement_item_recovery = aliased(measurement_item_master)
 
+# v_alert_setting_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
 query = (
-    alert_setting_master.query
-    .join(device_master, alert_setting_master.device_id == device_master.device_id)
-    .filter(device_master.delete_flag == False)
-    .join(measurement_item_occur, alert_setting_master.alert_conditions_measurement_item_id == measurement_item_occur.measurement_item_id)
+    db.session.query(AlertSettingMasterByUser)
+    .join(measurement_item_occur, AlertSettingMasterByUser.alert_conditions_measurement_item_id == measurement_item_occur.measurement_item_id)
     .filter(measurement_item_occur.delete_flag == False)
-    .join(measurement_item_recovery, alert_setting_master.alert_recovery_conditions_measurement_item_id == measurement_item_recovery.measurement_item_id)
+    .join(measurement_item_recovery, AlertSettingMasterByUser.alert_recovery_conditions_measurement_item_id == measurement_item_recovery.measurement_item_id)
     .filter(measurement_item_recovery.delete_flag == False)
-    .join(alert_level_master, alert_setting_master.alert_level_id == alert_level_master.alert_level_id)
+    .join(alert_level_master, AlertSettingMasterByUser.alert_level_id == alert_level_master.alert_level_id)
     .filter(alert_level_master.delete_flag == False)
-    .filter(alert_setting_master.delete_flag == False)
+    .filter(AlertSettingMasterByUser.user_id == g.current_user.user_id)
+    .filter(AlertSettingMasterByUser.delete_flag == False)
 )
-
-# データスコープ制限
-query = query.join(organization_master, device_master.organization_id == organization_master.organization_id)
-query = query.filter(organization_master.delete_flag == False)
-query = query.join(organization_closure, organization_master.organization_id == organization_closure.subsidiary_organization_id)
-query = query.join(user_master, organization_closure.parent_organization_id == user_master.organization_id)
-query = query.filter(user_master.email_address == current_user.email_address)
 
 # ソート項目IDをカラム名にマッピング（sort_item_master テーブルで検証）
 # view_id = 6（アラート設定一覧画面）, sort_item_id = sort_item_id, delete_flag = FALSE で検索
@@ -262,16 +256,16 @@ if sort_item:
 # ソート適用
 # sort_item_name に応じてソートカラムを決定（クロステーブル対応）
 SORT_COLUMN_MAP = {
-    'alert_id':                                      alert_setting_master.alert_id,
-    'alert_name':                                    alert_setting_master.alert_name,
-    'organization_name':                             organization_master.organization_name,
-    'device_name':                                   device_master.device_name,
+    'alert_id':                                      AlertSettingMasterByUser.alert_id,
+    'alert_name':                                    AlertSettingMasterByUser.alert_name,
+    'organization_name':                             AlertSettingMasterByUser.device_organization_id,
+    'device_name':                                   AlertSettingMasterByUser.device_id,
     'alert_conditions_measurement_item_id':          measurement_item_occur.measurement_item_id,
     'alert_recovery_conditions_measurement_item_id': measurement_item_recovery.measurement_item_id,
-    'judgment_time':                                 alert_setting_master.judgment_time,
-    'alert_level_id':                                alert_setting_master.alert_level_id,
-    'alert_notification_flag':                       alert_setting_master.alert_notification_flag,
-    'alert_email_flag':                              alert_setting_master.alert_email_flag,
+    'judgment_time':                                 AlertSettingMasterByUser.judgment_time,
+    'alert_level_id':                                AlertSettingMasterByUser.alert_level_id,
+    'alert_notification_flag':                       AlertSettingMasterByUser.alert_notification_flag,
+    'alert_email_flag':                              AlertSettingMasterByUser.alert_email_flag,
 }
 
 if sort_by:
@@ -285,17 +279,17 @@ if sort_by:
         else:
             query = query.order_by(
                 sort_column.asc() if sort_order == 'asc' else sort_column.desc(),
-                alert_setting_master.alert_id.asc()  # 第2ソートキー
+                AlertSettingMasterByUser.alert_id.asc()  # 第2ソートキー
             )
     else:
         # sort_item_name がマップに存在しない場合は alert_id にフォールバック
         query = query.order_by(
-            alert_setting_master.alert_id.asc() if sort_order == 'asc' else alert_setting_master.alert_id.desc()
+            AlertSettingMasterByUser.alert_id.asc() if sort_order == 'asc' else AlertSettingMasterByUser.alert_id.desc()
         )
 else:
     # sort_item_id が sort_item_master に存在しない場合（異常系）: alert_id でフォールバック
     query = query.order_by(
-        alert_setting_master.alert_id.asc() if sort_order == 'asc' else alert_setting_master.alert_id.desc()
+        AlertSettingMasterByUser.alert_id.asc() if sort_order == 'asc' else AlertSettingMasterByUser.alert_id.desc()
     )
 
 # ページング
@@ -359,13 +353,13 @@ flowchart TD
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
     Convert --> Scope[データスコープ制限を適用]
-    Scope -->  Count[表示件数取得DBクエリ実行<br>alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件を適用]
+    Scope -->  Count[表示件数取得DBクエリ実行<br>v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件を適用]
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件を適用]
     Query --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|失敗| Error500[500エラーモーダル表示]
@@ -394,50 +388,49 @@ flowchart TD
 
 **検索クエリ実行:**
 
+- `search_alert_settings()` はフロー1（初期表示）と共用（フィルタ条件はすべてサービス内で処理）
+
 ```python
 from sqlalchemy import or_
-from models import alert_setting_master, device_master, measurement_item_master, alert_level_master
+from models import alert_setting_master_by_user, measurement_item_master, alert_level_master
 from sqlalchemy.orm import aliased
 
 measurement_item_occur = aliased(measurement_item_master)
 measurement_item_recovery = aliased(measurement_item_master)
 
+# v_alert_setting_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
 query = (
-    alert_setting_master.query
-    .join(device_master, alert_setting_master.device_id == device_master.device_id)
-    .filter(device_master.delete_flag == False)
-    .join(measurement_item_occur, alert_setting_master.alert_conditions_measurement_item_id == measurement_item_occur.measurement_item_id)
+    db.session.query(AlertSettingMasterByUser)
+    .join(measurement_item_occur, AlertSettingMasterByUser.alert_conditions_measurement_item_id == measurement_item_occur.measurement_item_id)
     .filter(measurement_item_occur.delete_flag == False)
-    .join(measurement_item_recovery, alert_setting_master.alert_recovery_conditions_measurement_item_id == measurement_item_recovery.measurement_item_id)
+    .join(measurement_item_recovery, AlertSettingMasterByUser.alert_recovery_conditions_measurement_item_id == measurement_item_recovery.measurement_item_id)
     .filter(measurement_item_recovery.delete_flag == False)
-    .join(alert_level_master, alert_setting_master.alert_level_id == alert_level_master.alert_level_id)
+    .join(alert_level_master, AlertSettingMasterByUser.alert_level_id == alert_level_master.alert_level_id)
     .filter(alert_level_master.delete_flag == False)
-    .filter(alert_setting_master.delete_flag == False)
+    .filter(AlertSettingMasterByUser.user_id == g.current_user.user_id)
+    .filter(AlertSettingMasterByUser.delete_flag == False)
 )
-
-# データスコープ制限（初期表示と同様）
-# ...
 
 # アラート名検索
 alert_name = request.args.get('alert_name', '')
 if alert_name:
-    query = query.filter(alert_setting_master.alert_name.like(f'%{alert_name}%'))
+    query = query.filter(AlertSettingMasterByUser.alert_name.like(f'%{alert_name}%'))
 
 # デバイス名絞り込み
 device_name = request.args.get('device_name', '')
 if device_name:
-    query = query.filter(device_master.device_name.like(f'%{device_name}%'))
+    query = query.filter(AlertSettingMasterByUser.device_id.like(f'%{device_name}%'))
 
 # アラートレベル絞り込み
 alert_level_id = request.args.getlist('alert_level_id')
 if alert_level_id:
-    query = query.filter(alert_setting_master.alert_level_id.in_(alert_level_id))
+    query = query.filter(AlertSettingMasterByUser.alert_level_id.in_(alert_level_id))
 
 # ステータスフラグ絞り込み
 if request.args.get('alert_notification_flag') == '1':
-    query = query.filter(alert_setting_master.alert_notification_flag == True)
+    query = query.filter(AlertSettingMasterByUser.alert_notification_flag == True)
 if request.args.get('alert_email_flag') == '1':
-    query = query.filter(alert_setting_master.alert_email_flag == True)
+    query = query.filter(AlertSettingMasterByUser.alert_email_flag == True)
 
 # ソート・ページング
 # ...
@@ -675,7 +668,7 @@ flowchart TD
     CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
     Error401 --> End([処理完了])
 
-    CheckAuth -->|認証済み| GetID[アラートUUIDを取得<br>SELECT * FROM<br> alert_setting_master<br>WHERE alert_uuid = :uuid<br>AND データスコープ制限]
+    CheckAuth -->|認証済み| GetID[アラートUUIDを取得<br>SELECT * FROM<br> v_alert_setting_master_by_user<br>WHERE alert_uuid = :uuid<br>AND user_id = :user_id]
     GetID --> GetMaster[デバイスマスタ、<br>測定項目マスタ、<br>アラートレベルマスタを取得<br>データスコープ制限適用]
     GetMaster --> GetConfig[比較演算子、判定時間を<br>設定ファイルから取得]
     GetConfig --> Check{DBクエリ結果}
@@ -816,7 +809,7 @@ flowchart TD
     CheckAuth -->|未認証| Error401[ログイン画面へリダイレクト]
     Error401 --> End([処理完了])
 
-    CheckAuth -->|認証済み| GetID[アラート設定を取得<br>SELECT * FROM<br> alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>WHERE alert_uuid = :uuid<br>AND データスコープ制限]
+    CheckAuth -->|認証済み| GetID[アラート設定を取得<br>SELECT * FROM<br> v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>WHERE alert_uuid = :uuid<br>AND user_id = :user_id]
     GetID --> Check{DBクエリ結果}
 
     Check -->|データなし| Error404[404エラーモーダル表示]
@@ -858,7 +851,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| Query[DBクエリ実行<br>alert_setting_master<br>JOIN device_master<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件・データスコープ制限適用]
+    CheckPerm -->|権限OK| Query[DBクエリ実行<br>v_alert_setting_master_by_user<br>JOIN measurement_item_master<br>JOIN alert_level_master<br>検索条件適用]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
@@ -880,11 +873,11 @@ flowchart TD
 ```python
 import pandas as pd
 from datetime import datetime
-from models import alert_setting_master, device_master, measurement_item_master, alert_level_master
+from models import alert_setting_master_by_user, measurement_item_master, alert_level_master
 
 @alert_settings_bp.route('/alert/alert-setting', methods=['GET'])
 def list_alert_settings():
-    # ... 検索条件適用済みクエリ（measurement_item_master, alert_level_masterをJOIN済み、各テーブルのdelete_flag == Falseでフィルタ済み） ...
+    # ... 検索条件適用済みクエリ（v_alert_setting_master_by_userをベースにmeasurement_item_master, alert_level_masterをJOIN済み） ...
 
     # CSVエクスポート処理
     if request.args.get('export') == 'csv':
@@ -930,19 +923,19 @@ def list_alert_settings():
 
 ### 使用テーブル一覧
 
-| No | テーブル名 | 論理名 | 操作種別 | ワークフロー | 目的 |
-|----|-----------|--------|---------|------------|------|
-| 1 | alert_setting_master | アラート設定マスタ | SELECT | 初期表示、検索、参照、CSVエクスポート | アラート設定情報取得 |
-| 2 | alert_setting_master | アラート設定マスタ | INSERT | アラート設定登録 | 新規アラート設定作成 |
-| 3 | alert_setting_master | アラート設定マスタ | UPDATE | アラート設定更新 | アラート設定変更 |
-| 4 | alert_setting_master | アラート設定マスタ | UPDATE | アラート設定削除 | 論理削除（delete_flag=TRUE） |
-| 5 | device_master | デバイスマスタ | SELECT | 初期表示、検索、登録フォーム、更新フォーム、参照、CSVエクスポート | デバイス情報取得、選択肢表示 |
-| 6 | measurement_item_master | 測定項目マスタ | SELECT | 初期表示、検索、登録フォーム、更新フォーム、参照、CSVエクスポート | 測定項目名取得、選択肢表示 |
-| 7 | alert_level_master | アラートレベルマスタ | SELECT | 初期表示、検索、登録フォーム、更新フォーム、参照、CSVエクスポート | アラートレベル名取得、選択肢表示 |
-| 8 | organization_master | 組織マスタ | SELECT | 初期表示、検索、データスコープ制限 | 組織情報取得、検索条件用選択肢表示 |
-| 9 | organization_closure | 組織閉包テーブル | SELECT | 初期表示、検索、データスコープ制限 | 組織階層関係の取得 |
-| 10 | user_master | ユーザーマスタ | SELECT | データスコープ制限 | ログインユーザーの所属組織特定 |
-| 11 | sort_item_master | ソート項目マスタ | SELECT | 初期表示、検索、ソート | ソート項目の選択肢取得とカラム名マッピング（view_id = 6） |
+| No  | テーブル名                        | 論理名                       | 操作種別 | ワークフロー                                                   | 目的                                                                                               |
+| --- | --------------------------------- | ---------------------------- | -------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | v_alert_setting_master_by_user    | アラート設定一覧用VIEW       | SELECT   | 初期表示、検索、参照、更新フォーム、削除、CSVエクスポート      | アラート設定情報取得（組織スコープ制限込み）                                                       |
+| 2   | alert_setting_master              | アラート設定マスタ           | INSERT   | アラート設定登録                                               | 新規アラート設定作成                                                                               |
+| 3   | alert_setting_master              | アラート設定マスタ           | UPDATE   | アラート設定更新                                               | アラート設定変更                                                                                   |
+| 4   | alert_setting_master              | アラート設定マスタ           | UPDATE   | アラート設定削除                                               | 論理削除（delete_flag=TRUE）                                                                       |
+| 5   | device_master                     | デバイスマスタ               | SELECT   | 登録フォーム、更新フォーム                                     | デバイス選択肢表示                                                                                 |
+| 6   | measurement_item_master           | 測定項目マスタ               | SELECT   | 初期表示、検索、登録フォーム、更新フォーム、参照               | 測定項目名取得、選択肢表示                                                                         |
+| 7   | alert_level_master                | アラートレベルマスタ         | SELECT   | 初期表示、検索、登録フォーム、更新フォーム、参照               | アラートレベル名取得、選択肢表示                                                                   |
+| 8   | v_organization_master_by_user     | 組織一覧用VIEW               | SELECT   | 初期表示、検索（検索条件用選択肢）                             | 組織選択肢取得（組織スコープ制限込み）                                                             |
+| 9   | organization_closure              | 組織閉包テーブル             | SELECT   | 全ワークフロー（VIEW経由）                                     | データスコープ制限（VIEWの内部実装で使用。アプリから直接アクセスしない）                           |
+| 10  | user_master                       | ユーザーマスタ               | SELECT   | 認証チェック                                                   | ユーザー情報・権限取得                                                                             |
+| 11  | sort_item_master                  | ソート項目マスタ             | SELECT   | 初期表示、検索、ソート                                         | ソート項目の選択肢取得とカラム名マッピング（view_id = 6）                                          |
 
 ### SQL実行順序
 
@@ -962,46 +955,38 @@ def list_alert_settings():
 - Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`, `X-Forwarded-Email`）
 - セッション管理: Flaskセッション（サーバーサイド）
 
-**認可ロジック:** 自社デバイスおよび傘下組織デバイスのアラート設定を管理可能
+**認可ロジック:**
+
+組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
+
+**処理内容:**
+- **全ユーザー共通**: `v_alert_setting_master_by_user` に `user_id` を渡すことでスコープ制限を自動適用
+  - VIEWが内部で `organization_closure` を参照し、アクセス可能な組織配下のデータのみ返す
+  - **ロールによる条件分岐は一切行わない**
+
+**注**: システム保守者・管理者が全データにアクセスできるのは、
+ルート組織（すべての組織を子組織に持つ）に所属しているため
 
 **実装例:**
 
 ```python
-from functools import wraps
-from flask import abort
-
-def require_data_scope(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        current_user = get_current_user()
-        alert_uuid = kwargs.get('alert_uuid')
-
-        if alert_uuid:
-            # 指定されたアラート設定が、ログインユーザーのデータスコープ内にあるかチェック
-            result = (
-                alert_setting_master.query
-                .join(device_master, alert_setting_master.device_id == device_master.device_id)
-                .filter(device_master.delete_flag == False)
-                .join(organization_master, device_master.organization_id == organization_master.organization_id)
-                .filter(organization_master.delete_flag == False)
-                .join(organization_closure, organization_master.organization_id == organization_closure.subsidiary_organization_id)
-                .join(user_master, organization_closure.parent_organization_id == user_master.organization_id)
-                .filter(user_master.delete_flag == False)
-                .filter(user_master.email_address == current_user.email_address)
-                .filter(alert_setting_master.alert_uuid == alert_uuid)
-                .filter(alert_setting_master.delete_flag == False)
-                .first()
-            )
-            if not result:
-                abort(403)
-        return f(*args, **kwargs)
-    return decorated_function
+# 使用例: アラート設定一覧取得
+@alert_settings_bp.route('/alert/alert-setting', methods=['GET'])
+@require_auth
+def list_alert_settings():
+    # v_alert_setting_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
+    alert_settings = db.session.query(AlertSettingMasterByUser).filter(
+        AlertSettingMasterByUser.user_id == g.current_user.user_id,
+        AlertSettingMasterByUser.delete_flag == False,
+    ).all()
+    return render_template('alert_settings/list.html', alert_settings=alert_settings)
 
 @alert_settings_bp.route('/alert/alert-setting/delete', methods=['POST'])
+@require_auth
 def delete_alert_settings():
     # 削除対象のUUIDリストを取得
     alert_uuids = request.form.getlist('alert_uuids')
-    # 削除処理（各UUIDに対してデータスコープチェック適用）
+    # VIEWに user_id を渡してスコープチェック（対象外UUIDは0件更新として404扱い）
     pass
 ```
 
@@ -1060,8 +1045,8 @@ def delete_alert_settings():
 - [データベース設計](../../01-architecture/database.md) - テーブル定義、インデックス設計
 
 ### 共通仕様
-- [共通仕様書](../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
-- [UI共通仕様書](../common/ui-common-specification.md) - すべての画面に共通するUI仕様
+- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
+- [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 
 ---
 
