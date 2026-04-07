@@ -958,20 +958,20 @@ VACUUM iot_catalog.silver.silver_sensor_data;
 
 ### チェックポイントテーブルの削除ジョブ例
 
-ts（チェックポイントID/タイムスタンプ）の最新値で判定します。スレッド内の古いチェックポイントだけ消すと親子関係（parent_ts）が壊れるため、スレッド単位でまとめて削除します。
+timestamp（チェックポイントID/タイムスタンプ）の最新値で判定します。スレッド内の古いチェックポイントだけ消すと親子関係（parent_timestamp）が壊れるため、スレッド単位でまとめて削除します。
 
 ```sql
 -- 最終更新から30日経過したスレッドを削除
-DELETE FROM iot_catalog.ai_chat.checkpoints
+DELETE FROM iot_catalog.ai_chat.check_point_data
 WHERE thread_id IN (
     SELECT thread_id
-    FROM iot_catalog.ai_chat.checkpoints
+    FROM iot_catalog.ai_chat.check_point_data
     GROUP BY thread_id
-    HAVING MAX(ts) < DATE_SUB(CURRENT_TIMESTAMP(), 30)
+    HAVING MAX(`timestamp`) < DATE_SUB(CURRENT_TIMESTAMP(), 30)
 );
 
 -- VACUUM実行（7日経過後に物理削除）
-VACUUM iot_catalog.ai_chat.checkpoints;
+VACUUM iot_catalog.ai_chat.check_point_data;
 ```
 
 ---

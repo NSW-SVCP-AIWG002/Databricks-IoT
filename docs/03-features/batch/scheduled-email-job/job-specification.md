@@ -1,4 +1,4 @@
-# ジョブ仕様書
+# メール送信ジョブ仕様書
 
 ## 目次
 
@@ -41,31 +41,24 @@
 
 ## 概要
 
-このドキュメントは、Databricks Workflowとして実装するバッチ機能の詳細を記載します。
+このドキュメントは、Databricks Workflowとして実装するバッチ機能のうち、メール送信ジョブの詳細を記載します。
 
 ### このドキュメントの役割
 
-- アラート通知処理（メール送信バッチジョブ）
-- データクリーンアップ処理（キュークリーンアップジョブ）
-- Delta Lakeメンテナンス処理（OPTIMIZE、VACUUM、チェックポイントクリーンアップ）
+- アラート通知処理
+- PROCESSING状態滞留レコード削除処理
 
 ### 対象機能
 
-| 機能ID   | 機能名             | 処理内容                           |
-| -------- | ------------------ | ---------------------------------- |
-| FR-003-2 | アラート通知       | メール送信キューからのメール送信   |
-| OP-001   | データメンテナンス | Delta Lakeテーブルの最適化・圧縮   |
-| OP-002   | クリーンアップ     | 古いデータ・チェックポイントの削除 |
+| 機能ID   | 機能名       | 処理内容                         |
+| -------- | ------------ | -------------------------------- |
+| FR-003-2 | アラート通知 | メール送信キューからのメール送信 |
 
 ### ジョブ一覧
 
-| ジョブ名                  | 実行間隔           | 説明                                    |
-| ------------------------- | ------------------ | --------------------------------------- |
-| email_notification_sender | 1分間隔            | メール送信キューからメールを送信        |
-| email_queue_cleanup       | 日次（03:00）      | 30日経過した送信済み/失敗レコードを削除 |
-| silver_table_optimize     | 日次（02:00）      | Silver層テーブルのOPTIMIZE実行          |
-| silver_table_vacuum       | 週次（日曜 04:00） | Silver層テーブルのVACUUM実行            |
-| checkpoint_cleanup        | 週次（日曜 05:00） | 古いチェックポイントファイルの削除      |
+| ジョブ名                  | 実行間隔 | 説明                                                                                               |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| email_notification_sender | 1分間隔  | メール送信キューからメールを送信/メール送信キューテーブルのPROCESS状態で滞留しているレコードを削除 |
 
 ---
 
@@ -73,21 +66,24 @@
 
 ### ジョブ概要
 
-| 項目             | 設定値                                        |
-| ---------------- | --------------------------------------------- |
-| ジョブ名         | email_notification_sender                     |
-| 実行方式         | Databricks Workflow                           |
-| 実行間隔         | 1分間隔（cron: `* * * * *`）                  |
-| クラスタ         | Jobs Compute（サーバーレス推奨）              |
-| タイムアウト     | 5分                                           |
+| 項目             | 設定値                                           |
+| ---------------- | ------------------------------------------------ |
+| ジョブ名         | email_notification_sender                        |
+| 実行方式         | Databricks Workflow                              |
+| 実行間隔         | 1分間隔（cron: `* * * * *`）                     |
+| クラスタ         | Jobs Compute（サーバーレス推奨）                 |
+| タイムアウト     | 5分                                              |
 | リトライポリシー | 失敗時、ジッター付き指数バックオフを設けて再実行 |
 
 ### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> Fetch[PENDINGレコード取得<br>最大100件]
-    Fetch --> Check{レコード<br>あり?}
+    Start([ジョブ開始]) --> DeleteRecord[PROCESSINGステータスで<br>滞留している、DeleteRecord最終更新後<br>15分以上経過レコードを<br>削除]
+    DeleteRecord --> Fetch[PENDINGレコード取得<br>最大100件]
+    Fetch -->JoinOrg[組織マスタと結合]
+    JoinOrg --> JoinUser[ユーザマスタと結合]
+    JoinUser --> Check{レコード<br>あり?}
     Check -->|なし| End([ジョブ終了])
     Check -->|あり| UpdateProcessing[ステータスを<br>PROCESSINGに更新]
     UpdateProcessing --> Loop[各レコードを処理]
@@ -166,7 +162,7 @@ def send_email(recipient: str, subject: str, body: str) -> tuple[bool, str]:
 
 def cleanup_stale_processing_records(conn):
     """
-    PROCESSING状態のまま15分経過したレコードを削除する。
+    PROCESSING状態のまま最終更新後15分経過したレコードを削除する。
     ジョブ異常終了時のリカバリ処理として実行。
     """
     STALE_THRESHOLD_MINUTES = 15
@@ -309,366 +305,13 @@ process_email_queue()
 
 ### リトライ戦略
 
-| 項目               | 値                                                      | 説明                                                                                   |
-| ------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 最大リトライ回数   | 3回                                                     | retry_countが3に達したらFAILEDに遷移                                                   |
-| リトライ間隔       | ジッター付き指数バックオフ（10～12秒、10～14秒、10～18秒） | 送信失敗時の待機時間                                                                   |
-| タイムアウト       | 30秒                                                    | SMTP接続タイムアウト                                                                   |
-| 失敗時処理         | FAILED更新、error_message記録                           | 原因調査・手動対応用にエラー内容を保存                                                 |
-| PROCESSING滞留対応 | 15分経過で削除                                          | ジョブ異常終了時のリカバリとして、ジョブ開始時に15分以上PROCESSING状態のレコードを削除 |
-
----
-
-## キュークリーンアップジョブ仕様
-
-### ジョブ概要
-
-| 項目             | 設定値                              |
-| ---------------- | ----------------------------------- |
-| ジョブ名         | email_queue_cleanup                 |
-| 実行方式         | Databricks Workflow                 |
-| 実行間隔         | 日次（cron: `0 3 * * *`）毎日 03:00 |
-| クラスタ         | Jobs Compute（サーバーレス推奨）    |
-| タイムアウト     | 30分                                |
-| リトライポリシー | 失敗時リトライなし                  |
-
-### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> Count[削除対象件数をカウント<br>30日経過したSENT/FAILEDレコード]
-    Count --> Check{レコード<br>あり?}
-    Check -->|なし| End([ジョブ終了])
-    Check -->|あり| Delete[対象レコードを削除]
-    Delete --> Log[削除件数を出力]
-    Log --> End
-```
-
-### 処理コード
-
-送信完了または失敗したレコードを定期的に削除する。
-
-```python
-def cleanup_email_queue():
-    """30日経過したSENT/FAILEDレコードを削除"""
-    import pymysql
-    import pymysql.cursors
-
-    db_config = {
-        "host": dbutils.secrets.get("scope", "mysql-host"),
-        "port": int(dbutils.secrets.get("scope", "mysql-port")),
-        "user": dbutils.secrets.get("scope", "mysql-user"),
-        "password": dbutils.secrets.get("scope", "mysql-password"),
-        "database": dbutils.secrets.get("scope", "mysql-database"),
-        "cursorclass": pymysql.cursors.DictCursor,
-        "charset": "utf8mb4",
-    }
-
-    with pymysql.connect(**db_config) as conn:
-        with conn.cursor() as cursor:
-            # 削除対象件数を確認
-            cursor.execute("""
-                SELECT COUNT(*) as cnt
-                FROM email_notification_queue
-                WHERE status IN ('SENT', 'FAILED')
-                  AND processed_time < DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """)
-            count_before = cursor.fetchone()["cnt"]
-
-        print(f"削除対象レコード数: {count_before}")
-
-        if count_before == 0:
-            print("削除対象レコードなし")
-            return
-
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                DELETE FROM email_notification_queue
-                WHERE status IN ('SENT', 'FAILED')
-                  AND processed_time < DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """)
-        conn.commit()
-        print(f"削除完了: {count_before}件")
-
-
-# ジョブ実行
-cleanup_email_queue()
-```
-
-### クリーンアップ設定
-
-| 項目     | 設定値                | 説明                                   |
-| -------- | --------------------- | -------------------------------------- |
-| 保持期間 | 30日                  | 処理完了から30日経過したレコードを削除 |
-| 対象     | SENT/FAILEDステータス | 処理済みレコードのみ削除               |
-
----
-
-## Delta Lakeメンテナンスジョブ仕様
-
-Delta Lakeテーブルのパフォーマンスを維持するための定期メンテナンスジョブ。
-
-### 日次OPTIMIZEジョブ
-
-小ファイルを最適なサイズに統合し、クエリパフォーマンスを向上させる。
-
-#### ジョブ概要
-
-| 項目             | 設定値                         |
-| ---------------- | ------------------------------ |
-| ジョブ名         | silver_table_optimize          |
-| 実行方式         | Databricks Workflow            |
-| 実行間隔         | 日次（cron: `0 2 * * *`）02:00 |
-| クラスタ         | Jobs Compute                   |
-| タイムアウト     | 2時間                          |
-| リトライポリシー | 失敗時1回リトライ              |
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
-
-    Loop --> Optimize[OPTIMIZE実行]
-    Optimize --> Result{成功?}
-
-    Result -->|成功| Metrics[メトリクス出力<br>統合/削除ファイル数]
-    Result -->|失敗| Error[エラー出力]
-
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
-
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
-```
-
-#### 処理コード
-
-```python
-def optimize_silver_tables():
-    """Silver層テーブルのOPTIMIZE実行"""
-
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
-
-    for table in tables:
-        print(f"OPTIMIZE開始: {table}")
-        try:
-            result = spark.sql(f"OPTIMIZE {table}")
-            metrics = result.first()
-            print(f"  - 統合ファイル数: {metrics['numFilesAdded']}")
-            print(f"  - 削除ファイル数: {metrics['numFilesRemoved']}")
-            print(f"OPTIMIZE完了: {table}")
-        except Exception as e:
-            print(f"OPTIMIZEエラー: {table} - {str(e)}")
-
-    print("全テーブルのOPTIMIZE完了")
-
-
-# ジョブ実行
-optimize_silver_tables()
-```
-
-#### OPTIMIZE設定
-
-| 項目               | 設定値                     | 説明                             |
-| ------------------ | -------------------------- | -------------------------------- |
-| 対象テーブル       | Silver層全テーブル         | センサーデータ、状態             |
-| 実行タイミング     | 毎日 02:00（低負荷時間帯） | ストリーミング処理への影響を軽減 |
-| 自動コンパクション | 有効（テーブル設定）       | 日次に加えて自動実行も併用       |
-
-### 週次VACUUMジョブ
-
-削除済みファイルを物理的に削除し、ストレージ使用量を削減する。
-
-#### ジョブ概要
-
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | silver_table_vacuum                |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 4 * * 0`）日曜04:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 4時間                              |
-| リトライポリシー | 失敗時1回リトライ                  |
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
-
-    Loop --> Before[VACUUM前のファイル数を取得]
-    Before --> Vacuum[VACUUM実行<br>保持期間: 168時間]
-    Vacuum --> Result{成功?}
-
-    Result -->|成功| After[VACUUM後のファイル数を取得]
-    After --> Metrics[メトリクス出力<br>削除前後のファイル数]
-    Result -->|失敗| Error[エラー出力]
-
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
-
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
-```
-
-#### 処理コード
-
-```python
-def vacuum_silver_tables():
-    """Silver層テーブルのVACUUM実行"""
-
-    # 保持期間（時間）
-    RETAIN_HOURS = 168  # 7日
-
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
-
-    for table in tables:
-        print(f"VACUUM開始: {table}")
-        try:
-            # VACUUM実行前のファイル数を取得
-            before_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
-
-            # VACUUM実行
-            spark.sql(f"VACUUM {table} RETAIN {RETAIN_HOURS} HOURS")
-
-            # VACUUM実行後のファイル数を取得
-            after_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
-
-            print(f"  - 削除前ファイル数: {before_files}")
-            print(f"  - 削除後ファイル数: {after_files}")
-            print(f"VACUUM完了: {table}")
-        except Exception as e:
-            print(f"VACUUMエラー: {table} - {str(e)}")
-
-    print("全テーブルのVACUUM完了")
-
-
-# ジョブ実行
-vacuum_silver_tables()
-```
-
-#### VACUUM設定
-
-| 項目           | 設定値             | 説明                                 |
-| -------------- | ------------------ | ------------------------------------ |
-| 保持期間       | 168時間（7日）     | Time Travel用に7日分のファイルを保持 |
-| 対象テーブル   | Silver層全テーブル | センサーデータ、状態                 |
-| 実行タイミング | 日曜 04:00         | 週末の低負荷時間帯に実行             |
-
-**注意事項:**
-- VACUUMを実行すると、保持期間より古いバージョンへのTime Travelができなくなる
-- 保持期間はテーブルプロパティ `delta.deletedFileRetentionDuration` と一致させる
-
-### チェックポイントクリーンアップジョブ
-
-ストリーミングパイプラインのチェックポイントファイルを定期的にクリーンアップする。
-
-#### ジョブ概要
-
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | checkpoint_cleanup                 |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 5 * * 0`）日曜05:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 1時間                              |
-| リトライポリシー | 失敗時リトライなし                 |
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> Cutoff[カットオフ日時を計算<br>現在 - 7日]
-    Cutoff --> DirLoop[各チェックポイント<br>ディレクトリを処理]
-
-    DirLoop --> ListFiles[ディレクトリ内の<br>ファイル一覧を取得]
-    ListFiles --> ListResult{取得<br>成功?}
-
-    ListResult -->|失敗| DirError[エラー出力]
-    ListResult -->|成功| FileLoop[各ファイルを処理]
-
-    FileLoop --> CheckDate{更新日時が<br>カットオフ日<br>より前?}
-    CheckDate -->|はい| Delete[ファイル/ディレクトリ削除]
-    CheckDate -->|いいえ| Skip[スキップ]
-
-    Delete --> NextFile{次の<br>ファイル?}
-    Skip --> NextFile
-
-    NextFile -->|あり| FileLoop
-    NextFile -->|なし| Log[削除件数を出力]
-
-    DirError --> NextDir{次の<br>ディレクトリ?}
-    Log --> NextDir
-
-    NextDir -->|あり| DirLoop
-    NextDir -->|なし| End([ジョブ終了])
-```
-
-#### 処理コード
-
-```python
-from datetime import datetime, timedelta
-
-def cleanup_old_checkpoints():
-    """7日以上経過したチェックポイントファイルを削除"""
-
-    # チェックポイント保存先
-    CHECKPOINT_BASE_PATH = "abfss://checkpoints@{storage_account}.dfs.core.windows.net/"
-
-    # 保持期間（日）
-    RETAIN_DAYS = 7
-
-    # 対象パイプラインのチェックポイントディレクトリ
-    checkpoint_dirs = [
-        f"{CHECKPOINT_BASE_PATH}silver_pipeline/",
-    ]
-
-    cutoff_date = datetime.now() - timedelta(days=RETAIN_DAYS)
-
-    for checkpoint_dir in checkpoint_dirs:
-        print(f"チェックポイントクリーンアップ開始: {checkpoint_dir}")
-        try:
-            # ディレクトリ内のファイル一覧を取得
-            files = dbutils.fs.ls(checkpoint_dir)
-
-            deleted_count = 0
-            for file_info in files:
-                # ファイルの更新日時を確認
-                if hasattr(file_info, 'modificationTime'):
-                    file_time = datetime.fromtimestamp(file_info.modificationTime / 1000)
-                    if file_time < cutoff_date:
-                        dbutils.fs.rm(file_info.path, recurse=True)
-                        deleted_count += 1
-
-            print(f"  - 削除ファイル/ディレクトリ数: {deleted_count}")
-            print(f"クリーンアップ完了: {checkpoint_dir}")
-        except Exception as e:
-            print(f"クリーンアップエラー: {checkpoint_dir} - {str(e)}")
-
-    print("全チェックポイントのクリーンアップ完了")
-
-
-# ジョブ実行
-cleanup_old_checkpoints()
-```
-
-#### クリーンアップ設定
-
-| 項目           | 設定値                       | 説明                                         |
-| -------------- | ---------------------------- | -------------------------------------------- |
-| 保持期間       | 7日                          | 障害復旧に必要な期間を確保                   |
-| 対象           | チェックポイントディレクトリ | ストリーミングパイプラインのチェックポイント |
-| 実行タイミング | 日曜 05:00                   | VACUUM後に実行                               |
-
+| 項目               | 値                                                         | 説明                                                                                                                 |
+| ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 最大リトライ回数   | 3回                                                        | retry_countが3に達したらFAILEDに遷移                                                                                 |
+| リトライ間隔       | ジッター付き指数バックオフ（10～12秒、10～14秒、10～18秒） | 送信失敗時の待機時間                                                                                                 |
+| タイムアウト       | 30秒                                                       | SMTP接続タイムアウト                                                                                                 |
+| 失敗時処理         | FAILED更新、error_message記録                              | 原因調査・手動対応用にエラー内容を保存                                                                               |
+| PROCESSING滞留対応 | 最終更新時刻から15分経過で削除                             | ジョブ異常終了時のリカバリとして、ジョブ開始時に最終更新時刻から15分以上経過している、PROCESSING状態のレコードを削除 |
 ---
 
 ## 関連ドキュメント
