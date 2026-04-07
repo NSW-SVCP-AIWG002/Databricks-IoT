@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/bar_chart.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/timeline.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/circle_chart.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/belt_chart.css') }}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {% endblock %}
 
@@ -310,6 +311,7 @@
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/circle_chart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/belt_chart.js') }}"></script>
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},

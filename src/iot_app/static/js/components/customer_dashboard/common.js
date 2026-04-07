@@ -101,6 +101,9 @@ const CustomerDashboard = (function () {
 
     // 円グラフ登録モーダル専用
     bindCircleChartGadgetRegister(container);
+
+    // 帯グラフ登録モーダル専用
+    bindBeltChartGadgetRegister(container);
   }
 
   /**

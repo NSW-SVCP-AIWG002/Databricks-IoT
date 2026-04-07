@@ -1,0 +1,232 @@
+/* ============================================================
+   帯グラフガジェット
+   ============================================================ */
+
+.belt-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.belt-chart__canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.belt-chart__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.belt-chart__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-top: 1px solid #eee;
+  font-size: var(--font-size-sm);
+}
+
+.belt-chart__label {
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.belt-chart__unit-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.belt-chart__unit-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.belt-chart__unit-btn {
+  padding: 2px var(--spacing-2);
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  border-radius: 2px;
+}
+
+.belt-chart__unit-btn--active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.belt-chart__interval-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.belt-chart__interval-select {
+  padding: 2px var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
+.belt-chart__datetime-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.belt-chart__datetime-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.belt-chart__datetime-input {
+  width: 170px;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--spacing-2) 2px 24px;
+}
+
+.belt-chart__calendar-btn {
+  position: absolute;
+  left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+
+.belt-chart__refresh-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  padding: 0;
+  line-height: 1;
+}
+
+/* 2x2 ガジェット */
+.gadget--2x2 .belt-chart__unit-selector {
+  width: 100%;
+}
+
+/* ============================================================
+   帯グラフガジェット登録モーダル（circle_chart デザイン準拠）
+   ============================================================ */
+
+/* top-row グリッド調整（3カラム） */
+#belt-chart-register-form .gadget-register__top-row {
+  grid-template-columns: 200px 1fr 1fr;
+}
+
+/* top-row を上端揃えに */
+#belt-chart-register-form .gadget-register__top-row {
+  align-items: flex-start;
+}
+
+/* device-mode-area 内を上端揃えに */
+#belt-chart-register-form .gadget-register__device-mode-area {
+  align-items: flex-start;
+}
+
+/* 表示項目選択ラベルを左にオフセット */
+#belt-chart-register-form .gadget-register__measurement-title {
+  margin-left: -100px;
+}
+
+/* プレビュー下余白 */
+#belt-chart-register-form .gadget-register__preview {
+  margin-bottom: 0;
+}
+
+/* 右カラムを縦方向に */
+#belt-chart-register-form .gadget-register__right {
+  flex-direction: column;
+}
+
+/* デバイス名 */
+.gadget-register__device-name-row .belt-chart-register__device-name {
+  grid-column: 1 / 3;
+}
+
+/* デバイスモードボタン */
+.belt-chart-register__device-mode-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.belt-chart-register__device-mode-btn {
+  padding: var(--spacing-1) var(--spacing-3);
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.belt-chart-register__device-mode-btn--active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* ガジェットイメージプレビュー（積み上げ棒グラフ） */
+.gadget-register__preview-belt {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+}
+
+.gadget-register__preview-stack {
+  width: 28px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(
+    to top,
+    #5470c6 0%,
+    #5470c6 40%,
+    #91cc75 40%,
+    #91cc75 65%,
+    #fac858 65%,
+    #fac858 100%
+  );
+}
+.gadget-register__preview-stack--1 { height: 50%; }
+.gadget-register__preview-stack--2 { height: 75%; }
+.gadget-register__preview-stack--3 { height: 60%; }
+.gadget-register__preview-stack--4 { height: 85%; }
+
+/* 表示項目選択リスト */
+.belt-chart-register__measurement-list {
+  flex: 1;
+  min-width: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.belt-chart-register__measurement-list table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.belt-chart-register__measurement-list thead {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.belt-chart-register__measurement-list th,
+.belt-chart-register__measurement-list td {
+  border: 1px solid #ddd;
+}
+
+.belt-chart-register__measurement-list td:first-child {
+  text-align: center;
+}
