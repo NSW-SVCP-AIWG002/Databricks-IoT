@@ -166,21 +166,21 @@ flowchart TD
     ClearCookie --> InitParams[検索条件を初期化<br>page=1, alert_page=1]
     GetCookie --> OverridePage[Cookie検索条件に<br>page/alert_pageパラメータを上書き<br>page=request.args.get'page'<br>alert_page=request.args.get'alert_page']
 
-    InitParams --> Scope[データスコープ制限適用<br>organization_closureテーブルから下位組織IDリスト取得]
+    InitParams --> Scope[データスコープ制限適用<br>VIEW v_alert_history_by_user / v_device_master_by_user<br>に user_id を渡して自動フィルタリング]
     OverridePage --> Scope
 
-    Scope --> AlertCount[アラート一覧件数取得<br>DB alert_history]
+    Scope --> AlertCount[アラート一覧件数取得<br>VIEW v_alert_history_by_user]
     AlertCount --> CheckAlertCount{DBクエリ結果}
 
-    CheckAlertCount{DBクエリ結果} -->|成功| AlertQuery[アラート一覧取得<br>DB alert_history]
+    CheckAlertCount{DBクエリ結果} -->|成功| AlertQuery[アラート一覧取得<br>VIEW v_alert_history_by_user]
     CheckAlertCount{DBクエリ結果} -->|失敗| Error500[500エラーモーダル表示]
 
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
-    CheckAlertQuery -->|成功| DeviceCount[デバイス一覧件数取得<br>DB device_master]
+    CheckAlertQuery -->|成功| DeviceCount[デバイス一覧件数取得<br>VIEW v_device_master_by_user]
     CheckAlertQuery -->|失敗| Error500
 
     DeviceCount --> CheckDeviceCount{DBクエリ結果}
-    CheckDeviceCount -->|成功| DeviceQuery[デバイス一覧取得<br>DB device_master]
+    CheckDeviceCount -->|成功| DeviceQuery[デバイス一覧取得<br>VIEW v_device_master_by_user]
     CheckDeviceCount -->|失敗| Error500
 
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
@@ -206,13 +206,11 @@ flowchart TD
 **実行タイミング:** なし
 
 **データスコープ制限:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
+- **全ユーザー共通**: `v_alert_history_by_user` / `v_device_master_by_user` に `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれる
+  - `organization_closure` による組織階層フィルタリングはVIEW内で自動適用
   - **ロールによる条件分岐は一切行わない**
 
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
 
 #### 処理詳細（サーバーサイド）
 
@@ -232,80 +230,58 @@ flowchart TD
 
 **② データスコープ制限の適用**
 
-組織階層に基づいてデータスコープ制限を適用します。
+`v_alert_history_by_user` / `v_device_master_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
 
-**実装例:**
-```python
-def get_accessible_organizations(current_user_organization_id):
-    """アクセス可能な組織IDリストを取得"""
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user_organization_id
-    ).all()
-    return [org_id[0] for org_id in accessible_org_ids]
-```
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
 
 **③ アラート一覧取得**
 
 アラート履歴テーブルからアラート履歴を取得します。
 
-**使用テーブル:** alert_history、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master、 organization_master
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master
 
 **SQL詳細:**
 - アラート一覧件数取得DBクエリ
 ```sql
 SELECT
-  COUNT(alert_history_id) AS data_count
+  COUNT(v.alert_history_id) AS data_count
 FROM
-  alert_history ah
-LEFT JOIN alert_setting_master am
-  ON ah.alert_id = am.alert_id
-  AND am.delete_flag = FALSE
-LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
-  AND dm.delete_flag = FALSE
-LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
-  AND om.delete_flag = FALSE
+  v_alert_history_by_user v
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 LIMIT 30
 ```
 
 - アラート一覧取得DBクエリ
 ```sql
 SELECT
-  ah.alert_occurrence_datetime,
+  v.alert_occurrence_datetime,
   dm.device_name,
   am.alert_name,
   al.alert_level_name,
   asm.alert_status_name
 FROM
-  alert_history ah
+  v_alert_history_by_user v
 LEFT JOIN alert_status_master asm
-  ON ah.alert_status_id = asm.alert_status_id
+  ON v.alert_status_id = asm.alert_status_id
   AND asm.delete_flag = FALSE
 LEFT JOIN alert_setting_master am
-  ON ah.alert_id = am.alert_id
+  ON v.alert_id = am.alert_id
   AND am.delete_flag = FALSE
 LEFT JOIN alert_level_master al
   ON am.alert_level_id = al.alert_level_id
   AND al.delete_flag = FALSE
 LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
+  ON v.device_id = dm.device_id
   AND dm.delete_flag = FALSE
-LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
-  AND om.delete_flag = FALSE
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  ah.alert_history_id DESC
+  v.alert_history_id DESC
 LIMIT :item_per_page OFFSET 0
 ```
 
@@ -313,18 +289,18 @@ LIMIT :item_per_page OFFSET 0
 
 デバイスマスタからデバイス一覧を取得します。
 
-**使用テーブル:** device_master、organization_master、device_status_data
+**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、organization_master、device_status_data
 
 **SQL詳細:**
 - デバイス一覧件数取得
 ```sql
 SELECT
-  COUNT(device_id) AS data_count
+  COUNT(v.device_id) AS data_count
 FROM
-  device_master dm
+  v_device_master_by_user v
 WHERE
-  dm.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
 ```
 
 - デバイス一覧取得
@@ -332,21 +308,23 @@ WHERE
 SELECT
   dm.device_uuid,
   om.organization_name,
-  dm.device_name,
+  v.device_name,
   ds.status
 FROM
-  device_master dm
+  v_device_master_by_user v
+INNER JOIN device_master dm
+  ON v.device_id = dm.device_id
 LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
+  ON v.device_organization_id = om.organization_id
   AND om.delete_flag = FALSE
 LEFT JOIN device_status_data ds
-  ON dm.device_id = ds.device_id
+  ON v.device_id = ds.device_id
 WHERE
-  dm.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
 ORDER BY
-  dm.organization_id ASC
-  , dm.device_id ASC
+  v.device_organization_id ASC
+  , v.device_id ASC
 LIMIT :item_per_page OFFSET 0
 ```
 
@@ -382,14 +360,11 @@ def store_monitoring():
     page = search_params.get('page', 1)
     per_page = ITEM_PER_PAGE
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    # アラート一覧取得（v_alert_history_by_userにuser_idを渡してスコープ制限適用）
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=1, per_page=10)
 
-    # アラート一覧取得
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
-
-    # デバイス一覧取得
-    devices, devices_total = get_device_list_with_count(search_params, accessible_org_ids, page, per_page)
+    # デバイス一覧取得（v_device_master_by_userにuser_idを渡してスコープ制限適用）
+    devices, devices_total = get_device_list_with_count(search_params, g.current_user.user_id, page, per_page)
 
     # レンダリング
     response = make_response(render_template(
@@ -486,24 +461,24 @@ flowchart TD
 - アラート一覧件数取得DBクエリ
 ```sql
 SELECT
-  COUNT(alert_history_id) AS data_count
+  COUNT(v.alert_history_id) AS data_count
 FROM
-  alert_history ah
+  v_alert_history_by_user v
 LEFT JOIN alert_setting_master am
-  ON ah.alert_id = am.alert_id
+  ON v.alert_id = am.alert_id
   AND am.delete_flag = FALSE
 LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
+  ON v.device_id = dm.device_id
   AND dm.delete_flag = FALSE
 LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
+  ON v.device_organization_id = om.organization_id
   AND om.delete_flag = FALSE
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
   AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
     WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
     ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
@@ -514,66 +489,66 @@ LIMIT 30
 - アラート一覧取得DBクエリ
 ```sql
 SELECT
-  ah.alert_occurrence_datetime,
+  v.alert_occurrence_datetime,
   dm.device_name,
   am.alert_name,
   al.alert_level_name,
   asm.alert_status_name
 FROM
-  alert_history ah
+  v_alert_history_by_user v
 LEFT JOIN alert_status_master asm
-  ON ah.alert_status_id = asm.alert_status_id
+  ON v.alert_status_id = asm.alert_status_id
   AND asm.delete_flag = FALSE
 LEFT JOIN alert_setting_master am
-  ON ah.alert_id = am.alert_id
+  ON v.alert_id = am.alert_id
   AND am.delete_flag = FALSE
 LEFT JOIN alert_level_master al
   ON am.alert_level_id = al.alert_level_id
   AND al.delete_flag = FALSE
 LEFT JOIN device_master dm
-  ON am.device_id = dm.device_id
+  ON v.device_id = dm.device_id
   AND dm.delete_flag = FALSE
 LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
+  ON v.device_organization_id = om.organization_id
   AND om.delete_flag = FALSE
 WHERE
-  ah.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
-  AND ah.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
   AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
     WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
     ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
     ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
 ORDER BY
-  ah.alert_history_id DESC
+  v.alert_history_id DESC
 LIMIT :item_per_page OFFSET 0
 ```
 
 **② デバイス一覧取得**
 
-**使用テーブル:** device_master、organization_master、device_status_data
+**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、organization_master、device_status_data
 
 **SQL詳細:**
 - デバイス一覧件数取得
 ```sql
 SELECT
-  COUNT(device_id) AS data_count
+  COUNT(v.device_id) AS data_count
 FROM
-  device_master dm
+  v_device_master_by_user v
 LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
+  ON v.device_organization_id = om.organization_id
   AND om.delete_flag = FALSE
 WHERE
-  dm.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
   AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
     WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
     ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
+    ELSE v.device_name LIKE CONCAT('%', :device_name, '%') END
 ```
 
 - デバイス一覧取得
@@ -581,27 +556,29 @@ WHERE
 SELECT
   dm.device_uuid,
   om.organization_name,
-  dm.device_name,
+  v.device_name,
   ds.status
 FROM
-  device_master dm
+  v_device_master_by_user v
+INNER JOIN device_master dm
+  ON v.device_id = dm.device_id
 LEFT JOIN organization_master om
-  ON dm.organization_id = om.organization_id
+  ON v.device_organization_id = om.organization_id
   AND om.delete_flag = FALSE
 LEFT JOIN device_status_data ds
-  ON dm.device_id = ds.device_id
+  ON v.device_id = ds.device_id
 WHERE
-  dm.delete_flag = FALSE
-  AND dm.organization_id IN (:accessible_org_ids)
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
   AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN dm.organization_id = :organization_id
+    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
     WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
     ELSE TRUE END
   AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
+    ELSE v.device_name LIKE CONCAT('%', :device_name, '%') END
 ORDER BY
-    dm.organization_id ASC
-    , dm.device_id ASC
+    v.device_organization_id ASC
+    , v.device_id ASC
 LIMIT :item_per_page OFFSET (:page - 1) * :item_per_page
 ```
 
@@ -717,14 +694,20 @@ flowchart TD
 **① データスコープ制限チェック**
 
 ```python
-def check_device_access(device_uuid, accessible_org_ids):
-    """デバイスへのアクセス権限をチェック"""
-    device = Device.query.filter(
-        Device.device_uuid == device_uuid,
-        Device.organization_id.in_(accessible_org_ids),
-        Device.delete_flag == 0
+def check_device_access(device_uuid, user_id):
+    """デバイスへのアクセス権限をチェック（v_device_master_by_userを使用）"""
+    result = db.session.execute(
+        text("""
+            SELECT dm.device_id, dm.device_uuid, dm.device_name, dm.organization_id
+            FROM v_device_master_by_user v
+            INNER JOIN device_master dm ON v.device_id = dm.device_id
+            WHERE v.user_id = :user_id
+              AND dm.device_uuid = :device_uuid
+              AND v.delete_flag = FALSE
+        """),
+        {'user_id': user_id, 'device_uuid': device_uuid}
     ).first()
-    return device
+    return result
 ```
 
 **② 最新センサーデータ取得**
@@ -751,11 +734,8 @@ LIMIT 1
 def show_sensor_info(device_uuid):
     """センサー情報表示"""
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # デバイスアクセス権限チェック
-    device = check_device_access(device_uuid, accessible_org_ids)
+    # デバイスアクセス権限チェック（v_device_master_by_userにuser_idを渡してスコープ制限適用）
+    device = check_device_access(device_uuid, g.current_user.user_id)
     if not device:
         abort(404)
 
@@ -768,11 +748,11 @@ def show_sensor_info(device_uuid):
 
     page = search_params.get('page', 1)
 
-    # アラート一覧取得
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
+    # アラート一覧取得（v_alert_history_by_userにuser_idを渡してスコープ制限適用）
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=1, per_page=10)
 
-    # デバイス一覧取得
-    devices, total = get_device_list(search_params, accessible_org_ids, page, ITEM_PER_PAGE)
+    # デバイス一覧取得（v_device_master_by_userにuser_idを渡してスコープ制限適用）
+    devices, total = get_device_list(search_params, g.current_user.user_id, page, ITEM_PER_PAGE)
 
     # 最新センサーデータ取得（MySQLから取得）
     sensor_data = get_latest_sensor_data(device.device_id)
@@ -928,11 +908,8 @@ ORDER BY
 def device_details(device_uuid):
     """デバイス詳細初期表示・ページング"""
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # デバイスアクセス権限チェック
-    device = check_device_access(device_uuid, accessible_org_ids)
+    # デバイスアクセス権限チェック（v_device_master_by_userにuser_idを渡してスコープ制限適用）
+    device = check_device_access(device_uuid, g.current_user.user_id)
     if not device:
         abort(404)
 
@@ -1117,11 +1094,8 @@ def validate_date_range(start_datetime_str, end_datetime_str):
 def device_details_search(device_uuid):
     """デバイス詳細検索（表示期間変更）"""
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # デバイスアクセス権限チェック
-    device = check_device_access(device_uuid, accessible_org_ids)
+    # デバイスアクセス権限チェック（v_device_master_by_userにuser_idを渡してスコープ制限適用）
+    device = check_device_access(device_uuid, g.current_user.user_id)
     if not device:
         abort(404)
 
@@ -1345,11 +1319,11 @@ def export_sensor_data_csv(device, search_params):
 
 | No | テーブル名 | 論理名 | データソース | 操作種別 | ワークフロー | 目的 |
 |----|-----------|--------|-------------|---------|------------|------|
-| 1 | device_master | デバイスマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | デバイス情報取得 |
-| 2 | organization_master | 組織マスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | 組織名表示 |
-| 3 | organization_closure | 組織閉包テーブル | OLTP DB | SELECT | 全ワークフロー | データスコープ制限 |
-| 4 | device_status_data | デバイスステータス | OLTP DB | SELECT | 店舗モニタリング | デバイスステータス表示 |
-| 5 | alert_history | アラート履歴 | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラート履歴取得 |
+| 1 | v_device_master_by_user | デバイス一覧用VIEW | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | デバイス取得・データスコープ制限 |
+| 2 | v_alert_history_by_user | アラート履歴一覧用VIEW | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラート履歴取得・データスコープ制限 |
+| 3 | device_master | デバイスマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | device_uuid取得（VIEW非保持カラム） |
+| 4 | organization_master | 組織マスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | 組織名表示 |
+| 5 | device_status_data | デバイスステータス | OLTP DB | SELECT | 店舗モニタリング | デバイスステータス表示 |
 | 6 | alert_setting_master | アラート設定マスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラート名表示 |
 | 7 | alert_level_master | アラートレベルマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートレベル表示 |
 | 8 | alert_status_master | アラートステータスマスタ | OLTP DB | SELECT | 店舗モニタリング、デバイス詳細 | アラートステータス表示 |
@@ -1383,30 +1357,32 @@ def export_sensor_data_csv(device, search_params):
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデバイス・センサーデータのみアクセス可能
+- **全ユーザー共通**: `v_device_master_by_user` / `v_alert_history_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれる
+  - `organization_closure` による組織階層フィルタリングはVIEW内で自動適用
   - **ロールによる条件分岐は一切行わない**
 
 **注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
 
 **実装例:**
 ```python
-def apply_device_data_scope_filter(query, current_user):
-    """組織階層に基づいたデバイスデータのスコープ制限を適用"""
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
+# デバイス一覧取得（VIEWにuser_idを渡すだけでスコープ制限が自動適用）
+query = text("""
+    SELECT v.device_id, v.device_name, v.device_organization_id, dm.device_uuid
+    FROM v_device_master_by_user v
+    INNER JOIN device_master dm ON v.device_id = dm.device_id
+    WHERE v.user_id = :user_id
+      AND v.delete_flag = FALSE
+""")
+result = db.session.execute(query, {'user_id': g.current_user.user_id})
 
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        return query.filter(Device.organization_id.in_([]))
-
-    return query.filter(Device.organization_id.in_(org_ids))
+# アラート履歴取得（VIEWにuser_idを渡すだけでスコープ制限が自動適用）
+query = text("""
+    SELECT v.alert_history_id, v.alert_id, v.device_id, v.alert_occurrence_datetime
+    FROM v_alert_history_by_user v
+    WHERE v.user_id = :user_id
+      AND v.delete_flag = FALSE
+""")
+result = db.session.execute(query, {'user_id': g.current_user.user_id})
 ```
 
 ### ログ出力ルール
