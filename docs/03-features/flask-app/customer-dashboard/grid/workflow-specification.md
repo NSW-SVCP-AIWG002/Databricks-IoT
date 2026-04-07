@@ -20,20 +20,24 @@
       - [Flaskルート](#flaskルート-1)
       - [バリデーション](#バリデーション-1)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-1)
-    - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+    - [ページング](#ページング)
       - [処理フロー](#処理フロー-2)
+      - [処理詳細](#処理詳細)
+      - [UI状態](#ui状態)
+    - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+      - [処理フロー](#処理フロー-3)
       - [Flaskルート](#flaskルート-2)
       - [バリデーション](#バリデーション-2)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-2)
       - [エラーハンドリング](#エラーハンドリング)
     - [ガジェット登録](#ガジェット登録)
-      - [処理フロー](#処理フロー-3)
+      - [処理フロー](#処理フロー-4)
       - [Flaskルート](#flaskルート-3)
       - [バリデーション](#バリデーション-3)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-3)
       - [エラーハンドリング](#エラーハンドリング-1)
     - [CSVエクスポート](#csvエクスポート)
-      - [処理フロー](#処理フロー-4)
+      - [処理フロー](#処理フロー-5)
       - [Flaskルート](#flaskルート-4)
       - [バリデーション](#バリデーション-4)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-4)
@@ -100,6 +104,7 @@
 | 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に表ガジェットを埋め込み） | エラーページ表示 |
 | 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| ページ番号ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid, page` | JSON（該当ページデータ） | エラーモーダル表示 |
 | CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
 
 ### 表ガジェット登録モーダル
@@ -203,7 +208,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `start_datetime, end_datetime, chart_config` |
+| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` リクエストボディ: `start_datetime, end_datetime, page`（pageは省略時1） |
 
 #### バリデーション
 
@@ -430,6 +435,112 @@ def gadget_grid_data(gadget_uuid):
         logger.error(f'表データ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
+
+---
+
+### ページング
+
+**トリガー:** (6.1) ページネーションのページ番号ボタンクリック
+
+**前提条件:**
+- ガジェットが表示されている
+- ガジェットデータ取得が完了している
+
+#### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([ページ番号ボタンクリック]) --> SaveCookie[CookieにページConditions保存<br>start_datetime, end_datetime, page]
+    SaveCookie --> Ajax[AJAX POST<br>/analysis/customer-dashboard/gadgets/gadget_uuid/data<br>リクエストボディ: start_datetime, end_datetime, page]
+    Ajax --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[401エラーレスポンス]
+    CheckAuth -->|認証OK| Scope[データスコープ制限チェック]
+
+    Scope --> CheckScope{スコープOK?}
+    CheckScope -->|スコープ外| Error404[404エラーレスポンス]
+    CheckScope -->|スコープOK| CalcOffset[ページング計算<br>offset = page - 1 × 25<br>limit = 25]
+
+    CalcOffset --> DeviceQuery[選択中デバイス取得<br>DB dashboard_user_setting]
+    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
+    CheckDeviceQuery -->|失敗| Error500[500エラーレスポンス]
+    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>sensor_data_view<br>LIMIT 25 OFFSET offset]
+
+    SilverQuery --> CheckSilverQuery{DBクエリ結果}
+    CheckSilverQuery -->|失敗| Error500
+    CheckSilverQuery -->|OK| CountQuery[総件数取得<br>sensor_data_view COUNT]
+
+    CountQuery --> CheckCountQuery{DBクエリ結果}
+    CheckCountQuery -->|失敗| Error500
+    CheckCountQuery -->|OK| Format[データ整形]
+
+    Format --> ReturnData[JSONデータ返却<br>grid_data, total_count, page, per_page]
+    ReturnData --> Render[テーブル再描画<br>該当ページのデータ行を表示]
+    Render --> UpdatePagination[ページネーションUI更新<br>選択ページをアクティブ状態に変更]
+
+    Error401 --> End([処理完了])
+    Error404 --> End
+    Error500 --> End
+    UpdatePagination --> End
+```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| ガジェットデータ取得（ページング） | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` リクエストボディ: `start_datetime, end_datetime, page`（pageは1以上の整数） |
+
+#### 処理詳細
+
+ページネーションのページ番号を選択するたびにサーバーへAJAXリクエストを送信し、該当ページのデータのみを取得して表示する。
+
+**Cookie管理:**
+- Cookieキー: `grid_gadget_search_params_{gadget_uuid}`
+- 保存内容: `start_datetime`, `end_datetime`, `page`
+- 保存タイミング: ページ番号ボタンクリック時（AJAXリクエスト送信前）
+- `max_age`: 86400秒（24時間）
+
+**ページング計算（サーバーサイド）:**
+```python
+PER_PAGE = 25
+page = params.get('page', 1, type=int)
+offset = (page - 1) * PER_PAGE
+
+# センサーデータ取得（ページ分のみ）
+rows = fetch_grid_data(
+    device_id=device_id,
+    start_datetime=start_datetime,
+    end_datetime=end_datetime,
+    limit=PER_PAGE,
+    offset=offset
+)
+
+# 総件数取得
+total_count = count_grid_data(
+    device_id=device_id,
+    start_datetime=start_datetime,
+    end_datetime=end_datetime
+)
+```
+
+**レスポンス形式（ページング時の追加フィールド）:**
+```json
+{
+  "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "columns": [ ... ],
+  "grid_data": [ ... ],
+  "total_count": 250,
+  "page": 2,
+  "per_page": 25,
+  "updated_at": "2026/03/05 12:00:00"
+}
+```
+
+#### UI状態
+
+- 検索条件（開始日時・終了日時）: 保持
+- データテーブル: 選択ページのデータ行を表示（25件）
+- ページネーション: 選択ページをアクティブ状態
 
 ---
 

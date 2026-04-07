@@ -560,7 +560,9 @@
 - 入力タイプ: ラジオボタンリスト（1つのみ選択）
 - 表示形式: 選択 | 表示名称 | 単位
 - 選択制限: 単一選択
-- データソース: 凡例一覧（22項目）
+- データソース: 
+  - DB: measurement_item_masterを全件取得
+  - 表示順: measurement_item_master.measurement_item_idの昇順
 
 ---
 

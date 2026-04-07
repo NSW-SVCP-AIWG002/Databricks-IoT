@@ -107,7 +107,7 @@
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/timeline/create` | なし | HTML（モーダル） | エラーページ表示 |
-| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/timeline/register` | `title, device_mode, device_id, group_id, left_item_id, right_item_id, left_min_value, right_min_value, left_max_value, right_max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/timeline/register` | `title, device_mode, device_id, group_id, primary_item_id, secondary_item_id, primary_min_value, secondary_min_value, primary_max_value, secondary_max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
 
 ---
 
@@ -242,12 +242,12 @@ WHERE
 **chart_config JSON スキーマ:**
 ```json
 {
-  "left_item_id": 1,
-  "right_item_id": 2,
-  "left_min_value": 0.0,
-  "right_min_value": 10.0,
-  "left_max_value": 100.0,
-  "right_max_value": 110.0
+  "primary_item_id": 1,
+  "secondary_item_id": 2,
+  "primary_min_value": 0.0,
+  "secondary_min_value": 10.0,
+  "primary_max_value": 100.0,
+  "secondary_max_value": 110.0
 }
 ```
 
@@ -407,8 +407,8 @@ def gadget_timeline_data(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ 表示単位別センサーデータ取得
-        left_item = get_measurement_item(chart_config['left_item_id'])
-        right_item = get_measurement_item(chart_config['right_item_id'])
+        left_item = get_measurement_item(chart_config['primary_item_id'])
+        right_item = get_measurement_item(chart_config['secondary_item_id'])
         left_column_name = left_item.silver_data_column_name
         right_column_name = right_item.silver_data_column_name
 
@@ -416,8 +416,8 @@ def gadget_timeline_data(gadget_uuid):
             device_id=device_id,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            left_item_id=chart_config['left_item_id'],
-            right_item_id=chart_config['right_item_id']
+            primary_item_id=chart_config['primary_item_id'],
+            secondary_item_id=chart_config['secondary_item_id']
         )
 
         # ④ データ整形
@@ -734,7 +734,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 時系列グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/timeline/register` | フォームデータ: `title, device_mode, device_id, group_id, left_item_id, right_item_id, left_min_value, right_min_value, left_max_value, right_max_value, gadget_size` |
+| 時系列グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/timeline/register` | フォームデータ: `title, device_mode, device_id, group_id, primary_item_id, secondary_item_id, primary_min_value, secondary_min_value, primary_max_value, secondary_max_value, gadget_size` |
 
 #### バリデーション
 
@@ -768,12 +768,12 @@ WHERE
 ```json
 // chart_config
 {
-  "left_item_id": 1,
-  "right_item_id": 2,
-  "left_min_value": 0.0,
-  "right_min_value": 10.0,
-  "left_max_value": 100.0,
-  "right_max_value": 110.0
+  "primary_item_id": 1,
+  "secondary_item_id": 2,
+  "primary_min_value": 0.0,
+  "secondary_min_value": 10.0,
+  "primary_max_value": 100.0,
+  "secondary_max_value": 110.0
 }
 
 // data_source_config（デバイス固定モード）
@@ -864,12 +864,12 @@ def gadget_timeline_register():
     try:
         # ② chart_config / data_source_config 生成
         chart_config = json.dumps({
-            "left_item_id": form.left_item_id.data,
-            "right_item_id": form.right_item_id.data,
-            "left_min_value": form.left_min_value.data,
-            "right_min_value": form.right_min_value.data,
-            "left_max_value": form.left_max_value.data,
-            "right_max_value": form.right_max_value.data
+            "primary_item_id": form.primary_item_id.data,
+            "secondary_item_id": form.secondary_item_id.data,
+            "primary_min_value": form.primary_min_value.data,
+            "secondary_min_value": form.secondary_min_value.data,
+            "primary_max_value": form.primary_max_value.data,
+            "secondary_max_value": form.secondary_max_value.data
         })
         data_source_config = json.dumps({'device_id': device_id})
 
@@ -1025,12 +1025,20 @@ flowchart TD
 
 **④ CSVカラム定義**
 
-| カラム名 | 内容 | 形式 |
-|---------|------|------|
-| event_timestamp | 受信日時 | YYYY/MM/DD HH:mm:ss |
-| device_name | デバイス名 | |
-| left_column_name | 左表示項目のセンサー値 | 数値 |
-| right_column_name | 右表示項目のセンサー値 | 数値 |
+| 列番号 | 表示名 | 内容 | 形式 |
+|--------|-------|------|------|
+| 1 | デバイス名 | デバイス名 | |
+| 2 | 時刻 | 表示時間（グラフX軸） | YYYY/MM/DD HH:mm:ss |
+| 3 | 凡例名 | 左表示項目のセンサー値（グラフY軸左） | 数値（小数点2桁） |
+| 4 | 凡例名 | 右表示項目のセンサー値（グラフY軸右） | 数値（小数点2桁） |
+
+**CSVサンプル**
+```csv
+デバイス名,時刻,外気温度（℃）,第1冷凍 設定温度（℃）
+DEV-001,2026/02/01 10:00:00,25.1,5.1
+DEV-001,2026/02/01 10:10:00,25.2,5.2
+DEV-001,2026/02/01 10:20:00,25.3,5.3
+```
 
 ---
 
@@ -1072,8 +1080,8 @@ def gadget_csv_export(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ センサーデータ取得（最大10万件）
-        left_item = get_measurement_item(chart_config['left_item_id'])
-        right_item = get_measurement_item(chart_config['right_item_id'])
+        left_item = get_measurement_item(chart_config['primary_item_id'])
+        right_item = get_measurement_item(chart_config['secondary_item_id'])
         left_column_name = left_item.silver_data_column_name
         right_column_name = right_item.silver_data_column_name
         left_label = left_item.display_name
@@ -1083,8 +1091,8 @@ def gadget_csv_export(gadget_uuid):
             device_id=device_id,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            left_item_id=chart_config['left_item_id'],
-            right_item_id=chart_config['right_item_id'],
+            primary_item_id=chart_config['primary_item_id'],
+            secondary_item_id=chart_config['secondary_item_id'],
             limit=100000
         )
 
