@@ -348,3 +348,60 @@
   }
 
 })();
+
+// ============================================================
+// 棒グラフ登録モーダル UIバインド
+// ============================================================
+
+/**
+ * 棒グラフ登録モーダルのUIイベントをバインドする
+ * @param {Element} container - モーダルコンテナ要素
+ */
+function bindBarChartGadgetRegister(container) {
+  const modeButtons = container.querySelectorAll('.bar-chart-register__device-mode-btn');
+  if (!modeButtons.length) return;
+
+  const deviceModeInput = container.querySelector('#device_mode');
+  const deviceFixedArea = container.querySelector('#device-fixed-area');
+  const deviceNameArea  = container.querySelector('#device-name-area');
+  const orgFilter       = container.querySelector('#organization-filter');
+  const deviceSelect    = container.querySelector('#device-select');
+
+  modeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      modeButtons.forEach(function (b) {
+        b.classList.remove('bar-chart-register__device-mode-btn--active');
+      });
+      btn.classList.add('bar-chart-register__device-mode-btn--active');
+      const mode = btn.dataset.mode;
+      if (deviceModeInput) deviceModeInput.value = mode;
+      const isFixed = mode === 'fixed';
+      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
+      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+    });
+  });
+
+  if (!orgFilter || !deviceSelect) return;
+
+  const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
+  orgFilter.addEventListener('change', function () {
+    const orgId = orgFilter.value;
+    deviceSelect.innerHTML = '<option value="">選択してください</option>';
+    allDeviceOptions.forEach(function (opt) {
+      if (!orgId || opt.dataset.org === orgId) {
+        deviceSelect.appendChild(opt.cloneNode(true));
+      }
+    });
+    deviceSelect.disabled = !orgId;
+    const nameEl = container.querySelector('#selected-device-name');
+    if (nameEl) nameEl.textContent = '-';
+  });
+
+  deviceSelect.addEventListener('change', function () {
+    const selected = deviceSelect.options[deviceSelect.selectedIndex];
+    const nameEl = container.querySelector('#selected-device-name');
+    if (nameEl) nameEl.textContent = selected ? (selected.dataset.name || '-') : '-';
+  });
+}
+
+CustomerDashboard.registerModalBinder(bindBarChartGadgetRegister);

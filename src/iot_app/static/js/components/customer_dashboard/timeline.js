@@ -443,6 +443,10 @@ function bindTimelineGadgetRegister(container) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
-  const gadgetEls = document.querySelectorAll('.gadget[data-gadget-uuid]');
-  gadgetEls.forEach((el) => initGadget(el));
+  document.querySelectorAll('.timeline[data-gadget-uuid]').forEach(function (timelineEl) {
+    const gadgetEl = timelineEl.closest('.gadget');
+    if (gadgetEl) initGadget(gadgetEl);
+  });
 });
+
+CustomerDashboard.registerModalBinder(bindTimelineGadgetRegister);
