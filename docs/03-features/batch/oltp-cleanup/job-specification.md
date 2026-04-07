@@ -1,34 +1,40 @@
-# Deltaテーブル最適化ジョブ仕様書
+# OLTP DBクリーンアップジョブ仕様書
 
 ## 目次
 
-- [Deltaテーブル最適化ジョブ仕様書](#deltaテーブル最適化ジョブ仕様書)
+- [OLTP DBクリーンアップジョブ仕様書](#oltp-dbクリーンアップジョブ仕様書)
   - [目次](#目次)
   - [概要](#概要)
     - [このドキュメントの役割](#このドキュメントの役割)
     - [対象機能](#対象機能)
     - [ジョブ一覧](#ジョブ一覧)
-  - [キュークリーンアップジョブ仕様](#キュークリーンアップジョブ仕様)
-    - [ジョブ概要](#ジョブ概要)
+    - [タスク一覧](#タスク一覧)
+  - [共通関数](#共通関数)
+  - [メール通知キュークリーンアップタスク仕様](#メール通知キュークリーンアップタスク仕様)
+    - [タスク概要](#タスク概要)
     - [処理フロー](#処理フロー)
     - [処理コード](#処理コード)
     - [クリーンアップ設定](#クリーンアップ設定)
-  - [Delta Lakeメンテナンスジョブ仕様](#delta-lakeメンテナンスジョブ仕様)
-    - [日次OPTIMIZEジョブ](#日次optimizeジョブ)
-      - [ジョブ概要](#ジョブ概要-1)
-      - [処理フロー](#処理フロー-1)
-      - [処理コード](#処理コード-1)
-      - [OPTIMIZE設定](#optimize設定)
-    - [週次VACUUMジョブ](#週次vacuumジョブ)
-      - [ジョブ概要](#ジョブ概要-2)
-      - [処理フロー](#処理フロー-2)
-      - [処理コード](#処理コード-2)
-      - [VACUUM設定](#vacuum設定)
-    - [チェックポイントクリーンアップジョブ](#チェックポイントクリーンアップジョブ)
-      - [ジョブ概要](#ジョブ概要-3)
-      - [処理フロー](#処理フロー-3)
-      - [処理コード](#処理コード-3)
-      - [クリーンアップ設定](#クリーンアップ設定-1)
+  - [シルバー層センサーデータテーブルクリーンアップタスク仕様](#シルバー層センサーデータテーブルクリーンアップタスク仕様)
+    - [タスク概要](#タスク概要-1)
+    - [処理フロー](#処理フロー-1)
+    - [処理コード](#処理コード-1)
+    - [クリーンアップ設定](#クリーンアップ設定-1)
+  - [センサーデータ時次サマリテーブルクリーンアップタスク仕様](#センサーデータ時次サマリテーブルクリーンアップタスク仕様)
+    - [タスク概要](#タスク概要-2)
+    - [処理フロー](#処理フロー-2)
+    - [処理コード](#処理コード-2)
+    - [クリーンアップ設定](#クリーンアップ設定-2)
+  - [センサーデータ日次サマリテーブルクリーンアップタスク仕様](#センサーデータ日次サマリテーブルクリーンアップタスク仕様)
+    - [タスク概要](#タスク概要-3)
+    - [処理フロー](#処理フロー-3)
+    - [処理コード](#処理コード-3)
+    - [クリーンアップ設定](#クリーンアップ設定-3)
+  - [センサーデータ月次サマリテーブルクリーンアップタスク仕様](#センサーデータ月次サマリテーブルクリーンアップタスク仕様)
+    - [タスク概要](#タスク概要-4)
+    - [処理フロー](#処理フロー-4)
+    - [処理コード](#処理コード-4)
+    - [クリーンアップ設定](#クリーンアップ設定-4)
   - [関連ドキュメント](#関連ドキュメント)
   - [変更履歴](#変更履歴)
 
@@ -36,51 +42,125 @@
 
 ## 概要
 
-このドキュメントは、Databricks Workflowとして実装するDeltaテーブル最適化ジョブ機能の詳細を記載します。
+このドキュメントは、Databricks Workflowとして実装するOLTP DBクリーンアップジョブ機能の詳細を記載します。
 
 ### このドキュメントの役割
 
-- Delta Lakeメンテナンス処理（OPTIMIZE、VACUUM、チェックポイントクリーンアップ）
+- OLTP DBメンテナンス処理（クリーンアップ）
 
 ### 対象機能
 
-| 機能ID | 機能名             | 処理内容                           |
-| ------ | ------------------ | ---------------------------------- |
-| OP-001 | データメンテナンス | Delta Lakeテーブルの最適化・圧縮   |
-| OP-002 | クリーンアップ     | 古いデータ・チェックポイントの削除 |
+| 機能ID | 機能名         | 処理内容                       |
+| ------ | -------------- | ------------------------------ |
+| OP-002 | クリーンアップ | 保持期間の超過したデータの削除 |
 
 ### ジョブ一覧
 
-| ジョブ名              | 実行間隔      | 説明                               |
-| --------------------- | ------------- | ---------------------------------- |
-| silver_table_optimize | 日次（02:00） | Silver層テーブルのOPTIMIZE実行     |
-| silver_table_vacuum   | 日次（04:00） | Silver層テーブルのVACUUM実行       |
-| gold_table_optimize   | 日次（02:00） | Gold層テーブルのOPTIMIZE実行       |
-| gold_table_vacuum     | 日次（04:00） | Gold層テーブルのVACUUM実行         |
-| checkpoint_cleanup    | 日次（05:00） | 古いチェックポイントファイルの削除 |
+| ジョブ名           | 実行間隔      | 説明                          |
+| ------------------ | ------------- | ----------------------------- |
+| oltp_table_cleanup | 日次（03:00） | OLTP DBのテーブルのデータ削除 |
+
+### タスク一覧
+
+| タスク名                                 | 実行順序 | 説明                                         |
+| ---------------------------------------- | -------- | -------------------------------------------- |
+| email_queue_cleanup                      | 1        | メール通知キューテーブルのデータ削除         |
+| silver_sensor_data_cleanup               | 2        | シルバー層センサーデータテーブルのデータ削除 |
+| gold_sensor_data_hourly_summary_cleanup  | 3        | センサーデータ時次サマリテーブルのデータ削除 |
+| gold_sensor_data_daily_summary_cleanup   | 4        | センサーデータ日次サマリテーブルのデータ削除 |
+| gold_sensor_data_monthly_summary_cleanup | 5        | センサーデータ月次サマリテーブルのデータ削除 |
+
+実行順序が若いもの順で直列で実行する。OLTP DBへの接続負荷を抑えるため、並列実行は行わない。
 
 ---
 
-## キュークリーンアップジョブ仕様
+## 共通関数
 
-### ジョブ概要
+各クリーンアップタスクはクリーンアップ対象が異なるのみで、処理内容に違いがないことから、処理の本体は共通処理化する。
+各クリーンアップタスクから呼び出す共通処理を `common_cleanup.py` に定義する。
+
+```python
+# common_cleanup.py
+
+import pymysql
+import pymysql.cursors
+
+
+def get_db_connection() -> pymysql.Connection:
+    """OLTP DB接続を返す"""
+    return pymysql.connect(
+        host=dbutils.secrets.get("scope", "mysql-host"),
+        port=int(dbutils.secrets.get("scope", "mysql-port")),
+        user=dbutils.secrets.get("scope", "mysql-user"),
+        password=dbutils.secrets.get("scope", "mysql-password"),
+        database=dbutils.secrets.get("scope", "mysql-database"),
+        cursorclass=pymysql.cursors.DictCursor,
+        charset="utf8mb4",
+    )
+
+
+def cleanup_oltp_table(
+    conn: pymysql.Connection,
+    table: str,
+    timestamp_col: str,
+    retain_months: int,
+    label: str,
+) -> None:
+    """保持期間超過レコードをOLTP DBから削除する共通処理
+
+    Args:
+        conn:           OLTP DB接続オブジェクト
+        table:          削除対象テーブル名
+        timestamp_col:  保持期間判定に使用するタイムスタンプカラム名
+        retain_months:  データ保持月数（これを超えたレコードを削除）
+        label:          ログ出力用のテーブル識別ラベル
+    """
+    with conn.cursor() as cursor:
+        # 削除対象件数を確認
+        cursor.execute(f"""
+            SELECT COUNT(*) AS cnt
+            FROM {table}
+            WHERE {timestamp_col} < DATE_SUB(NOW(), INTERVAL {retain_months} MONTH)
+        """)
+        count = cursor.fetchone()["cnt"]
+
+    print(f"[{label}] 削除対象レコード数: {count}")
+
+    if count == 0:
+        print(f"[{label}] 削除対象レコードなし")
+        return
+
+    with conn.cursor() as cursor:
+        cursor.execute(f"""
+            DELETE FROM {table}
+            WHERE {timestamp_col} < DATE_SUB(NOW(), INTERVAL {retain_months} MONTH)
+        """)
+    conn.commit()
+    print(f"[{label}] 削除完了: {count}件")
+```
+
+---
+
+## メール通知キュークリーンアップタスク仕様
+
+### タスク概要
 
 | 項目             | 設定値                              |
 | ---------------- | ----------------------------------- |
-| ジョブ名         | email_queue_cleanup                 |
+| タスク名         | email_queue_cleanup                 |
 | 実行方式         | Databricks Workflow                 |
 | 実行間隔         | 日次（cron: `0 3 * * *`）毎日 03:00 |
 | クラスタ         | Jobs Compute（サーバーレス推奨）    |
 | タイムアウト     | 30分                                |
-| リトライポリシー | 失敗時リトライなし                  |
+| リトライポリシー | 失敗時1回リトライ                   |
 
 ### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> Count[削除対象件数をカウント<br>30日経過したSENT/FAILEDレコード]
+    Start([タスク開始]) --> Count[削除対象件数をカウント<br>30日経過したSENT/FAILEDレコード]
     Count --> Check{レコード<br>あり?}
-    Check -->|なし| End([ジョブ終了])
+    Check -->|なし| End([タスク終了])
     Check -->|あり| Delete[対象レコードを削除]
     Delete --> Log[削除件数を出力]
     Log --> End
@@ -88,14 +168,15 @@ flowchart TD
 
 ### 処理コード
 
-送信完了または失敗したレコードを定期的に削除する。
+送信完了または失敗したレコードを定期的に削除する。メール通知キューは保持期間の条件（ステータス・経過日数）が他テーブルと異なるため、共通関数を使用せず個別実装とする。
 
 ```python
+# email_queue_cleanup.py
+import pymysql
+import pymysql.cursors
+
 def cleanup_email_queue():
     """30日経過したSENT/FAILEDレコードを削除"""
-    import pymysql
-    import pymysql.cursors
-
     db_config = {
         "host": dbutils.secrets.get("scope", "mysql-host"),
         "port": int(dbutils.secrets.get("scope", "mysql-port")),
@@ -133,7 +214,7 @@ def cleanup_email_queue():
         print(f"削除完了: {count_before}件")
 
 
-# ジョブ実行
+# タスク実行
 cleanup_email_queue()
 ```
 
@@ -146,283 +227,259 @@ cleanup_email_queue()
 
 ---
 
-## Delta Lakeメンテナンスジョブ仕様
+## シルバー層センサーデータテーブルクリーンアップタスク仕様
 
-Delta Lakeテーブルのパフォーマンスを維持するための定期メンテナンスジョブ。
+OLTP DBのシルバー層センサーデータテーブルに登録されているデータのうち、保持期間を超過したデータを定期削除するタスク。
 
-### 日次OPTIMIZEジョブ
+### タスク概要
 
-小ファイルを最適なサイズに統合し、クエリパフォーマンスを向上させる。
+| 項目             | 設定値                          |
+| ---------------- | ------------------------------- |
+| タスク名         | silver_sensor_data_cleanup      |
+| 実行方式         | Databricks Workflow             |
+| 実行間隔         | email_queue_cleanupタスク完了後 |
+| クラスタ         | Jobs Compute                    |
+| タイムアウト     | 1時間                           |
+| リトライポリシー | 失敗時1回リトライ               |
 
-#### ジョブ概要
-
-| 項目             | 設定値                         |
-| ---------------- | ------------------------------ |
-| ジョブ名         | silver_table_optimize          |
-| 実行方式         | Databricks Workflow            |
-| 実行間隔         | 日次（cron: `0 2 * * *`）02:00 |
-| クラスタ         | Jobs Compute                   |
-| タイムアウト     | 2時間                          |
-| リトライポリシー | 失敗時1回リトライ              |
-
-#### 処理フロー
+### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
-
-    Loop --> Optimize[OPTIMIZE実行]
-    Optimize --> Result{成功?}
-
-    Result -->|成功| Metrics[メトリクス出力<br>統合/削除ファイル数]
-    Result -->|失敗| Error[エラー出力]
-
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
-
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
+    Start([タスク開始]) --> Count[削除対象件数をカウント<br>2か月経過したレコード]
+    Count --> Check{レコード<br>あり?}
+    Check -->|なし| End([タスク終了])
+    Check -->|あり| Delete[対象レコードを削除]
+    Delete --> Log[削除件数を出力]
+    Log --> End
 ```
 
-#### 処理コード
+### 処理コード
 
 ```python
-def optimize_silver_tables():
-    """Silver層テーブルのOPTIMIZE実行"""
+# silver_sensor_data_cleanup.py
+from common_cleanup import get_db_connection, cleanup_oltp_table
 
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
-
-    for table in tables:
-        print(f"OPTIMIZE開始: {table}")
-        try:
-            result = spark.sql(f"OPTIMIZE {table}")
-            metrics = result.first()
-            print(f"  - 統合ファイル数: {metrics['numFilesAdded']}")
-            print(f"  - 削除ファイル数: {metrics['numFilesRemoved']}")
-            print(f"OPTIMIZE完了: {table}")
-        except Exception as e:
-            print(f"OPTIMIZEエラー: {table} - {str(e)}")
-
-    print("全テーブルのOPTIMIZE完了")
+def silver_sensor_data_cleanup():
+    """2か月経過したsilver_sensor_dataのレコードを削除"""
+    with get_db_connection() as conn:
+        cleanup_oltp_table(
+            conn=conn,
+            table="silver_sensor_data",
+            timestamp_col="event_timestamp",
+            retain_months=2,
+            label="silver_sensor_data",
+        )
 
 
-# ジョブ実行
-optimize_silver_tables()
+# タスク実行
+silver_sensor_data_cleanup()
 ```
 
-#### OPTIMIZE設定
+### クリーンアップ設定
 
-| 項目               | 設定値                     | 説明                             |
-| ------------------ | -------------------------- | -------------------------------- |
-| 対象テーブル       | Silver層全テーブル         | センサーデータ、状態             |
-| 実行タイミング     | 毎日 02:00（低負荷時間帯） | ストリーミング処理への影響を軽減 |
-| 自動コンパクション | 有効（テーブル設定）       | 日次に加えて自動実行も併用       |
+| 項目           | 設定値                          | 説明                    |
+| -------------- | ------------------------------- | ----------------------- |
+| 対象テーブル   | silver_sensor_data              | センサーデータ          |
+| タイムスタンプ | event_timestamp                 | 保持期間判定カラム      |
+| 保持期間       | 2か月                           | 2か月超過レコードを削除 |
+| 実行タイミング | email_queue_cleanupタスク完了後 | ジョブ構成で定義        |
 
-### 週次VACUUMジョブ
+---
 
-削除済みファイルを物理的に削除し、ストレージ使用量を削減する。
+## センサーデータ時次サマリテーブルクリーンアップタスク仕様
 
-#### ジョブ概要
+OLTP DBのセンサーデータ時次サマリテーブルに登録されているデータのうち、保持期間を超過したデータを定期削除するタスク。
 
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | silver_table_vacuum                |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 4 * * 0`）日曜04:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 4時間                              |
-| リトライポリシー | 失敗時1回リトライ                  |
+### タスク概要
 
-#### 処理フロー
+| 項目             | 設定値                                  |
+| ---------------- | --------------------------------------- |
+| タスク名         | gold_sensor_data_hourly_summary_cleanup |
+| 実行方式         | Databricks Workflow                     |
+| 実行間隔         | silver_sensor_data_cleanupタスク完了後  |
+| クラスタ         | Jobs Compute                            |
+| タイムアウト     | 1時間                                   |
+| リトライポリシー | 失敗時1回リトライ                       |
+
+### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
-
-    Loop --> Before[VACUUM前のファイル数を取得]
-    Before --> Vacuum[VACUUM実行<br>保持期間: 168時間]
-    Vacuum --> Result{成功?}
-
-    Result -->|成功| After[VACUUM後のファイル数を取得]
-    After --> Metrics[メトリクス出力<br>削除前後のファイル数]
-    Result -->|失敗| Error[エラー出力]
-
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
-
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
+    Start([タスク開始]) --> Count[削除対象件数をカウント<br>2か月経過したレコード]
+    Count --> Check{レコード<br>あり?}
+    Check -->|なし| End([タスク終了])
+    Check -->|あり| Delete[対象レコードを削除]
+    Delete --> Log[削除件数を出力]
+    Log --> End
 ```
 
-#### 処理コード
+### 処理コード
 
 ```python
-def vacuum_silver_tables():
-    """Silver層テーブルのVACUUM実行"""
+# gold_sensor_data_hourly_summary_cleanup.py
+from common_cleanup import get_db_connection, cleanup_oltp_table
 
-    # 保持期間（時間）
-    RETAIN_HOURS = 168  # 7日
-
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
-
-    for table in tables:
-        print(f"VACUUM開始: {table}")
-        try:
-            # VACUUM実行前のファイル数を取得
-            before_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
-
-            # VACUUM実行
-            spark.sql(f"VACUUM {table} RETAIN {RETAIN_HOURS} HOURS")
-
-            # VACUUM実行後のファイル数を取得
-            after_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
-
-            print(f"  - 削除前ファイル数: {before_files}")
-            print(f"  - 削除後ファイル数: {after_files}")
-            print(f"VACUUM完了: {table}")
-        except Exception as e:
-            print(f"VACUUMエラー: {table} - {str(e)}")
-
-    print("全テーブルのVACUUM完了")
+def gold_sensor_data_hourly_summary_cleanup():
+    """2か月経過したgold_sensor_data_hourly_summaryのレコードを削除"""
+    with get_db_connection() as conn:
+        cleanup_oltp_table(
+            conn=conn,
+            table="gold_sensor_data_hourly_summary",
+            timestamp_col="collection_datetime",
+            retain_months=2,
+            label="gold_sensor_data_hourly_summary",
+        )
 
 
-# ジョブ実行
-vacuum_silver_tables()
+# タスク実行
+gold_sensor_data_hourly_summary_cleanup()
 ```
 
-#### VACUUM設定
+### クリーンアップ設定
 
-| 項目           | 設定値             | 説明                                 |
-| -------------- | ------------------ | ------------------------------------ |
-| 保持期間       | 168時間（7日）     | Time Travel用に7日分のファイルを保持 |
-| 対象テーブル   | Silver層全テーブル | センサーデータ、状態                 |
-| 実行タイミング | 日曜 04:00         | 週末の低負荷時間帯に実行             |
+| 項目           | 設定値                                 | 説明                     |
+| -------------- | -------------------------------------- | ------------------------ |
+| 対象テーブル   | gold_sensor_data_hourly_summary        | センサーデータ時次サマリ |
+| タイムスタンプ | collection_datetime                    | 保持期間判定カラム       |
+| 保持期間       | 2か月                                  | 2か月超過レコードを削除  |
+| 実行タイミング | silver_sensor_data_cleanupタスク完了後 | ジョブ構成で定義         |
 
-**注意事項:**
-- VACUUMを実行すると、保持期間より古いバージョンへのTime Travelができなくなる
-- 保持期間はテーブルプロパティ `delta.deletedFileRetentionDuration` と一致させる
+---
 
-### チェックポイントクリーンアップジョブ
+## センサーデータ日次サマリテーブルクリーンアップタスク仕様
 
-ストリーミングパイプラインのチェックポイントファイルを定期的にクリーンアップする。
+OLTP DBのセンサーデータ日次サマリテーブルに登録されているデータのうち、保持期間を超過したデータを定期削除するタスク。
 
-#### ジョブ概要
+### タスク概要
 
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | checkpoint_cleanup                 |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 5 * * 0`）日曜05:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 1時間                              |
-| リトライポリシー | 失敗時リトライなし                 |
+| 項目             | 設定値                                              |
+| ---------------- | --------------------------------------------------- |
+| タスク名         | gold_sensor_data_daily_summary_cleanup              |
+| 実行方式         | Databricks Workflow                                 |
+| 実行間隔         | gold_sensor_data_hourly_summary_cleanupタスク完了後 |
+| クラスタ         | Jobs Compute                                        |
+| タイムアウト     | 1時間                                               |
+| リトライポリシー | 失敗時1回リトライ                                   |
 
-#### 処理フロー
+### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> Cutoff[カットオフ日時を計算<br>現在 - 7日]
-    Cutoff --> DirLoop[各チェックポイント<br>ディレクトリを処理]
-
-    DirLoop --> ListFiles[ディレクトリ内の<br>ファイル一覧を取得]
-    ListFiles --> ListResult{取得<br>成功?}
-
-    ListResult -->|失敗| DirError[エラー出力]
-    ListResult -->|成功| FileLoop[各ファイルを処理]
-
-    FileLoop --> CheckDate{更新日時が<br>カットオフ日<br>より前?}
-    CheckDate -->|はい| Delete[ファイル/ディレクトリ削除]
-    CheckDate -->|いいえ| Skip[スキップ]
-
-    Delete --> NextFile{次の<br>ファイル?}
-    Skip --> NextFile
-
-    NextFile -->|あり| FileLoop
-    NextFile -->|なし| Log[削除件数を出力]
-
-    DirError --> NextDir{次の<br>ディレクトリ?}
-    Log --> NextDir
-
-    NextDir -->|あり| DirLoop
-    NextDir -->|なし| End([ジョブ終了])
+    Start([タスク開始]) --> Count[削除対象件数をカウント<br>2か月経過したレコード]
+    Count --> Check{レコード<br>あり?}
+    Check -->|なし| End([タスク終了])
+    Check -->|あり| Delete[対象レコードを削除]
+    Delete --> Log[削除件数を出力]
+    Log --> End
 ```
 
-#### 処理コード
+### 処理コード
 
 ```python
-from datetime import datetime, timedelta
+# gold_sensor_data_daily_summary_cleanup.py
+from common_cleanup import get_db_connection, cleanup_oltp_table
 
-def cleanup_old_checkpoints():
-    """7日以上経過したチェックポイントファイルを削除"""
-
-    # チェックポイント保存先
-    CHECKPOINT_BASE_PATH = "abfss://checkpoints@{storage_account}.dfs.core.windows.net/"
-
-    # 保持期間（日）
-    RETAIN_DAYS = 7
-
-    # 対象パイプラインのチェックポイントディレクトリ
-    checkpoint_dirs = [
-        f"{CHECKPOINT_BASE_PATH}silver_pipeline/",
-    ]
-
-    cutoff_date = datetime.now() - timedelta(days=RETAIN_DAYS)
-
-    for checkpoint_dir in checkpoint_dirs:
-        print(f"チェックポイントクリーンアップ開始: {checkpoint_dir}")
-        try:
-            # ディレクトリ内のファイル一覧を取得
-            files = dbutils.fs.ls(checkpoint_dir)
-
-            deleted_count = 0
-            for file_info in files:
-                # ファイルの更新日時を確認
-                if hasattr(file_info, 'modificationTime'):
-                    file_time = datetime.fromtimestamp(file_info.modificationTime / 1000)
-                    if file_time < cutoff_date:
-                        dbutils.fs.rm(file_info.path, recurse=True)
-                        deleted_count += 1
-
-            print(f"  - 削除ファイル/ディレクトリ数: {deleted_count}")
-            print(f"クリーンアップ完了: {checkpoint_dir}")
-        except Exception as e:
-            print(f"クリーンアップエラー: {checkpoint_dir} - {str(e)}")
-
-    print("全チェックポイントのクリーンアップ完了")
+def gold_sensor_data_daily_summary_cleanup():
+    """2か月経過したgold_sensor_data_daily_summaryのレコードを削除"""
+    with get_db_connection() as conn:
+        cleanup_oltp_table(
+            conn=conn,
+            table="gold_sensor_data_daily_summary",
+            timestamp_col="collection_date",
+            retain_months=2,
+            label="gold_sensor_data_daily_summary",
+        )
 
 
-# ジョブ実行
-cleanup_old_checkpoints()
+# タスク実行
+gold_sensor_data_daily_summary_cleanup()
 ```
 
-#### クリーンアップ設定
+### クリーンアップ設定
 
-| 項目           | 設定値                       | 説明                                         |
-| -------------- | ---------------------------- | -------------------------------------------- |
-| 保持期間       | 7日                          | 障害復旧に必要な期間を確保                   |
-| 対象           | チェックポイントディレクトリ | ストリーミングパイプラインのチェックポイント |
-| 実行タイミング | 日曜 05:00                   | VACUUM後に実行                               |
+| 項目           | 設定値                                              | 説明                     |
+| -------------- | --------------------------------------------------- | ------------------------ |
+| 対象テーブル   | gold_sensor_data_daily_summary                      | センサーデータ日次サマリ |
+| タイムスタンプ | collection_date                                     | 保持期間判定カラム       |
+| 保持期間       | 2か月                                               | 2か月超過レコードを削除  |
+| 実行タイミング | gold_sensor_data_hourly_summary_cleanupタスク完了後 | ジョブ構成で定義         |
+
+---
+
+## センサーデータ月次サマリテーブルクリーンアップタスク仕様
+
+OLTP DBのセンサーデータ月次サマリテーブルに登録されているデータのうち、保持期間を超過したデータを定期削除するタスク。
+
+### タスク概要
+
+| 項目             | 設定値                                             |
+| ---------------- | -------------------------------------------------- |
+| タスク名         | gold_sensor_data_monthly_summary_cleanup           |
+| 実行方式         | Databricks Workflow                                |
+| 実行間隔         | gold_sensor_data_daily_summary_cleanupタスク完了後 |
+| クラスタ         | Jobs Compute                                       |
+| タイムアウト     | 1時間                                              |
+| リトライポリシー | 失敗時1回リトライ                                  |
+
+### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([タスク開始]) --> Count[削除対象件数をカウント<br>3年経過したレコード]
+    Count --> Check{レコード<br>あり?}
+    Check -->|なし| End([タスク終了])
+    Check -->|あり| Delete[対象レコードを削除]
+    Delete --> Log[削除件数を出力]
+    Log --> End
+```
+
+### 処理コード
+
+```python
+# gold_sensor_data_monthly_summary_cleanup.py
+from common_cleanup import get_db_connection, cleanup_oltp_table
+
+def gold_sensor_data_monthly_summary_cleanup():
+    """3年（36か月）経過したgold_sensor_data_monthly_summaryのレコードを削除"""
+    with get_db_connection() as conn:
+        cleanup_oltp_table(
+            conn=conn,
+            table="gold_sensor_data_monthly_summary",
+            timestamp_col="collection_year_month",
+            retain_months=36,
+            label="gold_sensor_data_monthly_summary",
+        )
+
+
+# タスク実行
+gold_sensor_data_monthly_summary_cleanup()
+```
+
+### クリーンアップ設定
+
+| 項目           | 設定値                                             | 説明                     |
+| -------------- | -------------------------------------------------- | ------------------------ |
+| 対象テーブル   | gold_sensor_data_monthly_summary                   | センサーデータ月次サマリ |
+| タイムスタンプ | collection_year_month                              | 保持期間判定カラム       |
+| 保持期間       | 3年（36か月）                                      | 3年超過レコードを削除    |
+| 実行タイミング | gold_sensor_data_daily_summary_cleanupタスク完了後 | ジョブ構成で定義         |
 
 ---
 
 ## 関連ドキュメント
 
-- [README.md](./README.md) - メール送信ジョブ概要
-- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
+- [README.md](./README.md) - OLTPクリーンアップジョブ概要
+- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - センサーデータ登録処理の詳細
+- [ゴールド層LDPパイプライン仕様書](../../ldp-pipeline/gold-layer/ldp-pipeline-specification.md) - センサーデータのサマリ登録処理の詳細
 - [アプリケーションデータベース設計書](../../common/app-database-specification.md) - email_notification_queue・mail_historyテーブル定義
 
 ---
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容 | 担当者       |
-| ---------- | ---- | -------- | ------------ |
-| 2026-01-19 | 1.0  | 初版作成 | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                  | 担当者       |
+| ---------- | ---- | --------------------------------------------------------- | ------------ |
+| 2026-01-19 | 1.0  | 初版作成                                                  | Kei Sugiyama |
+| 2026-04-07 | 1.1  | 共通関数追加・Silver/Gold各タスクの処理コード・設定を実装 | Kei Sugiyama |
+| 2026-04-07 | 1.2  | 各テーブルの保持期間を変更・共通関数をretain_months対応   | Kei Sugiyama |
