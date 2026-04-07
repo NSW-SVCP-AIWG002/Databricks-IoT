@@ -124,6 +124,10 @@ def customer_dashboard():
         get_gadget_type_id_by_name(name): info['template']
         for name, info in _GADGET_REGISTRY.items()
     }
+    gadget_type_ids = {
+        name: get_gadget_type_id_by_name(name)
+        for name in _GADGET_REGISTRY
+    }
 
     if not dashboard_id:
         return render_template(
@@ -133,6 +137,7 @@ def customer_dashboard():
             groups=[],
             gadgets=[],
             gadget_id_to_template=gadget_id_to_template,
+            gadget_type_ids=gadget_type_ids,
             gadget_static_files=gadget_static_files,
             organizations=organizations,
             devices=[],
@@ -156,6 +161,7 @@ def customer_dashboard():
         groups=groups,
         gadgets=gadgets,
         gadget_id_to_template=gadget_id_to_template,
+        gadget_type_ids=gadget_type_ids,
         gadget_static_files=gadget_static_files,
         organizations=organizations,
         devices=devices,
