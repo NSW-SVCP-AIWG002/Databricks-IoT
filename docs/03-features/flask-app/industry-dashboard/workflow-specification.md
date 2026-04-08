@@ -64,7 +64,7 @@
       - [エラーハンドリング](#エラーハンドリング-5)
   - [使用データベース詳細](#使用データベース詳細)
     - [使用テーブル一覧](#使用テーブル一覧)
-  - [センサーデータ取得のデータソース切り替えロジック](#センサーデータ取得のデータソース切り替えロジック)
+  - [センサーデータ取得仕様](#センサーデータ取得仕様)
   - [セキュリティ実装](#セキュリティ実装)
     - [認証・認可実装](#認証認可実装)
     - [ログ出力ルール](#ログ出力ルール)
@@ -103,7 +103,7 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
+| 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | device_page・alert_page いずれもなし=初期表示、少なくとも一方あり=ページング |
 | 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
 | 3 | センサー情報表示 | `/analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
 | 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
@@ -124,7 +124,7 @@
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
 | 検索ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/store-monitoring` | `organization_name, organization_id, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
-| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/store-monitoring` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
+| ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/store-monitoring` | `device_page` | HTML（検索結果画面） | エラーモーダル表示 |
 | センサー情報表示ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
 | デバイス詳細ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
 
@@ -158,13 +158,13 @@ flowchart TD
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| CheckPage{request.args に<br>'page' または 'alert_page' パラメータあり?}
+    CheckAuth -->|認証OK| CheckPage{request.args に<br>'device_page' または 'alert_page' パラメータあり?}
 
-    CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
-    CheckPage -->|あり<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
+    CheckPage -->|いずれもなし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
+    CheckPage -->|少なくとも一方あり<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
 
-    ClearCookie --> InitParams[検索条件を初期化<br>page=1, alert_page=1]
-    GetCookie --> OverridePage[Cookie検索条件に<br>page/alert_pageパラメータを上書き<br>page=request.args.get'page'<br>alert_page=request.args.get'alert_page']
+    ClearCookie --> InitParams[検索条件を初期化<br>device_page=1, alert_page=1]
+    GetCookie --> OverridePage[Cookie検索条件に<br>device_page/alert_pageパラメータを上書き<br>device_page=request.args.get'device_page'<br>alert_page=request.args.get'alert_page']
 
     InitParams --> Scope[データスコープ制限適用<br>VIEW v_alert_history_by_user / v_device_master_by_user<br>に user_id を渡して自動フィルタリング]
     OverridePage --> Scope
@@ -199,7 +199,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 店舗モニタリング初期表示 | `GET /analysis/industry-dashboard/store-monitoring` | クエリパラメータ: `page`, `alert_page` |
+| 店舗モニタリング初期表示 | `GET /analysis/industry-dashboard/store-monitoring` | クエリパラメータ: `device_page`, `alert_page` |
 
 #### バリデーション
 
@@ -242,6 +242,9 @@ flowchart TD
 
 **SQL詳細:**
 - アラート一覧件数取得DBクエリ
+
+> **注:** アラート件数の上限30件制御はアプリケーション側（`min(count, 30)`）で行う。COUNTクエリにLIMITを付けても件数上限にはならないため、SQLでは制御しない。
+
 ```sql
 SELECT
   COUNT(v.alert_history_id) AS data_count
@@ -251,7 +254,6 @@ WHERE
   v.user_id = :user_id
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
-LIMIT 30
 ```
 
 - アラート一覧取得DBクエリ
@@ -282,7 +284,7 @@ WHERE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
   v.alert_history_id DESC
-LIMIT :item_per_page OFFSET 0
+LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
 
 **④ デバイス一覧取得**
@@ -325,7 +327,7 @@ WHERE
 ORDER BY
   v.device_organization_id ASC
   , v.device_id ASC
-LIMIT :item_per_page OFFSET 0
+LIMIT :item_per_page OFFSET (:device_page - 1) * :item_per_page
 ```
 
 **⑤ HTMLレンダリング**
@@ -338,11 +340,11 @@ def store_monitoring():
     """店舗モニタリング初期表示・ページング"""
 
     # 初期表示 vs ページング判定
-    if 'page' not in request.args and 'alert_page' not in request.args:
+    if 'device_page' not in request.args and 'alert_page' not in request.args:
         search_params = {
             'organization_name': '',
             'device_name': '',
-            'page': 1,
+            'device_page': 1,
             'alert_page': 1,
         }
         save_cookie = True
@@ -353,18 +355,19 @@ def store_monitoring():
             search_params = json.loads(cookie_data)
         else:
             search_params = get_default_search_params()
-        search_params['page'] = request.args.get('page', search_params.get('page', 1), type=int)
+        search_params['device_page'] = request.args.get('device_page', search_params.get('device_page', 1), type=int)
         search_params['alert_page'] = request.args.get('alert_page', search_params.get('alert_page', 1), type=int)
         save_cookie = False
 
-    page = search_params.get('page', 1)
+    device_page = search_params.get('device_page', 1)
+    alert_page = search_params.get('alert_page', 1)
     per_page = ITEM_PER_PAGE
 
     # アラート一覧取得（v_alert_history_by_userにuser_idを渡してスコープ制限適用）
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=1, per_page=10)
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=alert_page, per_page=ITEM_PER_PAGE)
 
     # デバイス一覧取得（v_device_master_by_userにuser_idを渡してスコープ制限適用）
-    devices, devices_total = get_device_list_with_count(search_params, g.current_user.user_id, page, per_page)
+    devices, devices_total = get_device_list_with_count(search_params, g.current_user.user_id, device_page, per_page)
 
     # レンダリング
     response = make_response(render_template(
@@ -373,19 +376,21 @@ def store_monitoring():
         alerts_total=alerts_total,
         devices=devices,
         devices_total=devices_total,
-        page=page,
+        device_page=device_page,
         per_page=per_page,
         search_params=search_params
     ))
 
-    # 初期表示・ページング問わずCookie格納
-    response.set_cookie(
-        'store_monitoring_search_params',
-        json.dumps(search_params),
-        max_age=86400,
-        httponly=True,
-        samesite='Lax'
-    )
+    # 初期表示時のみCookieをクリア・格納（ページング時はCookieに触れない）
+    if save_cookie:
+        response.delete_cookie('store_monitoring_search_params')
+        response.set_cookie(
+            'store_monitoring_search_params',
+            json.dumps(search_params),
+            max_age=86400,
+            httponly=True,
+            samesite='Lax'
+        )
 
     return response
 ```
@@ -442,9 +447,9 @@ flowchart TD
 
     CheckAuth -->|認証OK| ClearCookie[既存Cookieをクリア<br>response.delete_cookie]
     ClearCookie --> GetParams[フォームから検索条件を取得<br>organization_name, organization_id, device_name]
-    GetParams --> SetPage[page=1, alert_page=1 にリセット]
+    GetParams --> SetPage[device_page=1, alert_page=1 にリセット]
     SetPage --> SaveCookie[Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
-    SaveCookie --> Redirect[GETへリダイレクト<br>redirect url_for store_monitoring page=1 alert_page=1]
+    SaveCookie --> Redirect[GETへリダイレクト<br>redirect url_for store_monitoring device_page=1 alert_page=1]
     Redirect --> Response[リダイレクトレスポンス返却]
 
     LoginRedirect --> End([処理完了])
@@ -453,134 +458,7 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
-**① アラート一覧取得**
-
-**使用テーブル:** alert_history、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master、organization_master
-
-**SQL詳細:**
-- アラート一覧件数取得DBクエリ
-```sql
-SELECT
-  COUNT(v.alert_history_id) AS data_count
-FROM
-  v_alert_history_by_user v
-LEFT JOIN alert_setting_master am
-  ON v.alert_id = am.alert_id
-  AND am.delete_flag = FALSE
-LEFT JOIN device_master dm
-  ON v.device_id = dm.device_id
-  AND dm.delete_flag = FALSE
-LEFT JOIN organization_master om
-  ON v.device_organization_id = om.organization_id
-  AND om.delete_flag = FALSE
-WHERE
-  v.user_id = :user_id
-  AND v.delete_flag = FALSE
-  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
-  AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
-    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
-    ELSE TRUE END
-  AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
-LIMIT 30
-```
-
-- アラート一覧取得DBクエリ
-```sql
-SELECT
-  v.alert_occurrence_datetime,
-  dm.device_name,
-  am.alert_name,
-  al.alert_level_name,
-  asm.alert_status_name
-FROM
-  v_alert_history_by_user v
-LEFT JOIN alert_status_master asm
-  ON v.alert_status_id = asm.alert_status_id
-  AND asm.delete_flag = FALSE
-LEFT JOIN alert_setting_master am
-  ON v.alert_id = am.alert_id
-  AND am.delete_flag = FALSE
-LEFT JOIN alert_level_master al
-  ON am.alert_level_id = al.alert_level_id
-  AND al.delete_flag = FALSE
-LEFT JOIN device_master dm
-  ON v.device_id = dm.device_id
-  AND dm.delete_flag = FALSE
-LEFT JOIN organization_master om
-  ON v.device_organization_id = om.organization_id
-  AND om.delete_flag = FALSE
-WHERE
-  v.user_id = :user_id
-  AND v.delete_flag = FALSE
-  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
-  AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
-    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
-    ELSE TRUE END
-  AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE dm.device_name LIKE CONCAT('%', :device_name, '%') END
-ORDER BY
-  v.alert_history_id DESC
-LIMIT :item_per_page OFFSET 0
-```
-
-**② デバイス一覧取得**
-
-**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、organization_master、device_status_data
-
-**SQL詳細:**
-- デバイス一覧件数取得
-```sql
-SELECT
-  COUNT(v.device_id) AS data_count
-FROM
-  v_device_master_by_user v
-LEFT JOIN organization_master om
-  ON v.device_organization_id = om.organization_id
-  AND om.delete_flag = FALSE
-WHERE
-  v.user_id = :user_id
-  AND v.delete_flag = FALSE
-  AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
-    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
-    ELSE TRUE END
-  AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE v.device_name LIKE CONCAT('%', :device_name, '%') END
-```
-
-- デバイス一覧取得
-```sql
-SELECT
-  dm.device_uuid,
-  om.organization_name,
-  v.device_name,
-  ds.status
-FROM
-  v_device_master_by_user v
-INNER JOIN device_master dm
-  ON v.device_id = dm.device_id
-LEFT JOIN organization_master om
-  ON v.device_organization_id = om.organization_id
-  AND om.delete_flag = FALSE
-LEFT JOIN device_status_data ds
-  ON v.device_id = ds.device_id
-WHERE
-  v.user_id = :user_id
-  AND v.delete_flag = FALSE
-  AND CASE
-    WHEN :organization_id IS NOT NULL AND :organization_id != '' THEN v.device_organization_id = :organization_id
-    WHEN :organization_name IS NOT NULL AND :organization_name != '' THEN om.organization_name LIKE CONCAT('%', :organization_name, '%')
-    ELSE TRUE END
-  AND CASE WHEN :device_name IS NULL THEN TRUE
-    ELSE v.device_name LIKE CONCAT('%', :device_name, '%') END
-ORDER BY
-    v.device_organization_id ASC
-    , v.device_id ASC
-LIMIT :item_per_page OFFSET (:page - 1) * :item_per_page
-```
+> **注:** このルートはPRGパターン（Cookie保存後GETへリダイレクト）のため、サーバーサイドでのDBアクセスは行わない。アラート一覧・デバイス一覧の取得はリダイレクト先のGETルート（[店舗モニタリング初期表示](#店舗モニタリング初期表示)）が担当する。
 
 **実装例:**
 ```python
@@ -594,13 +472,13 @@ def store_monitoring_search():
         'organization_name': request.form.get('organization_name', ''),
         'organization_id': request.form.get('organization_id', ''),
         'device_name': request.form.get('device_name', ''),
-        'page': 1,
+        'device_page': 1,
         'alert_page': 1,
     }
 
     # PRGパターン: Cookieに検索条件を格納してGETへリダイレクト
     response = make_response(
-        redirect(url_for('analysis.store_monitoring', page=1, alert_page=1))
+        redirect(url_for('analysis.store_monitoring', device_page=1, alert_page=1))
     )
     response.delete_cookie('store_monitoring_search_params')
     response.set_cookie(
@@ -662,15 +540,20 @@ flowchart TD
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>device_uuidに対応するデバイスが<br>アクセス可能な組織に属するか確認]
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
+    DeviceQuery --> CheckDeviceQuery{取得結果}
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
+    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
 
-    CheckScope -->|スコープOK| DeviceQuery[デバイス情報取得<br>DB device_master]
-    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
-    CheckDeviceQuery -->|失敗| Error500[500エラーモーダル表示]
+    CheckDeviceQuery -->|成功| AlertQuery[アラート一覧取得<br>VIEW v_alert_history_by_user]
+    AlertQuery --> CheckAlertQuery{DBクエリ結果}
+    CheckAlertQuery -->|失敗| Error500
 
-    CheckDeviceQuery -->|成功| SensorQuery[最新センサーデータ取得<br>OLTP DB silver_sensor_data]
+    CheckAlertQuery -->|成功| DeviceListQuery[デバイス一覧取得<br>VIEW v_device_master_by_user]
+    DeviceListQuery --> CheckDeviceListQuery{DBクエリ結果}
+    CheckDeviceListQuery -->|失敗| Error500
+
+    CheckDeviceListQuery -->|成功| SensorQuery[最新センサーデータ取得<br>OLTP DB silver_sensor_data]
     SensorQuery --> CheckSensorQuery{DBクエリ結果}
     CheckSensorQuery -->|失敗| Error500
 
@@ -691,7 +574,9 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
-**① データスコープ制限チェック**
+**① データスコープ制限チェック＆デバイス情報取得**
+
+**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、device_master
 
 ```python
 def check_device_access(device_uuid, user_id):
@@ -710,7 +595,85 @@ def check_device_access(device_uuid, user_id):
     return result
 ```
 
-**② 最新センサーデータ取得**
+**② アラート一覧取得**
+
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master
+
+**SQL詳細:**
+- アラート一覧件数取得DBクエリ
+
+> **注:** アラート件数の上限30件制御はアプリケーション側（`min(count, 30)`）で行う。
+
+```sql
+SELECT
+  COUNT(v.alert_history_id) AS data_count
+FROM
+  v_alert_history_by_user v
+WHERE
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+```
+
+- アラート一覧取得DBクエリ
+```sql
+SELECT
+  v.alert_occurrence_datetime,
+  dm.device_name,
+  am.alert_name,
+  al.alert_level_name,
+  asm.alert_status_name
+FROM
+  v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
+WHERE
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+ORDER BY
+  v.alert_history_id DESC
+LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
+```
+
+**③ デバイス一覧取得**
+
+**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、organization_master、device_status_data
+
+**SQL詳細:**
+- デバイス一覧取得DBクエリ
+```sql
+SELECT
+  dm.device_uuid,
+  om.organization_name,
+  v.device_name,
+  ds.status
+FROM
+  v_device_master_by_user v
+INNER JOIN device_master dm
+  ON v.device_id = dm.device_id
+LEFT JOIN organization_master om
+  ON v.device_organization_id = om.organization_id
+  AND om.delete_flag = FALSE
+LEFT JOIN device_status_data ds
+  ON v.device_id = ds.device_id
+WHERE
+  v.user_id = :user_id
+  AND v.delete_flag = FALSE
+ORDER BY
+  v.device_organization_id ASC
+  , v.device_id ASC
+LIMIT :item_per_page OFFSET (:device_page - 1) * :item_per_page
+```
+
+**④ 最新センサーデータ取得**
 
 **使用テーブル:** MySQL の `silver_sensor_data`
 
@@ -746,13 +709,14 @@ def show_sensor_info(device_uuid):
     else:
         search_params = get_default_search_params()
 
-    page = search_params.get('page', 1)
+    device_page = search_params.get('device_page', 1)
+    alert_page = search_params.get('alert_page', 1)
 
     # アラート一覧取得（v_alert_history_by_userにuser_idを渡してスコープ制限適用）
-    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=1, per_page=10)
+    alerts, alerts_total = get_recent_alerts_with_count(search_params, g.current_user.user_id, page=alert_page, per_page=ITEM_PER_PAGE)
 
     # デバイス一覧取得（v_device_master_by_userにuser_idを渡してスコープ制限適用）
-    devices, total = get_device_list(search_params, g.current_user.user_id, page, ITEM_PER_PAGE)
+    devices, devices_total = get_device_list_with_count(search_params, g.current_user.user_id, device_page, ITEM_PER_PAGE)
 
     # 最新センサーデータ取得（MySQLから取得）
     sensor_data = get_latest_sensor_data(device.device_id)
@@ -760,9 +724,10 @@ def show_sensor_info(device_uuid):
     return render_template(
         'analysis/industry_dashboard/store_monitoring.html',
         alerts=alerts,
+        alerts_total=alerts_total,
         devices=devices,
-        total=total,
-        page=page,
+        devices_total=devices_total,
+        device_page=device_page,
         per_page=ITEM_PER_PAGE,
         search_params=search_params,
         selected_device=device,
@@ -816,11 +781,12 @@ flowchart TD
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック]
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
+    DeviceQuery --> CheckDeviceQuery{取得結果}
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
+    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
 
-    CheckScope -->|スコープOK| CheckPage{request.args に<br>'page' パラメータあり?}
+    CheckDeviceQuery -->|成功| CheckPage{request.args に<br>'page' パラメータあり?}
 
     CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア]
     CheckPage -->|あり<br>ページング| GetCookie[Cookieから検索条件取得]
@@ -828,17 +794,12 @@ flowchart TD
     ClearCookie --> InitParams[検索条件を初期化<br>表示期間: 直近24時間<br>page=1]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き]
 
-    InitParams --> DeviceQuery[デバイス情報取得<br>DB device_master]
-    OverridePage --> DeviceQuery
-
-    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
-    CheckDeviceQuery -->|失敗| Error500[500エラーモーダル表示]
-
-    CheckDeviceQuery -->|成功| AlertCount[アラート一覧件数取得<br>DB alert_history]
+    InitParams --> AlertCount[アラート一覧件数取得<br>VIEW v_alert_history_by_user]
+    OverridePage --> AlertCount
     AlertCount --> CheckAlertCount{DBクエリ結果}
     CheckAlertCount -->|失敗| Error500
 
-    CheckAlertCount -->|成功| AlertQuery[アラート一覧取得<br>DB alert_history]
+    CheckAlertCount -->|成功| AlertQuery[アラート一覧取得<br>VIEW v_alert_history_by_user]
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
     CheckAlertQuery -->|失敗| Error500
 
@@ -884,7 +845,56 @@ def get_default_date_range():
     }
 ```
 
-**② グラフ用データ取得**
+**② アラート一覧取得**
+
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master
+
+**SQL詳細:**
+- アラート一覧件数取得DBクエリ
+
+> **注:** アラート件数の上限30件制御はアプリケーション側（`min(count, 30)`）で行う。
+
+```sql
+SELECT
+  COUNT(v.alert_history_id) AS data_count
+FROM
+  v_alert_history_by_user v
+WHERE
+  v.user_id = :user_id
+  AND v.device_id = :device_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+```
+
+- アラート一覧取得DBクエリ
+```sql
+SELECT
+  v.alert_occurrence_datetime,
+  am.alert_name,
+  al.alert_level_name,
+  asm.alert_status_name
+FROM
+  v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
+WHERE
+  v.user_id = :user_id
+  AND v.device_id = :device_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+ORDER BY
+  v.alert_history_id DESC
+LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
+```
+
+**③ グラフ用データ取得**
 
 時系列グラフ描画用に、表示期間内の全センサーデータを取得します。MySQLのみを参照し、MySQLにデータがない場合は空リストを返します。
 
@@ -1016,11 +1026,12 @@ flowchart TD
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック]
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
+    CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
+    DeviceQuery --> CheckDeviceQuery{取得結果}
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
+    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
 
-    CheckScope -->|スコープOK| Validate[バリデーション<br>表示期間の妥当性チェック]
+    CheckDeviceQuery -->|成功| Validate[バリデーション<br>表示期間の妥当性チェック]
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーモーダル表示]
 
@@ -1028,8 +1039,8 @@ flowchart TD
     ClearCookie --> GetParams[フォームから検索条件を取得<br>search_start_datetime, search_end_datetime]
     GetParams --> Convert[検索条件設定<br>page: 1（リセット）]
 
-    Convert --> DeviceQuery[デバイス情報取得]
-    DeviceQuery --> AlertCount[アラート一覧件数取得]
+    Convert --> DeviceQuery2[デバイス情報取得]
+    DeviceQuery2 --> AlertCount[アラート一覧件数取得]
     AlertCount --> AlertQuery[アラート履歴取得]
     AlertQuery --> GraphQuery[グラフ用データ取得<br>表示期間を適用]
 
@@ -1087,7 +1098,56 @@ def validate_date_range(start_datetime_str, end_datetime_str):
 
 #### 処理詳細（サーバーサイド）
 
-**実装例:**
+**① アラート一覧取得**
+
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master
+
+**SQL詳細:**
+- アラート一覧件数取得DBクエリ
+
+> **注:** アラート件数の上限30件制御はアプリケーション側（`min(count, 30)`）で行う。
+
+```sql
+SELECT
+  COUNT(v.alert_history_id) AS data_count
+FROM
+  v_alert_history_by_user v
+WHERE
+  v.user_id = :user_id
+  AND v.device_id = :device_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+```
+
+- アラート一覧取得DBクエリ
+```sql
+SELECT
+  v.alert_occurrence_datetime,
+  am.alert_name,
+  al.alert_level_name,
+  asm.alert_status_name
+FROM
+  v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
+WHERE
+  v.user_id = :user_id
+  AND v.device_id = :device_id
+  AND v.delete_flag = FALSE
+  AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
+ORDER BY
+  v.alert_history_id DESC
+LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
+```
+
+**② 実装例:**
 ```python
 @analysis_bp.route('/analysis/industry-dashboard/device-details/<device_uuid>', methods=['POST'])
 @require_auth
@@ -1114,11 +1174,8 @@ def device_details_search(device_uuid):
         'page': 1
     }
 
-    # アラート一覧件数取得
-    alerts_total = get_device_alerts_with_count(device.device_id, search_params)
-
-    # アラート一覧取得
-    alerts = get_device_alerts(device.device_id, search_params)
+    # アラート一覧取得（件数・リストを同時取得）
+    alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params)
 
     # グラフ用データ取得（MySQLから取得）
     graph_data = get_graph_data(device.device_id, search_params)
