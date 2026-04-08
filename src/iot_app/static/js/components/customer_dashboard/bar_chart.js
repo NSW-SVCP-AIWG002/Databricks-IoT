@@ -226,7 +226,24 @@
       base_datetime: toFullDatetime(state.baseDatetime, state.displayUnit),
     });
     const url = CSV_ENDPOINT.replace('{uuid}', state.uuid) + '?' + params.toString();
-    window.location.href = url;
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (data) {
+            Toast.show(data.error || 'エラーが発生しました');
+          });
+        }
+        return res.blob().then(function (blob) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'sensor_data.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+      })
+      .catch(function () {
+        Toast.show('CSVのダウンロードに失敗しました');
+      });
   }
 
   // ============================================================

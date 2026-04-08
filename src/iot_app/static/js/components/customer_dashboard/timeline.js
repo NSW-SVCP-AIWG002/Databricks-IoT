@@ -349,8 +349,25 @@ function initGadget(gadgetEl) {
       const endInput   = document.getElementById(`end-datetime-${gadgetUuid}`);
       const start = encodeURIComponent(startInput.value);
       const end   = encodeURIComponent(endInput.value);
-      window.location.href =
-        `/analysis/customer-dashboard/gadgets/${gadgetUuid}?export=csv&start_datetime=${start}&end_datetime=${end}`;
+      const csvUrl = `/analysis/customer-dashboard/gadgets/${gadgetUuid}?export=csv&start_datetime=${start}&end_datetime=${end}`;
+      fetch(csvUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (res) {
+          if (!res.ok) {
+            return res.json().then(function (data) {
+              Toast.show(data.error || 'エラーが発生しました');
+            });
+          }
+          return res.blob().then(function (blob) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'sensor_data.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          });
+        })
+        .catch(function () {
+          Toast.show('CSVのダウンロードに失敗しました');
+        });
     });
   }
 
