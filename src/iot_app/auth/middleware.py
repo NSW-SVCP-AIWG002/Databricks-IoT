@@ -51,11 +51,8 @@ def authenticate_request():
     try:
         app_user = find_user_by_email(idp_user_info['email'])
     except UnauthorizedError:
-        # IdP認証済みだがアプリ未登録 → 403エラーページを直接返却
-        # ※ abort(403) は使用しない。他の403（ロール不足）はモーダル表示だが、
-        #   このケースはページ表示前に発生するため middleware 内で直接レンダリングする。
         logger.warning("アクセス拒否：アプリ未登録ユーザー", extra={"email": idp_user_info.get("email")})
-        return render_template("errors/403.html"), 403
+        abort(403)
 
     _sync_session(idp_user_info, app_user)
 

@@ -9,8 +9,7 @@
     <form method="POST"
           action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
           id="timeline-register-form"
-          novalidate
-          data-ajax-submit>
+          novalidate>
       {{ form.hidden_tag() }}
 
       <div class="modal__body">
