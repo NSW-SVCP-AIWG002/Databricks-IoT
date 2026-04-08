@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-=======
 /* ===== ボタン ===== */
 
->>>>>>> origin/main
 /* ボタン基本スタイル */
 .button {
   display: inline-flex;
@@ -82,8 +79,6 @@
 .button--block {
   display: block;
   width: 100%;
-<<<<<<< HEAD
-=======
 }
 
 /* ローディング状態 */
@@ -135,5 +130,4 @@
   .button {
     width: auto;
   }
->>>>>>> origin/main
 }

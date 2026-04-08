@@ -16,12 +16,12 @@ class Config:
     # Databricks Configuration
     DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
     DATABRICKS_SERVING_ENDPOINT_NAME = os.getenv(
-        "DATABRICKS_SERVING_ENDPOINT_NAME", "ai-orchestrator-chat"
+        "DATABRICKS_SERVING_ENDPOINT_NAME", "ai_orchestrator"
     )
 
     # MySQL Configuration
     MYSQL_HOST = os.getenv("MYSQL_HOST", "db")
-    MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
+    MYSQL_PORT = int(os.getenv("MYSQL_PORT") or 3306)
     MYSQL_USER = os.getenv("MYSQL_USER", "user")
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "databricks_iot")
@@ -48,7 +48,10 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     AUTH_TYPE = 'dev'
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL",
+        f"mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{Config.MYSQL_DATABASE}"
+    )
     WTF_CSRF_ENABLED = False
 
 

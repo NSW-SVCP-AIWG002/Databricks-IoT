@@ -1,7 +1,5 @@
 /* ===== 基本スタイル ===== */
 
-<<<<<<< HEAD
-=======
 /* レイアウト */
 .wrapper {
   display: flex;
@@ -96,7 +94,6 @@
   white-space: nowrap;
 }
 
->>>>>>> origin/main
 body {
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);

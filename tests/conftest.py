@@ -2,10 +2,7 @@ import os
 import pytest
 
 os.environ["FLASK_ENV"] = "testing"
-<<<<<<< HEAD
-=======
 os.environ["DATABASE_URL"] = "mysql+pymysql://user:password@db:3306/databricks_iot"
->>>>>>> origin/main
 
 from iot_app import create_app, db as _db
 
@@ -29,10 +26,6 @@ def app():
         import iot_app.models.device  # noqa: F401
         _db.create_all()
         yield app
-<<<<<<< HEAD
-        _db.drop_all()
-=======
->>>>>>> origin/main
 
 
 @pytest.fixture()

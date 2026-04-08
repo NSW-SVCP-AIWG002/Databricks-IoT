@@ -54,13 +54,6 @@
   }
 }
 
-<<<<<<< HEAD
-.modal--small    { max-width: 400px; }
-.modal--medium   { max-width: 600px; }
-.modal--large    { max-width: 800px; }
-.modal--fullscreen { max-width: 90%; width: 90%; }
-
-=======
 /* サイズバリエーション */
 .modal--small {
   max-width: 400px;
@@ -80,7 +73,6 @@
 }
 
 /* モーダルヘッダー */
->>>>>>> origin/main
 .modal__header {
   display: flex;
   flex-direction: column;
@@ -107,8 +99,6 @@
   margin-left: var(--spacing-4);
 }
 
-<<<<<<< HEAD
-=======
 /* タイトルカラーバリエーション（ステータスメッセージモーダル） */
 .modal__title--success {
   color: var(--color-success);
@@ -118,7 +108,6 @@
   color: var(--color-danger);
 }
 
->>>>>>> origin/main
 .modal__description {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
@@ -133,18 +122,12 @@
   margin-top: var(--spacing-4);
 }
 
-<<<<<<< HEAD
-=======
 /* モーダルボディ */
->>>>>>> origin/main
 .modal__body {
   padding: var(--spacing-0) var(--spacing-5);
 }
 
-<<<<<<< HEAD
-=======
 /* モーダルフッター */
->>>>>>> origin/main
 .modal__footer {
   display: flex;
   align-items: center;

@@ -562,8 +562,6 @@ def get_devices_by_organization(org_id):
         .order_by(DeviceMaster.device_id)
         .all()
     )
-<<<<<<< HEAD
-=======
 
 
 # ---------------------------------------------------------------------------
@@ -613,4 +611,3 @@ def check_device_access(device_id, accessible_org_ids):
         )
         .first()
     )
->>>>>>> origin/main

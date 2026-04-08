@@ -3,8 +3,6 @@ from datetime import datetime
 from iot_app import db
 
 
-<<<<<<< HEAD
-=======
 class SilverSensorData(db.Model):
     __tablename__ = "silver_sensor_data"
 
@@ -37,7 +35,6 @@ class SilverSensorData(db.Model):
     create_time                      = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
 
 
->>>>>>> origin/main
 class MeasurementItemMaster(db.Model):
     """測定項目マスタ"""
     __tablename__ = 'measurement_item_master'
