@@ -2226,7 +2226,7 @@ class TestFetchBeltChartDataLimit:
         assert call_kwargs is not None
         # execute に渡された引数（位置またはキーワード）に 100 が含まれる
         all_args = list(call_kwargs.args) + list(call_kwargs.kwargs.values())
-        assert any(100 in str(a) for a in all_args)
+        assert any(str(100) in str(a) for a in all_args)
 
     @patch(f'{_BELT_CHART_SERVICE_MODULE}.db')
     def test_csv_export_uses_limit_100000(self, mock_db):
@@ -2250,7 +2250,7 @@ class TestFetchBeltChartDataLimit:
         call_kwargs = mock_db.session.execute.call_args
         assert call_kwargs is not None
         all_args = list(call_kwargs.args) + list(call_kwargs.kwargs.values())
-        assert any(100000 in str(a) for a in all_args)
+        assert any(str(100000) in str(a) for a in all_args)
 
 
 # ---------------------------------------------------------------------------
