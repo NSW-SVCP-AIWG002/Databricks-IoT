@@ -129,7 +129,7 @@
 
 /* device-mode-area 内を上端揃えに */
 #belt-chart-register-form .gadget-register__device-mode-area {
-  align-items: flex-start;
+  align-items: center;
 }
 
 /* 表示項目選択ラベルを左にオフセット */
@@ -204,7 +204,7 @@
 .belt-chart-register__measurement-list {
   flex: 1;
   min-width: 0;
-  max-height: 400px;
+  max-height: 300px;
   overflow-y: auto;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -213,6 +213,7 @@
 .belt-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .belt-chart-register__measurement-list thead {
@@ -229,4 +230,8 @@
 
 .belt-chart-register__measurement-list td:first-child {
   text-align: center;
+}
+
+.form__row--top {
+  align-items: flex-start;
 }

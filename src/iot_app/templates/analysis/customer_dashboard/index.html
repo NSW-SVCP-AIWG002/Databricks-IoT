@@ -267,6 +267,8 @@
                     {% include 'analysis/customer_dashboard/gadgets/timeline.html' %}
                   {% elif gadget.gadget_type_id == gadget_type_ids['円グラフ'] %}
                     {% include 'analysis/customer_dashboard/gadgets/circle_chart.html' %}
+                  {% elif gadget.gadget_type_id == gadget_type_ids['帯グラフ'] %}
+                    {% include 'analysis/customer_dashboard/gadgets/belt_chart.html' %}
                   {% endif %}
 
                 </div>{# /gadget #}
