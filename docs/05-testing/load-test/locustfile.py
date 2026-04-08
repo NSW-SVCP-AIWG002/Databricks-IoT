@@ -71,6 +71,11 @@ _CREDS_FILE = os.getenv("DEVICE_CREDENTIALS_FILE", "device_credentials.csv")
 # デバイス認証情報 dict を格納: {device_name, device_id, primary_key}
 _credential_queue: queue.Queue = queue.Queue()
 _registration_done = threading.Event()  # 読込完了まで on_start をブロック
+_connected_count = 0
+_failed_count = 0
+_issued_count = 0   # credential を取得したユーザー数
+_connected_count_lock = threading.Lock()
+
 
 
 def _load_credentials(offset: int, count: int) -> list[dict]:
@@ -199,22 +204,35 @@ class MqttDeviceUser(User):
       DEVICE_CREDENTIALS_FILE   - デバイス認証情報 CSV パス（デフォルト: device_credentials.csv）
     """
 
-    # 2回目以降は5分間隔で送信
-    wait_time = between(300, 300)
+    # 送信間隔（60〜120秒）: AzureTCPアイドルタイムアウト（4分）以内に送信して接続維持
+    wait_time = between(60, 120)
+
+    def _on_disconnect(self, client, userdata, rc):
+        """切断コールバック: 予期しない切断をLocust Web UIに報告"""
+        if rc != 0:
+            print(f"[MQTT] 予期しない切断 device={self.device_name} rc={rc}")
+            self.environment.events.request.fire(
+                request_type="MQTT",
+                name="disconnect",
+                response_time=0,
+                response_length=0,
+                exception=Exception(f"unexpected disconnect rc={rc}"),
+                context=self.context(),
+            )
 
     def on_start(self):
         _registration_done.wait()  # 認証情報読込完了まで待機
-        # 起動後5分以内のランダムなタイミングで初回送信
-        self._first_send = True
-        self._initial_wait = random.uniform(0, 300)
 
+        global _issued_count, _connected_count, _failed_count
         try:
             cred = _credential_queue.get_nowait()
+            with _connected_count_lock:
+                _issued_count += 1
         except queue.Empty:
-            raise RuntimeError(
-                "デバイスキューが空です。DEVICE_COUNT または -u の値、"
-                "または device_credentials.csv の内容を確認してください。"
-            )
+            # キューが空 = 割り当て可能なデバイスがない → このユーザーを静かに停止
+            print("[WARN] デバイスキューが空です。このユーザーを停止します。")
+            self.stop()
+            return
 
         self.device_name  = cred["device_name"]
         self.device_id    = cred["device_id"]
@@ -227,53 +245,107 @@ class MqttDeviceUser(User):
 
         # SAS トークン生成（有効期限: 2時間）
         sas_token = _generate_sas_token(
-            iothub_hostname, self.device_name, self._primary_key, expiry_secs=7200
+            iothub_hostname, self.device_name, self._primary_key, expiry_secs=86400
         )
 
-        # paho-mqtt クライアント生成・接続
-        self._mqtt = mqtt.Client(
-            client_id=self.device_name,
-            protocol=mqtt.MQTTv311,
-            transport="tcp",
-        )
-        self._mqtt.username_pw_set(
-            username=f"{iothub_hostname}/{self.device_name}/?api-version=2021-04-12",
-            password=sas_token,
-        )
-        self._mqtt.tls_set(
-            cert_reqs=ssl.CERT_REQUIRED,
-            tls_version=ssl.PROTOCOL_TLS_CLIENT,
-        )
+        # 接続タイミングを分散（0〜600秒のランダム待機
+        time.sleep(random.uniform(0, 120))
 
-        try:
-            self._mqtt.connect(iothub_hostname, port=8883, keepalive=120)
-            self._mqtt.loop_start()
-            print(f"[MQTT] 接続完了 device={self.device_name} (device_id={self.device_id})")
-        except Exception as e:
-            raise RuntimeError(f"[MQTT] 接続失敗 {self.device_name}: {e}") from e
+        connack_timeout = 60
+        retry_wait_base = 30  # 失敗後のリトライ基準待機時間（リトライストーム防止）
+        attempt = 0
+        while True:
+            attempt += 1
+            # 再試行のたびにクライアントを再作成（状態リセット）
+            self._mqtt = mqtt.Client(
+                client_id=self.device_name,
+                protocol=mqtt.MQTTv311,
+                transport="tcp",
+            )
+            self._mqtt.on_disconnect = self._on_disconnect
+            self._mqtt.username_pw_set(
+                username=f"{iothub_hostname}/{self.device_name}/?api-version=2021-04-12",
+                password=sas_token,
+            )
+            self._mqtt.tls_set(
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLS_CLIENT,
+            )
+            self._mqtt._connect_timeout = 30
+            try:
+                # keepalive=180: wait_time最大(120秒)より長く、Azure TCP制限(4分)より短い
+                self._mqtt.connect(iothub_hostname, port=8883, keepalive=180)
+
+                # CONNACKをloop()ポーリングで待機（geventと互換性のある方式）
+                connack_start = time.time()
+                while not self._mqtt.is_connected() and time.time() - connack_start < connack_timeout:
+                    self._mqtt.loop(timeout=0.1)
+                    time.sleep(1.0)
+
+                if not self._mqtt.is_connected():
+                    raise RuntimeError(f"CONNACK タイムアウト（{connack_timeout}秒）")
+
+                print(f"[MQTT] 接続完了 device={self.device_name} (device_id={self.device_id}) attempt={attempt}")
+                break
+            except Exception as e:
+                retry_wait = random.uniform(retry_wait_base, retry_wait_base * 3)
+                print(f"[MQTT] 接続失敗 device={self.device_name} attempt={attempt}: {e} → {retry_wait:.0f}秒後に再試行")
+                time.sleep(retry_wait)
 
         # デバイス-to-クラウド メッセージトピック
         self._topic = f"devices/{self.device_name}/messages/events/"
 
+        # 接続完了カウントを更新
+        with _connected_count_lock:
+            _connected_count += 1
+            print(f"[接続完了] {self.device_name} 接続済み: {_connected_count}台 / {_issued_count}台")
+
+        # 送信開始タイミングを分散（一斉送信を防ぐ）
+        time.sleep(random.uniform(0, 60))
+
     def on_stop(self):
         if hasattr(self, "_mqtt"):
-            self._mqtt.loop_stop()
             self._mqtt.disconnect()
             print(f"[MQTT] 切断 device={self.device_name}")
 
     @task
     def send_telemetry(self):
-        # 初回のみ: 起動後0〜5分のランダムなタイミングまで待機
-        if self._first_send:
-            time.sleep(self._initial_wait)
-            self._first_send = False
-
         body = json.dumps(_make_telemetry(self.device_id)).encode("utf-8")
+
+        # 接続が切れている場合は再接続を試みる
+        if not self._mqtt.is_connected():
+            print(f"[MQTT] 切断検知 device={self.device_name} → 再接続試行")
+            # 再接続を分散（TLSハンドシェイクの集中を防ぐ）
+            time.sleep(random.uniform(0, 30))
+            for retry in range(1, 6):
+                try:
+                    self._mqtt.reconnect()
+                    reconnack_start = time.time()
+                    while not self._mqtt.is_connected() and time.time() - reconnack_start < 30:
+                        self._mqtt.loop(timeout=0.1)
+                        time.sleep(1.0)
+                    if not self._mqtt.is_connected():
+                        raise RuntimeError("再接続 CONNACK タイムアウト")
+                    print(f"[MQTT] 再接続成功 device={self.device_name} attempt={retry}")
+                    break
+                except Exception as reconnect_exc:
+                    print(f"[MQTT] 再接続失敗 device={self.device_name} attempt={retry}/5: {reconnect_exc}")
+                    if retry == 5:
+                        self.environment.events.request.fire(
+                            request_type="MQTT",
+                            name="send_telemetry",
+                            response_time=0,
+                            response_length=0,
+                            exception=reconnect_exc,
+                            context=self.context(),
+                        )
+                        return
+                    time.sleep(5 * retry)
 
         start = time.perf_counter()
         try:
             self._mqtt.publish(self._topic, payload=body, qos=0)
-            self._mqtt.loop(timeout=0.01)  # 送信キューを処理
+            self._mqtt.loop(timeout=0.1)  # パケットを即時送信
             elapsed_ms = int((time.perf_counter() - start) * 1000)
 
             self.environment.events.request.fire(
@@ -295,161 +367,6 @@ class MqttDeviceUser(User):
                 exception=exc,
                 context=self.context(),
             )
-
-
-# ---------------------------------------------------------------------------
-# 旧シナリオ: Event Hub Kafka 直接送信（IoT Hub をバイパス）
-# ---------------------------------------------------------------------------
-# ※ 本番フローは MqttDeviceUser（IoT Hub 経由）を使用する。
-#    本シナリオは IoT Hub を経由せず Event Hub へ直接送信するため
-#    Event Hub 以降のパイプライン単体検証に使用する場合のみアンコメントすること。
-# ---------------------------------------------------------------------------
-
-# import itertools
-# from confluent_kafka import Producer
-#
-# def _build_producer() -> Producer:
-#     import re
-#     conn_str = os.getenv("EVENTHUB_CONNECTION_STRING", "")
-#     if not conn_str:
-#         raise EnvironmentError("EVENTHUB_CONNECTION_STRING が設定されていません")
-#     match = re.search(r"sb://([^.]+)\.servicebus\.windows\.net", conn_str)
-#     if not match:
-#         raise EnvironmentError(
-#             "EVENTHUB_CONNECTION_STRING から名前空間を解析できませんでした"
-#         )
-#     namespace = match.group(1)
-#     return Producer({
-#         "bootstrap.servers": f"{namespace}.servicebus.windows.net:9093",
-#         "security.protocol": "SASL_SSL",
-#         "sasl.mechanism": "PLAIN",
-#         "sasl.username": "$ConnectionString",
-#         "sasl.password": conn_str,
-#     })
-#
-#
-# class KafkaDeviceUser(User):
-#     """Event Hubs Kafka 互換エンドポイントへテレメトリを送信する（IoT Hub バイパス）。"""
-#
-#     wait_time = between(2, 5)
-#
-#     def on_start(self):
-#         _registration_done.wait()
-#         try:
-#             self.device_id = _credential_queue.get_nowait()
-#         except queue.Empty:
-#             raise RuntimeError("デバイスキューが空です。")
-#         self._topic = os.getenv("KAFKA_TOPIC") or os.getenv("EVENTHUB_NAME", "")
-#         if not self._topic:
-#             raise EnvironmentError("KAFKA_TOPIC または EVENTHUB_NAME が設定されていません")
-#         self._producer = _build_producer()
-#         print(f"[Kafka] 準備完了 device_id={self.device_id}")
-#
-#     def on_stop(self):
-#         if hasattr(self, "_producer"):
-#             self._producer.flush(timeout=5)
-#
-#     @task
-#     def send_telemetry(self):
-#         body = json.dumps(_make_telemetry(self.device_id)).encode("utf-8")
-#         start = time.perf_counter()
-#         try:
-#             self._producer.produce(
-#                 self._topic, key=str(self.device_id).encode(), value=body,
-#             )
-#             self._producer.poll(0)
-#             elapsed_ms = int((time.perf_counter() - start) * 1000)
-#             self.environment.events.request.fire(
-#                 request_type="Kafka", name="send_telemetry",
-#                 response_time=elapsed_ms, response_length=len(body),
-#                 exception=None, context=self.context(),
-#             )
-#         except Exception as exc:
-#             elapsed_ms = int((time.perf_counter() - start) * 1000)
-#             self.environment.events.request.fire(
-#                 request_type="Kafka", name="send_telemetry",
-#                 response_time=elapsed_ms, response_length=0,
-#                 exception=exc, context=self.context(),
-#             )
-
-
-# ---------------------------------------------------------------------------
-# 旧シナリオ: ADLS Gen2 直接書き込み
-# ---------------------------------------------------------------------------
-# ※ 現在は silver_pipeline.py（Databricks）経由のフローを使用するためコメントアウト。
-#    silver_pipeline が停止している場合の ADLS 疎通確認用として残す。
-#    使用する場合は以下をアンコメントし、.env に ADLS 関連環境変数を設定すること。
-#
-# 本番フロー（通常使用）:
-#   Locust（MqttDeviceUser）→ IoT Hub → Event Hub → silver_pipeline → ADLS
-#
-# 直接書き込みフロー（silver_pipeline 停止時の疎通確認）:
-#   Locust（ADLSDeviceUser）→ ADLS（直接）
-# ---------------------------------------------------------------------------
-
-# import itertools as _itertools
-# _adls_counter_lock = threading.Lock()
-# _adls_device_counter = _itertools.count(int(os.getenv("DEVICE_ID_OFFSET", "1")))
-#
-# def _build_adls_client() -> DataLakeServiceClient:
-#     tenant_id       = os.getenv("AZURE_TENANT_ID", "")
-#     client_id_env   = os.getenv("AZURE_CLIENT_ID", "")
-#     client_secret   = os.getenv("AZURE_CLIENT_SECRET", "")
-#     storage_account = os.getenv("ADLS_STORAGE_ACCOUNT", "")
-#     if not all([tenant_id, client_id_env, client_secret, storage_account]):
-#         raise EnvironmentError(
-#             "AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / "
-#             "ADLS_STORAGE_ACCOUNT を設定してください"
-#         )
-#     credential = ClientSecretCredential(tenant_id, client_id_env, client_secret)
-#     return DataLakeServiceClient(
-#         account_url=f"https://{storage_account}.dfs.core.windows.net",
-#         credential=credential,
-#     )
-#
-# class ADLSDeviceUser(User):
-#     """ADLS Gen2 へテレメトリ JSON を直接書き込む（silver_pipeline 停止時の疎通確認用）。"""
-#     wait_time = between(2, 5)
-#
-#     def on_start(self):
-#         with _adls_counter_lock:
-#             self.device_id = next(_adls_device_counter)
-#         self._container = os.getenv("ADLS_CONTAINER", "bronze")
-#         self._prefix    = os.getenv("ADLS_PATH_PREFIX", "telemetry/loadtest")
-#         self._client    = _build_adls_client()
-#         self._fs        = self._client.get_file_system_client(self._container)
-#         print(f"[ADLS] 準備完了 device_id={self.device_id}")
-#
-#     def on_stop(self):
-#         if hasattr(self, "_client"):
-#             self._client.close()
-#
-#     @task
-#     def write_telemetry(self):
-#         now       = datetime.now(timezone.utc)
-#         date_path = now.strftime("%Y/%m/%d")
-#         file_name = f"{now.strftime('%H%M%S%f')}_{uuid.uuid4().hex[:8]}.json"
-#         path      = f"{self._prefix}/{self.device_id}/{date_path}/{file_name}"
-#         body      = json.dumps(_make_telemetry(self.device_id)).encode("utf-8")
-#         start     = time.perf_counter()
-#         try:
-#             self._fs.get_file_client(path).upload_data(body, overwrite=True)
-#             elapsed_ms = int((time.perf_counter() - start) * 1000)
-#             print(f"[ADLS] 書込み完了 device_id={self.device_id} path={path} {elapsed_ms}ms")
-#             self.environment.events.request.fire(
-#                 request_type="ADLS", name="write_telemetry",
-#                 response_time=elapsed_ms, response_length=len(body),
-#                 exception=None, context=self.context(),
-#             )
-#         except Exception as exc:
-#             elapsed_ms = int((time.perf_counter() - start) * 1000)
-#             print(f"[ADLS] 書込み失敗 device_id={self.device_id}: {exc}")
-#             self.environment.events.request.fire(
-#                 request_type="ADLS", name="write_telemetry",
-#                 response_time=elapsed_ms, response_length=0,
-#                 exception=exc, context=self.context(),
-#             )
-
 
 # ---------------------------------------------------------------------------
 # 接続確認シナリオ: Event Hub コンシューマー（変更なし）
