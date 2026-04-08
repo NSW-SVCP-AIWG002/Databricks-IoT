@@ -148,6 +148,7 @@ class ChatUI {
                 });
                 // HITL 中は入力を無効にしたままにする
             } else {
+                response.timestamp = new Date().toISOString();
                 this._appendAIMessage(response, true);
                 this._saveToHistory({
                     role: 'ai',
@@ -156,7 +157,7 @@ class ChatUI {
                     df: response.df,
                     fig_data: response.fig_data,
                     sql_query: response.sql_query,
-                    timestamp: new Date().toISOString(),
+                    timestamp: response.timestamp,
                 });
                 this._setSending(false);
             }
