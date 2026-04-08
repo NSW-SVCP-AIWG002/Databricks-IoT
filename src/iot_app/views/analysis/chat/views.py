@@ -76,7 +76,7 @@ def call_orchestrator_endpoint(
                 "thread_id": thread_id,
             }]
         },
-        timeout=60,
+        timeout=300,
     )
     response.raise_for_status()
     result = response.json()
