@@ -468,7 +468,7 @@ class ChatUI {
     _setSending(sending) {
         this._sending = sending;
         this.input.disabled = sending;
-        this.submitBtn.disabled = sending;
+        this.submitBtn.disabled = sending || this.input.value.trim().length === 0;
         const retryList = document.querySelectorAll(".retry-button")
         retryList.forEach(function (btn) {
             btn.disabled = sending;
