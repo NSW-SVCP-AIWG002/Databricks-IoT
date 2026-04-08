@@ -339,12 +339,12 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
 
     if display_unit == "day":
         sql = """
-            SELECT collection_hour, summary_value
+            SELECT HOUR(collection_datetime) AS collection_hour, summary_value
             FROM iot_catalog.gold.gold_sensor_data_hourly_summary
             WHERE device_id = :device_id
               AND summary_item = :measurement_item_id
               AND summary_method_id = :summary_method_id
-              AND collection_date = :target_date
+              AND DATE(collection_datetime) = :target_date
             ORDER BY collection_hour ASC
             LIMIT :limit
         """

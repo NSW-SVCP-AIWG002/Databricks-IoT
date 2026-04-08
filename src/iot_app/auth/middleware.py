@@ -84,7 +84,8 @@ def authenticate_request():
         except JWTRetrievalError:
             abort(500)
         except JWTExpiredError:
-            return redirect(f'/.auth/refresh?post_login_redirect_uri={request.path}')
+            redirect_uri = request.full_path.rstrip('?')
+            return render_template('auth/token_refresh.html', redirect_uri=redirect_uri)
         except TokenExchangeError:
             abort(500)
 
