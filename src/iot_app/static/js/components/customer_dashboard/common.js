@@ -52,9 +52,9 @@ const CustomerDashboard = (function () {
         return;
       }
       if (!res.ok) {
-        // 4xx → サーバーが返すエラーフラグメントをモーダルに表示
-        content.innerHTML = await res.text();
-        _bindModalEvents(content);
+        const data = await res.json();
+        _closeModal();
+        Toast.show(data.error || 'エラーが発生しました');
         return;
       }
       content.innerHTML = await res.text();
@@ -84,12 +84,6 @@ const CustomerDashboard = (function () {
       closeBtn.addEventListener('click', _closeModal);
     }
 
-    // data-ajax-submit フォーム
-    const form = container.querySelector('form[data-ajax-submit]');
-    if (form) {
-      form.addEventListener('submit', _handleFormSubmit);
-    }
-
     // ダッシュボード管理モーダル専用
     _bindDashboardManagementEvents(container);
 
@@ -98,56 +92,6 @@ const CustomerDashboard = (function () {
 
     // 各ガジェット種別のバインド処理（各ガジェットJSが registerModalBinder で登録）
     _modalBinders.forEach(function (fn) { fn(container); });
-  }
-
-  /**
-   * フォーム AJAX 送信ハンドラ
-   * - 成功（リダイレクト後のURL がダッシュボードURL）→ ページリロード
-   * - 400 → モーダル内容をエラーレスポンスで更新
-   * - 500+ → エラー表示
-   */
-  async function _handleFormSubmit(e) {
-    e.preventDefault();
-    const form = e.currentTarget;
-
-    await withSubmitLock(form, async function () {
-      const formData = new FormData(form);
-
-      const res = await fetch(form.action, {
-        method: 'POST',
-        body: formData,
-        redirect: 'follow',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-
-      if (res.status === 200 && res.redirected) {
-        // リダイレクト後に成功 → ページリロード
-        window.location.reload();
-        return;
-      }
-
-      if (res.status === 200) {
-        // リダイレクトなし 200 → 成功としてリロード（POST-Redirect-GET の fetch 追従）
-        window.location.reload();
-        return;
-      }
-
-      if (res.status >= 400 && res.status < 500) {
-        // 4xx → モーダル内容を更新（400: フォームエラーHTML、403/404/409: エラーフラグメントHTML）
-        const html = await res.text();
-        const content = document.getElementById('ajax-modal-content');
-        content.innerHTML = html;
-        _bindModalEvents(content);
-        return;
-      }
-
-      // 500以上 → 500エラーページを表示（仕様: 500エラーページ表示）
-      const html = await res.text();
-      document.documentElement.innerHTML = html;
-    }).catch(function () {
-      // ネットワーク断等の通信エラー → リロード（サーバー復旧で通常ページへ、未復旧でブラウザエラー画面）
-      window.location.reload();
-    });
   }
 
   /* =========================================================

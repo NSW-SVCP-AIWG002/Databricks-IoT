@@ -6,7 +6,6 @@
   method="POST"
   action="{{ url_for('customer_dashboard.dashboard_delete', dashboard_uuid=dashboard.dashboard_uuid) }}"
   class="modal-form"
-  data-ajax-submit
 >
   {{ form.hidden_tag() if form is defined else '' }}
 
