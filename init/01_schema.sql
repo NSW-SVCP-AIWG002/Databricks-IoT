@@ -444,6 +444,7 @@ CREATE TABLE IF NOT EXISTS silver_sensor_data (
     sensor_data_json                 JSON           NULL,
     create_time                      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (device_id, organization_id, event_timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ============================================================
 -- 顧客作成ダッシュボード

@@ -155,6 +155,7 @@ def send_question():
             "error_message": "無効なthread_idが指定されました",
         }), 400
 
+    ## 正しいToken取得方法に修正
     user_token = getattr(getattr(g, 'current_user', None), 'databricks_token', None)
 
     try:
