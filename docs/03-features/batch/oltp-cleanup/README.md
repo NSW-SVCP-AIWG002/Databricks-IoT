@@ -79,7 +79,7 @@ flowchart TB
         end
 
         subgraph T2["タスク2: silver_sensor_data_cleanup"]
-            Count2[削除対象件数カウント<br>event_timestamp が5年超過]
+            Count2[削除対象件数カウント<br>event_timestamp が2か月超過]
             Check2{レコードあり?}
             Delete2[対象レコードを削除]
             Count2 --> Check2
@@ -88,7 +88,7 @@ flowchart TB
         end
 
         subgraph T3["タスク3: gold_sensor_data_hourly_summary_cleanup"]
-            Count3[削除対象件数カウント<br>collection_datetime が10年超過]
+            Count3[削除対象件数カウント<br>collection_datetime が2か月超過]
             Check3{レコードあり?}
             Delete3[対象レコードを削除]
             Count3 --> Check3
@@ -97,7 +97,7 @@ flowchart TB
         end
 
         subgraph T4["タスク4: gold_sensor_data_daily_summary_cleanup"]
-            Count4[削除対象件数カウント<br>collection_date が10年超過]
+            Count4[削除対象件数カウント<br>collection_date が2か月超過]
             Check4{レコードあり?}
             Delete4[対象レコードを削除]
             Count4 --> Check4
@@ -106,7 +106,7 @@ flowchart TB
         end
 
         subgraph T5["タスク5: gold_sensor_data_monthly_summary_cleanup"]
-            Count5[削除対象件数カウント<br>collection_year_month が10年超過]
+            Count5[削除対象件数カウント<br>collection_year_month が3年超過]
             Check5{レコードあり?}
             Delete5[対象レコードを削除]
             Count5 --> Check5
