@@ -242,3 +242,5 @@ function bindCircleChartGadgetRegister(container) {
   // 初期状態を適用（hidden inputの現在値に合わせる）
   applyMode(deviceModeInput ? deviceModeInput.value : 'fixed');
 }
+
+CustomerDashboard.registerModalBinder(bindCircleChartGadgetRegister);

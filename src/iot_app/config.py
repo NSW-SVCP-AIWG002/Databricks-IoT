@@ -48,14 +48,7 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     AUTH_TYPE = 'dev'
-<<<<<<< HEAD
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-=======
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{Config.MYSQL_DATABASE}"
-    )
->>>>>>> origin/main
     WTF_CSRF_ENABLED = False
 
 

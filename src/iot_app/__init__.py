@@ -71,12 +71,16 @@ def create_app():
 
     @app.before_request
     def _before_request():
+        if request.path.startswith('/static'):
+            return
         g.request_id = str(uuid.uuid4())
         g.request_start_time = time.monotonic()
         _logger.info("リクエスト開始")
 
     @app.after_request
     def _after_request(response):
+        if request.path.startswith('/static'):
+            return response
         duration_ms = int((time.monotonic() - getattr(g, "request_start_time", time.monotonic())) * 1000)
         _logger.info(
             "リクエスト完了",
