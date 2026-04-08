@@ -170,28 +170,25 @@ class TestAuthenticateRequest:
 
                 assert session.get("email") is None
 
-    def test_user_not_registered_returns_403_error_page(self, app):
-        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、403エラーページを直接返す
-        （abort(403) は使用しない。セッションはクリアしない）
+    def test_user_not_registered_aborts_403(self, app):
+        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、abort(403) を発生させる
+        （セッションはクリアしない）
         """
+        from werkzeug.exceptions import Forbidden
+
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
         with app.test_request_context("/dashboard"):
             with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("iot_app.auth.middleware.render_template",
-                               return_value="<html>403</html>") as mock_render:
-                        session["email"] = "existing@example.com"
+                    session["email"] = "existing@example.com"
 
-                        result = authenticate_request()
+                    with pytest.raises(Forbidden):
+                        authenticate_request()
 
-                        # 403レスポンスをタプルで直接返す
-                        assert result[1] == 403
-                        # errors/403.html をレンダリングする
-                        mock_render.assert_called_once_with("errors/403.html")
-                        # IdP認証は成功しているためセッションはクリアしない
-                        assert session.get("email") == "existing@example.com"
+                    # IdP認証は成功しているためセッションはクリアしない
+                    assert session.get("email") == "existing@example.com"
 
     def test_idp_auth_success_syncs_session_and_returns_none(self, app):
         """2.1.1: IdP 認証成功時、セッションが同期されて None を返す"""
@@ -361,6 +358,7 @@ class TestAuthenticateRequestLogging:
     def test_user_not_registered_logs_warning(self, app, caplog):
         """1.4.1.3: アプリ未登録ユーザーのアクセス時に WARN レベルで email フィールド付きログが出力される"""
         import logging
+        from werkzeug.exceptions import Forbidden
 
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
@@ -368,9 +366,8 @@ class TestAuthenticateRequestLogging:
             with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("iot_app.auth.middleware.render_template",
-                               return_value="<html>403</html>"):
-                        with caplog.at_level(logging.WARNING):
+                    with caplog.at_level(logging.WARNING):
+                        with pytest.raises(Forbidden):
                             authenticate_request()
 
         warn_records = [r for r in caplog.records if r.levelno == logging.WARNING]
