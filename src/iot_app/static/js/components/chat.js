@@ -364,6 +364,44 @@ class ChatUI {
             bubble.innerHTML = sanitized;
         }
 
+        // テーブル描画
+        if (data.df) {
+            try {
+                const records = typeof data.df === 'string' ? JSON.parse(data.df) : data.df;
+                if (Array.isArray(records) && records.length > 0) {
+                    const tableWrapper = document.createElement('div');
+                    tableWrapper.className = 'chat-table-wrapper';
+
+                    const table = document.createElement('table');
+                    table.className = 'chat-table';
+
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    Object.keys(records[0]).forEach((col) => {
+                        const th = document.createElement('th');
+                        th.textContent = col;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    const tbody = document.createElement('tbody');
+                    records.forEach((row) => {
+                        const tr = document.createElement('tr');
+                        Object.values(row).forEach((val) => {
+                            const td = document.createElement('td');
+                            td.textContent = val == null ? '' : val;
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    tableWrapper.appendChild(table);
+                    bubble.appendChild(tableWrapper);
+                }
+            } catch (_) { /* パース失敗時は無視 */ }
+        }
+
         // グラフ描画
         if (data.fig_data) {
             const graphContainer = document.createElement('div');
