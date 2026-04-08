@@ -1,4 +1,5 @@
 import base64
+import re
 import requests
 import traceback
 import pandas as pd
@@ -12,7 +13,6 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from databricks import sql
-from databricks.sdk import WorkspaceClient
 
 from conf.settings import FileStoreConfig, GenieConfig, TokenContext
 from conf.logging_config import log_message
@@ -23,80 +23,154 @@ JST_TIMEZONE = pytz.timezone('Asia/Tokyo')
 DEFAULT_POLL_INTERVAL = 5
 DEFAULT_POLL_TIMEOUT = 600
 DEFAULT_MAX_RETRIES = 3
+_DBFS_CHUNK_SIZE = 1024 * 1024  # 1MB
 
-def create_workspace_client() -> WorkspaceClient:
-    """
-    新しいWorkspaceClientインスタンスを作成
-    
+
+def _get_sp_access_token() -> str:
+    """サービスプリンシパルの OAuth トークンを取得する。
+
+    DBFS への書き込みはデータアクセス制御の対象外であるため、
+    ユーザー PAT ではなくサービスプリンシパルの認証情報を使用する。
+
     Returns:
-        WorkspaceClient: 新しい接続インスタンス
+        str: アクセストークン
+
+    Raises:
+        RuntimeError: 環境変数未設定またはトークン取得失敗
     """
-    auth_token = TokenContext.get("auth_token")
-    return WorkspaceClient(
-        host=FileStoreConfig.DATABRICKS_HOST,
-        token=auth_token
+    client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+    client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
+    host = os.environ.get("DATABRICKS_HOST", FileStoreConfig.DATABRICKS_HOST)
+
+    if not client_id or not client_secret:
+        raise RuntimeError("DATABRICKS_CLIENT_ID / DATABRICKS_CLIENT_SECRET が設定されていません")
+
+    base_url = "https://" + re.sub(r'^https?://', '', host).rstrip('/')
+    resp = requests.post(
+        f"{base_url}/oidc/v1/token",
+        auth=(client_id, client_secret),
+        data={"grant_type": "client_credentials", "scope": "all-apis"},
+        timeout=30,
     )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+def _upload_to_dbfs(host: str, token: str, dbfs_path: str, data: bytes, overwrite: bool = True) -> None:
+    """DBFS Streaming Upload API を使ってファイルをアップロード（SDKを使用しない）
+
+    Databricks SDK の WorkspaceClient は環境変数の OAuth 認証情報と PAT が
+    同時に存在すると競合エラーを起こすため、REST API を直接呼び出す。
+
+    Args:
+        host: Databricks ホスト名（scheme なし）
+        token: ユーザーの PAT トークン
+        dbfs_path: アップロード先 DBFS パス（例: /FileStore/foo.csv）
+        data: アップロードするバイト列
+        overwrite: 上書き許可フラグ
+    """
+    base_url = "https://" + re.sub(r'^https?://', '', host).rstrip('/')
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    # ハンドルを作成
+    create_resp = requests.post(
+        f"{base_url}/api/2.0/dbfs/create",
+        headers=headers,
+        json={"path": dbfs_path, "overwrite": overwrite},
+        timeout=30,
+    )
+    create_resp.raise_for_status()
+    handle = create_resp.json()["handle"]
+
+    try:
+        # 1MB ごとにチャンク送信
+        offset = 0
+        while offset < len(data):
+            chunk = data[offset:offset + _DBFS_CHUNK_SIZE]
+            block_resp = requests.post(
+                f"{base_url}/api/2.0/dbfs/add-block",
+                headers=headers,
+                json={
+                    "handle": handle,
+                    "data": base64.standard_b64encode(chunk).decode("utf-8"),
+                },
+                timeout=60,
+            )
+            block_resp.raise_for_status()
+            offset += _DBFS_CHUNK_SIZE
+
+        # ハンドルをクローズ
+        close_resp = requests.post(
+            f"{base_url}/api/2.0/dbfs/close",
+            headers=headers,
+            json={"handle": handle},
+            timeout=30,
+        )
+        close_resp.raise_for_status()
+    except Exception:
+        # エラー時もハンドルを閉じてリソースリーク防止
+        try:
+            requests.post(
+                f"{base_url}/api/2.0/dbfs/close",
+                headers=headers,
+                json={"handle": handle},
+                timeout=30,
+            )
+        except Exception:
+            pass
+        raise
+
 
 def upload_large_csv_with_sdk(
-    df: pd.DataFrame, 
-    sled_info: Dict[str, Any], 
+    df: pd.DataFrame,
+    sled_info: Dict[str, Any],
     timestamp_jst: str,
 ) -> Optional[str]:
-    """
-    Databricks SDKを使用してCSVをアップロード（インメモリ処理）
-    
+    """CSVをDBFSにアップロード（REST API直接呼び出し、インメモリ処理）
+
     Args:
         df: アップロードするDataFrame
         sled_info: メッセージ情報を含む辞書
         timestamp_jst: JSTタイムスタンプ
-    
+
     Returns:
         アップロードされたファイル名、失敗時はNone
     """
-    # 入力検証
     if df is None or df.empty:
         log_message("DataFrameが空またはNoneです", level="WARNING")
         return None
-    
+
     message_id = sled_info.get("message_id")
     if not message_id:
         log_message("message_idが指定されていません", level="WARNING")
         return None
-    
-    w = None
+
     try:
-        # 新しいWorkspaceClientを作成（各リクエストごと）
-        w = create_workspace_client()
-        log_message("Databricks接続完了")
-        
-        # ファイル名とパスの生成
+        sp_token = _get_sp_access_token()
         save_csv_name = FileStoreConfig.CSV_FILE_NAME.format(
             message_id=message_id,
-            timestamp=timestamp_jst
+            timestamp=timestamp_jst,
         )
         dbfs_path = f"/FileStore/{save_csv_name}"
-        
-        # CSVデータをメモリ上で処理（一時ファイルを使わない）
-        csv_string = df.to_csv(index=False)
-        csv_buffer = io.BytesIO(csv_string.encode('utf-8-sig'))
-        
-        # ファイルをアップロード
-        w.dbfs.upload(dbfs_path, csv_buffer, overwrite=True)
-        
+
+        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+        _upload_to_dbfs(
+            host=FileStoreConfig.DATABRICKS_HOST,
+            token=sp_token,
+            dbfs_path=dbfs_path,
+            data=csv_bytes,
+            overwrite=True,
+        )
+
         log_message(f"✓ アップロード完了: {dbfs_path}")
         return save_csv_name
-        
+
     except Exception as e:
         log_message(f"アップロード失敗: {str(e)}", level="ERROR")
         return None
-    finally:
-        # 明示的なクリーンアップ（ガベージコレクションを待たない）
-        if w is not None:
-            try:
-                # WorkspaceClientのクリーンアップ（必要に応じて）
-                pass
-            except:
-                pass
 
 def execution_sql(sql_query: str) -> pd.DataFrame:
     """

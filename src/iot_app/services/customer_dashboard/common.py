@@ -562,3 +562,52 @@ def get_devices_by_organization(org_id):
         .order_by(DeviceMaster.device_id)
         .all()
     )
+
+
+# ---------------------------------------------------------------------------
+# 表示項目取得
+# ---------------------------------------------------------------------------
+
+def get_measurement_items():
+    """測定項目マスタの全件を measurement_item_id昇順で返す"""
+    from iot_app.models.measurement import MeasurementItemMaster
+    return (
+        db.session.query(MeasurementItemMaster)
+        .filter(MeasurementItemMaster.delete_flag == False)
+        .order_by(MeasurementItemMaster.measurement_item_id)
+        .all()
+    )
+
+
+def get_all_devices_in_scope(accessible_org_ids):
+    """アクセス可能スコープ内の全デバイス一覧をdevice_id昇順で返す"""
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.organization_id.in_(accessible_org_ids),
+            DeviceMaster.delete_flag == False,
+        )
+        .order_by(DeviceMaster.device_id)
+        .all()
+    )
+
+
+def check_device_access(device_id, accessible_org_ids):
+    """デバイスの存在とデータスコープをチェックする
+
+    Args:
+        device_id (int): デバイスID
+        accessible_org_ids (list): アクセス可能な組織IDリスト
+
+    Returns:
+        DeviceMaster or None: デバイスが存在しアクセス可能な場合はデバイス、それ以外は None
+    """
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.device_id == device_id,
+            DeviceMaster.organization_id.in_(accessible_org_ids),
+            DeviceMaster.delete_flag == False,
+        )
+        .first()
+    )

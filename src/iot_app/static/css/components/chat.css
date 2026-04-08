@@ -119,6 +119,40 @@
     text-align: left;
 }
 
+/* --- (3.1.3.2) データテーブル表示欄 --- */
+
+.chat-table-wrapper {
+    margin-top: 12px;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.chat-table {
+    border-collapse: collapse;
+    font-size: 13px;
+    white-space: nowrap;
+    min-width: 100%;
+}
+
+.chat-table th {
+    background-color: #E3EEF8;
+    color: #2272B4;
+    font-weight: bold;
+    border: 1px solid #BDBDBD;
+    padding: 6px 12px;
+    text-align: left;
+}
+
+.chat-table td {
+    border: 1px solid #E0E0E0;
+    padding: 5px 12px;
+    text-align: left;
+}
+
+.chat-table tbody tr:nth-child(even) {
+    background-color: #F9FBFD;
+}
+
 /* --- (3.1.3.3) グラフ表示欄 --- */
 
 .chat-graph {
