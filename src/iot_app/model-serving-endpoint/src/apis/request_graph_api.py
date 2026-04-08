@@ -19,6 +19,7 @@ from conf.logging_config import log_message
 from conf.prompt import graph_prompt
 from src.utils.llm import post_chat
 from src.utils.sandbox import validate_generated_code, execute_with_timeout, CodeExecutionTimeoutError
+from src.utils.sandbox import validate_generated_code, execute_with_timeout, CodeExecutionTimeoutError
 
 # エージェントがグラフ描画するコードを生成する関数
 def plot_code_node(prompt, sql_query, df):
@@ -84,6 +85,8 @@ def create_plot(prompt, sql_query, df):
                     }
                 }
                 start_exec = time.time()
+                # L3: タイムアウト付き実行
+                execute_with_timeout(plot_code_clean, exec_namespace, 30)
                 # L3: タイムアウト付き実行
                 execute_with_timeout(plot_code_clean, exec_namespace, 30)
                 end_exec = time.time()
