@@ -474,6 +474,7 @@
 .timeline-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .timeline-register__measurement-list thead {
