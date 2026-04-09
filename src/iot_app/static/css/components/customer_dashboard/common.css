@@ -345,6 +345,19 @@
   white-space: nowrap;
 }
 
+.gadget__subheader .button {
+  height: auto;
+  padding: var(--spacing-1) var(--spacing-3);
+}
+
+.gadget__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-2);
+  overflow: hidden;
+}
+
 .gadget__chart {
   flex: 1;
   overflow: hidden;
