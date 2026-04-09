@@ -212,7 +212,7 @@
             {% for gadget in group_gadgets %}
                 {# (8) ガジェット #}
                 <div
-                  class="gadget{% if gadget.gadget_size == 1 %} gadget--2x4{% else %} gadget--2x2{% endif %}"
+                  class="gadget{% if gadget.gadget_size == 1 %} gadget--wide{% endif %}"
                   data-gadget-uuid="{{ gadget.gadget_uuid }}"
                   data-gadget-id="{{ gadget.gadget_id }}"
                   data-gadget-type-id="{{ gadget.gadget_type_id }}"

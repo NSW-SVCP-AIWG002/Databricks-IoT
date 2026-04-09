@@ -4,7 +4,7 @@ import time
 import requests
 from flask import session
 
-from iot_app.auth.exceptions import TokenExchangeError, JWTExpiredError, JWTRetrievalError, UnauthorizedError
+from iot_app.auth.exceptions import TokenExchangeError, JWTRetrievalError, UnauthorizedError
 from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,8 +50,6 @@ class TokenExchanger:
                 "duration_ms": duration_ms,
                 "failure_reason": response.text[:200],
             })
-            if 'TOKEN_EXPIRED' in response.text:
-                raise JWTExpiredError(f"Token Exchange failed: {response.text}")
             raise TokenExchangeError(f"Token Exchange failed: {response.text}")
 
         logger.info("外部API完了", extra={

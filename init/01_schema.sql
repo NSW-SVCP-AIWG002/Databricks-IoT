@@ -268,7 +268,6 @@ CREATE TABLE IF NOT EXISTS device_master (
     modifier                    INT          NOT NULL,
     delete_flag                 BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (device_id),
-    UNIQUE INDEX UX_device_master_uuid (device_uuid),
     UNIQUE INDEX UX_device_master_mac_address (mac_address),
     INDEX IX_device_master_organization_id (organization_id),
     INDEX IX_device_master_type_id (device_type_id),
@@ -276,9 +275,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     CONSTRAINT FK_device_organization FOREIGN KEY (organization_id)
         REFERENCES organization_master (organization_id),
     CONSTRAINT FK_device_type FOREIGN KEY (device_type_id)
-        REFERENCES device_type_master (device_type_id),
-    CONSTRAINT FK_device_inventory FOREIGN KEY (device_inventory_id)
-        REFERENCES device_inventory_master (device_inventory_id)
+        REFERENCES device_type_master (device_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 12. アラート設定マスタ
@@ -303,7 +300,6 @@ CREATE TABLE IF NOT EXISTS alert_setting_master (
     modifier                                    INT          NOT NULL,
     delete_flag                                 BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (alert_id),
-    UNIQUE INDEX UX_alert_setting_uuid (alert_uuid),
     INDEX IX_alert_setting_device_id (device_id),
     INDEX IX_alert_setting_conditions_item (alert_conditions_measurement_item_id),
     INDEX IX_alert_setting_recovery_item (alert_recovery_conditions_measurement_item_id),
@@ -321,14 +317,12 @@ CREATE TABLE IF NOT EXISTS alert_setting_master (
 
 -- 16. デバイスステータス
 CREATE TABLE IF NOT EXISTS device_status_data (
-    device_id          INT       NOT NULL,
-    last_received_time TIMESTAMP NULL,
-    delete_flag        BOOLEAN   NOT NULL DEFAULT FALSE,
-    create_date        DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_date        DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (device_id),
-    CONSTRAINT FK_device_status_device FOREIGN KEY (device_id)
-        REFERENCES device_master (device_id)
+    device_id   VARCHAR(100) NOT NULL,
+    status      INT          NOT NULL DEFAULT 0,
+    delete_flag BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 15. ソート項目マスタ
@@ -391,7 +385,6 @@ CREATE TABLE IF NOT EXISTS alert_history (
     modifier                  INT          NOT NULL,
     delete_flag               BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (alert_history_id),
-    UNIQUE INDEX UX_alert_history_uuid (alert_history_uuid),
     CONSTRAINT FK_alert_history_alert FOREIGN KEY (alert_id)
         REFERENCES alert_setting_master (alert_id),
     CONSTRAINT FK_alert_history_status FOREIGN KEY (alert_status_id)
@@ -527,8 +520,8 @@ CREATE TABLE IF NOT EXISTS dashboard_gadget_master (
 CREATE TABLE IF NOT EXISTS dashboard_user_setting (
     user_id         INT      NOT NULL,
     dashboard_id    INT      NOT NULL,
-    organization_id INT      NULL,
-    device_id       INT      NULL,
+    organization_id INT      NOT NULL,
+    device_id       INT      NOT NULL,
     create_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator         INT      NOT NULL,
     update_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -538,11 +531,7 @@ CREATE TABLE IF NOT EXISTS dashboard_user_setting (
     CONSTRAINT FK_dashboard_user_setting_user FOREIGN KEY (user_id)
         REFERENCES user_master (user_id),
     CONSTRAINT FK_dashboard_user_setting_dashboard FOREIGN KEY (dashboard_id)
-        REFERENCES dashboard_master (dashboard_id),
-    CONSTRAINT FK_dashboard_user_setting_organization FOREIGN KEY (organization_id)
-        REFERENCES organization_master (organization_id),
-    CONSTRAINT FK_dashboard_user_setting_device FOREIGN KEY (device_id)
-        REFERENCES device_master (device_id)
+        REFERENCES dashboard_master (dashboard_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 34. サマリー計算手法マスタ
