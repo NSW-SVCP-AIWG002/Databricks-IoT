@@ -83,7 +83,7 @@
 
 | 出力先                   | 形式                 | 説明                                          |
 | ------------------------ | -------------------- | --------------------------------------------- |
-| SMTPサーバ               | メール送信リクエスト | アラート通知メールの送信                      |
+| SendGrid API             | HTTP POSTリクエスト  | アラート通知メールの送信                      |
 | email_notification_queue | OLTP DB テーブル更新 | ステータス・retry_count・processed_timeの更新 |
 | mail_history             | OLTP DB テーブル登録 | 送信済みメールの履歴記録                      |
 
@@ -181,9 +181,9 @@ flowchart TB
     end
 
     subgraph External["外部連携"]
-        SMTP[SMTPサーバ]
+        SendGrid[SendGrid API]
         MailHistory[(OLTP DB<br>mail_history)]
-        SendEmail --> SMTP
+        SendEmail --> SendGrid
         RecordHistory --> MailHistory
     end
 
@@ -212,7 +212,7 @@ flowchart TB
 
 | エラー種別             | 通知タイミング       | 説明                                       |
 | ---------------------- | -------------------- | ------------------------------------------ |
-| SMTP接続失敗           | 最大リトライ超過後   | SMTPサーバへの接続失敗が連続した場合       |
+| SendGrid API接続失敗   | 最大リトライ超過後   | SendGrid APIへの接続失敗が連続した場合     |
 | メール送信履歴記録失敗 | INSERT失敗時（即時） | mail_historyへのINSERT失敗時               |
 | キュー取得失敗         | 例外発生時（即時）   | email_notification_queueへのアクセス失敗時 |
 | FAILED件数過多         | 日次（100件超過）    | 大量のFAILEDレコード発生時                 |
@@ -227,7 +227,7 @@ flowchart TB
 | -------------- | ------------------------ | ------------------------------------------ |
 | 実行間隔       | 1分（60秒）              | Databricks Workflowの定期実行              |
 | バッチ処理時間 | 1分以内                  | 1バッチあたり最大100件で次実行に干渉しない |
-| メール送信     | 平均100件/分             | SMTP接続タイムアウト30秒以内               |
+| メール送信     | 平均100件/分             | SendGrid APIタイムアウト30秒以内           |
 | E2Eレイテンシ  | アラート検出から70秒以内 | ストリーミング処理5秒 + キュー待機60秒     |
 
 ---

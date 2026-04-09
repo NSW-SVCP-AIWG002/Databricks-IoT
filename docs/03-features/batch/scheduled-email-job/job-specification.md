@@ -2,40 +2,17 @@
 
 ## 目次
 
-- [ジョブ仕様書](#ジョブ仕様書)
-  - [目次](#目次)
-  - [概要](#概要)
-    - [このドキュメントの役割](#このドキュメントの役割)
-    - [対象機能](#対象機能)
-    - [ジョブ一覧](#ジョブ一覧)
-  - [メール送信バッチジョブ仕様](#メール送信バッチジョブ仕様)
-    - [ジョブ概要](#ジョブ概要)
-    - [処理フロー](#処理フロー)
-    - [バッチ処理コード](#バッチ処理コード)
-    - [リトライ戦略](#リトライ戦略)
-  - [キュークリーンアップジョブ仕様](#キュークリーンアップジョブ仕様)
-    - [ジョブ概要](#ジョブ概要-1)
-    - [処理フロー](#処理フロー-1)
-    - [処理コード](#処理コード)
-    - [クリーンアップ設定](#クリーンアップ設定)
-  - [Delta Lakeメンテナンスジョブ仕様](#delta-lakeメンテナンスジョブ仕様)
-    - [日次OPTIMIZEジョブ](#日次optimizeジョブ)
-      - [ジョブ概要](#ジョブ概要-2)
-      - [処理フロー](#処理フロー-2)
-      - [処理コード](#処理コード-1)
-      - [OPTIMIZE設定](#optimize設定)
-    - [週次VACUUMジョブ](#週次vacuumジョブ)
-      - [ジョブ概要](#ジョブ概要-3)
-      - [処理フロー](#処理フロー-3)
-      - [処理コード](#処理コード-2)
-      - [VACUUM設定](#vacuum設定)
-    - [チェックポイントクリーンアップジョブ](#チェックポイントクリーンアップジョブ)
-      - [ジョブ概要](#ジョブ概要-4)
-      - [処理フロー](#処理フロー-4)
-      - [処理コード](#処理コード-3)
-      - [クリーンアップ設定](#クリーンアップ設定-1)
-  - [関連ドキュメント](#関連ドキュメント)
-  - [変更履歴](#変更履歴)
+- [概要](#概要)
+  - [このドキュメントの役割](#このドキュメントの役割)
+  - [対象機能](#対象機能)
+  - [ジョブ一覧](#ジョブ一覧)
+- [メール送信バッチジョブ仕様](#メール送信バッチジョブ仕様)
+  - [ジョブ概要](#ジョブ概要)
+  - [処理フロー](#処理フロー)
+  - [バッチ処理コード](#バッチ処理コード)
+  - [リトライ戦略](#リトライ戦略)
+- [関連ドキュメント](#関連ドキュメント)
+- [変更履歴](#変更履歴)
 
 ---
 
@@ -108,9 +85,7 @@ flowchart TD
 ### バッチ処理コード
 
 ```python
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from datetime import datetime
 import time
 import random
@@ -123,39 +98,48 @@ MAX_RETRY_COUNT = 3
 RETRY_INTERVALS = [random.uniform(10, 12), random.uniform(10, 14), random.uniform(10, 18)]  # ジッター付き指数バックオフ（秒）
 
 # =============================================================================
-# SMTP設定取得
+# SendGrid設定取得
 # =============================================================================
-SMTP_CONFIG = {
-    "host": dbutils.secrets.get("scope", "smtp-host"),
-    "port": int(dbutils.secrets.get("scope", "smtp-port")),
-    "user": dbutils.secrets.get("scope", "smtp-user"),
-    "password": dbutils.secrets.get("scope", "smtp-password"),
+SENDGRID_CONFIG = {
+    "api_key": dbutils.secrets.get("scope", "sendgrid-api-key"),
+    "endpoint": "https://api.sendgrid.com/v3/mail/send",
     "from_address": "noreply@iot-system.example.com"
 }
 
 def send_email(recipient: str, subject: str, body: str) -> tuple[bool, str]:
     """
-    メール送信を実行
+    SendGrid HTTP API経由でメール送信を実行
 
     Returns:
         tuple[bool, str]: (成功フラグ, エラーメッセージ)
     """
     try:
-        msg = MIMEMultipart()
-        msg["Subject"] = subject
-        msg["From"] = SMTP_CONFIG["from_address"]
-        msg["To"] = recipient
-        msg.attach(MIMEText(body, "plain", "utf-8"))
+        payload = {
+            "personalizations": [{"to": [{"email": recipient}]}],
+            "from": {"email": SENDGRID_CONFIG["from_address"]},
+            "subject": subject,
+            "content": [{"type": "text/plain", "value": body}],
+        }
+        headers = {
+            "Authorization": f"Bearer {SENDGRID_CONFIG['api_key']}",
+            "Content-Type": "application/json",
+        }
 
-        with smtplib.SMTP(SMTP_CONFIG["host"], SMTP_CONFIG["port"], timeout=30) as server:
-            server.starttls()
-            server.login(SMTP_CONFIG["user"], SMTP_CONFIG["password"])
-            server.send_message(msg)
+        response = requests.post(
+            SENDGRID_CONFIG["endpoint"],
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
 
-        return True, None
+        # 202 Accepted が正常応答
+        if response.status_code == 202:
+            return True, None
+        else:
+            return False, f"SendGrid API Error: status={response.status_code}, body={response.text}"
 
-    except smtplib.SMTPException as e:
-        return False, f"SMTP Error: {str(e)}"
+    except requests.exceptions.Timeout:
+        return False, "SendGrid API Timeout"
     except Exception as e:
         return False, f"Unexpected Error: {str(e)}"
 
@@ -309,7 +293,7 @@ process_email_queue()
 | ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 最大リトライ回数   | 3回                                                        | retry_countが3に達したらFAILEDに遷移                                                                                 |
 | リトライ間隔       | ジッター付き指数バックオフ（10～12秒、10～14秒、10～18秒） | 送信失敗時の待機時間                                                                                                 |
-| タイムアウト       | 30秒                                                       | SMTP接続タイムアウト                                                                                                 |
+| タイムアウト       | 30秒                                                       | SendGrid APIタイムアウト                                                                                             |
 | 失敗時処理         | FAILED更新、error_message記録                              | 原因調査・手動対応用にエラー内容を保存                                                                               |
 | PROCESSING滞留対応 | 最終更新時刻から15分経過で削除                             | ジョブ異常終了時のリカバリとして、ジョブ開始時に最終更新時刻から15分以上経過している、PROCESSING状態のレコードを削除 |
 ---
