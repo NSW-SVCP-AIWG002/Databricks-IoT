@@ -808,6 +808,41 @@ class TestGadgetBeltChartCreate:
         # Assert
         assert response.status_code == 404
 
+    def test_create_modal_no_dashboard_returns_404(
+        self, client, auth_user_id, dashboard_user_setting
+    ):
+        """2.2.4: user_setting は存在するが dashboard_master が存在しない場合に404エラー
+
+        workflow-spec: get_dashboard_by_id が None → CheckDashboard→なし→Error404
+        """
+        # Arrange: dashboard_user_setting あり・dashboard_master なし（DBに登録しない）
+
+        # Act
+        response = client.get(self._URL)
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_create_modal_empty_summary_methods_returns_200(
+        self,
+        client,
+        auth_user_id,
+        dashboard_user_setting,
+        dashboard_master,
+        dashboard_group_master,
+    ):
+        """gold_summary_method_master が空（0件）でも登録モーダルが200で表示される
+
+        workflow-spec: ⑦集約方法一覧取得 - 該当レコードなしでも空リストを渡してテンプレート描画する
+        """
+        # Arrange: gold_summary_method_master フィクスチャなし（テーブル空）
+
+        # Act
+        response = client.get(self._URL)
+
+        # Assert: 集約方法が空でもモーダルは200で表示される
+        assert response.status_code == 200
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. ガジェット登録実行
@@ -1537,7 +1572,10 @@ class TestGadgetBeltChartCsvExport:
         assert re.search(r'sensor_data_\d{14}\.csv', disposition)
 
     def test_csv_has_header_row(self, client, belt_chart_gadget_fixed, mocker):
-        """4.6.5: CSVの1行目にヘッダー（timestamp 等）が含まれる"""
+        """4.6.5: CSVの1行目に「デバイス名」「時間」列ヘッダーが含まれる
+
+        CSVサンプル（設計書）の先頭列: デバイス名,時間,{測定項目名...}
+        """
         # Arrange
         mocker.patch(_GOLD_QUERY, return_value=[])
 
@@ -1546,11 +1584,13 @@ class TestGadgetBeltChartCsvExport:
             self._url(belt_chart_gadget_fixed.gadget_uuid, **self._default_params())
         )
 
-        # Assert: CSV先頭にヘッダー行が存在する（BOM付き・なし両方考慮）
-        # TODO: 設計書に CSVヘッダーの具体的な列名記載なし、要確認
+        # Assert: CSV先頭行に「デバイス名」「時間」が含まれる（BOM付きUTF-8考慮）
         csv_text = response.data.decode('utf-8-sig')
         lines = [line for line in csv_text.splitlines() if line.strip()]
-        assert len(lines) >= 1  # 少なくともヘッダー行が存在する
+        assert len(lines) >= 1
+        header = lines[0]
+        assert 'デバイス名' in header
+        assert '時間' in header
 
     def test_csv_without_export_param_returns_404(self, client, belt_chart_gadget_fixed):
         """2.2.4: export=csv パラメータなしで404"""

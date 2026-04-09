@@ -15,7 +15,7 @@
   const DEFAULT_INTERVAL = '10min';
 
   // ECharts 系列カラー
-  const SERIES_COLORS = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'];
+  const SERIES_COLORS = ['#E8877F', '#7CB5D2', '#A8D88E', '#F0C87A', '#B39CD0'];
 
   // ============================================================
   // ガジェット初期化
