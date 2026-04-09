@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * 棒グラフガジェット管理
+ * 帯グラフガジェット管理
  * 各ガジェットのECharts描画・AJAX・UI操作を担当する
  */
 (function () {
@@ -14,36 +14,33 @@
   const DEFAULT_UNIT     = 'hour';
   const DEFAULT_INTERVAL = '10min';
 
+  // ECharts 系列カラー
+  const SERIES_COLORS = ['#E8877F', '#7CB5D2', '#A8D88E', '#F0C87A', '#B39CD0'];
+
   // ============================================================
   // ガジェット初期化
   // ============================================================
   function initAllGadgets() {
-    document.querySelectorAll('.bar-chart[data-gadget-uuid]').forEach(function (el) {
+    document.querySelectorAll('.belt-chart[data-gadget-uuid]').forEach(function (el) {
       initGadget(el);
     });
   }
 
   function initGadget(el) {
     const uuid    = el.dataset.gadgetUuid;
-    const chartEl = el.querySelector('.bar-chart__canvas');
+    const chartEl = el.querySelector('.belt-chart__canvas');
     if (!chartEl) return;
-    const _rawConfig = el.closest('.gadget')?.dataset.chartConfig || '{}';
-    const _parsed = JSON.parse(_rawConfig);
-    const chartConfig = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
 
     const chart = echarts.init(chartEl);
     setEmptyChart(chart);
 
     const state = {
-      uuid:        uuid,
-      chart:       chart,
-      displayUnit: DEFAULT_UNIT,
-      interval:    DEFAULT_INTERVAL,
+      uuid:         uuid,
+      chart:        chart,
+      displayUnit:  DEFAULT_UNIT,
+      interval:     DEFAULT_INTERVAL,
       baseDatetime: nowString(),
-      fp:          null,
-      minValue:    chartConfig.min_value ?? null,
-      maxValue:    chartConfig.max_value ?? null,
-      errorEl:     el.querySelector('.bar-chart__error'),
+      fp:           null,
     };
 
     bindControls(el, state);
@@ -55,17 +52,16 @@
   // ============================================================
   function bindControls(el, state) {
     // 表示単位ボタン
-    el.querySelectorAll('.bar-chart__unit-btn').forEach(function (btn) {
+    el.querySelectorAll('.belt-chart__unit-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        el.querySelectorAll('.bar-chart__unit-btn').forEach(function (b) {
-          b.classList.remove('bar-chart__unit-btn--active');
+        el.querySelectorAll('.belt-chart__unit-btn').forEach(function (b) {
+          b.classList.remove('belt-chart__unit-btn--active');
         });
-        btn.classList.add('bar-chart__unit-btn--active');
+        btn.classList.add('belt-chart__unit-btn--active');
         state.displayUnit = btn.dataset.unit;
         updateDatetimeLabel(el, state.displayUnit);
         toggleIntervalSelector(el, state.displayUnit);
-        // flatpickr を単位に合わせて再初期化
-        const datetimeInput = el.querySelector('.bar-chart__datetime-input');
+        const datetimeInput = el.querySelector('.belt-chart__datetime-input');
         if (datetimeInput && state.fp) {
           state.fp.destroy();
           state.fp = createFlatpickr(datetimeInput, state);
@@ -75,7 +71,7 @@
     });
 
     // 集計時間幅セレクト
-    const intervalSelect = el.querySelector('.bar-chart__interval-select');
+    const intervalSelect = el.querySelector('.belt-chart__interval-select');
     if (intervalSelect) {
       intervalSelect.addEventListener('change', function () {
         state.interval = intervalSelect.value;
@@ -84,13 +80,13 @@
     }
 
     // 時間帯 DateTimePicker (flatpickr)
-    const datetimeInput = el.querySelector('.bar-chart__datetime-input');
+    const datetimeInput = el.querySelector('.belt-chart__datetime-input');
     if (datetimeInput) {
       state.fp = createFlatpickr(datetimeInput, state);
     }
 
     // カレンダーアイコンボタン
-    const calendarBtn = el.querySelector('.bar-chart__calendar-btn');
+    const calendarBtn = el.querySelector('.belt-chart__calendar-btn');
     if (calendarBtn) {
       calendarBtn.addEventListener('click', function () {
         if (state.fp) state.fp.open();
@@ -98,7 +94,7 @@
     }
 
     // 更新ボタン
-    const refreshBtn = el.querySelector('.bar-chart__refresh-btn');
+    const refreshBtn = el.querySelector('.belt-chart__refresh-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', function () {
         const config = getUnitConfig(state.displayUnit);
@@ -108,7 +104,7 @@
       });
     }
 
-    // CSVエクスポートボタン（ガジェット共通ツールバー）
+    // CSVエクスポートボタン
     const gadgetEl = el.closest('.gadget');
     if (gadgetEl) {
       const csvBtn = gadgetEl.querySelector('.gadget__csv-btn');
@@ -119,28 +115,25 @@
         });
       }
 
-      // ツールバー日時ボタン連動（common.js からの CustomEvent を受信）
+      // ツールバー日時ボタン連動
       gadgetEl.addEventListener('gadget:daterange-changed', function (e) {
         const { range, start } = e.detail;
-        const config = _rangeToBarChartConfig(range, start);
+        const config = _rangeToBeltChartConfig(range, start);
 
-        // displayUnit が変わる場合は flatpickr を再初期化
         if (config.unit !== state.displayUnit) {
           state.displayUnit = config.unit;
-          const datetimeInput = el.querySelector('.bar-chart__datetime-input');
+          const datetimeInput = el.querySelector('.belt-chart__datetime-input');
           if (datetimeInput && state.fp) {
             state.fp.destroy();
             state.fp = createFlatpickr(datetimeInput, state);
           }
           updateDatetimeLabel(el, state.displayUnit);
           toggleIntervalSelector(el, state.displayUnit);
-          // UIアクティブボタン更新
-          el.querySelectorAll('.bar-chart__unit-btn').forEach(function (btn) {
-            btn.classList.toggle('bar-chart__unit-btn--active', btn.dataset.unit === state.displayUnit);
+          el.querySelectorAll('.belt-chart__unit-btn').forEach(function (btn) {
+            btn.classList.toggle('belt-chart__unit-btn--active', btn.dataset.unit === state.displayUnit);
           });
         }
 
-        // baseDatetime を上書き（createFlatpickr がデフォルト値をセットするため後から上書き）
         state.baseDatetime = config.datetime;
         if (state.fp) state.fp.setDate(state.baseDatetime, false);
 
@@ -164,51 +157,43 @@
       }),
     })
       .then(function (res) {
-        if (!res.ok) {
-          return res.json().then(function (data) {
-            if (state.errorEl) state.errorEl.textContent = data.error;
-          }).catch(function () {});
-        }
-        return res.json().then(function (data) {
-          if (state.errorEl) state.errorEl.textContent = '';
-          renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
-        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        renderChart(state.chart, data.chart_data, state.displayUnit);
       })
       .catch(function (err) {
-        console.error('棒グラフデータ取得エラー:', err);
+        console.error('帯グラフデータ取得エラー:', err);
         setEmptyChart(state.chart);
       });
   }
 
   // ============================================================
-  // ECharts 描画
+  // ECharts 描画（積み上げ棒グラフ）
   // ============================================================
-  function renderChart(chart, chartData, displayUnit, minValue, maxValue) {
-    const labels      = chartData.labels       || [];
-    const values      = chartData.values       || [];
-    const legendLabel = chartData.legend_label || '';
+  function renderChart(chart, chartData, displayUnit) {
+    const labels = chartData.labels  || [];
+    const series = chartData.series  || [];
 
-    const yAxis = { type: 'value' };
-    if (minValue !== null && minValue !== undefined) yAxis.min = minValue;
-    if (maxValue !== null && maxValue !== undefined) yAxis.max = maxValue;
+    const echartsSeriesList = series.map(function (s, i) {
+      return {
+        name:      s.name,
+        type:      'bar',
+        stack:     'total',
+        data:      s.values,
+        itemStyle: { color: SERIES_COLORS[i % SERIES_COLORS.length] },
+      };
+    });
+
+    const legendData = series.map(function (s) { return s.name; });
 
     chart.setOption({
-      tooltip: { trigger: 'axis' },
-      legend: {
-        bottom: 0,
-        data:   [legendLabel],
-      },
-      xAxis: {
-        type: 'category',
-        data: labels,
-      },
-      yAxis: yAxis,
-      series: [{
-        name:      legendLabel,
-        type:      'bar',
-        data:      values,
-        itemStyle: { color: '#2272B4' },
-      }],
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend:  { bottom: 0, data: legendData },
+      xAxis:   { type: 'category', data: labels },
+      yAxis:   { type: 'value' },
+      series:  echartsSeriesList,
     });
   }
 
@@ -216,7 +201,7 @@
     chart.setOption({
       xAxis:  { type: 'category', data: [] },
       yAxis:  { type: 'value' },
-      series: [{ type: 'bar', data: [] }],
+      series: [{ type: 'bar', stack: 'total', data: [] }],
     });
   }
 
@@ -231,24 +216,7 @@
       base_datetime: toFullDatetime(state.baseDatetime, state.displayUnit),
     });
     const url = CSV_ENDPOINT.replace('{uuid}', state.uuid) + '?' + params.toString();
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (res) {
-        if (!res.ok) {
-          return res.json().then(function (data) {
-            Toast.show(data.error || 'エラーが発生しました');
-          });
-        }
-        return res.blob().then(function (blob) {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'sensor_data.csv';
-          a.click();
-          URL.revokeObjectURL(a.href);
-        });
-      })
-      .catch(function () {
-        Toast.show('CSVのダウンロードに失敗しました');
-      });
+    window.location.href = url;
   }
 
   // ============================================================
@@ -284,14 +252,6 @@
     const d = new Date();
     const pad = function (n) { return String(n).padStart(2, '0'); };
     return d.getFullYear() + '/' + pad(d.getMonth() + 1);
-  }
-
-  function mondayString() {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - ((day + 6) % 7));
-    const pad = function (n) { return String(n).padStart(2, '0'); };
-    return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate());
   }
 
   function toFullDatetime(baseDatetime, displayUnit) {
@@ -334,11 +294,11 @@
     });
   }
 
-  function _rangeToBarChartConfig(range, start) {
+  function _rangeToBeltChartConfig(range, start) {
     switch (range) {
       case 'today':      return { unit: 'hour',  datetime: nowString() };
       case 'yesterday':  return { unit: 'day',   datetime: yesterdayString() };
-      case 'this_week':  return { unit: 'week',  datetime: mondayString() };
+      case 'this_week':  return { unit: 'week',  datetime: yesterdayString() };
       case 'this_month': return { unit: 'month', datetime: thisMonthString() };
       case 'this_year':  return { unit: 'hour',  datetime: nowString() };
       case 'custom':
@@ -349,12 +309,12 @@
 
   function updateDatetimeLabel(el, displayUnit) {
     const labelMap = { hour: '時間帯：', day: '表示日：', week: '表示週：', month: '表示月：' };
-    const labelEl = el.querySelector('.bar-chart__datetime-label');
+    const labelEl = el.querySelector('.belt-chart__datetime-label');
     if (labelEl) labelEl.textContent = labelMap[displayUnit] || '時間帯：';
   }
 
   function toggleIntervalSelector(el, displayUnit) {
-    const selectorEl = el.querySelector('.bar-chart__interval-selector');
+    const selectorEl = el.querySelector('.belt-chart__interval-selector');
     if (selectorEl) {
       selectorEl.style.display = displayUnit === 'hour' ? '' : 'none';
     }
@@ -371,59 +331,104 @@
 
 })();
 
-// ============================================================
-// 棒グラフ登録モーダル UIバインド
-// ============================================================
+// ---------------------------------------------------------------------------
+// 登録モーダル イベントバインド（common.js の _bindModalEvents から呼ばれる）
+// ---------------------------------------------------------------------------
 
 /**
- * 棒グラフ登録モーダルのUIイベントをバインドする
+ * 帯グラフ登録モーダルのイベントをバインドする
  * @param {Element} container - モーダルコンテナ要素
  */
-function bindBarChartGadgetRegister(container) {
-  const modeButtons = container.querySelectorAll('.bar-chart-register__device-mode-btn');
-  if (!modeButtons.length) return;
+function bindBeltChartGadgetRegister(container) {
+  var modeBtns = container.querySelectorAll('.belt-chart-register__device-mode-btn');
+  if (!modeBtns.length) return;
 
-  const deviceModeInput = container.querySelector('#device_mode');
-  const deviceFixedArea = container.querySelector('#device-fixed-area');
-  const deviceNameArea  = container.querySelector('#device-name-area');
-  const orgFilter       = container.querySelector('#organization-filter');
-  const deviceSelect    = container.querySelector('#device-select');
+  var deviceModeInput = container.querySelector('#device_mode');
+  var deviceFixedArea = container.querySelector('#device-fixed-area');
+  var deviceNameArea  = container.querySelector('#device-name-area');
+  var deviceSelect    = container.querySelector('#device-select');
 
-  modeButtons.forEach(function (btn) {
+  function applyMode(mode) {
+    modeBtns.forEach(function (btn) {
+      btn.classList.toggle('belt-chart-register__device-mode-btn--active', btn.dataset.mode === mode);
+    });
+    if (deviceModeInput) deviceModeInput.value = mode;
+    var isFixed = mode === 'fixed';
+    if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? 'visible' : 'hidden';
+    if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? 'visible' : 'hidden';
+    if (!isFixed && deviceSelect) {
+      deviceSelect.value = '';
+      var nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = '-';
+    }
+  }
+
+  modeBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      modeButtons.forEach(function (b) {
-        b.classList.remove('bar-chart-register__device-mode-btn--active');
-      });
-      btn.classList.add('bar-chart-register__device-mode-btn--active');
-      const mode = btn.dataset.mode;
-      if (deviceModeInput) deviceModeInput.value = mode;
-      const isFixed = mode === 'fixed';
-      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
-      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      applyMode(btn.dataset.mode);
     });
   });
 
-  if (!orgFilter || !deviceSelect) return;
+  var orgFilter = container.querySelector('#organization-filter');
 
-  const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
-  orgFilter.addEventListener('change', function () {
-    const orgId = orgFilter.value;
-    deviceSelect.innerHTML = '<option value="">選択してください</option>';
-    allDeviceOptions.forEach(function (opt) {
-      if (!orgId || opt.dataset.org === orgId) {
-        deviceSelect.appendChild(opt.cloneNode(true));
+  if (orgFilter && deviceSelect) {
+    var allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
+
+    orgFilter.addEventListener('change', function () {
+      var orgId   = orgFilter.value;
+      var prevVal = deviceSelect.value;
+      deviceSelect.innerHTML = '<option value="">選択してください</option>';
+      allDeviceOptions.forEach(function (opt) {
+        if (!orgId || opt.dataset.org === orgId) {
+          deviceSelect.appendChild(opt.cloneNode(true));
+        }
+      });
+      deviceSelect.value    = prevVal;
+      deviceSelect.disabled = !orgId;
+      if (!deviceSelect.value) {
+        var nameEl = container.querySelector('#selected-device-name');
+        if (nameEl) nameEl.textContent = '-';
       }
     });
-    deviceSelect.disabled = !orgId;
-    const nameEl = container.querySelector('#selected-device-name');
-    if (nameEl) nameEl.textContent = '-';
-  });
+  }
 
-  deviceSelect.addEventListener('change', function () {
-    const selected = deviceSelect.options[deviceSelect.selectedIndex];
-    const nameEl = container.querySelector('#selected-device-name');
-    if (nameEl) nameEl.textContent = selected ? (selected.dataset.name || '-') : '-';
+  if (deviceSelect) {
+    deviceSelect.addEventListener('change', function () {
+      var opt    = deviceSelect.options[deviceSelect.selectedIndex];
+      var nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = opt ? (opt.dataset.name || '-') : '-';
+    });
+  }
+
+  // 422再描画時：選択済みデバイス名を復元
+  if (deviceSelect) {
+    var selectedOpt = deviceSelect.options[deviceSelect.selectedIndex];
+    if (selectedOpt && selectedOpt.value) {
+      var nameEl = container.querySelector('#selected-device-name');
+      if (nameEl) nameEl.textContent = selectedOpt.dataset.name || '-';
+    }
+  }
+
+  // チェックボックス最大5個制限
+  var checkboxes = container.querySelectorAll('.belt-chart-register__item-checkbox');
+  checkboxes.forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      var checked = container.querySelectorAll('.belt-chart-register__item-checkbox:checked');
+      if (checked.length >= 5) {
+        checkboxes.forEach(function (c) { if (!c.checked) c.disabled = true; });
+      } else {
+        checkboxes.forEach(function (c) { c.disabled = false; });
+      }
+    });
   });
+  // 初期状態で5個チェック済みの場合も制限を適用
+  var initialChecked = container.querySelectorAll('.belt-chart-register__item-checkbox:checked');
+  if (initialChecked.length >= 5) {
+    checkboxes.forEach(function (c) { if (!c.checked) c.disabled = true; });
+  }
+
+  // 初期状態を適用（hidden inputの現在値に合わせる）
+  applyMode(deviceModeInput ? deviceModeInput.value : 'fixed');
 }
 
-CustomerDashboard.registerModalBinder(bindBarChartGadgetRegister);
+CustomerDashboard.registerModalBinder(bindBeltChartGadgetRegister);

@@ -82,6 +82,13 @@ _GADGET_REGISTRY = {
         'js':       'js/components/customer_dashboard/circle_chart.js',
         'module':   'iot_app.views.analysis.customer_dashboard.circle_chart',
     },
+    '帯グラフ': {
+        'slug':     'belt-chart',
+        'template': 'analysis/customer_dashboard/gadgets/belt_chart.html',
+        'css':      'css/components/customer_dashboard/belt_chart.css',
+        'js':       'js/components/customer_dashboard/belt_chart.js',
+        'module':   'iot_app.views.analysis.customer_dashboard.belt_chart',
+    },
 }
 
 # レジストリから派生（直接編集不要）

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from flask import g, request, session, abort, render_template, current_app, redirect, url_for
 
 from iot_app.auth.services import find_user_by_email
-from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, JWTExpiredError, TokenExchangeError
 from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -81,6 +81,14 @@ def authenticate_request():
             abort(500)
         except JWTExpiredError:
             redirect_uri = request.full_path.rstrip('?')
+            is_ajax = (
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                or request.is_json
+                or 'application/json' in request.headers.get('Accept', '')
+            )
+            if is_ajax:
+                from flask import jsonify as _jsonify
+                return _jsonify({'error': 'token_expired'}), 401
             return render_template('auth/token_refresh.html', redirect_uri=redirect_uri)
         except TokenExchangeError:
             abort(500)

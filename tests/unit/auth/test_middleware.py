@@ -11,7 +11,7 @@ from flask import session
 from werkzeug.exceptions import InternalServerError, Unauthorized
 
 from iot_app.auth.middleware import is_excluded_path, _sync_session, authenticate_request
-from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError, JWTExpiredError
 
 
 # ---------------------------------------------------------------------------
@@ -325,6 +325,103 @@ class TestAuthenticateRequest:
                                return_value=mock_exchanger):
                         with pytest.raises(InternalServerError):
                             authenticate_request()
+
+
+# ---------------------------------------------------------------------------
+# JWTExpiredError ハンドリング
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestJWTExpiredHandling:
+    """JWTExpiredError 発生時のレスポンス分岐テスト
+    観点: 1.3 エラーハンドリング
+
+    JWTExpiredError（Databricks Token Exchange の JWT 期限切れ）発生時の挙動:
+      - 非AJAXリクエスト: token_refresh.html を返す（通常ページとしてリフレッシュ処理）
+      - AJAXリクエスト: 401 + {"error": "token_expired"} JSON を返す
+        （フロントのグローバル fetch インターセプターが window.location.reload() を実行）
+    """
+
+    def _make_mock_provider(self):
+        mock_provider = MagicMock()
+        mock_provider.get_user_info.return_value = {"email": "yamada@example.com"}
+        mock_provider.requires_additional_setup.return_value = False
+        return mock_provider
+
+    def _default_app_user(self):
+        return {"user_id": 42, "user_type_id": 2, "organization_id": 10}
+
+    def _make_expired_exchanger(self):
+        mock_exchanger = MagicMock()
+        mock_exchanger.ensure_valid_token.side_effect = JWTExpiredError("token expired")
+        return mock_exchanger
+
+    def test_non_ajax_jwt_expired_returns_token_refresh_template(self, app):
+        """1.3.5: 通常リクエスト（非AJAX）でJWT期限切れの場合、token_refresh.html を返す"""
+        with app.test_request_context("/dashboard"):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        with patch("iot_app.auth.middleware.render_template",
+                                   return_value="<html>token_refresh</html>") as mock_render:
+                            result = authenticate_request()
+
+        mock_render.assert_called_once()
+        assert mock_render.call_args[0][0] == "auth/token_refresh.html"
+        assert result == "<html>token_refresh</html>"
+
+    def test_xhr_header_jwt_expired_returns_401_json(self, app):
+        """1.3.5: X-Requested-With: XMLHttpRequest の場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
+
+    def test_json_content_type_jwt_expired_returns_401_json(self, app):
+        """1.3.5: Content-Type: application/json（request.is_json）の場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            content_type="application/json",
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
+
+    def test_accept_json_header_jwt_expired_returns_401_json(self, app):
+        """1.3.5: Accept: application/json ヘッダーの場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            headers={"Accept": "application/json"},
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
 
 
 # ---------------------------------------------------------------------------

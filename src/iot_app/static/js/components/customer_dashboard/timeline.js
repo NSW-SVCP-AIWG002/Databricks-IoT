@@ -203,10 +203,11 @@ function renderLegends(legendEl, chartData) {
  * @param {string}      gadgetUuid
  * @param {echarts}     chart
  * @param {HTMLElement} legendEl
+ * @param {HTMLElement} errorEl
  * @param {string}      startDatetime
  * @param {string}      endDatetime
  */
-async function fetchAndRender(gadgetUuid, chart, legendEl, startDatetime, endDatetime) {
+async function fetchAndRender(gadgetUuid, chart, legendEl, errorEl, startDatetime, endDatetime) {
   try {
     const resp = await fetch(
       `/analysis/customer-dashboard/gadgets/${gadgetUuid}/data`,
@@ -222,11 +223,15 @@ async function fetchAndRender(gadgetUuid, chart, legendEl, startDatetime, endDat
 
     if (!resp.ok) {
       if (resp.status === 400) {
-        legendEl.innerHTML = '<span class="form__error">日時の指定が不正です（取得期間は24時間以内、終了は開始より後に設定してください）</span>';
+        const errData = await resp.json().catch(() => ({}));
+        legendEl.innerHTML = '';
+        if (errorEl) errorEl.textContent = errData.error;
       }
       console.error(`[timeline] データ取得失敗: gadget_uuid=${gadgetUuid} status=${resp.status}`);
       return;
     }
+
+    if (errorEl) errorEl.textContent = '';
 
     const data = await resp.json();
     if (data.error) {
@@ -270,6 +275,9 @@ function initGadget(gadgetEl) {
   // 凡例エリア
   const legendEl = document.getElementById(`legends-${gadgetUuid}`);
 
+  // エラーメッセージ領域
+  const errorEl = document.getElementById(`error-${gadgetUuid}`);
+
   // 初期日時
   const initStart = oneHourAgo();
   const initEnd   = now();
@@ -283,7 +291,7 @@ function initGadget(gadgetEl) {
     defaultDate:    initStart,
     onChange: (_dates, dateStr) => {
       const endInput = document.getElementById(`end-datetime-${gadgetUuid}`);
-      fetchAndRender(gadgetUuid, chart, legendEl, dateStr, endInput.value);
+      fetchAndRender(gadgetUuid, chart, legendEl, errorEl, dateStr, endInput.value);
     },
   });
 
@@ -296,7 +304,7 @@ function initGadget(gadgetEl) {
     defaultDate:    initEnd,
     onChange: (_dates, dateStr) => {
       const startInput = document.getElementById(`start-datetime-${gadgetUuid}`);
-      fetchAndRender(gadgetUuid, chart, legendEl, startInput.value, dateStr);
+      fetchAndRender(gadgetUuid, chart, legendEl, errorEl, startInput.value, dateStr);
     },
   });
 
@@ -323,7 +331,7 @@ function initGadget(gadgetEl) {
 
     startFp.setDate(newStart, false);
     endFp.setDate(newEnd, false);
-    fetchAndRender(gadgetUuid, chart, legendEl, newStart, newEnd);
+    fetchAndRender(gadgetUuid, chart, legendEl, errorEl, newStart, newEnd);
   });
 
   // 🔄 開始日時リセットボタン（現在日時-1時間）
@@ -349,8 +357,25 @@ function initGadget(gadgetEl) {
       const endInput   = document.getElementById(`end-datetime-${gadgetUuid}`);
       const start = encodeURIComponent(startInput.value);
       const end   = encodeURIComponent(endInput.value);
-      window.location.href =
-        `/analysis/customer-dashboard/gadgets/${gadgetUuid}?export=csv&start_datetime=${start}&end_datetime=${end}`;
+      const csvUrl = `/analysis/customer-dashboard/gadgets/${gadgetUuid}?export=csv&start_datetime=${start}&end_datetime=${end}`;
+      fetch(csvUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (res) {
+          if (!res.ok) {
+            return res.json().then(function (data) {
+              Toast.show(data.error || 'エラーが発生しました');
+            });
+          }
+          return res.blob().then(function (blob) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'sensor_data.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          });
+        })
+        .catch(function () {
+          Toast.show('CSVのダウンロードに失敗しました');
+        });
     });
   }
 
@@ -358,7 +383,7 @@ function initGadget(gadgetEl) {
   window.addEventListener('resize', () => chart.resize());
 
   // 初期データ取得
-  fetchAndRender(gadgetUuid, chart, legendEl, formatDatetime(initStart), formatDatetime(initEnd));
+  fetchAndRender(gadgetUuid, chart, legendEl, errorEl, formatDatetime(initStart), formatDatetime(initEnd));
 }
 
 // ---------------------------------------------------------------------------

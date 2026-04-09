@@ -70,7 +70,7 @@
 /* 登録モーダル: device-mode-area内のラベルとボタンも上端揃えに */
 
 #circle-chart-register-form .gadget-register__device-mode-area {
-  align-items: flex-start;
+  align-items: center;
 }
 
 /* 登録モーダル: デバイスモードボタン */
@@ -109,7 +109,7 @@
 .circle-chart-register__measurement-list {
   flex: 1;
   min-width: 0;
-  max-height: 400px;
+  max-height: 300px;
   overflow-y: auto;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -118,6 +118,7 @@
 .circle-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .circle-chart-register__measurement-list thead {
