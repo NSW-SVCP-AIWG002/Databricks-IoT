@@ -2,11 +2,11 @@
 
 ## 概要
 
-ゴールド層LDPパイプラインは、シルバー層で構造化されたセンサーデータを時次・日次・月次・年次で集計し、ダッシュボード表示用のサマリデータを生成するLakeflow宣言型パイプライン（LDP）機能です。
+ゴールド層LDPパイプラインは、シルバー層で構造化されたセンサーデータを時次・日次・月次で集計し、ダッシュボード表示用のサマリデータを生成するLakeflow宣言型パイプライン（LDP）機能です。
 
 ### 主な責務
 
-1. **データ集計**: シルバー層センサーデータの時次・日次・月次・年次集計
+1. **データ集計**: シルバー層センサーデータの時次・日次・月次集計
 2. **サマリ生成**: 集約対象項目ごとの統計値（平均、最大、最小等）算出
 3. **長期保存**: 10年間のデータ保持
 4. **障害通知**: エラー発生時のTeams通知
@@ -36,7 +36,6 @@
 | gold_sensor_data_hourly_summary  | iot_catalog.gold | センサーデータ時次サマリ | 1時間    |
 | gold_sensor_data_daily_summary   | iot_catalog.gold | センサーデータ日次サマリ | 1日      |
 | gold_sensor_data_monthly_summary | iot_catalog.gold | センサーデータ月次サマリ | 1か月    |
-| gold_sensor_data_yearly_summary  | iot_catalog.gold | センサーデータ年次サマリ | 1年      |
 
 ### 出力テーブル（OLTP DB）
 
@@ -45,7 +44,6 @@
 | gold_sensor_data_hourly_summary  | iot_app_db | センサーデータ時次サマリ | 1時間    |
 | gold_sensor_data_daily_summary   | iot_app_db | センサーデータ日次サマリ | 1日      |
 | gold_sensor_data_monthly_summary | iot_app_db | センサーデータ月次サマリ | 1か月    |
-| gold_sensor_data_yearly_summary  | iot_app_db | センサーデータ年次サマリ | 1年      |
 
 ---
 
@@ -53,16 +51,20 @@
 
 ### 時次サマリカラム一覧（gold_sensor_data_hourly_summary）
 
-| #   | カラム物理名        | カラム論理名 | データ型  | NULL     | PK  | 説明                                                        |
-| --- | ------------------- | ------------ | --------- | -------- | --- | ----------------------------------------------------------- |
-| 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  | システム内でのIoTデバイスの一意識別子                       |
-| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  | 所属組織ID                                                  |
-| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 |
-| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  | 集約対象の項目                                              |
-| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（平均、分散など）                                |
-| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                                    |
-| 7   | data_count          | データ数     | INT       | NOT NULL |     | 集約したデータ数                                            |
-| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                                            |
+| #   | カラム物理名        | カラム論理名 | データ型  | NULL     | PK  | 説明                                                           |
+| --- | ------------------- | ------------ | --------- | -------- | --- | -------------------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  | システム内でのIoTデバイスの一意識別子                          |
+| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  | 所属組織ID                                                     |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 ※1 |
+| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  | 集約対象の項目                                                 |
+| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL | 〇  | 集約方法ID（平均、分散など）                                   |
+| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     | 集約結果                                                       |
+| 7   | data_count          | データ数     | INT       | NOT NULL |     | 集約したデータ数                                               |
+| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                                               |
+
+※1　iot_catalog.silver.silver_sensor_dataテーブルに登録されているデータに対して、HH:00:00 ~ HH:59:59（Hは任意の時）のevent_timestampを持つデータを集計対象とする。
+
+- 例）1:00:00 ~ 1:59:59、15:00:00 ~ 15:59:59など
 
 ### 日次サマリカラム一覧（gold_sensor_data_daily_summary）
 
@@ -70,38 +72,33 @@
 | --- | ----------------- | ------------ | --------- | -------- | --- | -------------------------------------------- |
 | 1   | device_id         | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子                      |
 | 2   | organization_id   | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                                   |
-| 3   | collection_date   | 集約日       | DATE      | NOT NULL | ○   | センサーデータを集約した日                   |
+| 3   | collection_date   | 集約日       | DATE      | NOT NULL | ○   | センサーデータを集約した日  ※1               |
 | 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                 |
-| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照） |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL | ○   | 集約方法ID（gold_summary_method_master参照） |
 | 6   | summary_value     | 集約値       | DOUBLE    | NULL     |     | 集約結果                                     |
 | 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                             |
 | 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                             |
 
+※1　iot_catalog.silver.silver_sensor_dataテーブルに登録されているデータに対して、YYYY/MM/DD 0:00:00 ~ YYYY/MM/DD 23:59:59（YYYY/MM/DDは任意の日付）のevent_timestampを持つデータを集計対象とする。
+
+- 例）2025/04/02 0:00:00 ~ 2025/04/02 23:59:59、2025/12/31 0:00:00 ~ 2025/12/31 23:59:59など
+
 ### 月次サマリカラム一覧（gold_sensor_data_monthly_summary）
 
-| #   | カラム物理名          | カラム論理名 | データ型   | NULL     | PK  | 説明                                                     |
-| --- | --------------------- | ------------ | ---------- | -------- | --- | -------------------------------------------------------- |
-| 1   | device_id             | デバイスID   | INT        | NOT NULL | ○   | IoTデバイスの一意識別子                                  |
-| 2   | organization_id       | 組織ID       | INT        | NOT NULL | ○   | 所属組織ID                                               |
-| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM形式、例: 2026/01） |
-| 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | ○   | 集約対象の項目（測定項目ID）                             |
-| 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL |     | 集約方法ID（gold_summary_method_master参照）             |
-| 6   | summary_value         | 集約値       | DOUBLE     | NULL     |     | 集約結果                                                 |
-| 7   | data_count            | データ数     | INT        | NOT NULL |     | 集約したデータ数                                         |
-| 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     | レコード作成日時                                         |
+| #   | カラム物理名          | カラム論理名 | データ型   | NULL     | PK  | 説明                                                        |
+| --- | --------------------- | ------------ | ---------- | -------- | --- | ----------------------------------------------------------- |
+| 1   | device_id             | デバイスID   | INT        | NOT NULL | ○   | IoTデバイスの一意識別子                                     |
+| 2   | organization_id       | 組織ID       | INT        | NOT NULL | ○   | 所属組織ID                                                  |
+| 3   | collection_year_month | 集約年月     | VARCHAR(7) | NOT NULL | ○   | センサーデータを集約した年月（YYYY/MM形式、例: 2026/01） ※1 |
+| 4   | summary_item          | 集約対象項目 | INT        | NOT NULL | ○   | 集約対象の項目（測定項目ID）                                |
+| 5   | summary_method_id     | 集約方法ID   | INT        | NOT NULL | ○   | 集約方法ID（gold_summary_method_master参照）                |
+| 6   | summary_value         | 集約値       | DOUBLE     | NULL     |     | 集約結果                                                    |
+| 7   | data_count            | データ数     | INT        | NOT NULL |     | 集約したデータ数                                            |
+| 8   | create_time           | 作成日時     | TIMESTAMP  | NOT NULL |     | レコード作成日時                                            |
 
-### 年次サマリカラム一覧（gold_sensor_data_yearly_summary）
+※1　iot_catalog.silver.silver_sensor_dataテーブルに登録されているデータに対して、YYYY/MM/01 0:00:00 ~ YYYY/MM/dd 23:59:59（YYYY/MMは任意の年月、ddは月末の日付）のevent_timestampを持つデータを集計対象とする。
 
-| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | PK  | 説明                                             |
-| --- | ----------------- | ------------ | --------- | -------- | --- | ------------------------------------------------ |
-| 1   | device_id         | デバイスID   | INT       | NOT NULL | ○   | IoTデバイスの一意識別子                          |
-| 2   | organization_id   | 組織ID       | INT       | NOT NULL | ○   | 所属組織ID                                       |
-| 3   | collection_year   | 集約年       | INT       | NOT NULL | ○   | センサーデータを集約した年（YYYY形式、例: 2026） |
-| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | ○   | 集約対象の項目（測定項目ID）                     |
-| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL |     | 集約方法ID（gold_summary_method_master参照）     |
-| 6   | summary_value     | 集約値       | DOUBLE    | NULL     |     | 集約結果                                         |
-| 7   | data_count        | データ数     | INT       | NOT NULL |     | 集約したデータ数                                 |
-| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL |     | レコード作成日時                                 |
+- 例）2025/05/01 0:00:00 ~ 2025/05/31 23:59:59、2025/04/01 0:00:00 ~ 2025/04/30 23:59:59など
 
 ### サマリー計算手法マスタカラム一覧（gold_summary_method_master）
 
@@ -128,8 +125,6 @@ CLUSTER BY (collection_date, device_id)
 -- 月次サマリ
 CLUSTER BY (collection_year_month, device_id)
 
--- 年次サマリ
-CLUSTER BY (collection_year, device_id)
 ```
 
 ---
@@ -150,7 +145,6 @@ CLUSTER BY (collection_year, device_id)
 | iot_catalog | gold     | gold_sensor_data_hourly_summary  | 時次サマリ |
 | iot_catalog | gold     | gold_sensor_data_daily_summary   | 日次サマリ |
 | iot_catalog | gold     | gold_sensor_data_monthly_summary | 月次サマリ |
-| iot_catalog | gold     | gold_sensor_data_yearly_summary  | 年次サマリ |
 
 ### 書き込みテーブル（OLTP DB）
 
@@ -159,7 +153,6 @@ CLUSTER BY (collection_year, device_id)
 | iot_app_db | gold_sensor_data_hourly_summary  | 時次サマリ |
 | iot_app_db | gold_sensor_data_daily_summary   | 日次サマリ |
 | iot_app_db | gold_sensor_data_monthly_summary | 月次サマリ |
-| iot_app_db | gold_sensor_data_yearly_summary  | 年次サマリ |
 
 OLTP DBへの書き込みの際、INSERT ... ON DUPLICATE KEY UPDATEを用いて、OLTP DB上のサマリデータに対して冪等性を確保する。
 
@@ -191,27 +184,19 @@ flowchart TB
             M_Group[月次グループ化]
             M_Agg["集約処理<br>avg/max/min/p25/median/p75/stddev/p95 + data_count(別カラム)"]
         end
-
-        subgraph Yearly["年次集計"]
-            Y_Read[センサーデータ読込]
-            Y_Group[年次グループ化]
-            Y_Agg["集約処理<br>avg/max/min/p25/median/p75/stddev/p95 + data_count(別カラム)"]
-        end
     end
 
     subgraph Gold["ゴールド層（出力）"]
         GoldHourly[(gold_sensor_data_hourly_summary)]
         GoldDaily[(gold_sensor_data_daily_summary)]
         GoldMonthly[(gold_sensor_data_monthly_summary)]
-        GoldYearly[(gold_sensor_data_yearly_summary)]
         GoldMethod[(gold_summary_method_master)]
     end
 
     subgraph OLTPGOLD["OLTP DB"]
         OLTP_Hourly[(gold_sensor_data_hourly_summary)]
         OLTP_Daily[(gold_sensor_data_daily_summary)]
-        OLTP_Monthly[(gold_sensor_data_yearly_summary)]
-        OLTP_Yearly[(gold_summary_method_master)]
+        OLTP_Monthly[(gold_sensor_data_monthly_summary)]
     end
 
     SensorData --> H_Read
@@ -228,11 +213,6 @@ flowchart TB
     M_Read --> M_Group --> M_Agg --> GoldMonthly
     M_Agg -.-> |データ参照| GoldMethod
     M_Agg --> OLTP_Monthly
-    
-    SensorData --> Y_Read
-    Y_Read --> Y_Group --> Y_Agg --> GoldYearly
-    Y_Agg -.-> |データ参照| GoldMethod
-    Y_Agg --> OLTP_Yearly
 ```
 
 ---
@@ -278,6 +258,7 @@ flowchart TB
 | 6                 | P75                 | 第3四分位数   | `PERCENTILE_APPROX(sensor_value, 0.75)` |
 | 7                 | STDDEV              | 標準偏差      | `STDDEV(sensor_value)`                  |
 | 8                 | P95                 | 上側5％境界値 | `PERCENTILE_APPROX(sensor_value, 0.95)` |
+| 9                 | SUM                 | 合計          | `SUM(sensor_value)`                     |
 
 ### 各サマリテーブルでの集約対象
 
@@ -286,17 +267,16 @@ flowchart TB
 | gold_sensor_data_hourly_summary  | silver_sensor_data | シルバー層の生データを時次で集約 |
 | gold_sensor_data_daily_summary   | silver_sensor_data | シルバー層の生データを日次で集約 |
 | gold_sensor_data_monthly_summary | silver_sensor_data | シルバー層の生データを月次で集約 |
-| gold_sensor_data_yearly_summary  | silver_sensor_data | シルバー層の生データを年次で集約 |
 
 ---
 
 ## パフォーマンス要件
 
-| 要件         | 値                          | 対応策                                  |
-| ------------ | --------------------------- | --------------------------------------- |
-| 処理時間     | 日次バッチ完了まで1時間以内 | インクリメンタル処理                    |
-| スループット | 10,000デバイス × 1分間隔    | インクリメンタル処理、Liquid Clustering |
-| データ量     | 10GB/日                     | Liquid Clustering、インクリメンタル処理 |
+| 要件         | 値                                                                   | 対応策                                  |
+| ------------ | -------------------------------------------------------------------- | --------------------------------------- |
+| 処理時間     | 時次バッチと日次バッチ完了まで1時間以内/月次バッチ完了まで24時間以内 | インクリメンタル処理、クラスタ最適化    |
+| スループット | 10,000デバイス × 1分間隔                                             | インクリメンタル処理、Liquid Clustering |
+| データ量     | 10GB/日                                                              | Liquid Clustering、インクリメンタル処理 |
 
 ---
 
@@ -373,3 +353,4 @@ flowchart TB
 | ---------- | ---- | --------------------------- | ------------ |
 | 2026-01-26 | 1.0  | 初版作成                    | Kei Sugiyama |
 | 2026-04-01 | 1.1  | データ出力先にOLTP DBを追加 | Kei Sugiyama |
+| 2026-04-02 | 1.2  | レビュー指摘事項反映        | Kei Sugiyama |
