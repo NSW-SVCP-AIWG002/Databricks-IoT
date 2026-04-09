@@ -129,7 +129,7 @@
 .timeline__datetime-input {
   width: 170px;
   font-size: var(--font-size-sm);
-  padding-left: 24px;
+  padding: 2px var(--spacing-2) 2px 24px;
 }
 
 /* カレンダーアイコン（装飾のみ・クリック不可） */
@@ -361,6 +361,7 @@
 .timeline-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .timeline-register__measurement-list thead {

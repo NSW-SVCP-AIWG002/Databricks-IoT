@@ -118,6 +118,7 @@
 .circle-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .circle-chart-register__measurement-list thead {
