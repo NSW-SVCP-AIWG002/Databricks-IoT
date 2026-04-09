@@ -27,9 +27,10 @@ from bs4 import BeautifulSoup
 BASE_URL = "/analysis/customer-dashboard"
 _VALID_DATETIME = "2026/03/06 12:00:00"
 
-# Unity Catalog クエリのモック対象パス（帯グラフはシルバー層とゴールド層両方を使用）
-_SILVER_QUERY = "iot_app.services.customer_dashboard.belt_chart.execute_silver_query"
-_GOLD_QUERY   = "iot_app.services.customer_dashboard.belt_chart.execute_gold_query"
+# データ取得関数のモック対象パス（ビュー層の fetch_belt_chart_data をモック）
+# サービス層は db.session.execute を直接使うため、ビュー経由でモックする
+_SILVER_QUERY = "iot_app.views.analysis.customer_dashboard.belt_chart.fetch_belt_chart_data"
+_GOLD_QUERY   = "iot_app.views.analysis.customer_dashboard.belt_chart.fetch_belt_chart_data"
 
 
 def _soup(response) -> BeautifulSoup:
@@ -63,7 +64,11 @@ def gadget_type_belt(db_session):
 
 @pytest.fixture()
 def measurement_items_multi(db_session):
-    """MeasurementItemMaster テストレコード（複数項目）"""
+    """MeasurementItemMaster テストレコード（複数項目）
+
+    seed_measurement_items（session-scoped autouse）が既に挿入済みの場合は
+    既存レコードを返す（IntegrityError 回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
     items = []
     item_defs = [
@@ -72,6 +77,10 @@ def measurement_items_multi(db_session):
         (3, '第1冷凍 庫内センサー温度', 'internal_sensor_temp_freezer_1', '℃'),
     ]
     for mid, display_name, col_name, unit in item_defs:
+        existing = db_session.get(MeasurementItemMaster, mid)
+        if existing is not None:
+            items.append(existing)
+            continue
         item = MeasurementItemMaster(
             measurement_item_id=mid,
             measurement_item_name=display_name,
@@ -89,14 +98,18 @@ def measurement_items_multi(db_session):
 
 
 @pytest.fixture()
-def belt_chart_gadget_fixed(db_session, gadget_type_belt):
-    """DashboardGadgetMaster テストレコード（帯グラフ、デバイス固定モード）"""
+def belt_chart_gadget_fixed(db_session, gadget_type_belt, dashboard_group_master):
+    """DashboardGadgetMaster テストレコード（帯グラフ、デバイス固定モード）
+
+    dashboard_group_master に依存することで FK 制約を満たす。
+    dashboard_group_master.dashboard_group_id を使用し、hardcode を避ける。
+    """
     from iot_app.models.customer_dashboard import DashboardGadgetMaster
     g = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name='テスト帯グラフ',
         gadget_type_id=gadget_type_belt.gadget_type_id,
-        dashboard_group_id=1,
+        dashboard_group_id=dashboard_group_master.dashboard_group_id,
         chart_config=json.dumps({
             'measurement_item_ids': [1, 2],
             'summary_method_id': 1,
@@ -104,7 +117,7 @@ def belt_chart_gadget_fixed(db_session, gadget_type_belt):
         data_source_config=json.dumps({'device_id': 1}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -115,14 +128,17 @@ def belt_chart_gadget_fixed(db_session, gadget_type_belt):
 
 
 @pytest.fixture()
-def belt_chart_gadget_variable(db_session, gadget_type_belt):
-    """DashboardGadgetMaster テストレコード（帯グラフ、デバイス可変モード）"""
+def belt_chart_gadget_variable(db_session, gadget_type_belt, dashboard_group_master):
+    """DashboardGadgetMaster テストレコード（帯グラフ、デバイス可変モード）
+
+    dashboard_group_master に依存することで FK 制約を満たす。
+    """
     from iot_app.models.customer_dashboard import DashboardGadgetMaster
     g = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name='テスト帯グラフ（可変）',
         gadget_type_id=gadget_type_belt.gadget_type_id,
-        dashboard_group_id=1,
+        dashboard_group_id=dashboard_group_master.dashboard_group_id,
         chart_config=json.dumps({
             'measurement_item_ids': [1, 2],
             'summary_method_id': 1,
@@ -130,7 +146,7 @@ def belt_chart_gadget_variable(db_session, gadget_type_belt):
         data_source_config=json.dumps({'device_id': None}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -154,7 +170,8 @@ class TestGadgetBeltChartData:
 
     @pytest.fixture(autouse=True)
     def _require_auth_scope(
-        self, auth_scope, dashboard_master, dashboard_group_master, gadget_type_belt
+        self, auth_scope, dashboard_master, dashboard_group_master, gadget_type_belt,
+        measurement_items_multi,
     ):
         """全テストで認証ユーザー＋アクセス可能スコープ＋ガジェット関連マスタを事前登録する"""
 
@@ -620,10 +637,10 @@ class TestGadgetBeltChartCreate:
         response = client.get(self._URL)
         soup = _soup(response)
 
-        # Assert: デバイス固定・デバイス可変を示すボタンまたは入力要素が存在する
-        mode_inputs = soup.find_all('input', {'name': 'device_mode'})
-        assert len(mode_inputs) >= 2
-        mode_values = {inp.get('value') for inp in mode_inputs}
+        # Assert: デバイス固定・デバイス可変を示すボタンが存在する（hidden inputはJS連動用で1つのみ）
+        mode_btns = soup.find_all('button', class_=lambda c: c and 'belt-chart-register__device-mode-btn' in c)
+        assert len(mode_btns) >= 2
+        mode_values = {btn.get('data-mode') for btn in mode_btns}
         assert 'fixed' in mode_values
         assert 'variable' in mode_values
 
@@ -809,13 +826,19 @@ class TestGadgetBeltChartCreate:
         assert response.status_code == 404
 
     def test_create_modal_no_dashboard_returns_404(
-        self, client, auth_user_id, dashboard_user_setting
+        self, client, auth_user_id, dashboard_user_setting, mocker
     ):
         """2.2.4: user_setting は存在するが dashboard_master が存在しない場合に404エラー
 
         workflow-spec: get_dashboard_by_id が None → CheckDashboard→なし→Error404
+        dashboard_user_setting は dashboard_master FK 制約のため自動生成される。
+        get_dashboard_by_id をモックして「DashboardMaster 未発見」状態を再現する。
         """
-        # Arrange: dashboard_user_setting あり・dashboard_master なし（DBに登録しない）
+        # Arrange: dashboard_user_setting あり・get_dashboard_by_id が None を返す
+        mocker.patch(
+            'iot_app.views.analysis.customer_dashboard.belt_chart.get_dashboard_by_id',
+            return_value=None,
+        )
 
         # Act
         response = client.get(self._URL)
@@ -864,9 +887,14 @@ class TestGadgetBeltChartRegister:
     })
 
     @pytest.fixture(autouse=True)
-    def _require_gadget_type(self, request, db_session):
-        """全テストで GadgetTypeMaster='帯グラフ' を事前登録する（サービス層の動的ルックアップに必要）。
-        GadgetTypeMaster の存在チェックテストではスキップする。
+    def _require_gadget_type(
+        self, request, db_session,
+        organization_master_record, dashboard_master, dashboard_group_master,
+    ):
+        """全テストで GadgetTypeMaster='帯グラフ' および DashboardGroupMaster(id=1) を事前登録する。
+
+        register サービスが dashboard_group_id=1 に INSERT するため DashboardGroupMaster が必要。
+        GadgetTypeMaster の存在チェックテストでは GadgetTypeMaster の挿入のみスキップする。
         """
         if request.node.name in self._SKIP_GADGET_TYPE:
             return
@@ -886,11 +914,15 @@ class TestGadgetBeltChartRegister:
         db_session.flush()
 
     def _valid_form(self, **overrides):
-        """デバイス可変モード・2x2 の最小有効フォームデータ（表示項目1件）"""
+        """デバイス可変モード・2x2 の最小有効フォームデータ（表示項目1件）
+
+        device_id='' (空文字) で IntegerField(Optional()) → None に変換される。
+        可変モードでは device_id=None が data_source_config に保存される。
+        """
         data = {
             'gadget_name': '帯グラフ',
             'device_mode': 'variable',  # 可変モード: デバイス存在チェックをスキップ
-            'device_id': '0',
+            'device_id': '',            # 空文字 → IntegerField(Optional()) → None
             'group_id': '1',
             'summary_method_id': '1',
             'measurement_item_ids': '1',  # 表示項目1件選択
@@ -1014,9 +1046,14 @@ class TestGadgetBeltChartRegister:
         """② 固定モード登録後 data_source_config.device_id が送信した整数値で保存される"""
         # Arrange
         from types import SimpleNamespace
+        _device_ns = SimpleNamespace(device_id=42, device_name='テストデバイス', organization_id=1)
         mocker.patch(
             'iot_app.views.analysis.customer_dashboard.belt_chart.check_device_access',
-            return_value=SimpleNamespace(device_id=42, device_name='テストデバイス', organization_id=1),
+            return_value=_device_ns,
+        )
+        mocker.patch(
+            'iot_app.services.customer_dashboard.belt_chart.check_device_access',
+            return_value=_device_ns,
         )
 
         # Act
@@ -1031,9 +1068,13 @@ class TestGadgetBeltChartRegister:
         assert data_source_config['device_id'] == 42
 
     def test_register_gadget_type_id_stored_correctly(
-        self, client, app, measurement_item, gadget_type_belt
+        self, client, app, measurement_item
     ):
-        """③ gadget_type_id が gadget_type_belt（id=5）の値で保存される"""
+        """③ gadget_type_id が帯グラフ（id=5）の値で保存される
+
+        NOTE: _require_gadget_type autouse が GadgetTypeMaster(id=5) を登録済み。
+        gadget_type_belt フィクスチャと重複するため明示的に依頼しない。
+        """
         # Act
         client.post(self._URL, data=self._valid_form(device_mode='variable'))
 
@@ -1307,49 +1348,16 @@ class TestGadgetBeltChartRegister:
         assert response.status_code == 404
 
     def test_register_fixed_mode_device_not_in_accessible_orgs_returns_404(
-        self, client, app, measurement_item
+        self, client, measurement_item
     ):
-        """4.3.9: device_mode=fixed、device_id はDBに存在するがアクセス可能組織外のため 404
+        """4.3.9: device_mode=fixed、accessible_org_ids=[] のためデバイスアクセス不可 → 404
 
-        認証未実装ブランチでは get_accessible_org_ids() が常に [] を返すため、
-        fixed モードのデバイスチェック（ビュー層）は必ず abort(404) になる。
+        認証未実装ブランチでは user_id=None → get_accessible_org_ids() が [] を返す。
+        check_device_access(device_id, []) は organization_id.in_([]) で必ず None → abort(404)。
+        DeviceMaster の作成は不要（スコープ外判定はクエリ条件で決まる）。
         """
-        # Arrange: DeviceMaster にデバイスを登録するが、org スコープ外（accessible_org_ids=[]）
-        with app.app_context():
-            from iot_app import db
-            from iot_app.models.device import DeviceMaster
-            from iot_app.models.organization import OrganizationMaster
-
-            org = OrganizationMaster(
-                organization_name='別組織',
-                organization_type_id=1,
-                address='',
-                phone_number='000',
-                contact_person='担当者',
-                contract_status_id=1,
-                contract_start_date=date(2024, 1, 1),
-                databricks_group_id='test-group-other',
-                creator=1,
-                modifier=1,
-            )
-            db.session.add(org)
-            db.session.flush()
-
-            device = DeviceMaster(
-                device_uuid=str(uuid.uuid4()),
-                device_name='別組織デバイス',
-                organization_id=org.organization_id,
-                device_type_id=1,
-                device_model='モデルX',
-                device_inventory_id=1,
-                creator=1,
-                modifier=1,
-            )
-            db.session.add(device)
-            db.session.commit()
-            device_id = device.device_id
-
-        form_data = self._valid_form(device_mode='fixed', device_id=str(device_id))
+        # Arrange: user_id=None → accessible_org_ids=[] → 任意の device_id で 404
+        form_data = self._valid_form(device_mode='fixed', device_id='42')
 
         # Act
         response = client.post(self._URL, data=form_data)
@@ -1977,9 +1985,14 @@ class TestBeltChartAuthentication:
         auth_scope,
         dashboard_master,
         dashboard_group_master,
+        dashboard_user_setting,
         gadget_type_belt,
     ):
-        """1.1.1: 認証済みユーザーはガジェット登録フォーム取得エンドポイントに正常アクセスできる"""
+        """1.1.1: 認証済みユーザーはガジェット登録フォーム取得エンドポイントに正常アクセスできる
+
+        create エンドポイントは get_dashboard_user_setting(user_id) → None → 404 を返すため
+        dashboard_user_setting フィクスチャが必要。
+        """
         # Act
         response = client.get(f"{BASE_URL}/gadgets/belt-chart/create")
 
@@ -2100,6 +2113,7 @@ class TestBeltChartDataScope:
 
         # ── 組織 ──────────────────────────────────────────────────────────
         org_own = OrganizationMaster(
+            organization_id=10,
             organization_name='スコープテスト自組織',
             organization_type_id=1,
             address='住所1',
@@ -2112,6 +2126,7 @@ class TestBeltChartDataScope:
             modifier=1,
         )
         org_sub = OrganizationMaster(
+            organization_id=11,
             organization_name='スコープテスト下位組織',
             organization_type_id=1,
             address='住所2',
@@ -2124,6 +2139,7 @@ class TestBeltChartDataScope:
             modifier=1,
         )
         org_other = OrganizationMaster(
+            organization_id=12,
             organization_name='スコープテスト無関係組織',
             organization_type_id=1,
             address='住所3',
@@ -2155,12 +2171,12 @@ class TestBeltChartDataScope:
 
         # ── ガジェット種別 ────────────────────────────────────────────────
         gt = GadgetTypeMaster(
-            gadget_type_id=15,
-            gadget_type_name='帯グラフ_スコープ用',
+            gadget_type_id=5,
+            gadget_type_name='帯グラフ',
             data_source_type=1,
             gadget_image_path='images/gadgets/belt_chart.png',
             gadget_description='スコープテスト用',
-            display_order=15,
+            display_order=5,
             creator=1,
             modifier=1,
             delete_flag=False,
@@ -2201,7 +2217,7 @@ class TestBeltChartDataScope:
             data_source_config=json.dumps({'device_id': 1}),
             position_x=0,
             position_y=0,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2241,7 +2257,7 @@ class TestBeltChartDataScope:
             data_source_config=json.dumps({'device_id': 1}),
             position_x=0,
             position_y=0,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2281,7 +2297,7 @@ class TestBeltChartDataScope:
             data_source_config=json.dumps({'device_id': 1}),
             position_x=0,
             position_y=0,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2409,15 +2425,18 @@ _REGISTER_URL = f"{BASE_URL}/gadgets/belt-chart/register"
 
 
 def _security_valid_form(**overrides):
-    """セキュリティテスト用の正常フォームデータ（20文字以内の gadget_name）"""
+    """セキュリティテスト用の正常フォームデータ（20文字以内の gadget_name）
+
+    device_mode='variable' を使用することでデバイス存在チェック（abort 404）を回避する。
+    """
     base = {
         'gadget_name': '帯グラフ',
         'group_id': '1',
         'summary_method_id': '1',
         'measurement_item_ids': ['1'],
         'gadget_size': '0',
-        'device_mode': 'fixed',
-        'device_id': '1',
+        'device_mode': 'variable',
+        'device_id': '0',
     }
     base.update(overrides)
     return base
@@ -2445,9 +2464,14 @@ class TestBeltChartSecurity:
 
     @pytest.fixture(autouse=True)
     def _setup(
-        self, auth_scope, dashboard_master, dashboard_group_master, gadget_type_belt
+        self, auth_scope, dashboard_master, dashboard_group_master,
+        dashboard_user_setting, gadget_type_belt,
     ):
-        """全テストで認証ユーザー＋ガジェット関連マスタを事前登録する"""
+        """全テストで認証ユーザー＋ガジェット関連マスタを事前登録する
+
+        dashboard_user_setting: register エンドポイントのバリデーション失敗時（400）に
+        get_dashboard_user_setting を呼ぶため必要。
+        """
 
     # ── 9.1 SQLインジェクション ─────────────────────────────────────────────
 
