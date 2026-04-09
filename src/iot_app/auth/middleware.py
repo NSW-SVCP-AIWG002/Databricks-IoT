@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from flask import g, request, session, abort, render_template, current_app, redirect, url_for
 
 from iot_app.auth.services import find_user_by_email
-from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, JWTExpiredError, TokenExchangeError
 from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
