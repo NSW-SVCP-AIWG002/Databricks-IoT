@@ -1,4 +1,4 @@
-# メール送信ジョブ仕様書
+# メール通知送信ジョブ仕様書
 
 ## 目次
 
@@ -41,7 +41,7 @@
 
 ## 概要
 
-このドキュメントは、Databricks Workflowとして実装するバッチ機能のうち、メール送信ジョブの詳細を記載します。
+このドキュメントは、Databricks Workflowとして実装するバッチ機能のうち、メール通知送信ジョブの詳細を記載します。
 
 ### このドキュメントの役割
 
@@ -316,7 +316,7 @@ process_email_queue()
 
 ## 関連ドキュメント
 
-- [README.md](./README.md) - メール送信ジョブ概要
+- [README.md](./README.md) - メール通知送信ジョブ概要
 - [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
 - [アプリケーションデータベース設計書](../../common/app-database-specification.md) - email_notification_queue・mail_historyテーブル定義
 
