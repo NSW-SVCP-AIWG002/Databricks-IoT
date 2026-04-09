@@ -82,6 +82,14 @@ def authenticate_request():
             abort(500)
         except JWTExpiredError:
             redirect_uri = request.full_path.rstrip('?')
+            is_ajax = (
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                or request.is_json
+                or 'application/json' in request.headers.get('Accept', '')
+            )
+            if is_ajax:
+                from flask import jsonify as _jsonify
+                return _jsonify({'error': 'token_expired'}), 401
             return render_template('auth/token_refresh.html', redirect_uri=redirect_uri)
         except TokenExchangeError:
             abort(500)

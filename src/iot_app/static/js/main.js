@@ -1,3 +1,29 @@
+/* ===== グローバル fetch インターセプター =====
+ * JWTトークン期限切れ（401 token_expired）を全AJAXで一括ハンドリングする。
+ * サーバーが {"error": "token_expired"} + 401 を返した場合、
+ * ページリロードすることで通常ページ遷移として token_refresh.html フローに乗せる。
+ */
+(function () {
+  var _originalFetch = window.fetch;
+  window.fetch = function () {
+    return _originalFetch.apply(this, arguments).then(function (response) {
+      if (response.status === 401) {
+        return response.clone().json().then(function (data) {
+          if (data && data.error === 'token_expired') {
+            window.location.reload();
+            // reload後のレスポンスを止めるため pending の Promise を返す
+            return new Promise(function () {});
+          }
+          return response;
+        }).catch(function () {
+          return response;
+        });
+      }
+      return response;
+    });
+  };
+}());
+
 /* ===== サイドバー：サブメニュークリック開閉（アコーディオン） ===== */
 document.querySelectorAll('.nav__item--parent > .nav__link').forEach(function(link) {
   link.addEventListener('click', function() {
