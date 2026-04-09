@@ -51,8 +51,9 @@ def call_orchestrator_endpoint(
         status, message, df, fig_data, sql_query を含む辞書
     """
     cfg = _get_config()
+    host = re.sub(r'^https?://', '', cfg.DATABRICKS_HOST).rstrip('/')
     endpoint_url = (
-        f"https://{cfg.DATABRICKS_HOST}"
+        f"https://{host}"
         f"/serving-endpoints/{cfg.DATABRICKS_SERVING_ENDPOINT_NAME}/invocations"
     )
 
@@ -75,7 +76,7 @@ def call_orchestrator_endpoint(
                 "thread_id": thread_id,
             }]
         },
-        timeout=60,
+        timeout=300,
     )
     response.raise_for_status()
     result = response.json()
@@ -104,7 +105,7 @@ def show_chat():
     認証チェック・トークン取得は AuthMiddleware（before_request）で実行済み。
     会話履歴の復元はフロントエンド（SessionStorage）で行う。
     """
-    return render_template('chat/index.html',
+    return render_template('analysis/chat/index.html',
                            user_email=session.get('email', ''))
 
 
@@ -154,7 +155,8 @@ def send_question():
             "error_message": "無効なthread_idが指定されました",
         }), 400
 
-    user_token = getattr(g, 'databricks_token', None)
+    ## 正しいToken取得方法に修正
+    user_token = getattr(getattr(g, 'current_user', None), 'databricks_token', None)
 
     try:
         result = call_orchestrator_endpoint(
@@ -191,6 +193,8 @@ def send_question():
         }), 500
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         # logger.error("外部API例外", exc_info=True, extra={
         #     "service": "ai_orchestrator",
         #     "error_type": type(e).__name__,

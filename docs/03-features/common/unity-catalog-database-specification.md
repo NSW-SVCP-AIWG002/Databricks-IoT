@@ -26,6 +26,7 @@
       - [2. センサーデータ日次サマリ (gold\_sensor\_data\_daily\_summary)](#2-センサーデータ日次サマリ-gold_sensor_data_daily_summary)
       - [3. センサーデータ月次サマリ (gold\_sensor\_data\_monthly\_summary)](#3-センサーデータ月次サマリ-gold_sensor_data_monthly_summary)
       - [4. サマリー計算手法マスタ（gold\_summary\_method\_master）](#4-サマリー計算手法マスタgold_summary_method_master)
+      - [4. サマリー計算手法マスタ（gold\_summary\_method\_master）](#4-サマリー計算手法マスタgold_summary_method_master-1)
     - [外部DBのマスタ類を同期するテーブル](#外部dbのマスタ類を同期するテーブル)
       - [1. デバイスマスタ（device\_master）](#1-デバイスマスタdevice_master)
       - [2. 組織マスタ（organization\_master）](#2-組織マスタorganization_master)
@@ -313,6 +314,16 @@ TBLPROPERTIES (
 | 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                                                    |
 | 7   | data_count          | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                                            |
 | 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                                            |
+| #   | カラム物理名        | カラム論理名 | データ型  | NULL     | PK  | FK  | 説明                                                        |
+| --- | ------------------- | ------------ | --------- | -------- | --- | --- | ----------------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT       | NOT NULL | 〇  |     | システム内でのIoTデバイスの一意識別子                       |
+| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 〇  |     | 所属組織ID                                                  |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | 〇  |     | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 |
+| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 〇  |     | 集約対象の項目                                              |
+| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL |     |     | 集約方法ID（平均、分散など）                                |
+| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL |     |     | 集約結果                                                    |
+| 7   | data_count          | データ数     | INT       | NOT NULL |     |     | 集約したデータ数                                            |
+| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL |     |     | レコード作成日時                                            |
 
 **クラスタリングキー**: `collection_datetime`, `device_id`
 
@@ -421,6 +432,7 @@ TBLPROPERTIES (
 );
 ```
 
+#### 4. サマリー計算手法マスタ（gold_summary_method_master）
 #### 4. サマリー計算手法マスタ（gold_summary_method_master）
 
 **概要**: サマリ作成時にどの計算手法にのっとって作成されたものかを表現するマスタ
@@ -881,20 +893,20 @@ VACUUM iot_catalog.silver.silver_sensor_data;
 
 ### チェックポイントテーブルの削除ジョブ例
 
-ts（チェックポイントID/タイムスタンプ）の最新値で判定します。スレッド内の古いチェックポイントだけ消すと親子関係（parent_ts）が壊れるため、スレッド単位でまとめて削除します。
+timestamp（チェックポイントID/タイムスタンプ）の最新値で判定します。スレッド内の古いチェックポイントだけ消すと親子関係（parent_timestamp）が壊れるため、スレッド単位でまとめて削除します。
 
 ```sql
 -- 最終更新から30日経過したスレッドを削除
-DELETE FROM iot_catalog.ai_chat.checkpoints
+DELETE FROM iot_catalog.ai_chat.check_point_data
 WHERE thread_id IN (
     SELECT thread_id
-    FROM iot_catalog.ai_chat.checkpoints
+    FROM iot_catalog.ai_chat.check_point_data
     GROUP BY thread_id
-    HAVING MAX(ts) < DATE_SUB(CURRENT_TIMESTAMP(), 30)
+    HAVING MAX(`timestamp`) < DATE_SUB(CURRENT_TIMESTAMP(), 30)
 );
 
 -- VACUUM実行（7日経過後に物理削除）
-VACUUM iot_catalog.ai_chat.checkpoints;
+VACUUM iot_catalog.ai_chat.check_point_data;
 ```
 
 ---

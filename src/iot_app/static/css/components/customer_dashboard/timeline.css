@@ -496,9 +496,6 @@
   margin-top: var(--spacing-1);
 }
 
-.form__row .form__group--half:first-child {
-  flex: 0 0 200px;
-}
 
 
 .form__group--inline {
@@ -541,7 +538,3 @@
   min-height: 1.4em;
 }
 
-#group_id,
-#gadget_size {
-  width: 170px;
-}

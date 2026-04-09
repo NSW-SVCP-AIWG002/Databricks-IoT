@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>認証情報を更新中...</title>
+</head>
+<body>
+  <script>
+    fetch('/.auth/refresh')
+      .then(function (res) {
+        if (res.ok) {
+          window.location.href = {{ redirect_uri | tojson }};
+        } else {
+          window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent({{ redirect_uri | tojson }});
+        }
+      })
+      .catch(function () {
+        window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent({{ redirect_uri | tojson }});
+      });
+  </script>
+</body>
+</html>

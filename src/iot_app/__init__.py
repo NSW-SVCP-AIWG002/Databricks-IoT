@@ -71,12 +71,16 @@ def create_app():
 
     @app.before_request
     def _before_request():
+        if request.path.startswith('/static'):
+            return
         g.request_id = str(uuid.uuid4())
         g.request_start_time = time.monotonic()
         _logger.info("リクエスト開始")
 
     @app.after_request
     def _after_request(response):
+        if request.path.startswith('/static'):
+            return response
         duration_ms = int((time.monotonic() - getattr(g, "request_start_time", time.monotonic())) * 1000)
         _logger.info(
             "リクエスト完了",
@@ -123,7 +127,9 @@ def create_app():
     def health():
         return jsonify(status='ok'), 200
 
-    # ルートリダイレクト
+    # 業種別ダッシュボード Blueprint
+    from iot_app.views.analysis.industry_dashboard import analysis_bp
+    app.register_blueprint(analysis_bp)
     @app.route('/')
     def index():
         from flask import redirect
@@ -136,7 +142,6 @@ def create_app():
     # 開発環境専用 Blueprint
     if config_name == "development":
         from iot_app.views.dev import dev_bp
-        app.register_blueprint(dev_bp)
 
     # 認証動作確認用エンドポイント（開発用）
     @app.route('/ping')

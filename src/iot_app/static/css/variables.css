@@ -1,35 +1,123 @@
 :root {
   /* ===== カラー ===== */
   --color-primary: #2272B4;
-  --color-primary-hover: #1e639b;
-  --color-danger: #F44336;
-  --color-danger-hover: #da190b;
+  --color-primary-hover: #1E639B;
+
+  /* ===== カラー：セカンダリ ===== */
+  --color-secondary: #6C757D;
+  --color-secondary-hover: #555B61;
+
+  /* ===== カラー：ブランド（ページネーション等） ===== */
+  --color-brand-blue: #DBE8F3;
+
+  /* ===== カラー：ステータス ===== */
   --color-success: #28A745;
-  --color-secondary: #6c757d;
-  --color-secondary-hover: #555b61;
+  --color-success-light: #D4EDDA;
+  --color-success-dark: #155724;
+
+  --color-danger: #F44336;
+  --color-danger-hover: #DA190B;
+  --color-danger-light: #F8D7DA;
+  --color-danger-dark: #721C24;
+
+  --color-warning: #FFC107;
+  --color-warning-light: #FFF3CD;
+  --color-warning-dark: #856404;
+
+  --color-info: #17A2B8;
+  --color-info-light: #D1ECF1;
+  --color-info-dark: #0C5460;
+
+  /* ===== カラー：グレースケール ===== */
+  --color-white: #FFFFFF;
+  --color-gray-50: #F8F9FA;
+  --color-gray-100: #F1F3F5;
+  --color-gray-200: #E9ECEF;
+  --color-gray-300: #DEE2E6;
+  --color-gray-400: #CED4DA;
+  --color-gray-500: #ADB5BD;
+  --color-gray-600: #6C757D;
+  --color-gray-700: #495057;
+  --color-gray-800: #343A40;
+  --color-gray-900: #212529;
+  --color-black: #000000;
+
+  /* ===== カラー：テーブル ===== */
+  --color-table-header: #F3F3F4;
+
+  /* ===== カラー：ボーダー ===== */
+  --color-border: #CED4DA;
+
+  /* ===== カラー：フォーカス ===== */
+  --color-focus-shadow: rgba(128, 189, 255, 0.25);
+  --color-danger-focus-shadow: rgba(220, 53, 69, 0.25);
+
+  /* ===== カラー：検索条件バッジ ===== */
+  --color-search-badge: #e3f2fd;
 
   /* ===== グローバルメニュー背景色 ===== */
   --nav-bkg-color-a: #2A3847;   /* ノンアクティブ */
   --nav-bkg-color-b: #2E3D4D;   /* ホバー中 */
   --nav-bkg-color-c: #596775;   /* 現在地 */
 
-  /* ===== スペーシング（8pxベース） ===== */
-  --spacing-1: 4px;
-  --spacing-2: 8px;
-  --spacing-3: 12px;
-  --spacing-4: 16px;
-  --spacing-5: 20px;
-  --spacing-6: 24px;
-  --spacing-8: 32px;
-
-
-  /* ===== ボタン制御 ===== */
-  --border-radius-base: 5px;
-
-  /* ===== フォント ===== */
+  /* ===== フォント：ファミリー ===== */
   --font-family-base: 'メイリオ', 'Meiryo', sans-serif;
+
+  /* ===== フォント：サイズ ===== */
   --font-size-sm: 12px;
   --font-size-base: 14px;
   --font-size-lg: 16px;
-}
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
 
+  /* ===== フォント：ウェイト ===== */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ===== 行間 ===== */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ===== スペーシング（8pxベース） ===== */
+  --spacing-0: 0;
+  --spacing-1: 4px;    /* 0.5 × 8px */
+  --spacing-2: 8px;    /* 1 × 8px */
+  --spacing-3: 12px;   /* 1.5 × 8px */
+  --spacing-4: 16px;   /* 2 × 8px */
+  --spacing-5: 20px;   /* 2.5 × 8px */
+  --spacing-6: 24px;   /* 3 × 8px */
+  --spacing-8: 32px;   /* 4 × 8px */
+  --spacing-10: 40px;  /* 5 × 8px */
+  --spacing-12: 48px;  /* 6 × 8px */
+  --spacing-16: 64px;  /* 8 × 8px */
+
+  /* ===== ボーダー ===== */
+  --border-radius-base: 4px;
+  --border-radius-lg: 8px;
+  --border-radius-full: 9999px;
+
+  --border-width: 1px;
+  --border-width-thick: 2px;
+  --border-width-heavy: 4px;
+
+  /* ===== シャドウ ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+  /* ===== トランジション ===== */
+  --transition-base: 0.2s ease;
+  --transition-fast: 0.15s ease;
+
+  /* ===== ブレークポイント ===== */
+  --breakpoint-xs: 575px;
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-xxl: 1400px;
+}

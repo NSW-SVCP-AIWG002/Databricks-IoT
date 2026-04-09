@@ -9,8 +9,7 @@
 <form method="POST"
       action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
       id="bar-chart-register-form"
-      novalidate
-      data-ajax-submit>
+      novalidate>
   {{ form.hidden_tag() }}
 
   <div class="modal__body">
@@ -134,7 +133,6 @@
       <div class="form__group form__group--half">
         <label class="form__label form__label--required" for="group_id">グループ選択</label>
         <select class="form__select" name="group_id" id="group_id">
-          <option value="">選択してください</option>
           {% for gr in groups %}
           <option value="{{ gr.dashboard_group_id }}">{{ gr.dashboard_group_name }}</option>
           {% endfor %}
@@ -146,7 +144,6 @@
       <div class="form__group form__group--half">
         <label class="form__label form__label--required" for="summary_method_id">集約方法</label>
         <select class="form__select" name="summary_method_id" id="summary_method_id">
-          <option value="">選択してください</option>
           {% for sm in summary_methods %}
           <option value="{{ sm.summary_method_id }}">{{ sm.summary_method_name }}</option>
           {% endfor %}

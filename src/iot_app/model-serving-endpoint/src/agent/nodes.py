@@ -4,6 +4,7 @@ import time
 import pandas as pd
 
 from databricks import sql
+from langgraph.errors import GraphInterrupt
 from langgraph.types import interrupt
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 
@@ -81,7 +82,8 @@ def planner_node(state: AgentState) -> AgentState:
             genie_task = {
                 "api": "GenieAPI",
                 "prompt": genie_prompt,
-                "space": space_name
+                "space": space_name,
+                "reuse": True,
             }
             selected_apis.insert(0, genie_task)
 
@@ -217,23 +219,15 @@ def genieapi_node(state: AgentState) -> AgentState:
         # 実行API一覧
         api_list = [api.get("api") for api in selected if isinstance(api, dict)]
         
-        if not need_new_genie_data:
-            # 共通POST
-            result = post_chat(
-                endpoint=endpoint,
-                system_prompt=decide_get_new_data_prompt,
-                prompt=prompt,
-                messages=messages,
-                temperature=0.1,
-            )
-            try:
-                if result:
-                    need_new_genie_data = result["continue"]
-                else:
-                    need_new_genie_data = True
-            # もしcontinueが取得できない場合は、Genieデータを再取得せず、履歴で取得したGenieデータを取得するようにする
-            except Exception:
-                need_new_genie_data = False
+        # GenieAPIの選択元に応じてデータ取得方針を決定
+        # - reuse=True: GraphAPIのみ選択時にPlannerが自動挿入したケース → 既存データ再利用（新規取得不要）
+        # - reuse なし: Plannerが明示的にGenieAPIを選択したケース → 新規データ取得
+        genie_items = [it for it in selected if it.get("api") == "GenieAPI"]
+        reuse = genie_items[0].get("reuse", False) if genie_items else False
+        if reuse:
+            need_new_genie_data = False
+        else:
+            need_new_genie_data = True
 
         if "LLM" in api_list or "GraphAPI" in api_list:
             genie_items = [it for it in selected if it.get("api") == "GenieAPI"]
@@ -291,6 +285,8 @@ def genieapi_node(state: AgentState) -> AgentState:
             "genie_download_url": download_url,
             "dataframe": df,
         }
+    except GraphInterrupt:
+        raise
     except Exception:
         traceback.print_exc()
         message = "GenieAPIのデータ取得で問題が発生しました。\n\nお手数ですが、入力内容や条件をご確認いただき、再度お試しください。"
@@ -384,6 +380,8 @@ def graphapi_node(state: AgentState) -> AgentState:
             "genie_conversation_info": conversation_info,
             "genie_download_url": download_url,
         }
+    except GraphInterrupt:
+        raise
     except Exception:
         traceback.print_exc()
         message = "Genie,GraphAPIでエラーが発生しました。\n\nお手数ですが、入力内容や条件をご確認いただき、再度お試しください"

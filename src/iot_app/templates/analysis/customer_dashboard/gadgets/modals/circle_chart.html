@@ -1,0 +1,167 @@
+<div class="modal-content--lg">
+
+<!-- モーダルヘッダー -->
+<div class="modal__header">
+  <h2 class="modal__title">円グラフ</h2>
+</div>
+
+<!-- モーダルボディ -->
+<form method="POST"
+      action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
+      id="circle-chart-register-form"
+      novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="modal__body">
+
+    <!-- (1) タイトル行 -->
+    <div class="gadget-register__title-row">
+      <label class="form__label form__label--required" for="gadget_name">タイトル</label>
+      {{ form.gadget_name(class="form__input", id="gadget_name", maxlength=20) }}
+      <span class="form__error form__error--reserved">{% if form.gadget_name.errors %}{{ form.gadget_name.errors[0] }}{% endif %}</span>
+    </div>
+
+    <!-- (2) 上部行：デバイスモード選択 + 表示項目ラベル -->
+    <div class="gadget-register__top-row">
+      <div class="gadget-register__device-mode-area">
+        <label class="form__label">表示デバイス選択</label>
+        <div class="circle-chart-register__device-mode-buttons">
+          <button type="button"
+                  class="button circle-chart-register__device-mode-btn{% if (form.device_mode.data or 'fixed') == 'fixed' %} circle-chart-register__device-mode-btn--active{% endif %}"
+                  data-mode="fixed">デバイス固定</button>
+          <button type="button"
+                  class="button circle-chart-register__device-mode-btn{% if (form.device_mode.data or 'fixed') == 'variable' %} circle-chart-register__device-mode-btn--active{% endif %}"
+                  data-mode="variable">デバイス可変</button>
+        </div>
+        <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'fixed' }}">
+      </div>
+      <div class="gadget-register__measurement-title">
+        <label class="form__label form__label--required">表示項目選択</label>
+        <span class="form__error form__error--reserved">{% if form.measurement_item_ids.errors %}{{ form.measurement_item_ids.errors[0] }}{% endif %}</span>
+      </div>
+    </div>
+
+    <!-- (5) デバイス名行 -->
+    <div class="gadget-register__device-name-row" id="device-name-area"
+         style="visibility: {% if (form.device_mode.data or 'fixed') == 'fixed' %}visible{% else %}hidden{% endif %};">
+      <span class="circle-chart-register__device-name" id="selected-device-name">-</span>
+    </div>
+
+    <!-- メインエリア（3カラム） -->
+    <div class="gadget-register__body">
+
+      <!-- 左カラム：ガジェットイメージ -->
+      <div class="gadget-register__left">
+        <div class="gadget-register__preview">
+          <div class="gadget-register__preview-circle">
+            <svg viewBox="0 0 100 100" class="gadget-register__preview-pie">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#5470c6" stroke-width="20"
+                      stroke-dasharray="62.8 188.5" stroke-dashoffset="0"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#91cc75" stroke-width="20"
+                      stroke-dasharray="62.8 188.5" stroke-dashoffset="-62.8"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#fac858" stroke-width="20"
+                      stroke-dasharray="62.8 188.5" stroke-dashoffset="-125.6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中カラム：表示デバイス指定（デバイス固定モード時のみ） -->
+      <div class="gadget-register__middle">
+        <div id="device-fixed-area"
+             style="visibility: {% if (form.device_mode.data or 'fixed') == 'fixed' %}visible{% else %}hidden{% endif %};">
+          <p class="gadget-register__section-title">表示デバイス指定</p>
+          <div class="form__group">
+            <label class="form__label">組織フィルター</label>
+            <select class="form__select" id="organization-filter">
+              <option value="">選択してください</option>
+              {% for org in organizations %}
+              <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form__group">
+            <label class="form__label form__label--required">デバイス選択</label>
+            <select class="form__select" name="device_id" id="device-select">
+              <option value="">選択してください</option>
+              {% for device in devices %}
+              <option value="{{ device.device_id }}"
+                      data-org="{{ device.organization_id }}"
+                      data-name="{{ device.device_name }}"
+                      {% if form.device_id.data == device.device_id %}selected{% endif %}>
+                {{ device.device_name }}
+              </option>
+              {% endfor %}
+            </select>
+            <span class="form__error form__error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右カラム：表示項目選択 -->
+      <div class="gadget-register__right">
+        <div class="circle-chart-register__measurement-list">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>選択</th>
+                <th>表示名称</th>
+                <th>単位</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in measurement_items %}
+              <tr>
+                <td>
+                  <input type="checkbox"
+                         name="measurement_item_ids"
+                         value="{{ item.measurement_item_id }}"
+                         id="measurement-{{ item.measurement_item_id }}"
+                         class="circle-chart-register__item-checkbox"
+                         {% if item.measurement_item_id in (form.measurement_item_ids.data or []) %}checked{% endif %}>
+                </td>
+                <td>
+                  <label for="measurement-{{ item.measurement_item_id }}">
+                    {{ item.display_name }}
+                  </label>
+                </td>
+                <td>{{ item.unit_name }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- (7) グループ選択 -->
+    <div class="form__row">
+      <div class="form__group form__group--half">
+        <div class="form__group--inline">
+          <label class="form__label form__label--required" for="group_id">グループ選択</label>
+          <select class="form__select" name="group_id" id="group_id">
+            {% for gr in groups %}
+            <option value="{{ gr.dashboard_group_id }}"
+                    {% if form.group_id.data == gr.dashboard_group_id %}selected{% endif %}>
+              {{ gr.dashboard_group_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- モーダルフッター -->
+  <div class="modal__footer">
+    <button type="submit" class="button button--primary" id="register-btn">登録</button>
+    <button type="button" class="button button--secondary"
+            id="modal-close-btn">キャンセル</button>
+  </div>
+
+</form>
+
+</div>

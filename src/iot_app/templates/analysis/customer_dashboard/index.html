@@ -4,8 +4,9 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/common.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/bar_chart.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/timeline.css') }}">
+{% for info in gadget_static_files %}
+<link rel="stylesheet" href="{{ url_for('static', filename=info['css']) }}">
+{% endfor %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {% endblock %}
 
@@ -254,14 +255,18 @@
                     <a
                       class="button button--primary gadget__csv-btn"
                       href="{{ url_for('customer_dashboard.gadget_csv_export', gadget_uuid=gadget.gadget_uuid) }}?export=csv"
+                      {% if gadget.gadget_type_id == gadget_type_ids['円グラフ'] %}style="visibility: hidden;"{% endif %}
                     >CSVエクスポート</a>
                   </div>
 
                   {# ガジェット種別固有UI #}
-                  {% if gadget.gadget_type_id == gadget_type_ids['棒グラフ'] %}
-                    {% include 'analysis/customer_dashboard/gadgets/bar_chart.html' %}
-                  {% elif gadget.gadget_type_id == gadget_type_ids['時系列グラフ'] %}
-                    {% include 'analysis/customer_dashboard/gadgets/timeline.html' %}
+                  {% set tmpl = gadget_id_to_template.get(gadget.gadget_type_id) %}
+                  {% if tmpl %}
+                    {% include tmpl %}
+                  {% else %}
+                    <div class="gadget__body">
+                      <p style="padding: var(--spacing-4); color: var(--color-secondary);">未対応のガジェット種別です（type_id: {{ gadget.gadget_type_id }}）</p>
+                    </div>
                   {% endif %}
 
                 </div>{# /gadget #}
@@ -303,8 +308,9 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
-<script src="{{ url_for('static', filename='js/components/customer_dashboard/bar_chart.js') }}"></script>
-<script src="{{ url_for('static', filename='js/components/customer_dashboard/timeline.js') }}"></script>
+{% for info in gadget_static_files %}
+<script src="{{ url_for('static', filename=info['js']) }}"></script>
+{% endfor %}
 <script>
   CustomerDashboard.init({
     selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},

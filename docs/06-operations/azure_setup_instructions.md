@@ -70,11 +70,13 @@
 
 ```json
 "loginParameters": [
-    "scope=openid profile email 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/user_impersonation"
+    "scope=openid profile email offline_access 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/user_impersonation"
 ]
 ```
 
 **重要:** 上記スコープがないと `X-MS-TOKEN-AAD-ACCESS-TOKEN` ヘッダーに Databricks 用トークンが含まれず、Token Exchange が失敗します。
+
+**注:** `offline_access` がないとリフレッシュトークンが発行されず、アクセストークン期限切れ時に `/.auth/refresh` でのトークン更新が機能しません。
 
 ---
 

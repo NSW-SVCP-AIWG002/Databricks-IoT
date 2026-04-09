@@ -5,7 +5,7 @@
 - [前提条件](#前提条件)
 - [STEP 1：conf/config.ini の設定](#step-1confconfigini-の設定)
 - [STEP 2：Databricks Workspace へのファイルアップロード](#step-2databricks-workspace-へのファイルアップロード)
-- [STEP 3：Notebook でモデル登録（log_model.py 実行）](#step-3notebook-でモデル登録log_modelpy-実行)
+- [STEP 3：Notebook でモデル登録（(Clone)log_model.py 実行）](#step-3notebook-でモデル登録log_modelpy-実行)
 - [STEP 4：Model Serving Endpoint の作成](#step-4model-serving-endpoint-の作成)
 - [STEP 5：動作確認](#step-5動作確認)
 - [トラブルシューティング](#トラブルシューティング)
@@ -85,7 +85,7 @@ max_size_bytes = 524288                  # ← 変更不要
 2. 対象のスペースをクリック
 3. ブラウザの URL を確認する
 
-```
+```text
 https://adb-xxxx.azuredatabricks.net/genie/spaces/01jxxxxxxxxxxxxxxxxxxxxxx/...
                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
                                                    この部分が id
@@ -106,13 +106,13 @@ https://adb-xxxx.azuredatabricks.net/genie/spaces/01jxxxxxxxxxxxxxxxxxxxxxx/...
 
 ### アップロード対象（必要なもの）
 
-```
+```text
 ai_chat_graph_gen_src/
 ├── conf/               ← 設定ファイル（STEP 1 で編集済み）
 ├── db/                 ← チェックポイント DB 接続
 ├── model/              ← MLflow pyfunc ラッパー
 ├── src/                ← ビジネスロジック
-├── log_model.py        ← デプロイ実行スクリプト
+├── (Clone)log_model.py ← デプロイ実行スクリプト
 └── requirements.txt    ← 依存パッケージ
 ```
 
@@ -148,11 +148,11 @@ databricks workspace import_dir \
 
 ---
 
-## STEP 3：Notebook でモデル登録（log_model.py 実行）
+## STEP 3：Notebook でモデル登録（(Clone)log_model.py 実行）
 
 ### 3-1. チェックポイント用スキーマの事前作成
 
-`log_model.py` を実行する前に、チェックポイントテーブルの保存先スキーマを作成します。
+`(Clone)log_model.py` を実行する前に、チェックポイントテーブルの保存先スキーマを作成します。
 
 Databricks の SQL Editor または Notebook で以下を実行します：
 
@@ -167,7 +167,7 @@ CREATE SCHEMA IF NOT EXISTS iot_catalog.genie;
 ### 3-2. モデル登録先スキーマの事前作成
 
 ```sql
--- log_model.py 内の registered_model_name に合わせて変更
+-- (Clone)log_model.py 内の registered_model_name に合わせて変更
 -- 例: "iot_catalog.ai.ai_orchestrator" の場合
 CREATE SCHEMA IF NOT EXISTS iot_catalog.ai;
 ```
@@ -175,11 +175,11 @@ CREATE SCHEMA IF NOT EXISTS iot_catalog.ai;
 ### 3-3. Notebook の作成と設定
 
 1. Databricks UI → STEP 2 でアップロードしたフォルダを開く
-2. `log_model.py` を右クリック → `Clone` で Notebook として複製する（または新規 Notebook を作成して内容を貼り付ける）
+2. `(Clone)log_model.py` を右クリック → `Clone` で Notebook として複製する（または新規 Notebook を作成して内容を貼り付ける）
 3. Notebook 内の以下の行を確認し、プロジェクトの Unity Catalog カタログ名に合わせて変更する：
 
 ```python
-# log_model.py 40行目（変更が必要な場合）
+# (Clone)log_model.py 40行目（変更が必要な場合）
 registered_model_name = "prd_im_dlh.genie.langgraph_agent"
 #                        ↑ カタログ  ↑ スキーマ ↑ モデル名
 # → 例: "iot_catalog.ai.ai_orchestrator" に変更
@@ -195,14 +195,14 @@ import os
 os.chdir("/Workspace/Users/yourname@example.com/ai_orchestrator")
 print(os.getcwd())
 print(os.listdir("."))
-# 出力例: ['conf', 'db', 'log_model.py', 'model', 'requirements.txt', 'src', ...]
+# 出力例: ['conf', 'db', '(Clone)log_model.py', 'model', 'requirements.txt', 'src', ...]
 ```
 
 ### 3-5. Notebook の実行
 
 セルを上から順に実行します。
 
-```
+```text
 セル1（追加）: os.chdir(...)
 セル2: %pip install mlflow==3.6.0       ← 実行後にカーネルが自動再起動
 セル3: %pip install databricks-sdk==0.73.0
@@ -214,7 +214,7 @@ print(os.listdir("."))
 
 **実行成功時の出力例：**
 
-```
+```text
 Registered: iot_catalog.ai.ai_orchestrator 1
 ```
 
@@ -239,14 +239,14 @@ Registered: iot_catalog.ai.ai_orchestrator 1
 | Compute size  | `Small`（起動後に必要に応じて変更可）                                   |
 | Scale to zero | 有効（コスト最適化のため推奨）                                          |
 
-4. `Create` をクリック
-5. ステータスが `Ready` になるまで待機（数分〜10分程度）
+1. `Create` をクリック
+2. ステータスが `Ready` になるまで待機（数分〜10分程度）
 
 ### 4-2. エンドポイント URL の確認
 
 Endpoint が `Ready` になったら URL をメモします：
 
-```
+```text
 https://adb-xxxxxxxxxxxx.azuredatabricks.net/serving-endpoints/ai-orchestrator/invocations
 ```
 
@@ -426,7 +426,7 @@ CREATE SCHEMA IF NOT EXISTS iot_catalog.genie;
 
 1. Databricks UI → `Serving` → 対象エンドポイント → `Logs` タブでエラー内容を確認する
 2. 作業ディレクトリ（`os.chdir()`）が正しく設定されているか確認する
-3. `log_model.py` 内の `code_paths=["model", "src", "conf", "db"]` の各ディレクトリが作業ディレクトリ直下に存在するか確認する
+3. `(Clone)log_model.py` 内の `code_paths=["model", "src", "conf", "db"]` の各ディレクトリが作業ディレクトリ直下に存在するか確認する
 
 ---
 

@@ -148,6 +148,7 @@ class ChatUI {
                 });
                 // HITL 中は入力を無効にしたままにする
             } else {
+                response.timestamp = new Date().toISOString();
                 this._appendAIMessage(response, true);
                 this._saveToHistory({
                     role: 'ai',
@@ -156,7 +157,7 @@ class ChatUI {
                     df: response.df,
                     fig_data: response.fig_data,
                     sql_query: response.sql_query,
-                    timestamp: new Date().toISOString(),
+                    timestamp: response.timestamp,
                 });
                 this._setSending(false);
             }
@@ -364,6 +365,44 @@ class ChatUI {
             bubble.innerHTML = sanitized;
         }
 
+        // テーブル描画
+        if (data.df) {
+            try {
+                const records = typeof data.df === 'string' ? JSON.parse(data.df) : data.df;
+                if (Array.isArray(records) && records.length > 0) {
+                    const tableWrapper = document.createElement('div');
+                    tableWrapper.className = 'chat-table-wrapper';
+
+                    const table = document.createElement('table');
+                    table.className = 'chat-table';
+
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    Object.keys(records[0]).forEach((col) => {
+                        const th = document.createElement('th');
+                        th.textContent = col;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    const tbody = document.createElement('tbody');
+                    records.forEach((row) => {
+                        const tr = document.createElement('tr');
+                        Object.values(row).forEach((val) => {
+                            const td = document.createElement('td');
+                            td.textContent = val == null ? '' : val;
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    tableWrapper.appendChild(table);
+                    bubble.appendChild(tableWrapper);
+                }
+            } catch (_) { /* パース失敗時は無視 */ }
+        }
+
         // グラフ描画
         if (data.fig_data) {
             const graphContainer = document.createElement('div');
@@ -430,7 +469,7 @@ class ChatUI {
     _setSending(sending) {
         this._sending = sending;
         this.input.disabled = sending;
-        this.submitBtn.disabled = sending;
+        this.submitBtn.disabled = sending || this.input.value.trim().length === 0;
         const retryList = document.querySelectorAll(".retry-button")
         retryList.forEach(function (btn) {
             btn.disabled = sending;

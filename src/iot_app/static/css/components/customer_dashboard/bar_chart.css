@@ -300,6 +300,10 @@
   min-width: 0;
 }
 
+#bar-chart-register-form .gadget-register__right {
+  display: block;
+}
+
 /* ガジェットイメージプレビュー */
 .gadget-register__preview {
   width: 100%;
@@ -428,10 +432,6 @@
   flex: 1;
 }
 
-#group_id,
-#gadget_size {
-  width: 170px;
-}
 
 /* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
 .gadget--2x2 .bar-chart__unit-selector {

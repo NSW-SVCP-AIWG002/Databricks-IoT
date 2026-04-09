@@ -150,7 +150,12 @@
   </div>
 </div>
 
+<!-- トースト通知コンテナ -->
+<div id="toast-container"></div>
+
+<script src="{{ url_for('static', filename='js/components/toast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/sort.js') }}"></script>
 {% block extra_js %}{% endblock %}
 
 </body>

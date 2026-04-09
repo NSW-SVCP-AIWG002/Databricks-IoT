@@ -13,6 +13,9 @@ const CustomerDashboard = (function () {
   let _autoRefreshTimer = null;
   const AUTO_REFRESH_INTERVAL = 60000; // 60秒
 
+  /* ── モーダルバインダー登録リスト ─────────────────── */
+  const _modalBinders = [];
+
   /* ── 初期化 ──────────────────────────────────── */
   function init(options) {
     _setupSettingMenus();
@@ -49,8 +52,9 @@ const CustomerDashboard = (function () {
         return;
       }
       if (!res.ok) {
-        // 4xx → モーダル内にエラー表示
-        content.innerHTML = `<div style="padding:24px;color:red;">エラーが発生しました（${res.status}）</div>`;
+        const data = await res.json();
+        _closeModal();
+        Toast.show(data.error || 'エラーが発生しました');
         return;
       }
       content.innerHTML = await res.text();
@@ -80,73 +84,14 @@ const CustomerDashboard = (function () {
       closeBtn.addEventListener('click', _closeModal);
     }
 
-    // data-ajax-submit フォーム
-    const form = container.querySelector('form[data-ajax-submit]');
-    if (form) {
-      form.addEventListener('submit', _handleFormSubmit);
-    }
-
     // ダッシュボード管理モーダル専用
     _bindDashboardManagementEvents(container);
 
     // ガジェット追加モーダル専用
     _bindGadgetAddEvents(container);
 
-    // 棒グラフ登録モーダル専用
-    _bindBarChartRegisterEvents(container);
-
-    // 時系列グラフ登録モーダル専用
-    bindTimelineGadgetRegister(container);
-  }
-
-  /**
-   * フォーム AJAX 送信ハンドラ
-   * - 成功（リダイレクト後のURL がダッシュボードURL）→ ページリロード
-   * - 400 → モーダル内容をエラーレスポンスで更新
-   * - 500+ → エラー表示
-   */
-  async function _handleFormSubmit(e) {
-    e.preventDefault();
-    const form = e.currentTarget;
-
-    await withSubmitLock(form, async function () {
-      const formData = new FormData(form);
-
-      const res = await fetch(form.action, {
-        method: 'POST',
-        body: formData,
-        redirect: 'follow',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-
-      if (res.status === 200 && res.redirected) {
-        // リダイレクト後に成功 → ページリロード
-        window.location.reload();
-        return;
-      }
-
-      if (res.status === 200) {
-        // リダイレクトなし 200 → 成功としてリロード（POST-Redirect-GET の fetch 追従）
-        window.location.reload();
-        return;
-      }
-
-      if (res.status >= 400 && res.status < 500) {
-        // 4xx → モーダル内容を更新（400: フォームエラーHTML、403/404/409: エラーフラグメントHTML）
-        const html = await res.text();
-        const content = document.getElementById('ajax-modal-content');
-        content.innerHTML = html;
-        _bindModalEvents(content);
-        return;
-      }
-
-      // 500以上 → 500エラーページを表示（仕様: 500エラーページ表示）
-      const html = await res.text();
-      document.documentElement.innerHTML = html;
-    }).catch(function () {
-      // ネットワーク断等の通信エラー → リロード（サーバー復旧で通常ページへ、未復旧でブラウザエラー画面）
-      window.location.reload();
-    });
+    // 各ガジェット種別のバインド処理（各ガジェットJSが registerModalBinder で登録）
+    _modalBinders.forEach(function (fn) { fn(container); });
   }
 
   /* =========================================================
@@ -287,60 +232,6 @@ const CustomerDashboard = (function () {
         }
       });
     }
-  }
-
-  /* =========================================================
-   * 棒グラフ登録モーダル専用イベント
-   * ========================================================= */
-
-  function _bindBarChartRegisterEvents(container) {
-    const modeButtons = container.querySelectorAll('.bar-chart-register__device-mode-btn');
-    if (!modeButtons.length) return;
-
-    const deviceModeInput = container.querySelector('#device_mode');
-    const deviceFixedArea = container.querySelector('#device-fixed-area');
-    const deviceNameArea  = container.querySelector('#device-name-area');
-    const orgFilter       = container.querySelector('#organization-filter');
-    const deviceSelect    = container.querySelector('#device-select');
-
-    // デバイスモード切替
-    modeButtons.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        modeButtons.forEach(function (b) {
-          b.classList.remove('bar-chart-register__device-mode-btn--active');
-        });
-        btn.classList.add('bar-chart-register__device-mode-btn--active');
-        const mode = btn.dataset.mode;
-        if (deviceModeInput) deviceModeInput.value = mode;
-        const isFixed = mode === 'fixed';
-        if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
-        if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
-      });
-    });
-
-    if (!orgFilter || !deviceSelect) return;
-
-    // 組織フィルターによるデバイス選択絞り込み
-    const allDeviceOptions = Array.from(deviceSelect.querySelectorAll('option[value]'));
-    orgFilter.addEventListener('change', function () {
-      const orgId = orgFilter.value;
-      deviceSelect.innerHTML = '<option value="">選択してください</option>';
-      allDeviceOptions.forEach(function (opt) {
-        if (!orgId || opt.dataset.org === orgId) {
-          deviceSelect.appendChild(opt.cloneNode(true));
-        }
-      });
-      deviceSelect.disabled = !orgId;
-      const nameEl = container.querySelector('#selected-device-name');
-      if (nameEl) nameEl.textContent = '-';
-    });
-
-    // デバイス選択時デバイス名表示
-    deviceSelect.addEventListener('change', function () {
-      const selected = deviceSelect.options[deviceSelect.selectedIndex];
-      const nameEl = container.querySelector('#selected-device-name');
-      if (nameEl) nameEl.textContent = selected ? (selected.dataset.name || '-') : '-';
-    });
   }
 
   /* =========================================================
@@ -837,6 +728,16 @@ const CustomerDashboard = (function () {
   /* =========================================================
    * 公開API
    * ========================================================= */
-  return { init };
+
+  /**
+   * 登録モーダルが開かれたときに呼ばれるバインド関数を登録する
+   * 各ガジェット種別JSがロード時に呼び出す
+   * @param {function} fn - モーダルコンテナを受け取るバインド関数
+   */
+  function registerModalBinder(fn) {
+    _modalBinders.push(fn);
+  }
+
+  return { init, registerModalBinder };
 
 }());
