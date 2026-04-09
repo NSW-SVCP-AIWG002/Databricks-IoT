@@ -1,34 +1,28 @@
-# Deltaテーブル最適化ジョブ仕様書
+# ゴールド層データ再生成ジョブ仕様書
 
 ## 目次
 
-- [Deltaテーブル最適化ジョブ仕様書](#deltaテーブル最適化ジョブ仕様書)
+- [ゴールド層データ再生成ジョブ仕様書](#ゴールド層データ再生成ジョブ仕様書)
   - [目次](#目次)
   - [概要](#概要)
     - [このドキュメントの役割](#このドキュメントの役割)
     - [対象機能](#対象機能)
     - [ジョブ一覧](#ジョブ一覧)
-  - [キュークリーンアップジョブ仕様](#キュークリーンアップジョブ仕様)
-    - [ジョブ概要](#ジョブ概要)
+    - [タスク一覧](#タスク一覧)
+  - [ジョブ処理フロー](#ジョブ処理フロー)
+  - [共通関数](#共通関数)
+  - [時次サマリデータ再生成タスク仕様](#時次サマリデータ再生成タスク仕様)
+    - [タスク概要](#タスク概要)
     - [処理フロー](#処理フロー)
     - [処理コード](#処理コード)
-    - [クリーンアップ設定](#クリーンアップ設定)
-  - [Delta Lakeメンテナンスジョブ仕様](#delta-lakeメンテナンスジョブ仕様)
-    - [日次OPTIMIZEジョブ](#日次optimizeジョブ)
-      - [ジョブ概要](#ジョブ概要-1)
-      - [処理フロー](#処理フロー-1)
-      - [処理コード](#処理コード-1)
-      - [OPTIMIZE設定](#optimize設定)
-    - [週次VACUUMジョブ](#週次vacuumジョブ)
-      - [ジョブ概要](#ジョブ概要-2)
-      - [処理フロー](#処理フロー-2)
-      - [処理コード](#処理コード-2)
-      - [VACUUM設定](#vacuum設定)
-    - [チェックポイントクリーンアップジョブ](#チェックポイントクリーンアップジョブ)
-      - [ジョブ概要](#ジョブ概要-3)
-      - [処理フロー](#処理フロー-3)
-      - [処理コード](#処理コード-3)
-      - [クリーンアップ設定](#クリーンアップ設定-1)
+    - [UPSERT設定](#upsert設定)
+  - [日次サマリデータ再生成タスク仕様](#日次サマリデータ再生成タスク仕様)
+    - [タスク概要](#タスク概要-1)
+    - [処理フロー](#処理フロー-1)
+    - [処理コード](#処理コード-1)
+    - [UPSERT設定](#upsert設定-1)
+  - [リトライ戦略](#リトライ戦略)
+  - [エラーハンドリング](#エラーハンドリング)
   - [関連ドキュメント](#関連ドキュメント)
   - [変更履歴](#変更履歴)
 
@@ -36,393 +30,661 @@
 
 ## 概要
 
-このドキュメントは、Databricks Workflowとして実装するDeltaテーブル最適化ジョブ機能の詳細を記載します。
+このドキュメントは、Databricks Workflowとして実装するゴールド層データ再生成ジョブの詳細を記載します。
 
 ### このドキュメントの役割
 
-- Delta Lakeメンテナンス処理（OPTIMIZE、VACUUM、チェックポイントクリーンアップ）
+- シルバー層センサーデータからゴールド層時次・日次サマリデータを再生成する処理
+- DeltaテーブルおよびOLTP DBへのUPSERT処理
 
 ### 対象機能
 
-| 機能ID | 機能名             | 処理内容                           |
-| ------ | ------------------ | ---------------------------------- |
-| OP-001 | データメンテナンス | Delta Lakeテーブルの最適化・圧縮   |
-| OP-002 | クリーンアップ     | 古いデータ・チェックポイントの削除 |
+| 機能ID   | 機能名                     | 処理内容                                                   |
+| -------- | -------------------------- | ---------------------------------------------------------- |
+| FR-002-2 | 表示用データ変換・保存処理 | シルバー層センサーデータからゴールド層サマリデータを再生成 |
 
 ### ジョブ一覧
 
-| ジョブ名              | 実行間隔      | 説明                               |
-| --------------------- | ------------- | ---------------------------------- |
-| silver_table_optimize | 日次（02:00） | Silver層テーブルのOPTIMIZE実行     |
-| silver_table_vacuum   | 日次（04:00） | Silver層テーブルのVACUUM実行       |
-| gold_table_optimize   | 日次（02:00） | Gold層テーブルのOPTIMIZE実行       |
-| gold_table_vacuum     | 日次（04:00） | Gold層テーブルのVACUUM実行         |
-| checkpoint_cleanup    | 日次（05:00） | 古いチェックポイントファイルの削除 |
+| ジョブ名               | 実行間隔      | 説明                                                                |
+| ---------------------- | ------------- | ------------------------------------------------------------------- |
+| gold_data_regeneration | 日次（01:00） | 前日分のシルバー層データから時次・日次サマリを再生成しUPSERTを実行 |
+
+### タスク一覧
+
+| タスク名                       | 実行順序 | 説明                                                         |
+| ------------------------------ | -------- | ------------------------------------------------------------ |
+| regenerate_hourly_summary_data | 1        | 時次サマリデータを再生成、Deltaテーブル、OLTPへ登録/更新する |
+| regenerate_daily_summary_data  | 2        | 日次サマリデータを再生成、Deltaテーブル、OLTPへ登録/更新する |
+
+実行順序が若いもの順で直列で実行する。OLTP DBへの接続負荷を抑えるため、並列実行は行わない。
 
 ---
 
-## キュークリーンアップジョブ仕様
+## ジョブ処理フロー
 
-### ジョブ概要
+タスク間で `target_date`（再生成対象日）を Task Values で受け渡す。
+
+```mermaid
+flowchart TD
+    subgraph Task1["タスク1: regenerate_hourly_summary_data"]
+        T1Start([タスク開始]) --> T1Date[対象日を取得<br>実行日の前日]
+        T1Date --> T1SetVal[target_date を<br>Task Valueに登録]
+        T1SetVal --> T1Silver[silver_sensor_dataから<br>対象日データ取得]
+        T1Silver --> T1Method[gold_summary_method_masterから<br>集計方法取得]
+        T1Method --> T1Gen[時次サマリデータ生成<br>cache]
+        T1Gen --> T1Delta[Deltaテーブルへ MERGE UPSERT<br>タスク内リトライ 最大3回]
+        T1Delta --> T1OLTP[OLTP DBへ UPSERT<br>タスク内リトライ 最大3回]
+        T1OLTP --> T1End([タスク終了])
+        T1Delta -->|リトライ超過| T1Fail([タスク失敗終了])
+        T1OLTP -->|リトライ超過| T1Fail
+    end
+
+    subgraph Task2["タスク2: regenerate_daily_summary_data"]
+        T2Start([タスク開始]) --> T2GetVal[Task Valueから<br>target_date を取得]
+        T2GetVal --> T2Silver[silver_sensor_dataから<br>対象日データ取得]
+        T2Silver --> T2Method[gold_summary_method_masterから<br>集計方法取得]
+        T2Method --> T2Gen[日次サマリデータ生成<br>cache]
+        T2Gen --> T2Delta[Deltaテーブルへ MERGE UPSERT<br>タスク内リトライ 最大3回]
+        T2Delta --> T2OLTP[OLTP DBへ UPSERT<br>タスク内リトライ 最大3回]
+        T2OLTP --> T2End([タスク終了])
+        T2Delta -->|リトライ超過| T2Fail([タスク失敗終了])
+        T2OLTP -->|リトライ超過| T2Fail
+    end
+
+    Task1 -->|成功| Task2
+    T1Fail -->|Workflowリトライ 最大1回| Task1
+    T2Fail -->|Workflowリトライ 最大1回| Task1
+```
+
+---
+
+## 共通関数
+
+時次・日次の両タスクで使用する共通処理を `common_gold_regeneration.py` に定義する。
+
+```python
+# common_gold_regeneration.py
+
+import time
+import pymysql
+import pymysql.cursors
+from datetime import date
+from pyspark.sql import functions as F
+from pyspark.sql.types import IntegerType, DoubleType, TimestampType
+
+SILVER_TABLE      = "iot_catalog.silver.silver_sensor_data"
+SUMMARY_MASTER    = "iot_catalog.gold.gold_summary_method_master"
+MAX_RETRIES       = 3
+BASE_WAIT_SEC     = 1.0
+DB_SECRET_SCOPE   = "my_sql_secrets"
+
+
+def _execute_with_retry(func, label: str = ""):
+    """指数バックオフで最大 MAX_RETRIES 回リトライする。
+    待機間隔: BASE_WAIT_SEC * 2^attempt 秒（1秒 → 2秒 → 4秒）
+    全試行失敗時は最後の例外を raise する。
+    注意: func は冪等な処理（UPSERT）に限定すること。
+    """
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            return func()
+        except Exception as e:
+            if attempt >= MAX_RETRIES:
+                raise
+            wait = BASE_WAIT_SEC * (2 ** attempt)
+            print(f"  [{label}] リトライ {attempt + 1}/{MAX_RETRIES}: {wait:.0f}秒後に再実行 - {str(e)}")
+            time.sleep(wait)
+
+
+def get_db_config() -> dict:
+    """OLTP DB接続設定をDatabricks Secretsから取得する。
+    注意: db_configはコード内でのみ生成し、外部入力を混入させないこと。
+    """
+    return {
+        "host":        dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-host"),
+        "port":        int(dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-port")),
+        "user":        dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-user"),
+        "password":    dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-password"),
+        "database":    dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-database"),
+        "cursorclass": pymysql.cursors.DictCursor,
+        "charset":     "utf8mb4",
+    }
+
+
+def fetch_silver_data(target_date: date):
+    """指定日のシルバー層センサーデータを全件取得する。"""
+    print(f"シルバー層データ取得開始: {target_date}")
+    df = (
+        spark.table(SILVER_TABLE)
+        .filter(F.to_date(F.col("event_timestamp")) == F.lit(str(target_date)))
+    )
+    print(f"  - 取得件数: {df.count()}件")
+    return df
+
+
+def fetch_summary_methods() -> dict:
+    """gold_summary_method_master から集計方法マスタを取得する。
+    戻り値: {summary_method_id: summary_method_code} の辞書
+    """
+    rows = (
+        spark.table(SUMMARY_MASTER)
+        .filter(F.col("delete_flag") == False)
+        .select("summary_method_id", "summary_method_code")
+        .collect()
+    )
+    return {row["summary_method_id"]: row["summary_method_code"] for row in rows}
+
+
+def _build_agg_dfs(silver_df, summary_methods: dict, group_key_cols: list, datetime_col: str) -> list:
+    """集計方法ごとにサマリ DataFrame を生成して返す（内部共通処理）。
+
+    対応する summary_method_code（gold_summary_method_master）:
+        AVG    (1): 平均値
+        MAX    (2): 最大値
+        MIN    (3): 最小値
+        P25    (4): 第1四分位数（25パーセンタイル）
+        MEDIAN (5): 中央値（50パーセンタイル）
+        P75    (6): 第3四分位数（75パーセンタイル）
+        STDDEV (7): 標準偏差
+        P95    (8): 上側5％境界値（95パーセンタイル）
+        SUM    (9): 合計
+    """
+    agg_map = {
+        "AVG":    F.avg("value"),
+        "MAX":    F.max("value"),
+        "MIN":    F.min("value"),
+        "P25":    F.percentile_approx("value", 0.25),
+        "MEDIAN": F.percentile_approx("value", 0.50),
+        "P75":    F.percentile_approx("value", 0.75),
+        "STDDEV": F.stddev("value"),
+        "P95":    F.percentile_approx("value", 0.95),
+        "SUM":    F.sum("value"),
+    }
+    summary_dfs = []
+    for method_id, method_code in summary_methods.items():
+        agg_func = agg_map.get(method_code)
+        if agg_func is None:
+            print(f"  - 未対応の集計方法をスキップ: method_id={method_id}, method_code={method_code}")
+            continue
+        summary_df = (
+            silver_df
+            .groupBy(*group_key_cols, "measurement_item_id")
+            .agg(
+                agg_func.alias("summary_value"),
+                F.count("value").alias("data_count"),
+            )
+            .withColumn("summary_item", F.col("measurement_item_id"))
+            .withColumn("summary_method_id", F.lit(method_id).cast(IntegerType()))
+            .withColumn("create_time", F.current_timestamp())
+            .select(
+                "device_id", "organization_id", datetime_col,
+                "summary_item", "summary_method_id",
+                F.col("summary_value").cast(DoubleType()),
+                F.col("data_count").cast(IntegerType()),
+                "create_time",
+            )
+        )
+        summary_dfs.append(summary_df)
+    if not summary_dfs:
+        raise ValueError("集計可能な集計方法が存在しません")
+    return summary_dfs
+
+
+def generate_hourly_summary(silver_df, summary_methods: dict):
+    """シルバー層データから時次サマリを生成する。
+    集計キー: device_id, organization_id, collection_datetime（時刻切り捨て）,
+               summary_item, summary_method_id
+    """
+    print("時次サマリ生成開始")
+    df = silver_df.withColumn(
+        "collection_datetime",
+        F.date_trunc("hour", F.col("event_timestamp")).cast(TimestampType())
+    )
+    summary_dfs = _build_agg_dfs(
+        df, summary_methods,
+        group_key_cols=["device_id", "organization_id", "collection_datetime"],
+        datetime_col="collection_datetime",
+    )
+    result_df = summary_dfs[0]
+    for sdf in summary_dfs[1:]:
+        result_df = result_df.union(sdf)
+    result_df = result_df.cache()
+    print(f"  - 時次サマリ生成件数: {result_df.count()}件")
+    return result_df
+
+
+def generate_daily_summary(silver_df, summary_methods: dict):
+    """シルバー層データから日次サマリを生成する。
+    集計キー: device_id, organization_id, collection_date（日付）,
+               summary_item, summary_method_id
+    """
+    print("日次サマリ生成開始")
+    df = silver_df.withColumn(
+        "collection_date",
+        F.to_date(F.col("event_timestamp"))
+    )
+    summary_dfs = _build_agg_dfs(
+        df, summary_methods,
+        group_key_cols=["device_id", "organization_id", "collection_date"],
+        datetime_col="collection_date",
+    )
+    result_df = summary_dfs[0]
+    for sdf in summary_dfs[1:]:
+        result_df = result_df.union(sdf)
+    result_df = result_df.cache()
+    print(f"  - 日次サマリ生成件数: {result_df.count()}件")
+    return result_df
+```
+
+---
+
+## 時次サマリデータ再生成タスク仕様
+
+### タスク概要
 
 | 項目             | 設定値                              |
 | ---------------- | ----------------------------------- |
-| ジョブ名         | email_queue_cleanup                 |
+| タスク名         | regenerate_hourly_summary_data      |
 | 実行方式         | Databricks Workflow                 |
-| 実行間隔         | 日次（cron: `0 3 * * *`）毎日 03:00 |
+| 実行間隔         | 日次（cron: `0 1 * * *`）毎日 01:00 |
 | クラスタ         | Jobs Compute（サーバーレス推奨）    |
 | タイムアウト     | 30分                                |
-| リトライポリシー | 失敗時リトライなし                  |
+| リトライポリシー | 失敗時1回リトライ                   |
 
 ### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> Count[削除対象件数をカウント<br>30日経過したSENT/FAILEDレコード]
-    Count --> Check{レコード<br>あり?}
-    Check -->|なし| End([ジョブ終了])
-    Check -->|あり| Delete[対象レコードを削除]
-    Delete --> Log[削除件数を出力]
-    Log --> End
+    Start([タスク開始]) --> GetDate[対象日を取得<br>実行日の前日]
+    GetDate --> SetVal[target_date を<br>Task Valueに登録]
+    SetVal --> GetSilver[silver_sensor_dataから<br>対象日データを全件取得]
+    GetSilver --> GetMethod[gold_summary_method_masterから<br>集計方法マスタを取得]
+    GetMethod --> Gen[時次サマリデータ生成<br>device_id・organization_id・時刻・<br>summary_item・summary_method_id 単位で集計]
+    Gen --> DeltaUpsert[Deltaテーブルへ MERGE UPSERT<br>gold_sensor_data_hourly_summary]
+    DeltaUpsert --> DeltaResult{成功?}
+    DeltaResult -->|失敗・3回未満| DeltaRetry[待機・リトライ<br>指数バックオフ]
+    DeltaRetry --> DeltaUpsert
+    DeltaResult -->|失敗・3回超過| Error[エラー出力・例外 raise]
+    DeltaResult -->|成功| OLTPUpsert[OLTP DBへ UPSERT<br>gold_sensor_data_hourly_summary]
+    OLTPUpsert --> OLTPResult{成功?}
+    OLTPResult -->|失敗・3回未満| OLTPRetry[待機・リトライ<br>指数バックオフ]
+    OLTPRetry --> OLTPUpsert
+    OLTPResult -->|失敗・3回超過| Error
+    OLTPResult -->|成功| End([タスク終了])
+    Error --> Fail([タスク失敗終了])
 ```
 
 ### 処理コード
 
-送信完了または失敗したレコードを定期的に削除する。
-
 ```python
-def cleanup_email_queue():
-    """30日経過したSENT/FAILEDレコードを削除"""
-    import pymysql
-    import pymysql.cursors
+# regenerate_hourly_summary_data.py
+from datetime import date, timedelta
+from delta.tables import DeltaTable
+import pymysql
+from common_gold_regeneration import (
+    get_db_config, fetch_silver_data, fetch_summary_methods, generate_hourly_summary,
+    _execute_with_retry,
+)
 
-    db_config = {
-        "host": dbutils.secrets.get("scope", "mysql-host"),
-        "port": int(dbutils.secrets.get("scope", "mysql-port")),
-        "user": dbutils.secrets.get("scope", "mysql-user"),
-        "password": dbutils.secrets.get("scope", "mysql-password"),
-        "database": dbutils.secrets.get("scope", "mysql-database"),
-        "cursorclass": pymysql.cursors.DictCursor,
-        "charset": "utf8mb4",
-    }
-
-    with pymysql.connect(**db_config) as conn:
-        with conn.cursor() as cursor:
-            # 削除対象件数を確認
-            cursor.execute("""
-                SELECT COUNT(*) as cnt
-                FROM email_notification_queue
-                WHERE status IN ('SENT', 'FAILED')
-                  AND processed_time < DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """)
-            count_before = cursor.fetchone()["cnt"]
-
-        print(f"削除対象レコード数: {count_before}")
-
-        if count_before == 0:
-            print("削除対象レコードなし")
-            return
-
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                DELETE FROM email_notification_queue
-                WHERE status IN ('SENT', 'FAILED')
-                  AND processed_time < DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """)
-        conn.commit()
-        print(f"削除完了: {count_before}件")
+HOURLY_DELTA    = "iot_catalog.gold.gold_sensor_data_hourly_summary"
+HOURLY_OLTP_TBL = "gold_sensor_data_hourly_summary"
 
 
-# ジョブ実行
-cleanup_email_queue()
+def upsert_to_delta_hourly(summary_df):
+    """時次サマリをDeltaテーブルへ MERGE UPSERT する。
+    マージキー: device_id, organization_id, collection_datetime,
+                summary_item, summary_method_id
+    """
+    print(f"Delta UPSERT開始: {HOURLY_DELTA}")
+    try:
+        def _do():
+            delta_table = DeltaTable.forName(spark, HOURLY_DELTA)
+            (
+                delta_table.alias("tgt")
+                .merge(
+                    summary_df.alias("src"),
+                    """
+                    tgt.device_id           = src.device_id
+                    AND tgt.organization_id     = src.organization_id
+                    AND tgt.collection_datetime = src.collection_datetime
+                    AND tgt.summary_item        = src.summary_item
+                    AND tgt.summary_method_id   = src.summary_method_id
+                    """
+                )
+                .whenMatchedUpdate(set={
+                    "summary_value": "src.summary_value",
+                    "data_count":    "src.data_count",
+                    "create_time":   "src.create_time",
+                })
+                .whenNotMatchedInsertAll()
+                .execute()
+            )
+        _execute_with_retry(_do, label=HOURLY_DELTA)
+        print(f"Delta UPSERT完了: {HOURLY_DELTA}")
+    except Exception as e:
+        print(f"Delta UPSERTエラー: {HOURLY_DELTA} - {str(e)}")
+        raise
+
+
+def upsert_to_oltp_hourly(summary_df):
+    """時次サマリをOLTP DBへバルク UPSERT する。
+    一意制約キー: device_id, organization_id, collection_datetime,
+                  summary_item, summary_method_id
+    """
+    print(f"OLTP UPSERT開始: {HOURLY_OLTP_TBL}")
+    try:
+        records = summary_df.collect()
+
+        def _do():
+            with pymysql.connect(**get_db_config()) as conn:
+                with conn.cursor() as cursor:
+                    # テーブル名はコード内定数（HOURLY_OLTP_TBL）のみ使用。外部入力は混入させないこと。
+                    sql = f"""
+                        INSERT INTO {HOURLY_OLTP_TBL}
+                            (device_id, organization_id, collection_datetime,
+                             summary_item, summary_method_id, summary_value,
+                             data_count, create_time)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            summary_value = VALUES(summary_value),
+                            data_count    = VALUES(data_count),
+                            create_time   = VALUES(create_time)
+                    """
+                    cursor.executemany(sql, [
+                        (r["device_id"], r["organization_id"], r["collection_datetime"],
+                         r["summary_item"], r["summary_method_id"],
+                         r["summary_value"], r["data_count"], r["create_time"])
+                        for r in records
+                    ])
+                conn.commit()
+
+        _execute_with_retry(_do, label=HOURLY_OLTP_TBL)
+        print(f"OLTP UPSERT完了: {HOURLY_OLTP_TBL} - {len(records)}件")
+    except Exception as e:
+        print(f"OLTP UPSERTエラー: {HOURLY_OLTP_TBL} - {str(e)}")
+        raise
+
+
+def run():
+    # 対象日: 実行日の前日
+    target_date = date.today() - timedelta(days=1)
+    print(f"時次サマリ再生成開始: 対象日={target_date}")
+
+    # target_date を Task Value に登録（タスク2で使用）
+    dbutils.jobs.taskValues.set(key="target_date", value=str(target_date))
+
+    silver_df       = fetch_silver_data(target_date)
+    summary_methods = fetch_summary_methods()
+    hourly_df       = generate_hourly_summary(silver_df, summary_methods)
+
+    try:
+        upsert_to_delta_hourly(hourly_df)
+        upsert_to_oltp_hourly(hourly_df)
+    finally:
+        hourly_df.unpersist()
+
+    print(f"時次サマリ再生成完了: 対象日={target_date}")
+
+
+# タスク実行
+run()
 ```
 
-### クリーンアップ設定
+### UPSERT設定
 
-| 項目     | 設定値                | 説明                                   |
-| -------- | --------------------- | -------------------------------------- |
-| 保持期間 | 30日                  | 処理完了から30日経過したレコードを削除 |
-| 対象     | SENT/FAILEDステータス | 処理済みレコードのみ削除               |
+**Deltaテーブル MERGE**
+
+| 項目           | 設定値                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| 対象テーブル   | `iot_catalog.gold.gold_sensor_data_hourly_summary`                                           |
+| マージキー     | device_id, organization_id, collection_datetime, summary_item, summary_method_id            |
+| 一致時         | summary_value, data_count, create_time を更新                                               |
+| 不一致時       | 全カラムを INSERT                                                                            |
+
+**OLTP DB UPSERT**
+
+| 項目           | 設定値                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| 対象テーブル   | `gold_sensor_data_hourly_summary`                                                            |
+| 一意制約キー   | device_id, organization_id, collection_datetime, summary_item, summary_method_id            |
+| 更新カラム     | summary_value, data_count, create_time                                                      |
+| 実装方式       | INSERT ON DUPLICATE KEY UPDATE（バルク executemany）                                         |
 
 ---
 
-## Delta Lakeメンテナンスジョブ仕様
+## 日次サマリデータ再生成タスク仕様
 
-Delta Lakeテーブルのパフォーマンスを維持するための定期メンテナンスジョブ。
+### タスク概要
 
-### 日次OPTIMIZEジョブ
+| 項目             | 設定値                                          |
+| ---------------- | ----------------------------------------------- |
+| タスク名         | regenerate_daily_summary_data                   |
+| 実行方式         | Databricks Workflow                             |
+| 実行間隔         | regenerate_hourly_summary_data タスク完了後     |
+| クラスタ         | Jobs Compute（サーバーレス推奨）                |
+| タイムアウト     | 30分                                            |
+| リトライポリシー | 失敗時1回リトライ                               |
 
-小ファイルを最適なサイズに統合し、クエリパフォーマンスを向上させる。
-
-#### ジョブ概要
-
-| 項目             | 設定値                         |
-| ---------------- | ------------------------------ |
-| ジョブ名         | silver_table_optimize          |
-| 実行方式         | Databricks Workflow            |
-| 実行間隔         | 日次（cron: `0 2 * * *`）02:00 |
-| クラスタ         | Jobs Compute                   |
-| タイムアウト     | 2時間                          |
-| リトライポリシー | 失敗時1回リトライ              |
-
-#### 処理フロー
+### 処理フロー
 
 ```mermaid
 flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
-
-    Loop --> Optimize[OPTIMIZE実行]
-    Optimize --> Result{成功?}
-
-    Result -->|成功| Metrics[メトリクス出力<br>統合/削除ファイル数]
-    Result -->|失敗| Error[エラー出力]
-
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
-
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
+    Start([タスク開始]) --> GetVal[Task Valueから<br>target_date を取得]
+    GetVal --> GetSilver[silver_sensor_dataから<br>対象日データを全件取得]
+    GetSilver --> GetMethod[gold_summary_method_masterから<br>集計方法マスタを取得]
+    GetMethod --> Gen[日次サマリデータ生成<br>device_id・organization_id・日付・<br>summary_item・summary_method_id 単位で集計]
+    Gen --> DeltaUpsert[Deltaテーブルへ MERGE UPSERT<br>gold_sensor_data_daily_summary]
+    DeltaUpsert --> DeltaResult{成功?}
+    DeltaResult -->|失敗・3回未満| DeltaRetry[待機・リトライ<br>指数バックオフ]
+    DeltaRetry --> DeltaUpsert
+    DeltaResult -->|失敗・3回超過| Error[エラー出力・例外 raise]
+    DeltaResult -->|成功| OLTPUpsert[OLTP DBへ UPSERT<br>gold_sensor_data_daily_summary]
+    OLTPUpsert --> OLTPResult{成功?}
+    OLTPResult -->|失敗・3回未満| OLTPRetry[待機・リトライ<br>指数バックオフ]
+    OLTPRetry --> OLTPUpsert
+    OLTPResult -->|失敗・3回超過| Error
+    OLTPResult -->|成功| End([タスク終了])
+    Error --> Fail([タスク失敗終了])
 ```
 
-#### 処理コード
+### 処理コード
 
 ```python
-def optimize_silver_tables():
-    """Silver層テーブルのOPTIMIZE実行"""
+# regenerate_daily_summary_data.py
+from datetime import date, timedelta
+from delta.tables import DeltaTable
+import pymysql
+from common_gold_regeneration import (
+    get_db_config, fetch_silver_data, fetch_summary_methods, generate_daily_summary,
+    _execute_with_retry,
+)
 
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
-
-    for table in tables:
-        print(f"OPTIMIZE開始: {table}")
-        try:
-            result = spark.sql(f"OPTIMIZE {table}")
-            metrics = result.first()
-            print(f"  - 統合ファイル数: {metrics['numFilesAdded']}")
-            print(f"  - 削除ファイル数: {metrics['numFilesRemoved']}")
-            print(f"OPTIMIZE完了: {table}")
-        except Exception as e:
-            print(f"OPTIMIZEエラー: {table} - {str(e)}")
-
-    print("全テーブルのOPTIMIZE完了")
+DAILY_DELTA    = "iot_catalog.gold.gold_sensor_data_daily_summary"
+DAILY_OLTP_TBL = "gold_sensor_data_daily_summary"
 
 
-# ジョブ実行
-optimize_silver_tables()
+def upsert_to_delta_daily(summary_df):
+    """日次サマリをDeltaテーブルへ MERGE UPSERT する。
+    マージキー: device_id, organization_id, collection_date,
+                summary_item, summary_method_id
+    """
+    print(f"Delta UPSERT開始: {DAILY_DELTA}")
+    try:
+        def _do():
+            delta_table = DeltaTable.forName(spark, DAILY_DELTA)
+            (
+                delta_table.alias("tgt")
+                .merge(
+                    summary_df.alias("src"),
+                    """
+                    tgt.device_id         = src.device_id
+                    AND tgt.organization_id   = src.organization_id
+                    AND tgt.collection_date   = src.collection_date
+                    AND tgt.summary_item      = src.summary_item
+                    AND tgt.summary_method_id = src.summary_method_id
+                    """
+                )
+                .whenMatchedUpdate(set={
+                    "summary_value": "src.summary_value",
+                    "data_count":    "src.data_count",
+                    "create_time":   "src.create_time",
+                })
+                .whenNotMatchedInsertAll()
+                .execute()
+            )
+        _execute_with_retry(_do, label=DAILY_DELTA)
+        print(f"Delta UPSERT完了: {DAILY_DELTA}")
+    except Exception as e:
+        print(f"Delta UPSERTエラー: {DAILY_DELTA} - {str(e)}")
+        raise
+
+
+def upsert_to_oltp_daily(summary_df):
+    """日次サマリをOLTP DBへバルク UPSERT する。
+    一意制約キー: device_id, organization_id, collection_date,
+                  summary_item, summary_method_id
+    """
+    print(f"OLTP UPSERT開始: {DAILY_OLTP_TBL}")
+    try:
+        records = summary_df.collect()
+
+        def _do():
+            with pymysql.connect(**get_db_config()) as conn:
+                with conn.cursor() as cursor:
+                    # テーブル名はコード内定数（DAILY_OLTP_TBL）のみ使用。外部入力は混入させないこと。
+                    sql = f"""
+                        INSERT INTO {DAILY_OLTP_TBL}
+                            (device_id, organization_id, collection_date,
+                             summary_item, summary_method_id, summary_value,
+                             data_count, create_time)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            summary_value = VALUES(summary_value),
+                            data_count    = VALUES(data_count),
+                            create_time   = VALUES(create_time)
+                    """
+                    cursor.executemany(sql, [
+                        (r["device_id"], r["organization_id"], r["collection_date"],
+                         r["summary_item"], r["summary_method_id"],
+                         r["summary_value"], r["data_count"], r["create_time"])
+                        for r in records
+                    ])
+                conn.commit()
+
+        _execute_with_retry(_do, label=DAILY_OLTP_TBL)
+        print(f"OLTP UPSERT完了: {DAILY_OLTP_TBL} - {len(records)}件")
+    except Exception as e:
+        print(f"OLTP UPSERTエラー: {DAILY_OLTP_TBL} - {str(e)}")
+        raise
+
+
+def run():
+    # target_date をタスク1の Task Value から取得
+    target_date_str = dbutils.jobs.taskValues.get(
+        taskKey    = "regenerate_hourly_summary_data",
+        key        = "target_date",
+        debugValue = str(date.today() - timedelta(days=1)),
+    )
+    target_date = date.fromisoformat(target_date_str)
+    print(f"日次サマリ再生成開始: 対象日={target_date}")
+
+    silver_df       = fetch_silver_data(target_date)
+    summary_methods = fetch_summary_methods()
+    daily_df        = generate_daily_summary(silver_df, summary_methods)
+
+    try:
+        upsert_to_delta_daily(daily_df)
+        upsert_to_oltp_daily(daily_df)
+    finally:
+        daily_df.unpersist()
+
+    print(f"日次サマリ再生成完了: 対象日={target_date}")
+
+
+# タスク実行
+run()
 ```
 
-#### OPTIMIZE設定
+### UPSERT設定
 
-| 項目               | 設定値                     | 説明                             |
-| ------------------ | -------------------------- | -------------------------------- |
-| 対象テーブル       | Silver層全テーブル         | センサーデータ、状態             |
-| 実行タイミング     | 毎日 02:00（低負荷時間帯） | ストリーミング処理への影響を軽減 |
-| 自動コンパクション | 有効（テーブル設定）       | 日次に加えて自動実行も併用       |
+**Deltaテーブル MERGE**
 
-### 週次VACUUMジョブ
+| 項目           | 設定値                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| 対象テーブル   | `iot_catalog.gold.gold_sensor_data_daily_summary`                                         |
+| マージキー     | device_id, organization_id, collection_date, summary_item, summary_method_id             |
+| 一致時         | summary_value, data_count, create_time を更新                                            |
+| 不一致時       | 全カラムを INSERT                                                                         |
 
-削除済みファイルを物理的に削除し、ストレージ使用量を削減する。
+**OLTP DB UPSERT**
 
-#### ジョブ概要
+| 項目           | 設定値                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| 対象テーブル   | `gold_sensor_data_daily_summary`                                                          |
+| 一意制約キー   | device_id, organization_id, collection_date, summary_item, summary_method_id             |
+| 更新カラム     | summary_value, data_count, create_time                                                   |
+| 実装方式       | INSERT ON DUPLICATE KEY UPDATE（バルク executemany）                                      |
 
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | silver_table_vacuum                |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 4 * * 0`）日曜04:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 4時間                              |
-| リトライポリシー | 失敗時1回リトライ                  |
+---
 
-#### 処理フロー
+## リトライ戦略
 
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> GetTables[対象テーブル一覧を取得]
-    GetTables --> Loop[各テーブルを処理]
+### ジョブリトライ戦略（Databricks Workflow）
 
-    Loop --> Before[VACUUM前のファイル数を取得]
-    Before --> Vacuum[VACUUM実行<br>保持期間: 168時間]
-    Vacuum --> Result{成功?}
+タスクが例外 raise で異常終了した場合、Databricks Workflow のリトライポリシーによりジョブ全体を再実行する。
 
-    Result -->|成功| After[VACUUM後のファイル数を取得]
-    After --> Metrics[メトリクス出力<br>削除前後のファイル数]
-    Result -->|失敗| Error[エラー出力]
+| 項目             | 値           | 説明                                                         |
+| ---------------- | ------------ | ------------------------------------------------------------ |
+| 最大リトライ回数 | 1回          | Databricks Workflow のリトライポリシーによる再実行           |
+| リトライ間隔     | 即時         | タスク内リトライ超過後、Workflow がジョブ全体を再実行する    |
+| タイムアウト     | 各タスク30分 | タスクごとのタイムアウト                                     |
+| 冪等性           | 保証         | 処理は UPSERT のため、再実行しても二重登録は発生しない       |
 
-    Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
+### タスク内リトライ戦略（コード）
 
-    Next -->|あり| Loop
-    Next -->|なし| End([ジョブ終了])
-```
+Delta UPSERT・OLTP UPSERT の書き込み処理失敗時、コード内で指数バックオフによるリトライを行う。
 
-#### 処理コード
+| 項目             | 値                        | 説明                                                               |
+| ---------------- | ------------------------- | ------------------------------------------------------------------ |
+| 最大リトライ回数 | 3回                       | `MAX_RETRIES = 3`（`common_gold_regeneration.py`）                 |
+| リトライ間隔     | 指数バックオフ            | 1回目: 1秒、2回目: 2秒、3回目: 4秒（`BASE_WAIT_SEC * 2^attempt`） |
+| リトライ対象処理 | Delta UPSERT・OLTP UPSERT | `_execute_with_retry()` でラップ                                   |
+| 全試行失敗時     | 例外 raise                | タスクを異常終了させ、Workflow のジョブリトライへ委譲する          |
 
-```python
-def vacuum_silver_tables():
-    """Silver層テーブルのVACUUM実行"""
+---
 
-    # 保持期間（時間）
-    RETAIN_HOURS = 168  # 7日
+## エラーハンドリング
 
-    # 対象テーブル一覧
-    tables = [
-        "iot_catalog.silver.silver_sensor_data"
-    ]
+以下のエラー発生時、Teamsのシステム保守者連絡チャネルへ通知を行う。
 
-    for table in tables:
-        print(f"VACUUM開始: {table}")
-        try:
-            # VACUUM実行前のファイル数を取得
-            before_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
+| エラー種別              | 通知タイミング       | 説明                                        |
+| ----------------------- | -------------------- | ------------------------------------------- |
+| OLTP接続失敗            | 最大リトライ超過後   | OLTP DBへの接続失敗が連続した場合           |
+| DeltaテーブルUPSERT失敗 | UPSERT失敗時（即時） | ゴールド層Deltaテーブルへの登録失敗時       |
 
-            # VACUUM実行
-            spark.sql(f"VACUUM {table} RETAIN {RETAIN_HOURS} HOURS")
-
-            # VACUUM実行後のファイル数を取得
-            after_files = spark.sql(f"DESCRIBE DETAIL {table}").first()["numFiles"]
-
-            print(f"  - 削除前ファイル数: {before_files}")
-            print(f"  - 削除後ファイル数: {after_files}")
-            print(f"VACUUM完了: {table}")
-        except Exception as e:
-            print(f"VACUUMエラー: {table} - {str(e)}")
-
-    print("全テーブルのVACUUM完了")
-
-
-# ジョブ実行
-vacuum_silver_tables()
-```
-
-#### VACUUM設定
-
-| 項目           | 設定値             | 説明                                 |
-| -------------- | ------------------ | ------------------------------------ |
-| 保持期間       | 168時間（7日）     | Time Travel用に7日分のファイルを保持 |
-| 対象テーブル   | Silver層全テーブル | センサーデータ、状態                 |
-| 実行タイミング | 日曜 04:00         | 週末の低負荷時間帯に実行             |
-
-**注意事項:**
-- VACUUMを実行すると、保持期間より古いバージョンへのTime Travelができなくなる
-- 保持期間はテーブルプロパティ `delta.deletedFileRetentionDuration` と一致させる
-
-### チェックポイントクリーンアップジョブ
-
-ストリーミングパイプラインのチェックポイントファイルを定期的にクリーンアップする。
-
-#### ジョブ概要
-
-| 項目             | 設定値                             |
-| ---------------- | ---------------------------------- |
-| ジョブ名         | checkpoint_cleanup                 |
-| 実行方式         | Databricks Workflow                |
-| 実行間隔         | 週次（cron: `0 5 * * 0`）日曜05:00 |
-| クラスタ         | Jobs Compute                       |
-| タイムアウト     | 1時間                              |
-| リトライポリシー | 失敗時リトライなし                 |
-
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ジョブ開始]) --> Cutoff[カットオフ日時を計算<br>現在 - 7日]
-    Cutoff --> DirLoop[各チェックポイント<br>ディレクトリを処理]
-
-    DirLoop --> ListFiles[ディレクトリ内の<br>ファイル一覧を取得]
-    ListFiles --> ListResult{取得<br>成功?}
-
-    ListResult -->|失敗| DirError[エラー出力]
-    ListResult -->|成功| FileLoop[各ファイルを処理]
-
-    FileLoop --> CheckDate{更新日時が<br>カットオフ日<br>より前?}
-    CheckDate -->|はい| Delete[ファイル/ディレクトリ削除]
-    CheckDate -->|いいえ| Skip[スキップ]
-
-    Delete --> NextFile{次の<br>ファイル?}
-    Skip --> NextFile
-
-    NextFile -->|あり| FileLoop
-    NextFile -->|なし| Log[削除件数を出力]
-
-    DirError --> NextDir{次の<br>ディレクトリ?}
-    Log --> NextDir
-
-    NextDir -->|あり| DirLoop
-    NextDir -->|なし| End([ジョブ終了])
-```
-
-#### 処理コード
-
-```python
-from datetime import datetime, timedelta
-
-def cleanup_old_checkpoints():
-    """7日以上経過したチェックポイントファイルを削除"""
-
-    # チェックポイント保存先
-    CHECKPOINT_BASE_PATH = "abfss://checkpoints@{storage_account}.dfs.core.windows.net/"
-
-    # 保持期間（日）
-    RETAIN_DAYS = 7
-
-    # 対象パイプラインのチェックポイントディレクトリ
-    checkpoint_dirs = [
-        f"{CHECKPOINT_BASE_PATH}silver_pipeline/",
-    ]
-
-    cutoff_date = datetime.now() - timedelta(days=RETAIN_DAYS)
-
-    for checkpoint_dir in checkpoint_dirs:
-        print(f"チェックポイントクリーンアップ開始: {checkpoint_dir}")
-        try:
-            # ディレクトリ内のファイル一覧を取得
-            files = dbutils.fs.ls(checkpoint_dir)
-
-            deleted_count = 0
-            for file_info in files:
-                # ファイルの更新日時を確認
-                if hasattr(file_info, 'modificationTime'):
-                    file_time = datetime.fromtimestamp(file_info.modificationTime / 1000)
-                    if file_time < cutoff_date:
-                        dbutils.fs.rm(file_info.path, recurse=True)
-                        deleted_count += 1
-
-            print(f"  - 削除ファイル/ディレクトリ数: {deleted_count}")
-            print(f"クリーンアップ完了: {checkpoint_dir}")
-        except Exception as e:
-            print(f"クリーンアップエラー: {checkpoint_dir} - {str(e)}")
-
-    print("全チェックポイントのクリーンアップ完了")
-
-
-# ジョブ実行
-cleanup_old_checkpoints()
-```
-
-#### クリーンアップ設定
-
-| 項目           | 設定値                       | 説明                                         |
-| -------------- | ---------------------------- | -------------------------------------------- |
-| 保持期間       | 7日                          | 障害復旧に必要な期間を確保                   |
-| 対象           | チェックポイントディレクトリ | ストリーミングパイプラインのチェックポイント |
-| 実行タイミング | 日曜 05:00                   | VACUUM後に実行                               |
+Teams通知の実装詳細は[共通仕様書](../../common/common-specification.md)を参照。
 
 ---
 
 ## 関連ドキュメント
 
-- [README.md](./README.md) - メール送信ジョブ概要
-- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
-- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - email_notification_queue・mail_historyテーブル定義
+- [README.md](./README.md) - ゴールド層データ再生成ジョブ概要
+- [共通仕様書](../../common/common-specification.md) - Teams通知・共通エラーハンドリング仕様
+- [シルバー層LDPパイプライン概要](../../ldp-pipeline/silver-layer/README.md) - silver_sensor_data への書き込み処理の概要
+- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - silver_sensor_data への書き込み処理の詳細
+- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - OLTP DB上のテーブル定義
+- [UnityCatalogデータベース設計書](../../common/unity-catalog-database-specification.md) - Deltaテーブルのテーブル定義
+- [Deltaテーブル最適化ジョブ仕様書](../optimization/job-specification.md) - Deltaテーブルクリーンアップ詳細
+- [OLTPデータ削除ジョブ仕様書](../oltp-cleanup/job-specification.md) - OLTP DBクリーンアップ詳細
 
 ---
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容 | 担当者       |
-| ---------- | ---- | -------- | ------------ |
-| 2026-01-19 | 1.0  | 初版作成 | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                           | 担当者       |
+| ---------- | ---- | ------------------------------------------------------------------ | ------------ |
+| 2026-04-09 | 1.0  | 初版作成                                                           | Kei Sugiyama |
+| 2026-04-09 | 1.1  | タスク分割対応・共通関数追加・Task Values による対象日受け渡し追加 | Kei Sugiyama |
+| 2026-04-09 | 1.2  | 集計方法を gold_summary_method_master の全9種に対応（P25/MEDIAN/P75/STDDEV/P95/SUM 追加） | Kei Sugiyama |
+| 2026-04-09 | 1.3  | タスク内リトライ追加（指数バックオフ3回）・delete_flag フィルタ追加・debugValue バグ修正・DataFrame cache 追加・フロー図修正 | Kei Sugiyama |
+| 2026-04-09 | 1.4  | DB_SECRET_SCOPE 定数追加（Secrets scope 名の明示化）                                                                       | Kei Sugiyama |

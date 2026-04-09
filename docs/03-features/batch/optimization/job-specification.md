@@ -96,10 +96,10 @@ flowchart TD
     Optimize --> Result{成功?}
 
     Result -->|成功| Metrics[メトリクス出力<br>統合/削除ファイル数]
-    Result -->|失敗| Error[エラー出力]
+    Result -->|失敗| Error[エラー出力・例外 raise]
 
     Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
+    Error --> End
 
     Next -->|あり| Loop
     Next -->|なし| End([ジョブ終了])
@@ -119,6 +119,7 @@ def optimize_table(table: str):
         print(f"OPTIMIZE完了: {table}")
     except Exception as e:
         print(f"OPTIMIZEエラー: {table} - {str(e)}")
+        raise
 
 
 def run_optimize(tables: list):
@@ -187,7 +188,7 @@ flowchart TD
     Delete --> DeleteResult{成功?}
 
     DeleteResult -->|成功| DeleteMetrics[メトリクス出力<br>削除行数]
-    DeleteResult -->|失敗| Error[エラー出力]
+    DeleteResult -->|失敗| Error[エラー出力・例外 raise]
 
     DeleteMetrics --> Before[VACUUM前のファイル数を取得]
     Before --> Vacuum[VACUUM実行<br>保持期間: 168時間（7日）]
@@ -198,7 +199,7 @@ flowchart TD
     VacuumResult -->|失敗| Error
 
     Metrics --> Next{次の<br>テーブル?}
-    Error --> Next
+    Error --> End
 
     Next -->|あり| Loop
     Next -->|なし| End([ジョブ終了])
@@ -215,13 +216,17 @@ def cleanup_and_vacuum(table: str, retain_years: int, timestamp_col: str, retain
         retain_years:  データ保持年数（これを超えたレコードを削除）
         timestamp_col: 保持期間判定に使用するタイムスタンプカラム名
         retain_hours:  VACUUMの保持時間（デフォルト: 168時間 = 7日）
+
+    注意:
+        table・timestamp_col・retain_years は CLEANUP_TABLE_CONFIG のコード内定数からのみ渡すこと。
+        外部入力（ユーザー入力・API経由の値等）を直接渡すと SQL インジェクションのリスクがある。
     """
     print(f"クリーンアップ開始: {table}")
     try:
         # 保持期間超過データを削除
         deleted = spark.sql(f"""
             DELETE FROM {table}
-            WHERE {timestamp_col} < DATEADD(YEAR, -{retain_years}, CURRENT_DATE())
+            WHERE {timestamp_col} < CURRENT_DATE() - INTERVAL {retain_years} YEAR
         """)
         print(f"  - {retain_years}年超過データ削除行数: {deleted.first()['num_deleted_rows']}")
 
@@ -239,6 +244,7 @@ def cleanup_and_vacuum(table: str, retain_years: int, timestamp_col: str, retain
         print(f"クリーンアップ完了: {table}")
     except Exception as e:
         print(f"クリーンアップエラー: {table} - {str(e)}")
+        raise
 
 
 # 対象テーブル設定（テーブル名・保持年数・タイムスタンプカラム）
@@ -300,7 +306,7 @@ print("全テーブルのクリーンアップ完了")
 
 | 項目             | 設定値                                      |
 | ---------------- | ------------------------------------------- |
-| ジョブ名         | checkpoint_cleanup                          |
+| ジョブ名         | checkpoint_cleanup_and_vacuum               |
 | 実行方式         | Databricks Workflows                        |
 | 実行間隔         | sensor_table_cleanup_and_vacuumジョブ完了後 |
 | クラスタ         | Jobs Compute                                |
@@ -384,11 +390,14 @@ def cleanup_old_checkpoints():
                     if file_time < cutoff_date:
                         dbutils.fs.rm(file_info.path, recurse=True)
                         deleted_count += 1
+                else:
+                    print(f"  - スキップ（modificationTime未取得）: {file_info.path}")
 
             print(f"  - 削除ファイル/ディレクトリ数: {deleted_count}")
             print(f"クリーンアップ完了: {checkpoint_dir}")
         except Exception as e:
             print(f"クリーンアップエラー: {checkpoint_dir} - {str(e)}")
+            raise
 
     print("全チェックポイントのクリーンアップ完了")
 
@@ -408,7 +417,7 @@ def cleanup_checkpoint_table():
                 SELECT thread_id
                 FROM {TABLE}
                 GROUP BY thread_id
-                HAVING MAX(`timestamp`) < DATE_SUB(CURRENT_TIMESTAMP(), 30)
+                HAVING MAX(`timestamp`) < CURRENT_TIMESTAMP() - INTERVAL 30 DAYS
             )
         """)
         print(f"  - 30日超過スレッド削除行数: {deleted.first()['num_deleted_rows']}")
@@ -458,9 +467,9 @@ cleanup_checkpoint_table()
 
 ## 関連ドキュメント
 
-- [README.md](./README.md) - メール送信ジョブ概要
-- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
-- [ゴールド層LDPパイプライン仕様書](../../ldp-pipeline/gold-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
+- [README.md](./README.md) - Deltaテーブル最適化ジョブ概要
+- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - silver_sensor_data への書き込み処理の詳細
+- [ゴールド層LDPパイプライン仕様書](../../ldp-pipeline/gold-layer/ldp-pipeline-specification.md) - gold_sensor_data_* への書き込み処理の詳細
 - [UnityCatalogデータベース設計書](../../common/unity-catalog-database-specification.md) - Silver層テーブル定義、Gold層テーブル定義、AIチャットチェックポイントテーブル定義
 
 ---
@@ -471,3 +480,5 @@ cleanup_checkpoint_table()
 | ---------- | ---- | ------------------------------------------------ | ------------ |
 | 2026-04-07 | 1.0  | 初版作成                                         | Kei Sugiyama |
 | 2026-04-07 | 1.1  | Silver・Gold処理を共通関数化してドキュメント統合 | Kei Sugiyama |
+| 2026-04-09 | 1.2  | INTERVAL構文統一・ジョブ名修正・エラー処理改善・スキップログ追加・関連ドキュメント修正 | Kei Sugiyama |
+| 2026-04-09 | 1.3  | cleanup_old_checkpoints に raise 追加・フロー図エラー時動作修正・安全注記追加          | Kei Sugiyama |
