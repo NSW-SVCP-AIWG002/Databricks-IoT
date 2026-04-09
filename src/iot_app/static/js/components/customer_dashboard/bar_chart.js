@@ -43,6 +43,7 @@
       fp:          null,
       minValue:    chartConfig.min_value ?? null,
       maxValue:    chartConfig.max_value ?? null,
+      errorEl:     el.querySelector('.bar-chart__error'),
     };
 
     bindControls(el, state);
@@ -163,11 +164,15 @@
       }),
     })
       .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
+        if (!res.ok) {
+          return res.json().then(function (data) {
+            if (state.errorEl) state.errorEl.textContent = data.error;
+          }).catch(function () {});
+        }
+        return res.json().then(function (data) {
+          if (state.errorEl) state.errorEl.textContent = '';
+          renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
+        });
       })
       .catch(function (err) {
         console.error('棒グラフデータ取得エラー:', err);

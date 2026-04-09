@@ -37,23 +37,23 @@ def validate_chart_params(display_unit, interval, base_datetime_str):
     """チャートパラメータのバリデーション
 
     Returns:
-        bool: 全パラメータが有効な場合 True、それ以外 False
+        str | None: エラーメッセージ（正常時は None）
     """
     if display_unit not in _VALID_DISPLAY_UNITS:
-        return False
+        return '表示単位が不正です'
 
     if interval not in INTERVAL_MINUTES:
-        return False
+        return '集計間隔が不正です'
 
     if not base_datetime_str:
-        return False
+        return '日付形式が不正です'
 
     try:
         datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        return False
+        return '日付形式が不正です'
 
-    return True
+    return None
 
 
 def validate_gadget_registration(params):

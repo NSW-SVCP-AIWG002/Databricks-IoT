@@ -49,8 +49,9 @@ def handle_gadget_data(gadget_uuid):
     interval = params.get('interval', '10min')
     base_datetime_str = params.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
-        return jsonify({'error': 'パラメータが不正です'}), 400
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
@@ -208,7 +209,7 @@ def handle_gadget_csv_export(gadget_uuid):
     interval = request.args.get('interval', '10min')
     base_datetime_str = request.args.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
+    if validate_chart_params(display_unit, interval, base_datetime_str):
         abort(400)
 
     try:
