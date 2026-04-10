@@ -22,6 +22,8 @@
     - [処理コード](#処理コード-1)
     - [UPSERT設定](#upsert設定-1)
   - [リトライ戦略](#リトライ戦略)
+    - [ジョブリトライ戦略（Databricks Workflow）](#ジョブリトライ戦略databricks-workflow)
+    - [タスク内リトライ戦略（コード）](#タスク内リトライ戦略コード)
   - [エラーハンドリング](#エラーハンドリング)
   - [関連ドキュメント](#関連ドキュメント)
   - [変更履歴](#変更履歴)
@@ -156,14 +158,14 @@ def fetch_silver_data(target_date: date):
     print(f"シルバー層データ取得開始: {target_date}")
     df = (
         spark.table(SILVER_TABLE)
-        .filter(F.to_date(F.col("event_timestamp")) == F.lit(str(target_date)))
+        .filter(F.to_date(F.col("event_timestamp")) == F.lit(target_date))
     )
     print(f"  - 取得件数: {df.count()}件")
     return df
 
 
 def fetch_summary_methods() -> dict:
-    """gold_summary_method_master から集計方法マスタを取得する。
+    """gold_summary_method_master（UnityCatalog） から集計方法マスタを取得する。
     戻り値: {summary_method_id: summary_method_code} の辞書
     """
     rows = (
@@ -318,7 +320,7 @@ flowchart TD
 
 ```python
 # regenerate_hourly_summary_data.py
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from delta.tables import DeltaTable
 import pymysql
 from common_gold_regeneration import (
@@ -406,8 +408,8 @@ def upsert_to_oltp_hourly(summary_df):
 
 
 def run():
-    # 対象日: 実行日の前日
-    target_date = date.today() - timedelta(days=1)
+    # 対象日: JST基準で実行日の前日
+    target_date = datetime.now(timezone(timedelta(hours=9))).date() - timedelta(days=1)
     print(f"時次サマリ再生成開始: 対象日={target_date}")
 
     # target_date を Task Value に登録（タスク2で使用）
@@ -491,7 +493,7 @@ flowchart TD
 
 ```python
 # regenerate_daily_summary_data.py
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from delta.tables import DeltaTable
 import pymysql
 from common_gold_regeneration import (
@@ -583,7 +585,7 @@ def run():
     target_date_str = dbutils.jobs.taskValues.get(
         taskKey    = "regenerate_hourly_summary_data",
         key        = "target_date",
-        debugValue = str(date.today() - timedelta(days=1)),
+        debugValue = str(datetime.now(timezone(timedelta(hours=9))).date() - timedelta(days=1)),
     )
     target_date = date.fromisoformat(target_date_str)
     print(f"日次サマリ再生成開始: 対象日={target_date}")
@@ -688,3 +690,5 @@ Teams通知の実装詳細は[共通仕様書](../../common/common-specification
 | 2026-04-09 | 1.2  | 集計方法を gold_summary_method_master の全9種に対応（P25/MEDIAN/P75/STDDEV/P95/SUM 追加） | Kei Sugiyama |
 | 2026-04-09 | 1.3  | タスク内リトライ追加（指数バックオフ3回）・delete_flag フィルタ追加・debugValue バグ修正・DataFrame cache 追加・フロー図修正 | Kei Sugiyama |
 | 2026-04-09 | 1.4  | DB_SECRET_SCOPE 定数追加（Secrets scope 名の明示化）                                                                       | Kei Sugiyama |
+| 2026-04-10 | 1.5  | fetch_silver_data() の日付リテラルを型安全化・対象日計算を UTC 明示化（datetime.now(timezone.utc)）                        | Kei Sugiyama |
+| 2026-04-10 | 1.6  | 対象日計算のタイムゾーンを UTC から JST に変更（datetime.now(timezone(timedelta(hours=9)))）                                | Kei Sugiyama |
