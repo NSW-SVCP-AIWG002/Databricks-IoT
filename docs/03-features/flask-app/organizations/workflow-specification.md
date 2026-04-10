@@ -145,7 +145,7 @@
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /admin/organizations` | なし | HTML（組織一覧画面） | エラーページ表示 |
-| 検索ボタン押下 | フォーム送信 | `POST /admin/organizations` | `organization_name, organization_type_id, contact_person_name, contract_status_id, sort_by, order` | HTML（検索結果画面） | エラーメッセージ表示 |
+| 検索ボタン押下 | フォーム送信 | `POST /admin/organizations` | `organization_name, organization_type_id, contact_person, contract_status_id, sort_by, order` | HTML（検索結果画面） | エラーメッセージ表示 |
 | ページボタン押下 | リンククリック | `GET /admin/organizations` | `page` | HTML（検索結果画面） | エラーメッセージ表示 |
 | 登録ボタン押下 | ボタンクリック | `GET /admin/organizations/create` | なし | HTML（登録モーダル） | エラーページ表示 |
 | 登録実行 | フォーム送信 | `POST /admin/organizations/register` | フォームデータ | リダイレクト → `GET /admin/organizations` | フォーム再表示（エラーメッセージ付き） |
@@ -343,13 +343,12 @@ WHERE
 - 検索結果取得DBクエリ
 ```sql
 SELECT
+  o.organization_id,
   o.organization_name,
-  o.organization_type_id,
   t.organization_type_name,
   o.address,
   o.phone_number,
-  o.contact_person_name,
-  o.contract_status_id,
+  o.contact_person,
   c.contract_status_name
 FROM
   v_organization_master_by_user o
@@ -380,7 +379,7 @@ def get_default_search_params() -> dict:
         'order': '',
         'organization_name': '',
         'organization_type_id': None,
-        'contact_person_name': '',
+        'contact_person': '',
         'contract_status_id': None,
     }
 
@@ -401,7 +400,23 @@ def search_organizations(search_params: dict, user_id: int) -> tuple[list, int]:
     order = search_params['order']
     offset = (page - 1) * per_page
 
-    query = db.session.query(OrganizationMasterByUser).filter(
+    query = db.session.query(
+        OrganizationMasterByUser,
+        OrganizationTypeMaster.organization_type_name,
+        ContractStatusMaster.contract_status_name,
+    ).outerjoin(
+        OrganizationTypeMaster,
+        and_(
+            OrganizationMasterByUser.organization_type_id == OrganizationTypeMaster.organization_type_id,
+            OrganizationTypeMaster.delete_flag == False,
+        )
+    ).outerjoin(
+        ContractStatusMaster,
+        and_(
+            OrganizationMasterByUser.contract_status_id == ContractStatusMaster.contract_status_id,
+            ContractStatusMaster.delete_flag == False,
+        )
+    ).filter(
         OrganizationMasterByUser.user_id == user_id,
         OrganizationMasterByUser.delete_flag == False,
     )
@@ -412,8 +427,8 @@ def search_organizations(search_params: dict, user_id: int) -> tuple[list, int]:
         query = query.filter(OrganizationMasterByUser.organization_name.like(f"%{search_params['organization_name']}%"))
     if search_params.get('organization_type_id') is not None:
         query = query.filter(OrganizationMasterByUser.organization_type_id == search_params['organization_type_id'])
-    if search_params.get('contact_person_name'):
-        query = query.filter(OrganizationMasterByUser.contact_person_name.like(f"%{search_params['contact_person_name']}%"))
+    if search_params.get('contact_person'):
+        query = query.filter(OrganizationMasterByUser.contact_person.like(f"%{search_params['contact_person']}%"))
     if search_params.get('contract_status_id') is not None:
         query = query.filter(OrganizationMasterByUser.contract_status_id == search_params['contract_status_id'])
 
@@ -542,20 +557,19 @@ WHERE
   AND o.delete_flag = FALSE
   AND CASE WHEN :organization_name IS NULL THEN TRUE ELSE o.organization_name LIKE CONCAT('%', :organization_name, '%') END
   AND CASE WHEN :organization_type_id IS NULL THEN TRUE ELSE o.organization_type_id = :organization_type_id END
-  AND CASE WHEN :contact_person_name IS NULL THEN TRUE ELSE o.contact_person_name LIKE CONCAT('%', :contact_person_name, '%') END
+  AND CASE WHEN :contact_person IS NULL THEN TRUE ELSE o.contact_person LIKE CONCAT('%', :contact_person, '%') END
   AND CASE WHEN :contract_status_id IS NULL THEN TRUE ELSE o.contract_status_id = :contract_status_id END
 ```
 
 - 検索結果取得DBクエリ
 ```sql
 SELECT
+  o.organization_id,
   o.organization_name,
-  o.organization_type_id,
   t.organization_type_name,
   o.address,
   o.phone_number,
-  o.contact_person_name,
-  o.contract_status_id,
+  o.contact_person,
   c.contract_status_name
 FROM
   v_organization_master_by_user o
@@ -570,7 +584,7 @@ WHERE
   AND o.delete_flag = FALSE
   AND CASE WHEN :organization_name IS NULL THEN TRUE ELSE o.organization_name LIKE CONCAT('%', :organization_name, '%') END
   AND CASE WHEN :organization_type_id IS NULL THEN TRUE ELSE o.organization_type_id = :organization_type_id END
-  AND CASE WHEN :contact_person_name IS NULL THEN TRUE ELSE o.contact_person_name LIKE CONCAT('%', :contact_person_name, '%') END
+  AND CASE WHEN :contact_person IS NULL THEN TRUE ELSE o.contact_person LIKE CONCAT('%', :contact_person, '%') END
   AND CASE WHEN :contract_status_id IS NULL THEN TRUE ELSE o.contract_status_id = :contract_status_id END
 ORDER BY
   {sort_by} {order}
@@ -588,7 +602,7 @@ LIMIT :item_per_page OFFSET (:page -1) * :item_per_page
 class OrganizationSearchForm(FlaskForm):
     organization_name    = StringField('組織名')
     organization_type_id = StringField('組織種別')
-    contact_person_name  = StringField('担当者名')
+    contact_person  = StringField('担当者名')
     contract_status_id   = StringField('契約状態')
     sort_by              = SelectField('ソート項目', coerce=str)   # 選択肢は sort_item_master から動的取得（空白=デフォルトソート）
     order                = SelectField('ソート順', coerce=str, choices=[('', ''), ('asc', '昇順'), ('desc', '降順')])
@@ -611,7 +625,7 @@ def search_organizations_view():
         'order': form.order.data or '',
         'organization_name': form.organization_name.data or '',
         'organization_type_id': form.organization_type_id.data,
-        'contact_person_name': form.contact_person_name.data or '',
+        'contact_person': form.contact_person.data or '',
         'contract_status_id': form.contract_status_id.data,
     }
 
@@ -2065,8 +2079,8 @@ def get_all_organizations_for_export(search_params: dict, user_id: int) -> list:
         query = query.filter(OrganizationMasterByUser.organization_name.like(f"%{search_params['organization_name']}%"))
     if search_params.get('organization_type_id') is not None:
         query = query.filter(OrganizationMasterByUser.organization_type_id == search_params['organization_type_id'])
-    if search_params.get('contact_person_name'):
-        query = query.filter(OrganizationMasterByUser.contact_person_name.like(f"%{search_params['contact_person_name']}%"))
+    if search_params.get('contact_person'):
+        query = query.filter(OrganizationMasterByUser.contact_person.like(f"%{search_params['contact_person']}%"))
     if search_params.get('contract_status_id') is not None:
         query = query.filter(OrganizationMasterByUser.contract_status_id == search_params['contract_status_id'])
     sort_col = getattr(OrganizationMasterByUser, search_params.get('sort_by', ''), None)
