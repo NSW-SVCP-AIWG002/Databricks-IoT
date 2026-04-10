@@ -9,8 +9,8 @@
 <form method="POST"
       action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
       id="belt-chart-register-form"
-      novalidate
-      data-ajax-submit>
+      class="modal-form"
+      novalidate>
   {{ form.hidden_tag() }}
 
   <div class="modal__body">

@@ -183,7 +183,7 @@ def handle_gadget_register(gadget_type):
             params=params,
             current_user_id=g.current_user.user_id,
         )
-        return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
+        return jsonify({'message': 'ガジェットを登録しました'})
 
     except NotFoundError:
         abort(404)

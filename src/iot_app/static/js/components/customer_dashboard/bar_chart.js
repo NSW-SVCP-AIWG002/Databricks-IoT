@@ -235,7 +235,7 @@
       .then(function (res) {
         if (!res.ok) {
           return res.json().then(function (data) {
-            Toast.show(data.error || 'エラーが発生しました');
+            Toast.show(data.error || 'エラーが発生しました', 'error');
           });
         }
         return res.blob().then(function (blob) {
@@ -247,7 +247,7 @@
         });
       })
       .catch(function () {
-        Toast.show('CSVのダウンロードに失敗しました');
+        Toast.show('CSVのダウンロードに失敗しました', 'error');
       });
   }
 

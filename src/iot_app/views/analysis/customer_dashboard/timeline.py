@@ -205,7 +205,7 @@ def handle_gadget_register(gadget_type):
     try:
         register_gadget(params, current_user_id=current_user_id)
         logger.info(f'時系列グラフガジェット登録成功: user_id={current_user_id}')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットを登録しました'})
 
     except AppValidationError as e:
         db.session.rollback()

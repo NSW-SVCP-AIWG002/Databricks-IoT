@@ -182,7 +182,7 @@ def handle_gadget_register(gadget_type):
             data_source_config=data_source_config,
             user_id=g.current_user.user_id,
         )
-        return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
+        return jsonify({'message': 'ガジェットを登録しました'})
 
     except Exception as e:
         logger.error(f'円グラフガジェット登録エラー: {str(e)}')
