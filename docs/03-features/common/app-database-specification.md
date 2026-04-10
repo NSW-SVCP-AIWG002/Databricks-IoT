@@ -291,24 +291,24 @@
 
 **概要**: 顧客組織、販社組織等の情報を管理するテーブル
 
-| #   | カラム物理名         | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                       |
-| --- | -------------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------ |
-| 1   | organization_id      | 組織ID               | INT          | NOT NULL | ○   | -   | -                 | 組織の一意識別子                           |
-| 2   | organization_name    | 組織名               | VARCHAR(200) | NOT NULL | -   | -   | -                 | 組織の表示名                               |
-| 3   | organization_type_id | 組織種別ID           | INT          | NOT NULL | -   | ○   | -                 | 組織種別ID（organization_type_master参照） |
-| 4   | address              | 住所                 | VARCHAR(500) | NOT NULL | -   | -   | -                 | 組織の所在地住所                           |
-| 5   | phone_number         | 電話番号             | VARCHAR(20)  | NOT NULL | -   | -   | -                 | 組織の電話番号                             |
-| 6   | fax_number           | FAX                  | VARCHAR(20)  | NULL     | -   | -   | -                 | 組織のFAX番号                              |
-| 7   | contact_person       | 担当者名             | VARCHAR(20)  | NOT NULL | -   | -   | -                 | 組織の担当者名                             |
-| 8   | contract_status_id   | 契約状態ID           | INT          | NOT NULL | -   | ○   | -                 | 契約状態ID（contract_status_master参照）   |
-| 9   | contract_start_date  | 契約開始日           | DATE         | NOT NULL | -   | -   | -                 | サービス契約開始日                         |
-| 10  | contract_end_date    | 契約終了日           | DATE         | NULL     | -   | -   | -                 | サービス契約終了日                         |
-| 11  | databricks_group_id  | DatabricksグループID | VARCHAR(20)  | NOT NULL | -   | -   | -                 | Databricksグループの一意の識別子           |
-| 12  | create_date          | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                           |
-| 13  | creator              | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                   |
-| 14  | update_date          | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                       |
-| 15  | modifier             | 更新者               | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                   |
-| 16  | delete_flag          | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE    |
+| #   | カラム物理名         | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                 |
+| --- | -------------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------ |
+| 1   | organization_id      | 組織ID               | INT          | NOT NULL | ○   | -   | -                 | 組織の一意識別子                                   |
+| 2   | organization_uuid    | 組織UUID             | VARCHAR(36)  | NOT NULL | -   | -   | -                 | 組織の外部公開用識別子（URLパスパラメータとして使用） |
+| 3   | organization_name    | 組織名               | VARCHAR(200) | NOT NULL | -   | -   | -                 | 組織の表示名                                       |
+| 4   | organization_type_id | 組織種別ID           | INT          | NOT NULL | -   | ○   | -                 | 組織種別ID（organization_type_master参照）         |
+| 5   | address              | 住所                 | VARCHAR(500) | NOT NULL | -   | -   | -                 | 組織の所在地住所                                   |
+| 6   | phone_number         | 電話番号             | VARCHAR(20)  | NOT NULL | -   | -   | -                 | 組織の電話番号                                     |
+| 7   | fax_number           | FAX                  | VARCHAR(20)  | NULL     | -   | -   | -                 | 組織のFAX番号                                     |
+| 8   | contact_person       | 担当者名             | VARCHAR(20)  | NOT NULL | -   | -   | -                 | 組織の担当者名                                     |
+| 9   | contract_status_id   | 契約状態ID           | INT          | NOT NULL | -   | ○   | -                 | 契約状態ID（contract_status_master参照）           |
+| 10  | contract_start_date  | 契約開始日           | DATE         | NOT NULL | -   | -   | -                 | サービス契約開始日                                 |
+| 11  | contract_end_date    | 契約終了日           | DATE         | NULL     | -   | -   | -                 | サービス契約終了日                                  |
+| 12  | create_date          | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
+| 13  | creator              | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                            |
+| 14  | update_date          | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
+| 15  | modifier             | 更新者               | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                            |
+| 16  | delete_flag          | 削除フラグ           | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE              |
 
 **外部キー:**
 
