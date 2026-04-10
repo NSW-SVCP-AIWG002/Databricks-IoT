@@ -519,8 +519,8 @@ CREATE TABLE IF NOT EXISTS dashboard_gadget_master (
 CREATE TABLE IF NOT EXISTS dashboard_user_setting (
     user_id         INT      NOT NULL,
     dashboard_id    INT      NOT NULL,
-    organization_id INT      NOT NULL,
-    device_id       INT      NOT NULL,
+    organization_id INT      NULL,
+    device_id       INT      NULL,
     create_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator         INT      NOT NULL,
     update_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
