@@ -6,7 +6,7 @@ OLTP DB (MySQL/SQLite) へのアクセスを担当する。
 """
 
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 from flask import Response
@@ -24,6 +24,7 @@ from iot_app.models.device_status import DeviceStatusData
 from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData  # noqa: F401
 from iot_app.models.organization import OrganizationClosure, OrganizationMaster
 
+_JST = timezone(timedelta(hours=9))
 _ALERT_RECENT_DAYS = 30
 _ALERT_MAX_TOTAL = 30
 _ITEM_PER_PAGE = 10
@@ -73,7 +74,7 @@ def get_default_date_range():
         dict: search_start_datetime / search_end_datetime を含む辞書
               フォーマット: YYYY/MM/DDTHH:MM
     """
-    end_dt = datetime.now()
+    end_dt = datetime.now(_JST).replace(tzinfo=None)
     start_dt = end_dt - timedelta(hours=24)
     return {
         "search_start_datetime": start_dt.strftime("%Y-%m-%dT%H:%M"),
@@ -279,7 +280,7 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
     offset = (page - 1) * per_page
     effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
     results = (
-        q.order_by(AlertHistory.alert_history_id.desc())
+        q.order_by(AlertLevelMaster.alert_level_id.asc(), AlertHistory.alert_history_id.desc())
         .limit(effective_limit)
         .offset(offset)
         .all()
@@ -409,7 +410,7 @@ def get_device_alerts_with_count(device_id, search_params):
     offset = (page - 1) * per_page
     effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
     results = (
-        q.order_by(AlertHistory.alert_history_id.desc())
+        q.order_by(AlertLevelMaster.alert_level_id.asc(), AlertHistory.alert_history_id.desc())
         .limit(effective_limit)
         .offset(offset)
         .all()
