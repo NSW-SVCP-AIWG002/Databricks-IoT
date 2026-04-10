@@ -324,8 +324,8 @@ def register_belt_chart():
 
     リクエストボディ:
     - title: ガジェットタイトル（必須）
-    - device_mode: 表示デバイス選択（'specified' or 'tree_linked'）（必須）
-    - device_id: デバイスID（device_mode='specified'の場合必須）
+    - device_mode: 表示デバイス選択（'fixed' or 'variable'）（必須）
+    - device_id: デバイスID（device_mode='fixed'の場合必須）
     - group_id: グループID（必須）
     - aggregation_method_id: 集約方法ID（必須）
     - items: 表示項目リスト（必須、1-5個）
@@ -381,11 +381,11 @@ def validate_register_params(data: dict) -> list:
         errors.append('タイトルは50文字以内で入力してください')
 
     # device_mode
-    if data.get('device_mode') not in ['specified', 'tree_linked']:
+    if data.get('device_mode') not in ['fixed', 'variable']:
         errors.append('表示デバイス選択が不正です')
 
     # device_id (指定デバイスモード時のみ必須)
-    if data.get('device_mode') == 'specified':
+    if data.get('device_mode') == 'fixed':
         if not data.get('device_id'):
             errors.append('デバイスIDは必須です')
 
@@ -1115,8 +1115,8 @@ flowchart TD
 | パラメータ | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
 | title | string | ○ | ガジェットタイトル（1-50文字） |
-| device_mode | string | ○ | 表示デバイス選択（'specified' / 'tree_linked'） |
-| device_id | string | △ | デバイスID（device_mode='specified'時必須） |
+| device_mode | string | ○ | 表示デバイス選択（'fixed' / 'variable'） |
+| device_id | string | △ | デバイスID（device_mode='fixed'時必須） |
 | group_id | string | ○ | グループID |
 | aggregation_method_id | integer | ○ | 集約方法ID（1-8） |
 | items | array | ○ | 表示項目リスト（1-5個） |

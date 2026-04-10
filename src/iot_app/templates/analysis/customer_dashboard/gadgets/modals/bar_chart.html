@@ -30,18 +30,19 @@
         <label class="form__label">表示デバイス選択</label>
         <div class="bar-chart-register__device-mode-buttons">
           <button type="button"
-                  class="button bar-chart-register__device-mode-btn bar-chart-register__device-mode-btn--active"
+                  class="button bar-chart-register__device-mode-btn"
                   data-mode="fixed">デバイス固定</button>
           <button type="button"
-                  class="button bar-chart-register__device-mode-btn"
+                  class="button bar-chart-register__device-mode-btn bar-chart-register__device-mode-btn--active"
                   data-mode="variable">デバイス可変</button>
         </div>
-        <input type="hidden" name="device_mode" id="device_mode" value="fixed">
+        <input type="hidden" name="device_mode" id="device_mode" value="variable">
       </div>
     </div>
 
     <!-- (5) デバイス名（デバイス固定モード時のみ） -->
-    <div class="gadget-register__device-name-row" id="device-name-area">
+    <div class="gadget-register__device-name-row" id="device-name-area"
+         style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
       <span class="bar-chart-register__device-name bar-chart-register__device-name--wide" id="selected-device-name">-</span>
     </div>
 
@@ -61,7 +62,8 @@
       </div>
 
       <!-- 中央カラム：(4) 表示デバイス指定（デバイス固定モード時のみ） -->
-      <div class="gadget-register__middle" id="device-fixed-area">
+      <div class="gadget-register__middle" id="device-fixed-area"
+           style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
         <p class="gadget-register__section-title">表示デバイス指定</p>
         <div class="form__group">
           <label class="form__label">組織フィルター</label>

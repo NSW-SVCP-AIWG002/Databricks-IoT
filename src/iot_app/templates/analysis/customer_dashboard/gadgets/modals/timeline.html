@@ -53,7 +53,8 @@
         </div>
 
         <!-- (6) デバイス名行 -->
-        <div class="gadget-register__device-name-row" id="device-name-area" style="visibility: hidden;">
+        <div class="gadget-register__device-name-row" id="device-name-area"
+             style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
           <span class="timeline-register__device-name" id="selected-device-name">-</span>
         </div>
 

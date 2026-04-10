@@ -398,8 +398,8 @@ function bindBarChartGadgetRegister(container) {
       const mode = btn.dataset.mode;
       if (deviceModeInput) deviceModeInput.value = mode;
       const isFixed = mode === 'fixed';
-      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
-      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? 'visible' : 'hidden';
+      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? 'visible' : 'hidden';
     });
   });
 
