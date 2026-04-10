@@ -210,7 +210,6 @@ CREATE TABLE IF NOT EXISTS user_master (
     modifier                 INT          NOT NULL,
     delete_flag              BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (user_id),
-    UNIQUE INDEX UX_user_master_email (email_address),
     INDEX IX_user_master_organization_id (organization_id),
     INDEX IX_user_master_user_type_id (user_type_id),
     INDEX IX_user_master_language_code (language_code),

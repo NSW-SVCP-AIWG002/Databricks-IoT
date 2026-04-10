@@ -123,6 +123,11 @@ def customer_dashboard():
     else:
         first = get_first_dashboard(accessible_org_ids)
         dashboard_id = first.dashboard_id if first else None
+        # ユーザー設定が未登録かつアクセス可能なダッシュボードがある場合は先頭を自動登録
+        if dashboard_id and not user_setting:
+            upsert_dashboard_user_setting(g.current_user.user_id, dashboard_id)
+            db.session.commit()
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
     dashboards = get_dashboards(accessible_org_ids)
     organizations = get_organizations(accessible_org_ids)
