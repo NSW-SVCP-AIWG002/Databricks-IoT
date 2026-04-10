@@ -210,7 +210,6 @@ CREATE TABLE IF NOT EXISTS user_master (
     modifier                 INT          NOT NULL,
     delete_flag              BOOLEAN      NOT NULL DEFAULT FALSE,
     PRIMARY KEY (user_id),
-    UNIQUE INDEX UX_user_master_email (email_address),
     INDEX IX_user_master_organization_id (organization_id),
     INDEX IX_user_master_user_type_id (user_type_id),
     INDEX IX_user_master_language_code (language_code),
@@ -520,8 +519,8 @@ CREATE TABLE IF NOT EXISTS dashboard_gadget_master (
 CREATE TABLE IF NOT EXISTS dashboard_user_setting (
     user_id         INT      NOT NULL,
     dashboard_id    INT      NOT NULL,
-    organization_id INT      NOT NULL,
-    device_id       INT      NOT NULL,
+    organization_id INT      NULL,
+    device_id       INT      NULL,
     create_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator         INT      NOT NULL,
     update_date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

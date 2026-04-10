@@ -282,8 +282,12 @@ flowchart TD
     CheckUserSetting -->|あり| GetDashboard[選択中ダッシュボードID取得]
     CheckUserSetting -->|なし| GetFirstDashboard[先頭ダッシュボード取得<br>dashboard_id昇順の最初]
 
+    GetFirstDashboard --> CheckAutoRegist{ユーザー設定未登録 かつ<br>先頭ダッシュボードあり?}
+    CheckAutoRegist -->|はい| UpsertUserSetting[ユーザー設定を自動登録<br>DB dashboard_user_setting UPSERT]
+    CheckAutoRegist -->|いいえ| DashboardQuery
+    UpsertUserSetting --> DashboardQuery
+
     GetDashboard --> DashboardQuery[ダッシュボード情報取得<br>DB dashboard_master]
-    GetFirstDashboard --> DashboardQuery
 
     DashboardQuery --> CheckDashboard{ダッシュボードあり?}
     CheckDashboard -->|なし| RenderEmpty[空のダッシュボード画面を表示]
@@ -524,6 +528,11 @@ def customer_dashboard():
         # デフォルト: 先頭ダッシュボード
         first_dashboard = get_first_dashboard(accessible_org_ids)
         dashboard_id = first_dashboard.dashboard_id if first_dashboard else None
+        # ユーザー設定が未登録かつアクセス可能なダッシュボードがある場合は先頭を自動登録
+        if dashboard_id and not user_setting:
+            upsert_dashboard_user_setting(g.current_user.user_id, dashboard_id)
+            db.session.commit()
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
     # ダッシュボード一覧取得
     dashboards = get_dashboards(accessible_org_ids)
@@ -2483,6 +2492,7 @@ def update_datasource_setting(db, user_id, organization_id, device_id, modifier)
 
 | ワークフロー | 操作テーブル | トランザクション要否 | 備考 |
 |------------|------------|-------------------|------|
+| ダッシュボード初期表示（ユーザー設定未登録時） | dashboard_user_setting | 必要 | ユーザー設定が存在しない場合のみ先頭ダッシュボードIDを自動登録 |
 | ダッシュボード登録 | dashboard_master, dashboard_user_setting | 必要 | 2テーブルへの書き込み |
 | ダッシュボード削除 | dashboard_gadget_master, dashboard_group_master, dashboard_master, dashboard_user_setting | 必要 | 4テーブルへの書き込み（カスケード削除） |
 | ダッシュボードグループ削除 | dashboard_gadget_master, dashboard_group_master | 必要 | 2テーブルへの書き込み（カスケード削除） |
@@ -2490,7 +2500,7 @@ def update_datasource_setting(db, user_id, organization_id, device_id, modifier)
 | データソース設定保存 | dashboard_user_setting | 必要 | 1レコードへの更新 |
 
 **読み取り専用ワークフロー（トランザクション不要）:**
-- ダッシュボード初期表示
+- ダッシュボード初期表示（※ユーザー設定未登録時は dashboard_user_setting への書き込みが発生するため除く）
 - ダッシュボード管理モーダル表示
 - ガジェット追加モーダル表示
 - ガジェットデータ取得

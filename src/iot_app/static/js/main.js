@@ -57,16 +57,36 @@ document.addEventListener('submit', function (e) {
  * トーストで表示したうえで URL からパラメータを消去する。
  */
 document.addEventListener('DOMContentLoaded', function () {
-  var params = new URLSearchParams(window.location.search);
-  var error = params.get('error');
-  if (!error) return;
+  /* ── URL パラメータ経由トースト（バックエンド起点のリダイレクト後） ──
+   * Flask が ?error= / ?success= を付与してリダイレクトした場合に表示する。
+   * JS 起点のトーストは Toast.show() / Toast.showAfterReload() を使うこと。
+   */
+  var params  = new URLSearchParams(window.location.search);
+  var error   = params.get('error');
+  var success = params.get('success');
 
-  Toast.show(error);
+  if (error)   Toast.show(error,   'error');
+  if (success) Toast.show(success, 'success');
 
-  params.delete('error');
-  var newSearch = params.toString();
-  var newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
-  history.replaceState(null, '', newUrl);
+  if (error || success) {
+    params.delete('error');
+    params.delete('success');
+    var newSearch = params.toString();
+    var newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    history.replaceState(null, '', newUrl);
+  }
+
+  /* ── sessionStorage 経由トースト（JS 起点のリロード後） ──
+   * Toast.showAfterReload() で保存されたメッセージをリロード後に表示する。
+   */
+  var pending = sessionStorage.getItem('_pending_toast');
+  if (pending) {
+    sessionStorage.removeItem('_pending_toast');
+    try {
+      var t = JSON.parse(pending);
+      Toast.show(t.message, t.type);
+    } catch (e) {}
+  }
 });
 
 /* ===== CSVインポートモーダル ===== */

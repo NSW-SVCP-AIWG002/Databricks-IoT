@@ -209,7 +209,7 @@ def handle_gadget_register(gadget_type):
 
     try:
         register_belt_chart_gadget(form_data, g.current_user.user_id, accessible_org_ids)
-        return redirect(url_for('customer_dashboard.customer_dashboard', registered=1))
+        return jsonify({'message': 'ガジェットを登録しました'})
     except NotFoundError:
         abort(404)
     except Exception as e:

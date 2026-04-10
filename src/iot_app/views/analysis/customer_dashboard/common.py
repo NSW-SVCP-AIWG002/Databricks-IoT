@@ -1,4 +1,4 @@
-from flask import abort, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, g, jsonify, redirect, render_template, request, url_for
 
 from iot_app import db
 from iot_app.common.logger import get_logger
@@ -123,6 +123,11 @@ def customer_dashboard():
     else:
         first = get_first_dashboard(accessible_org_ids)
         dashboard_id = first.dashboard_id if first else None
+        # ユーザー設定が未登録かつアクセス可能なダッシュボードがある場合は先頭を自動登録
+        if dashboard_id and not user_setting:
+            upsert_dashboard_user_setting(g.current_user.user_id, dashboard_id)
+            db.session.commit()
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
     dashboards = get_dashboards(accessible_org_ids)
     organizations = get_organizations(accessible_org_ids)
@@ -236,8 +241,7 @@ def dashboard_register():
         upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
         logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
-        flash('ダッシュボードを登録しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードを登録しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -308,8 +312,7 @@ def dashboard_update(dashboard_uuid):
     try:
         update_dashboard_title(dashboard, form.dashboard_name.data, g.current_user.user_id)
         db.session.commit()
-        flash('ダッシュボードタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -365,8 +368,7 @@ def dashboard_delete(dashboard_uuid):
     try:
         delete_dashboard_with_cascade(dashboard, accessible_org_ids, g.current_user.user_id)
         db.session.commit()
-        flash('ダッシュボードを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードを削除しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -442,8 +444,7 @@ def group_register():
         )
         db.session.commit()
         logger.info(f'グループ登録成功: dashboard_id={dashboard.dashboard_id}')
-        flash('ダッシュボードグループを登録しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードグループを登録しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -514,8 +515,7 @@ def group_update(dashboard_group_uuid):
     try:
         update_group_title(group, form.dashboard_group_name.data, g.current_user.user_id)
         db.session.commit()
-        flash('ダッシュボードグループタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードグループタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -571,8 +571,7 @@ def group_delete(dashboard_group_uuid):
     try:
         delete_group_with_cascade(group, g.current_user.user_id)
         db.session.commit()
-        flash('ダッシュボードグループを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードグループを削除しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -605,8 +604,8 @@ def gadget_create(gadget_type):
     """ガジェット登録モーダル表示（ガジェット種別ごとのハンドラーにディスパッチ）"""
     gadget_name = _SLUG_TO_NAME.get(gadget_type)
     if gadget_name is None:
-        logger.error(f'未対応のガジェット種別: gadget_type={gadget_type}')
-        abort(500)
+        logger.info(f'未実装のガジェット種別が選択されました: gadget_type={gadget_type}')
+        return jsonify({'error': '追加予定のガジェットです'}), 404
     handler = _get_handler(gadget_name, 'handle_gadget_create')
     return handler(gadget_type)
 
@@ -691,8 +690,7 @@ def gadget_update(gadget_uuid):
     try:
         update_gadget_title(gadget, form.gadget_name.data, g.current_user.user_id)
         db.session.commit()
-        flash('ガジェットタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
@@ -748,8 +746,7 @@ def gadget_delete(gadget_uuid):
     try:
         delete_gadget(gadget, g.current_user.user_id)
         db.session.commit()
-        flash('ガジェットを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットを削除しました'})
 
     except Exception as e:
         db.session.rollback()

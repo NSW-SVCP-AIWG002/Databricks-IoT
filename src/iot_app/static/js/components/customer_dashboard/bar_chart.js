@@ -235,7 +235,7 @@
       .then(function (res) {
         if (!res.ok) {
           return res.json().then(function (data) {
-            Toast.show(data.error || 'エラーが発生しました');
+            Toast.show(data.error || 'エラーが発生しました', 'error');
           });
         }
         return res.blob().then(function (blob) {
@@ -247,7 +247,7 @@
         });
       })
       .catch(function () {
-        Toast.show('CSVのダウンロードに失敗しました');
+        Toast.show('CSVのダウンロードに失敗しました', 'error');
       });
   }
 
@@ -398,8 +398,8 @@ function bindBarChartGadgetRegister(container) {
       const mode = btn.dataset.mode;
       if (deviceModeInput) deviceModeInput.value = mode;
       const isFixed = mode === 'fixed';
-      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
-      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? 'visible' : 'hidden';
+      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? 'visible' : 'hidden';
     });
   });
 
