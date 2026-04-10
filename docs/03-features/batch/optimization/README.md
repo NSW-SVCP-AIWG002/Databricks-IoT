@@ -152,4 +152,4 @@ flowchart TB
 | 日付       | 版数 | 変更内容                                       | 担当者       |
 | ---------- | ---- | ---------------------------------------------- | ------------ |
 | 2026-04-01 | 1.0  | 初版作成                                       | Kei Sugiyama |
-| 2026-04-07 | 1.1  | job-specification.mdの内容に合わせてREADME整備 | Kei Sugiyama |
+| 2026-04-10 | 1.1  | job-specification.mdの内容に合わせてREADME整備 | Kei Sugiyama |

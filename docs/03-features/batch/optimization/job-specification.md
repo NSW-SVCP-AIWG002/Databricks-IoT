@@ -183,7 +183,7 @@ flowchart TD
     Start([ジョブ開始]) --> GetTables[対象テーブル設定一覧を取得]
     GetTables --> Loop[各テーブルを処理]
 
-    Loop --> Cleanup[cleanup_and_vacuum 実行<br>テーブル名・保持年数・<br>タイムスタンプカラムを渡す]
+    Loop --> Cleanup[cleanup_and_vacuum 実行<br>テーブル名・保持年数・<br>タイムスタンプカラム・<br>日付書式（任意）を渡す]
     Cleanup --> Delete[保持期間超過データのDELETE実行]
     Delete --> DeleteResult{成功?}
 
@@ -208,25 +208,36 @@ flowchart TD
 #### 処理コード
 
 ```python
-def cleanup_and_vacuum(table: str, retain_years: int, timestamp_col: str, retain_hours: int = 168):
+def cleanup_and_vacuum(table: str, retain_years: int, timestamp_col: str,
+                       retain_hours: int = 168, cutoff_date_format: str = None):
     """テーブルのデータ削除（保持期間超過）およびVACUUM実行（共通処理）
 
     Args:
-        table:         対象テーブルのフルパス
-        retain_years:  データ保持年数（これを超えたレコードを削除）
-        timestamp_col: 保持期間判定に使用するタイムスタンプカラム名
-        retain_hours:  VACUUMの保持時間（デフォルト: 168時間 = 7日）
+        table:              対象テーブルのフルパス
+        retain_years:       データ保持年数（これを超えたレコードを削除）
+        timestamp_col:      保持期間判定に使用するタイムスタンプカラム名
+        retain_hours:       VACUUMの保持時間（デフォルト: 168時間 = 7日）
+        cutoff_date_format: カットオフ日付の書式（省略時は DATE 型で比較）。
+                            timestamp_col が STRING 型の場合に指定する
+                            （例: 'yyyy-MM' → DATE_FORMAT で STRING に変換して比較）
 
     注意:
-        table・timestamp_col・retain_years は CLEANUP_TABLE_CONFIG のコード内定数からのみ渡すこと。
+        table・timestamp_col・retain_years・cutoff_date_format は CLEANUP_TABLE_CONFIG の
+        コード内定数からのみ渡すこと。
         外部入力（ユーザー入力・API経由の値等）を直接渡すと SQL インジェクションのリスクがある。
     """
     print(f"クリーンアップ開始: {table}")
     try:
+        # カットオフ日付の式を決定（STRING型カラムの場合は書式変換）
+        if cutoff_date_format:
+            cutoff_expr = f"DATE_FORMAT(CURRENT_DATE() - INTERVAL {retain_years} YEAR, '{cutoff_date_format}')"
+        else:
+            cutoff_expr = f"CURRENT_DATE() - INTERVAL {retain_years} YEAR"
+
         # 保持期間超過データを削除
         deleted = spark.sql(f"""
             DELETE FROM {table}
-            WHERE {timestamp_col} < CURRENT_DATE() - INTERVAL {retain_years} YEAR
+            WHERE {timestamp_col} < {cutoff_expr}
         """)
         print(f"  - {retain_years}年超過データ削除行数: {deleted.first()['num_deleted_rows']}")
 
@@ -247,7 +258,7 @@ def cleanup_and_vacuum(table: str, retain_years: int, timestamp_col: str, retain
         raise
 
 
-# 対象テーブル設定（テーブル名・保持年数・タイムスタンプカラム）
+# 対象テーブル設定（テーブル名・保持年数・タイムスタンプカラム・日付書式（任意））
 CLEANUP_TABLE_CONFIG = [
     {
         "table": "iot_catalog.silver.silver_sensor_data",
@@ -268,6 +279,7 @@ CLEANUP_TABLE_CONFIG = [
         "table": "iot_catalog.gold.gold_sensor_data_monthly_summary",
         "retain_years": 10,
         "timestamp_col": "collection_year_month",
+        "cutoff_date_format": "yyyy-MM",
     },
 ]
 
@@ -280,10 +292,12 @@ print("全テーブルのクリーンアップ完了")
 
 #### DELETE設定
 
-| 項目         | Silver層           | Gold層             |
-| ------------ | ------------------ | ------------------ |
-| 保持期間     | 5年                | 10年               |
-| 対象テーブル | silver_sensor_data | gold_sensor_data_* |
+| 項目                   | Silver層           | Gold層（hourly/daily）                                                    | Gold層（monthly）                |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------- | -------------------------------- |
+| 保持期間               | 5年                | 10年                                                                      | 10年                             |
+| タイムスタンプカラム型 | TIMESTAMP          | TIMESTAMP / DATE                                                          | STRING（YYYY-MM）                |
+| カットオフ比較方式     | DATE型で比較       | DATE型で比較                                                              | DATE_FORMAT で STRING 変換後に比較 |
+| 対象テーブル           | silver_sensor_data | gold_sensor_data_hourly_summary<br>gold_sensor_data_daily_summary | gold_sensor_data_monthly_summary |
 
 #### VACUUM設定
 
@@ -323,7 +337,7 @@ flowchart TD
     DirLoop --> ListFiles[ディレクトリ内の<br>ファイル一覧を取得]
     ListFiles --> ListResult{取得<br>成功?}
 
-    ListResult -->|失敗| DirError[エラー出力]
+    ListResult -->|失敗| DirError[エラー出力・例外 raise]
     ListResult -->|成功| FileLoop[各ファイルを処理]
 
     FileLoop --> CheckDate{更新日時が<br>カットオフ日<br>より前?}
@@ -336,15 +350,15 @@ flowchart TD
     NextFile -->|あり| FileLoop
     NextFile -->|なし| Log[削除件数を出力]
 
-    DirError --> NextDir{次の<br>ディレクトリ?}
-    Log --> NextDir
+    DirError --> End
+    Log --> NextDir{次の<br>ディレクトリ?}
 
     NextDir -->|あり| DirLoop
     NextDir -->|なし| TableDelete[チェックポイントテーブルの<br>30日超過スレッドをDELETE]
 
     TableDelete --> DeleteResult{成功?}
     DeleteResult -->|成功| DeleteMetrics[メトリクス出力<br>削除行数]
-    DeleteResult -->|失敗| TableError[エラー出力]
+    DeleteResult -->|失敗| TableError[エラー出力・例外 raise]
 
     DeleteMetrics --> Vacuum[チェックポイントテーブルの<br>VACUUM実行<br>保持期間: 168時間（7日）]
     Vacuum --> VacuumResult{成功?}
@@ -436,6 +450,7 @@ def cleanup_checkpoint_table():
         print(f"チェックポイントテーブルクリーンアップ完了: {TABLE}")
     except Exception as e:
         print(f"チェックポイントテーブルクリーンアップエラー: {TABLE} - {str(e)}")
+        raise
 
 
 # ジョブ実行
@@ -479,6 +494,4 @@ cleanup_checkpoint_table()
 | 日付       | 版数 | 変更内容                                         | 担当者       |
 | ---------- | ---- | ------------------------------------------------ | ------------ |
 | 2026-04-07 | 1.0  | 初版作成                                         | Kei Sugiyama |
-| 2026-04-07 | 1.1  | Silver・Gold処理を共通関数化してドキュメント統合 | Kei Sugiyama |
-| 2026-04-09 | 1.2  | INTERVAL構文統一・ジョブ名修正・エラー処理改善・スキップログ追加・関連ドキュメント修正 | Kei Sugiyama |
-| 2026-04-09 | 1.3  | cleanup_old_checkpoints に raise 追加・フロー図エラー時動作修正・安全注記追加          | Kei Sugiyama |
+| 2026-04-10 | 1.1  | Silver・Gold処理を共通関数化してドキュメント統合 | Kei Sugiyama |
