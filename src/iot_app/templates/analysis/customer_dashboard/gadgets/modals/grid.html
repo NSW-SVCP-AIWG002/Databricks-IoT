@@ -1,0 +1,109 @@
+<div class="modal-content--lg">
+
+<!-- モーダルヘッダー -->
+<div class="modal__header">
+  <h2 class="modal__title">表</h2>
+</div>
+
+<!-- モーダルボディ -->
+<form method="POST"
+      action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
+      id="grid-register-form"
+      novalidate
+      data-ajax-submit>
+  {{ form.hidden_tag() }}
+
+  <div class="modal__body">
+
+    <!-- (1) タイトル行 -->
+    <div class="gadget-register__title-row">
+      <label class="form__label form__label--required" for="gadget_name">タイトル</label>
+      {{ form.gadget_name(class="form__input", id="gadget_name", maxlength=20) }}
+      <span class="form__error form__error--reserved">{% if form.gadget_name.errors %}{{ form.gadget_name.errors[0] }}{% endif %}</span>
+    </div>
+
+    <!-- (2)(3) 日時ピッカー行 -->
+    <div class="grid-register__datetime-row">
+      <div class="grid-register__datetime-group">
+        <span class="grid-register__label">開始日時：</span>
+        <div class="grid-register__datetime-input-wrapper">
+          <span class="grid-register__calendar-icon">📅</span>
+          <input class="form__input grid-register__datetime-input"
+                 type="text"
+                 id="preview-start-datetime"
+                 placeholder="YYYY/MM/DD HH:mm:ss"
+                 autocomplete="off">
+        </div>
+        <button class="grid-register__refresh-btn" type="button"
+                id="preview-start-refresh"
+                title="現在日時 - 1時間を設定">🔄</button>
+      </div>
+      <div class="grid-register__datetime-group">
+        <span class="grid-register__label">終了日時：</span>
+        <div class="grid-register__datetime-input-wrapper">
+          <span class="grid-register__calendar-icon">📅</span>
+          <input class="form__input grid-register__datetime-input"
+                 type="text"
+                 id="preview-end-datetime"
+                 placeholder="YYYY/MM/DD HH:mm:ss"
+                 autocomplete="off">
+        </div>
+        <button class="grid-register__refresh-btn" type="button"
+                id="preview-end-refresh"
+                title="現在日時を設定">🔄</button>
+      </div>
+    </div>
+
+    <!-- (4) テーブルプレビューエリア -->
+    <div class="grid-register__preview-wrapper">
+      <div class="grid-register__table-scroll">
+        <table class="table grid-register__table" id="preview-table">
+          <thead id="preview-thead">
+            <tr></tr>
+          </thead>
+          <tbody id="preview-tbody">
+          </tbody>
+        </table>
+      </div>
+      <div class="grid-register__pagination" id="preview-pagination"></div>
+    </div>
+
+    <!-- (5) グループ選択 / (6) 部品サイズ -->
+    <div class="form__row form__row--top">
+      <div class="form__group form__group--half">
+        <div class="form__group--inline">
+          <label class="form__label form__label--required" for="group_id">グループ選択</label>
+          <select class="form__select" name="group_id" id="group_id">
+            {% for gr in groups %}
+            <option value="{{ gr.dashboard_group_id }}"
+                    {% if form.group_id.data == gr.dashboard_group_id %}selected{% endif %}>
+              {{ gr.dashboard_group_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+      </div>
+      <div class="form__group form__group--half">
+        <div class="form__group--inline">
+          <label class="form__label form__label--required" for="gadget_size">部品サイズ</label>
+          {{ form.gadget_size(class="form__select", id="gadget_size") }}
+        </div>
+        {% if form.gadget_size.errors %}
+          <span class="form__error">{{ form.gadget_size.errors[0] }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- モーダルフッター -->
+  <div class="modal__footer">
+    <button type="submit" class="button button--primary" id="register-btn">登録</button>
+    <button type="button" class="button button--secondary"
+            id="modal-close-btn">キャンセル</button>
+  </div>
+
+</form>
+
+</div>

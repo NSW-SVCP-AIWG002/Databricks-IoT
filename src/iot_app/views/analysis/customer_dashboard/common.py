@@ -89,6 +89,13 @@ _GADGET_REGISTRY = {
         'js':       'js/components/customer_dashboard/belt_chart.js',
         'module':   'iot_app.views.analysis.customer_dashboard.belt_chart',
     },
+    '表': {
+        'slug':     'grid',
+        'template': 'analysis/customer_dashboard/gadgets/grid.html',
+        'css':      'css/components/customer_dashboard/grid.css',
+        'js':       'js/components/customer_dashboard/grid.js',
+        'module':   'iot_app.views.analysis.customer_dashboard.grid',
+    },
 }
 
 # レジストリから派生（直接編集不要）
@@ -759,6 +766,14 @@ def gadget_delete(gadget_uuid):
 # ---------------------------------------------------------------------------
 # No.23 ガジェットデータ取得 / CSVエクスポート（ガジェット種別ごとのハンドラーにディスパッチ）
 # ---------------------------------------------------------------------------
+
+@customer_dashboard_bp.route('/gadgets/preview/grid/data', methods=['POST'])
+@require_auth
+def gadget_preview_grid_data():
+    """表ガジェット登録モーダル用プレビューデータ取得"""
+    from iot_app.views.analysis.customer_dashboard.grid import handle_gadget_preview
+    return handle_gadget_preview()
+
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
 @require_auth

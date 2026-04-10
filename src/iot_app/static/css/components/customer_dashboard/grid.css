@@ -1,0 +1,428 @@
+/* ============================================================
+   表ガジェット
+   ============================================================ */
+
+.grid-gadget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 日時コントロールエリア */
+.grid-gadget__controls {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: var(--spacing-4);
+  row-gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-4);
+  flex-shrink: 0;
+}
+
+/* ラベル行・入力行：display: contents で子要素をグリッドアイテムに展開 */
+.grid-gadget__controls-label-row,
+.grid-gadget__controls-input-row {
+  display: contents;
+}
+
+.grid-gadget__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+/* 入力欄 + リフレッシュボタン */
+.grid-gadget__datetime-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+/* 日時入力ラッパー（入力欄 + カレンダーアイコン） */
+.grid-gadget__datetime-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.grid-gadget__datetime-input {
+  width: 170px;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--spacing-2) 2px 24px;
+}
+
+/* カレンダーアイコン */
+.grid-gadget__calendar-icon {
+  position: absolute;
+  left: 4px;
+  font-size: 13px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.grid-gadget__refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  color: var(--color-secondary);
+  margin-left: var(--spacing-1);
+}
+
+.grid-gadget__refresh-btn:hover {
+  color: var(--color-primary);
+}
+
+/* --------------------------------------------------------------------------
+   2x4ガジェット（gadget--wide）: 開始/終了日時を1行に配置
+   -------------------------------------------------------------------------- */
+
+.gadget--wide .grid-gadget__controls {
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+}
+
+.gadget--wide .grid-gadget__controls-label-row > :nth-child(1) { grid-column: 1; grid-row: 1; }
+.gadget--wide .grid-gadget__controls-label-row > :nth-child(2) { grid-column: 3; grid-row: 1; }
+.gadget--wide .grid-gadget__controls-input-row > :nth-child(1) { grid-column: 2; grid-row: 1; }
+.gadget--wide .grid-gadget__controls-input-row > :nth-child(2) { grid-column: 4; grid-row: 1; }
+
+/* テーブルエリア */
+.grid-gadget__table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid #eee;
+}
+
+.grid-gadget__table-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.grid-gadget__table {
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  min-width: 100%;
+}
+
+.grid-gadget__table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f5f5f5;
+}
+
+.grid-gadget__table th,
+.grid-gadget__table td {
+  border: 1px solid #ddd;
+  padding: var(--spacing-1) var(--spacing-2);
+  text-align: right;
+}
+
+/* 列幅定義 */
+.grid-gadget__table th:nth-child(1),
+.grid-gadget__table td:nth-child(1)  { min-width: 150px; width: 150px; }
+.grid-gadget__table th:nth-child(2),
+.grid-gadget__table td:nth-child(2)  { min-width: 120px; width: 120px; }
+.grid-gadget__table th:nth-child(3),
+.grid-gadget__table td:nth-child(3)  { min-width:  80px; width:  80px; }
+.grid-gadget__table th:nth-child(4),
+.grid-gadget__table td:nth-child(4)  { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(5),
+.grid-gadget__table td:nth-child(5)  { min-width: 140px; width: 140px; }
+.grid-gadget__table th:nth-child(6),
+.grid-gadget__table td:nth-child(6)  { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(7),
+.grid-gadget__table td:nth-child(7)  { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(8),
+.grid-gadget__table td:nth-child(8)  { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(9),
+.grid-gadget__table td:nth-child(9)  { min-width: 140px; width: 140px; }
+.grid-gadget__table th:nth-child(10),
+.grid-gadget__table td:nth-child(10) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(11),
+.grid-gadget__table td:nth-child(11) { min-width: 140px; width: 140px; }
+.grid-gadget__table th:nth-child(12),
+.grid-gadget__table td:nth-child(12) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(13),
+.grid-gadget__table td:nth-child(13) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(14),
+.grid-gadget__table td:nth-child(14) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(15),
+.grid-gadget__table td:nth-child(15) { min-width: 140px; width: 140px; }
+.grid-gadget__table th:nth-child(16),
+.grid-gadget__table td:nth-child(16) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(17),
+.grid-gadget__table td:nth-child(17) { min-width: 100px; width: 100px; }
+.grid-gadget__table th:nth-child(18),
+.grid-gadget__table td:nth-child(18) { min-width: 130px; width: 130px; }
+.grid-gadget__table th:nth-child(19),
+.grid-gadget__table td:nth-child(19) { min-width: 130px; width: 130px; }
+.grid-gadget__table th:nth-child(20),
+.grid-gadget__table td:nth-child(20) { min-width: 130px; width: 130px; }
+.grid-gadget__table th:nth-child(21),
+.grid-gadget__table td:nth-child(21) { min-width: 130px; width: 130px; }
+.grid-gadget__table th:nth-child(22),
+.grid-gadget__table td:nth-child(22) { min-width: 130px; width: 130px; }
+.grid-gadget__table th:nth-child(23),
+.grid-gadget__table td:nth-child(23) { min-width: 110px; width: 110px; }
+.grid-gadget__table th:nth-child(24),
+.grid-gadget__table td:nth-child(24) { min-width: 110px; width: 110px; }
+
+/* 列1・2：固定（sticky） */
+.grid-gadget__table th:nth-child(1),
+.grid-gadget__table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  text-align: left;
+  box-shadow: 1px 0 0 #ddd;
+}
+
+.grid-gadget__table th:nth-child(2),
+.grid-gadget__table td:nth-child(2) {
+  position: sticky;
+  left: 150px;
+  z-index: 1;
+  background: #fff;
+  text-align: left;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ヘッダー行の固定列背景 */
+.grid-gadget__table thead th:nth-child(1),
+.grid-gadget__table thead th:nth-child(2) {
+  background: #f5f5f5;
+}
+
+.grid-gadget__table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.grid-gadget__table tbody tr:hover {
+  background: #f0f4ff;
+}
+
+/* sticky列の背景を明示（スクロール時の透過防止） */
+.grid-gadget__table tbody td:nth-child(1),
+.grid-gadget__table tbody td:nth-child(2) { background: #fff; }
+
+.grid-gadget__table tbody tr:nth-child(even) td:nth-child(1),
+.grid-gadget__table tbody tr:nth-child(even) td:nth-child(2) { background: #fafafa; }
+
+.grid-gadget__table tbody tr:hover td:nth-child(1),
+.grid-gadget__table tbody tr:hover td:nth-child(2) { background: #f0f4ff; }
+
+/* ページネーション */
+.grid-gadget__pagination {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-1) var(--spacing-4);
+  flex-shrink: 0;
+  border-top: 1px solid #eee;
+}
+
+/* ============================================================
+   表ガジェット登録モーダル
+   ============================================================ */
+
+.grid-register__datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+.grid-register__datetime-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.grid-register__label {
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.grid-register__datetime-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.grid-register__calendar-icon {
+  position: absolute;
+  left: 4px;
+  font-size: 13px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.grid-register__datetime-input {
+  width: 175px;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--spacing-2) 2px 24px;
+}
+
+.grid-register__refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  color: var(--color-secondary);
+  margin-left: var(--spacing-1);
+}
+
+.grid-register__refresh-btn:hover {
+  color: var(--color-primary);
+}
+
+/* プレビューテーブル */
+.grid-register__preview-wrapper {
+  margin-bottom: var(--spacing-3);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.grid-register__table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.grid-register__table {
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  min-width: 100%;
+}
+
+.grid-register__table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f5f5f5;
+}
+
+.grid-register__table th,
+.grid-register__table td {
+  border: 1px solid #ddd;
+  padding: var(--spacing-1) var(--spacing-2);
+  text-align: right;
+}
+
+/* 列幅定義 */
+.grid-register__table th:nth-child(1),
+.grid-register__table td:nth-child(1)  { min-width: 170px; width: 170px; text-align: left; }
+.grid-register__table th:nth-child(2),
+.grid-register__table td:nth-child(2)  { min-width: 120px; width: 120px; text-align: left; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+/* 列1・2：固定（sticky） */
+.grid-register__table th:nth-child(1),
+.grid-register__table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  border-left: 1px solid #ddd;
+  box-shadow: 1px 0 0 #ddd;
+}
+
+.grid-register__table th:nth-child(2),
+.grid-register__table td:nth-child(2) {
+  position: sticky;
+  left: 170px;
+  z-index: 1;
+  background: #fff;
+  border-right: 1px solid #ddd;
+}
+
+/* ヘッダー行の固定列：縦横両方向に固定 */
+.grid-register__table thead th:nth-child(1) {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  background: #f5f5f5;
+}
+
+.grid-register__table thead th:nth-child(2) {
+  position: sticky;
+  top: 0;
+  left: 170px;
+  z-index: 3;
+  background: #f5f5f5;
+}
+
+/* tbody sticky列の背景（スクロール時の透過防止） */
+.grid-register__table tbody td:nth-child(1),
+.grid-register__table tbody td:nth-child(2) { background: #fff; }
+.grid-register__table th:nth-child(3),
+.grid-register__table td:nth-child(3)  { min-width:  80px; width:  80px; }
+.grid-register__table th:nth-child(4),
+.grid-register__table td:nth-child(4)  { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(5),
+.grid-register__table td:nth-child(5)  { min-width: 140px; width: 140px; }
+.grid-register__table th:nth-child(6),
+.grid-register__table td:nth-child(6)  { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(7),
+.grid-register__table td:nth-child(7)  { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(8),
+.grid-register__table td:nth-child(8)  { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(9),
+.grid-register__table td:nth-child(9)  { min-width: 140px; width: 140px; }
+.grid-register__table th:nth-child(10),
+.grid-register__table td:nth-child(10) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(11),
+.grid-register__table td:nth-child(11) { min-width: 140px; width: 140px; }
+.grid-register__table th:nth-child(12),
+.grid-register__table td:nth-child(12) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(13),
+.grid-register__table td:nth-child(13) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(14),
+.grid-register__table td:nth-child(14) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(15),
+.grid-register__table td:nth-child(15) { min-width: 140px; width: 140px; }
+.grid-register__table th:nth-child(16),
+.grid-register__table td:nth-child(16) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(17),
+.grid-register__table td:nth-child(17) { min-width: 100px; width: 100px; }
+.grid-register__table th:nth-child(18),
+.grid-register__table td:nth-child(18) { min-width: 130px; width: 130px; }
+.grid-register__table th:nth-child(19),
+.grid-register__table td:nth-child(19) { min-width: 130px; width: 130px; }
+.grid-register__table th:nth-child(20),
+.grid-register__table td:nth-child(20) { min-width: 130px; width: 130px; }
+.grid-register__table th:nth-child(21),
+.grid-register__table td:nth-child(21) { min-width: 130px; width: 130px; }
+.grid-register__table th:nth-child(22),
+.grid-register__table td:nth-child(22) { min-width: 130px; width: 130px; }
+.grid-register__table th:nth-child(23),
+.grid-register__table td:nth-child(23) { min-width: 110px; width: 110px; }
+.grid-register__table th:nth-child(24),
+.grid-register__table td:nth-child(24) { min-width: 110px; width: 110px; }
+
+.grid-register__pagination {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-1) var(--spacing-4);
+  border-top: 1px solid #eee;
+}
+
+.form__row--top {
+  align-items: flex-start;
+}

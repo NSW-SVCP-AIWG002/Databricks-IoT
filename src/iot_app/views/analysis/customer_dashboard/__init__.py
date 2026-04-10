@@ -11,3 +11,4 @@ from iot_app.views.analysis.customer_dashboard import bar_chart  # noqa: E402, F
 from iot_app.views.analysis.customer_dashboard import timeline  # noqa: E402, F401
 from iot_app.views.analysis.customer_dashboard import circle_chart  # noqa: E402, F401
 from iot_app.views.analysis.customer_dashboard import belt_chart  # noqa: E402, F401
+from iot_app.views.analysis.customer_dashboard import grid  # noqa: E402, F401

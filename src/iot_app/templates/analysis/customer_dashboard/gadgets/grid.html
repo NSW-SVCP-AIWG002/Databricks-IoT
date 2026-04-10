@@ -1,0 +1,63 @@
+<!-- 表ガジェット固有UI -->
+<div class="gadget__body">
+  <div class="grid-gadget" data-gadget-uuid="{{ gadget.gadget_uuid }}">
+
+    <!-- 日時選択エリア -->
+    <div class="grid-gadget__controls">
+      <!-- ラベル行 -->
+      <div class="grid-gadget__controls-label-row">
+        <span class="grid-gadget__label">開始日時：</span>
+        <span class="grid-gadget__label">終了日時：</span>
+      </div>
+      <!-- 入力行 -->
+      <div class="grid-gadget__controls-input-row">
+        <div class="grid-gadget__datetime-input-group">
+          <div class="grid-gadget__datetime-input-wrap">
+            <span class="grid-gadget__calendar-icon">📅</span>
+            <input class="form__input grid-gadget__datetime-input"
+                   type="text"
+                   id="start-datetime-{{ gadget.gadget_uuid }}"
+                   placeholder="YYYY/MM/DD HH:mm:ss"
+                   autocomplete="off">
+          </div>
+          <button class="grid-gadget__refresh-btn" type="button"
+                  id="start-refresh-{{ gadget.gadget_uuid }}"
+                  title="現在日時 - 1時間を設定">🔄</button>
+        </div>
+        <div class="grid-gadget__datetime-input-group">
+          <div class="grid-gadget__datetime-input-wrap">
+            <span class="grid-gadget__calendar-icon">📅</span>
+            <input class="form__input grid-gadget__datetime-input"
+                   type="text"
+                   id="end-datetime-{{ gadget.gadget_uuid }}"
+                   placeholder="YYYY/MM/DD HH:mm:ss"
+                   autocomplete="off">
+          </div>
+          <button class="grid-gadget__refresh-btn" type="button"
+                  id="end-refresh-{{ gadget.gadget_uuid }}"
+                  title="現在日時を設定">🔄</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- データテーブルエリア -->
+    <div class="grid-gadget__table-wrapper">
+      <div class="grid-gadget__table-scroll">
+        <table class="table grid-gadget__table"
+               id="table-{{ gadget.gadget_uuid }}">
+          <thead id="thead-{{ gadget.gadget_uuid }}">
+            <tr></tr>
+          </thead>
+          <tbody id="tbody-{{ gadget.gadget_uuid }}">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ページネーションエリア -->
+    <div class="grid-gadget__pagination"
+         id="pagination-{{ gadget.gadget_uuid }}">
+    </div>
+
+  </div>
+</div>
