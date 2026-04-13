@@ -460,6 +460,18 @@ flowchart TD
 
 > **注:** このルートはPRGパターン（Cookie保存後GETへリダイレクト）のため、サーバーサイドでのDBアクセスは行わない。アラート一覧・デバイス一覧の取得はリダイレクト先のGETルート（[店舗モニタリング初期表示](#店舗モニタリング初期表示)）が担当する。
 
+**リダイレクト先GETルートでの検索条件の適用:**
+
+リダイレクト先のGETルートは、Cookieから取得した検索条件をデバイス一覧・アラート一覧の両クエリに動的に追加する。適用ルールは以下の通り。
+
+| 条件 | デバイス一覧への追加 | アラート一覧への追加 |
+|------|---------------------|---------------------|
+| `organization_id` が指定されている | `AND v.device_organization_id = :organization_id` | `AND v.device_organization_id = :organization_id` |
+| `organization_id` が未指定かつ `organization_name` が指定されている | `AND om.organization_name LIKE :organization_name`（`om` は既存 JOIN） | `organization_master om` との `LEFT JOIN` を追加し `AND om.organization_name LIKE :organization_name` |
+| `device_name` が指定されている | `AND v.device_name LIKE :device_name` | `device_master dm` との `LEFT JOIN` を追加し `AND dm.device_name LIKE :device_name` |
+
+> **注:** `organization_id` と `organization_name` の両方が指定されている場合は `organization_id` を優先し、`organization_name` は無視する。
+
 **実装例:**
 ```python
 @analysis_bp.route('/analysis/industry-dashboard/store-monitoring', methods=['POST'])
