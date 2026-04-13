@@ -47,32 +47,34 @@
 
 ## 使用するFlaskルート一覧
 
-| No  | ルート名        | エンドポイント                                           | メソッド | 用途             | レスポンス形式     | 備考                   |
-| --- | --------------- | -------------------------------------------------------- | -------- | ---------------- | ------------------ | ---------------------- |
-| 1   | 台帳一覧表示    | `/admin/device-inventory`                                | GET      | 一覧・検索表示   | HTML               | ページング・検索対応   |
-| 2   | 台帳登録画面    | `/admin/device-inventory/create`                         | GET      | 登録モーダル表示 | HTML (partial)     | AJAX対応               |
-| 3   | 台帳登録実行    | `/admin/device-inventory/create`                         | POST     | 登録処理         | リダイレクト (302) | 成功時: 一覧へ         |
-| 4   | 台帳詳細表示    | `/admin/device-inventory/<device_inventory_uuid>`        | GET      | 参照モーダル表示 | HTML (partial)     | AJAX対応               |
-| 5   | 台帳更新画面    | `/admin/device-inventory/<device_inventory_uuid>/edit`   | GET      | 更新モーダル表示 | HTML (partial)     | AJAX対応               |
-| 6   | 台帳更新実行    | `/admin/device-inventory/<device_inventory_uuid>/update` | POST     | 更新処理         | リダイレクト (302) | 成功時: 一覧へ         |
-| 7   | 台帳削除実行    | `/admin/device-inventory/delete`                         | POST     | 削除処理         | リダイレクト (302) | 論理削除、複数選択対応 |
-| 8   | CSVエクスポート | `/admin/device-inventory`                                | POST     | CSV出力          | CSV                | 検索条件適用           |
+| No  | ルート名             | エンドポイント                                           | メソッド | 用途             | レスポンス形式     | 備考                   |
+| --- | -------------------- | -------------------------------------------------------- | -------- | ---------------- | ------------------ | ---------------------- |
+| 1   | 台帳一覧表示         | `/admin/device-inventory`                                | GET      | 一覧初期表示     | HTML               | ページング対応         |
+| 2   | 台帳一覧表示（検索） | `/admin/device-inventory`                                | POST     | 検索・絞り込み   | HTML               | 検索条件をCookieに保存 |
+| 3   | 台帳登録画面         | `/admin/device-inventory/create`                         | GET      | 登録モーダル表示 | HTML (partial)     | AJAX対応               |
+| 4   | 台帳登録実行         | `/admin/device-inventory/create`                         | POST     | 登録処理         | リダイレクト (302) | 成功時: 一覧へ         |
+| 5   | 台帳詳細表示         | `/admin/device-inventory/<device_inventory_uuid>`        | GET      | 参照モーダル表示 | HTML (partial)     | AJAX対応               |
+| 6   | 台帳更新画面         | `/admin/device-inventory/<device_inventory_uuid>/edit`   | GET      | 更新モーダル表示 | HTML (partial)     | AJAX対応               |
+| 7   | 台帳更新実行         | `/admin/device-inventory/<device_inventory_uuid>/update` | POST     | 更新処理         | リダイレクト (302) | 成功時: 一覧へ         |
+| 8   | 台帳削除実行         | `/admin/device-inventory/delete`                         | POST     | 削除処理         | リダイレクト (302) | 論理削除、複数選択対応 |
+| 9   | CSVエクスポート      | `/admin/device-inventory/export`                         | POST     | CSV出力          | CSV                | 検索条件適用           |
 
 ---
 
 ## ルート呼び出しマッピング
 
-| ユーザー操作        | トリガー        | 呼び出すルート                                                | パラメータ                     | レスポンス           | エラー時の挙動       |
-| ------------------- | --------------- | ------------------------------------------------------------- | ------------------------------ | -------------------- | -------------------- |
-| 画面初期表示        | URL直接アクセス | `GET /admin/device-inventory`                                 | `page=1`                       | HTML（一覧画面）     | エラーモーダル表示   |
-| 検索ボタン押下      | フォーム送信    | `GET /admin/device-inventory`                                 | 検索条件                       | HTML（検索結果）     | エラーメッセージ表示 |
-| 台帳登録ボタン押下  | リンククリック  | `GET /admin/device-inventory/create`                          | なし                           | HTML（登録モーダル） | エラーモーダル表示   |
-| 登録実行            | フォーム送信    | `POST /admin/device-inventory/create`                         | フォームデータ                 | リダイレクト → 一覧  | モーダル再表示       |
-| 参照ボタン押下      | ボタンクリック  | `GET /admin/device-inventory/<device_inventory_uuid>`         | device_inventory_uuid          | HTML（参照モーダル） | エラーモーダル表示   |
-| 編集ボタン押下      | リンククリック  | `GET /admin/device-inventory/<device_inventory_uuid>/edit`    | device_inventory_uuid          | HTML（更新モーダル） | エラーモーダル表示   |
-| 更新実行            | フォーム送信    | `POST /admin/device-inventory/<device_inventory_uuid>/update` | フォームデータ                 | リダイレクト → 一覧  | モーダル再表示       |
-| 削除ボタン押下      | フォーム送信    | `POST /admin/device-inventory/delete`                         | device_inventory_uuids（配列） | リダイレクト → 一覧  | エラーメッセージ表示 |
-| CSVエクスポート押下 | リンククリック  | `POST /admin/device-inventory`                                | 検索条件                       | CSVファイル          | エラーメッセージ表示 |
+| ユーザー操作        | トリガー                       | 呼び出すルート                                                | パラメータ                             | レスポンス           | エラー時の挙動       |
+| ------------------- | ------------------------------ | ------------------------------------------------------------- | -------------------------------------- | -------------------- | -------------------- |
+| 画面初期表示        | URL直接アクセス                | `GET /admin/device-inventory`                                 | `page=1`                               | HTML（一覧画面）     | エラーモーダル表示   |
+| 検索ボタン押下      | フォーム送信                   | `POST /admin/device-inventory`                                | 検索条件                               | HTML（検索結果）     | エラーメッセージ表示 |
+| ページング          | ページネーション操作           | `GET /admin/device-inventory`                                 | `page=N`（Cookieから検索条件引き継ぎ） | HTML（一覧画面）     | エラーモーダル表示   |
+| 台帳登録ボタン押下  | リンククリック                 | `GET /admin/device-inventory/create`                          | なし                                   | HTML（登録モーダル） | エラーモーダル表示   |
+| 登録実行            | フォーム送信                   | `POST /admin/device-inventory/create`                         | フォームデータ                         | リダイレクト → 一覧  | モーダル再表示       |
+| 参照ボタン押下      | ボタンクリック                 | `GET /admin/device-inventory/<device_inventory_uuid>`         | device_inventory_uuid                  | HTML（参照モーダル） | エラーモーダル表示   |
+| 編集ボタン押下      | リンククリック                 | `GET /admin/device-inventory/<device_inventory_uuid>/edit`    | device_inventory_uuid                  | HTML（更新モーダル） | エラーモーダル表示   |
+| 更新実行            | フォーム送信                   | `POST /admin/device-inventory/<device_inventory_uuid>/update` | フォームデータ                         | リダイレクト → 一覧  | モーダル再表示       |
+| 削除ボタン押下      | フォーム送信                   | `POST /admin/device-inventory/delete`                         | device_inventory_uuids（配列）         | リダイレクト → 一覧  | エラーメッセージ表示 |
+| CSVエクスポート押下 | ボタンクリック（フォーム送信） | `POST /admin/device-inventory/export`                         | なし（Cookieから検索条件を取得）       | CSVファイル          | エラーメッセージ表示 |
 
 ---
 
@@ -112,7 +114,7 @@ flowchart TD
 
     CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
 
-    CheckPage -->|ある<br>ページング| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie]
+    CheckPage -->|ある<br>ページング（初期表示後・検索後）| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie<br>※POST検索またはGET初期表示でセット済み]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
     OverridePage --> LoadMaster
 
@@ -209,6 +211,17 @@ def get_device_inventory_form_options() -> tuple[list, list, list]:
     return device_types, inventory_statuses, sort_items
 
 
+def get_organization_options() -> list:
+    """登録・更新フォーム用組織選択肢を取得する（get_device_inventory_form_optionsとは別関数）
+
+    Returns:
+        organizations: 組織マスタのリスト
+    """
+    return OrganizationMaster.query.filter_by(delete_flag=False).order_by(
+        OrganizationMaster.organization_name
+    ).all()
+
+
 def search_device_inventories(search_params: dict) -> tuple[list, int]:
     """デバイス台帳一覧を検索する
 
@@ -260,10 +273,18 @@ def search_device_inventories(search_params: dict) -> tuple[list, int]:
     order_direction = sort_order if sort_order in ['asc', 'desc'] else 'desc'
     sort_model      = DeviceMaster if sort_column in _DEVICE_MASTER_SORT_COLUMNS else DeviceInventoryMaster
     sort_attr       = getattr(sort_model, sort_column)
-    query = query.order_by(sort_attr.desc() if order_direction == 'desc' else sort_attr.asc())
+    query = query.order_by(
+        sort_attr.desc() if order_direction == 'desc' else sort_attr.asc(),
+        DeviceInventoryMaster.device_inventory_id.asc(),  # セカンダリソートキー（ページング時の並び順を一定に保つ）
+    )
 
     total       = query.count()
-    inventories = query.limit(per_page).offset(offset).all()
+
+    if per_page == -1:
+        inventories = query.all()
+    else:
+        inventories = query.limit(per_page).offset(offset).all()
+    
     return inventories, total
 ```
 
@@ -281,6 +302,8 @@ def list_device_inventory():
         save_cookie = True
     else:
         # ページング: Cookie から検索条件取得 → page 上書き
+        # CookieはPOST検索（search_device_inventory）またはGET初期表示（list_device_inventory）でセットされる
+        # Cookieが存在しない場合（直接URLアクセス等）はデフォルト値にフォールバック
         search_params = get_search_conditions_cookie('device_inventory') or get_default_search_params()
         search_params['page'] = request.args.get('page', 1, type=int)
         save_cookie = False
@@ -312,7 +335,7 @@ def list_device_inventory():
 | -------------- | ------------------ | -------------------------- | ---------------------------------- |
 | 401            | 認証エラー         | ログイン画面へリダイレクト | -                                  |
 | 403            | 権限エラー         | 403エラーモーダル表示      | この操作を実行する権限がありません |
-| 500            | データベースエラー | 110エラーモーダル表示      | データの取得に失敗しました         |
+| 500            | データベースエラー | 500エラーモーダル表示      | データの取得に失敗しました         |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -367,8 +390,8 @@ flowchart TD
 
 #### Flaskルート
 
-| ルート               | エンドポイント                 | 詳細                                                                                                                                                                                                                                             |
-| -------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ルート               | エンドポイント                 | 詳細                                                                                                                                                                                                                                          |
+| -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 台帳一覧表示（検索） | `POST /admin/device-inventory` | フォームデータ: `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_item_id`, `sort_order`。デバイス・在庫状況・ソート項目をDBから取得 |
 
 #### バリデーション
@@ -439,7 +462,7 @@ def search_device_inventory():
 
 #### 処理フロー
 
-ソート条件を変更して `GET /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
+ソート条件を変更して `POST /admin/device-inventory` へリダイレクト。検索条件は保持し、ページは1にリセット。
 
 **ソート項目マスタ:**
 フロントエンドから送信されるソート項目IDと実際のカラム名のマッピングは、`sort_item_master` テーブルで管理します。セキュリティのため、テーブルに登録された項目IDのみを受け付けます。
@@ -505,11 +528,26 @@ GET /admin/device-inventory?sort_item_id=0&sort_order=desc&page=1
 
 #### 処理フロー
 
-ページ番号を変更して `GET /admin/device-inventory` へリダイレクト。検索条件とソート条件は保持。
+ページ番号をクエリパラメータ `page` に設定して `GET /admin/device-inventory` へリクエストする。検索条件・ソート条件はURLに含めず、**Cookieから取得**する。
+
+**Cookieの設定タイミング:**
+
+| 操作                   | ルート                         | Cookie への影響                                      |
+| ---------------------- | ------------------------------ | ---------------------------------------------------- |
+| 検索ボタン押下         | `POST /admin/device-inventory` | 入力した検索条件でCookieを上書き（page=1でリセット） |
+| 初期表示（pageなし）   | `GET /admin/device-inventory`  | デフォルト検索条件でCookieをセット                   |
+| ページング（pageあり） | `GET /admin/device-inventory`  | Cookieを更新しない（読み取りのみ）                   |
+
+**ページングリクエストの形式:**
 
 ```
-GET /admin/device-inventory?device_name=...&sort_item_id=0&sort_order=desc&page=3
+GET /admin/device-inventory?page=3
 ```
+
+`list_device_inventory` は `page` クエリパラメータの有無で処理を分岐する（初期表示の処理フロー参照）：
+
+- `page` なし → 初期表示: デフォルト検索条件を使用し、Cookieを更新する
+- `page` あり → ページング: CookieからPOST検索（または前回の初期表示）の検索条件を取得し、`page` のみ上書きする。Cookieが存在しない場合はデフォルト値にフォールバック
 
 ---
 
@@ -531,8 +569,8 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| LoadMaster[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
-    LoadMaster --> QueryDB{DBクエリ結果}
+    CheckPerm -->|権限OK| LoadMaster[フォーム用マスタデータを取得<br>get_device_inventory_form_options（種別・在庫状況）<br>get_organization_options（組織）<br>device_type_master, inventory_status_master,<br>organization_master<br>各テーブルdelete_flag=FALSE]
+    LoadMaster --> QueryDB{マスタデータ取得結果}
 
     QueryDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
@@ -610,9 +648,10 @@ flowchart TD
 #### 処理詳細（サーバーサイド）
 
 **登録処理の概要:**
-ユースケース仕様書に従い、デバイス購入直後の登録時に以下を同時に行う:
-1. device_inventory_master（台帳マスタ）にレコード登録
-2. device_master（デバイスマスタ）にレコード登録
+ユースケース仕様書に従い、デバイス購入直後の登録時に以下を順次実行する:
+1. OLTP上のdevice_inventory_master（台帳マスタ）にレコード登録
+2. OLTP上のdevice_master（デバイスマスタ）にレコード登録
+3. UnityCatalog上のdevice_masterにレコードを登録
 
 **データ格納形式:**
 - MACアドレス: コロン込み（XX:XX:XX:XX:XX:XX形式、17文字）でそのまま格納
@@ -704,20 +743,21 @@ def create_device_inventory(form_data: dict, creator_id: int) -> None:
     # 3. Unity Catalog の device_master に INSERT
     uc = UnityCatalogConnector()
     try:
-        uc.execute(
+        uc.execute_dml(
             """
             INSERT INTO iot_catalog.oltp_db.device_master
-                (device_uuid, device_name, device_type_id, device_model,
+                (device_id, device_uuid, device_name, device_type_id, device_model,
                  device_inventory_id, sim_id, mac_address, organization_id,
                  software_version, device_location, certificate_expiration_date,
                  creator, modifier, delete_flag)
             VALUES
-                (:device_uuid, :device_name, :device_type_id, :device_model,
+                (:device_id, :device_uuid, :device_name, :device_type_id, :device_model,
                  :device_inventory_id, :sim_id, :mac_address, :organization_id,
                  :software_version, :device_location, :certificate_expiration_date,
                  :creator, :modifier, false)
             """,
             {
+                'device_id':                   device.device_id,  # flush() 後にSQLAlchemy(RETURNING/lastrowid)で確定したSEQUENCE値
                 'device_uuid':                 form_data['device_uuid'],
                 'device_name':                 form_data['device_name'],
                 'device_type_id':              form_data['device_type_id'],
@@ -735,11 +775,39 @@ def create_device_inventory(form_data: dict, creator_id: int) -> None:
             operation='UC device_master INSERT',
         )
     except Exception:
-        # UC INSERT 失敗 → OLTP もロールバック（UC 側は INSERT されていないため補償不要）
+        # UC INSERT 失敗 → UC を補償DELETE してから OLTP もロールバック
+        # （ネットワーク断等によりUC側にデータが残存している可能性があるため）
+        try:
+            uc.execute_dml(
+                """
+                DELETE FROM iot_catalog.oltp_db.device_master
+                WHERE device_id = :device_id
+                """,
+                {'device_id': device.device_id},
+                operation='UC device_master INSERT ロールバック（補償DELETE）',
+            )
+        except Exception:
+            pass  # UC 補償DELETEも失敗した場合は無視して OLTP ロールバックへ進む
         db.session.rollback()
         raise
 
     db.session.commit()
+```
+
+```python
+# views/admin/device_inventory.py
+
+@device_inventory_bp.route('/admin/device-inventory/create', methods=['GET'])
+@require_role('system_admin')
+def show_create_device_inventory():
+    form = DeviceInventoryCreateForm()
+    device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+    organizations = get_organization_options()                                  # → device_inventory_service
+    return render_template('admin/device_inventory/form.html',
+                           mode='create', form=form,
+                           device_types=device_types,
+                           inventory_statuses=inventory_statuses,
+                           organizations=organizations)
 ```
 
 ```python
@@ -751,10 +819,12 @@ def create_device_inventory_view():
     form = DeviceInventoryCreateForm(request.form)
     if not form.validate():
         device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+        organizations = get_organization_options()                                  # → device_inventory_service
         return render_template('admin/device_inventory/form.html',
                                mode='create', form=form,
                                device_types=device_types,
-                               inventory_statuses=inventory_statuses), 422
+                               inventory_statuses=inventory_statuses,
+                               organizations=organizations), 422
 
     form_data = {
         'device_uuid':                    form.device_uuid.data,
@@ -804,13 +874,14 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>JOIN organization_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
+    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
     Error404 --> End
 
-    CheckDB -->|成功| Template[更新モーダルをレンダリング<br>フォームに既定値を設定]
+    CheckDB -->|成功| LoadMaster[フォーム用マスタデータを取得<br>get_device_inventory_form_options（種別・在庫状況）<br>get_organization_options（組織）<br>device_type_master, inventory_status_master,<br>organization_master<br>各テーブルdelete_flag=FALSE]
+    LoadMaster --> Template[更新モーダルをレンダリング<br>フォームに既定値を設定]
     Template --> OpenModal[更新モーダルを開く]
 
     CheckPerm -->|権限なし| Error403[403エラー ※]
@@ -851,9 +922,9 @@ flowchart TD
     CancelMsg --> End
 
     OpenConfirmModal -->|更新ボタン押下| BeginTx[トランザクション開始]
-    BeginTx --> InsertInventory[device_inventory_masterに<br>在庫情報を追加]
-    InsertInventory --> InsertDevice[device_masterに<br>デバイス情報を追加]
-    InsertDevice --> UpdateResult{DBクエリ結果}
+    BeginTx --> UpdateInventory[device_inventory_masterの<br>在庫情報を更新]
+    UpdateInventory --> UpdateDevice[device_masterの<br>デバイス情報を更新]
+    UpdateDevice --> UpdateResult{DBクエリ結果}
 
     UpdateResult -->|0件更新| Error404[404エラーモーダル表示]
     Error404 --> End
@@ -887,9 +958,10 @@ flowchart TD
 #### 処理詳細（サーバーサイド）
 
 **更新処理の概要:**
-ユースケース仕様書に従い、台帳マスタとデバイスマスタを同時に更新する:
-1. device_inventory_master（台帳マスタ）の更新（在庫状況、在庫場所、出荷予定日、出荷日）
-2. device_master（デバイスマスタ）の更新（デバイス名、種別、SIMID、ソフトウェアバージョン、設置場所）
+ユースケース仕様書に従い、台帳マスタとデバイスマスタを順次更新する:
+1. device_inventory_master（台帳マスタ）の更新（在庫状況、在庫場所、出荷予定日、出荷日、購入日、メーカー保証終了日、デバイスモデル、MACアドレス）
+2. OLTPのdevice_master（デバイスマスタ）の更新（デバイス名、種別、SIMID、ソフトウェアバージョン、設置場所、組織、デバイスモデル、MACアドレス、証明書有効期限）
+3. UnityCatalogのdevice_master（デバイスマスタ）の更新（デバイス名、種別、SIMID、ソフトウェアバージョン、設置場所、デバイスUUID、デバイスモデル、MACアドレス、組織、証明書有効期限）
 
 **データ格納形式:**
 - MACアドレス: コロン込み（XX:XX:XX:XX:XX:XX形式、17文字）でそのまま格納
@@ -993,7 +1065,7 @@ def update_device_inventory(inventory_uuid: str, form_data: dict, modifier_id: i
     # 3. Unity Catalog の device_master を UPDATE
     uc = UnityCatalogConnector()
     try:
-        uc.execute(
+        uc.execute_dml(
             """
             UPDATE iot_catalog.oltp_db.device_master
             SET
@@ -1030,7 +1102,7 @@ def update_device_inventory(inventory_uuid: str, form_data: dict, modifier_id: i
     except Exception:
         # UC UPDATE 失敗 → UC を旧値に戻してから OLTP もロールバック
         try:
-            uc.execute(
+            uc.execute_dml(
                 """
                 UPDATE iot_catalog.oltp_db.device_master
                 SET
@@ -1061,17 +1133,50 @@ def update_device_inventory(inventory_uuid: str, form_data: dict, modifier_id: i
 ```python
 # views/admin/device_inventory.py
 
+@device_inventory_bp.route('/admin/device-inventory/<device_inventory_uuid>/edit', methods=['GET'])
+@require_role('system_admin')
+def show_edit_device_inventory(device_inventory_uuid):
+    inventory = DeviceInventoryMaster.query.filter_by(
+        device_inventory_uuid=device_inventory_uuid, delete_flag=False
+    ).first_or_404()
+    device = DeviceMaster.query.filter_by(
+        device_inventory_id=inventory.device_inventory_id, delete_flag=False
+    ).first_or_404()
+    form = DeviceInventoryUpdateForm(obj=device)
+    form.inventory_status_id.data    = inventory.inventory_status_id
+    form.purchase_date.data          = inventory.purchase_date
+    form.estimated_ship_date.data    = inventory.estimated_ship_date
+    form.ship_date.data              = inventory.ship_date
+    form.manufacturer_warranty_end_date.data = inventory.manufacturer_warranty_end_date
+    form.inventory_location.data     = inventory.inventory_location
+    form.device_model.data           = inventory.device_model
+    form.mac_address.data            = inventory.mac_address
+    device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+    organizations = get_organization_options()                                  # → device_inventory_service
+    return render_template('admin/device_inventory/edit.html',
+                           mode='edit', form=form,
+                           device_inventory_uuid=device_inventory_uuid,
+                           device_types=device_types,
+                           inventory_statuses=inventory_statuses,
+                           organizations=organizations)
+```
+
+```python
+# views/admin/device_inventory.py
+
 @device_inventory_bp.route('/admin/device-inventory/<device_inventory_uuid>/update', methods=['POST'])
 @require_role('system_admin')
 def update_device_inventory_view(device_inventory_uuid):
     form = DeviceInventoryUpdateForm(request.form)
     if not form.validate():
         device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+        organizations = get_organization_options()                                  # → device_inventory_service
         return render_template('admin/device_inventory/edit.html',
                                mode='edit', form=form,
                                device_inventory_uuid=device_inventory_uuid,
                                device_types=device_types,
-                               inventory_statuses=inventory_statuses), 422
+                               inventory_statuses=inventory_statuses,
+                               organizations=organizations), 422
 
     form_data = {
         'device_uuid':                    form.device_uuid.data,
@@ -1221,7 +1326,7 @@ def delete_device_inventories(inventory_uuids: list[str], modifier_id: int) -> N
     # 3. Unity Catalog の device_master を論理削除
     uc = UnityCatalogConnector()
     try:
-        uc.execute(
+        uc.execute_dml(
             """
             UPDATE iot_catalog.oltp_db.device_master
             SET delete_flag = true, modifier = :modifier
@@ -1237,7 +1342,7 @@ def delete_device_inventories(inventory_uuids: list[str], modifier_id: int) -> N
     except Exception:
         # UC 論理削除失敗 → UC を元の状態（delete_flag=false）に戻してから OLTP もロールバック
         try:
-            uc.execute(
+            uc.execute_dml(
                 """
                 UPDATE iot_catalog.oltp_db.device_master
                 SET delete_flag = false, modifier = :modifier
@@ -1376,9 +1481,9 @@ flowchart TD
 
 #### Flaskルート
 
-| ルート          | エンドポイント                 | 詳細                                                                              |
-| --------------- | ------------------------------ | --------------------------------------------------------------------------------- |
-| CSVエクスポート | `POST /admin/device-inventory` | 検索条件を適用してCSVダウンロード。デバイス・在庫状況・デバイス種別名をDBから取得 |
+| ルート          | エンドポイント                        | 詳細                                                                              |
+| --------------- | ------------------------------------- | --------------------------------------------------------------------------------- |
+| CSVエクスポート | `POST /admin/device-inventory/export` | 検索条件を適用してCSVダウンロード。デバイス・在庫状況・デバイス種別名をDBから取得 |
 
 #### 処理詳細（サーバーサイド）
 
@@ -1396,6 +1501,7 @@ def export_device_inventories_csv(search_params: dict) -> str:
     Returns:
         CSV文字列（utf-8-sig エンコード）
     """
+
     inventories, _ = search_device_inventories({
         **search_params,
         'page': 1,
@@ -1420,7 +1526,7 @@ def export_device_inventories_csv(search_params: dict) -> str:
 ```python
 # views/admin/device_inventory.py
 
-@device_inventory_bp.route('/admin/device-inventory', methods=['POST'])
+@device_inventory_bp.route('/admin/device-inventory/export', methods=['POST'])
 @require_role('system_admin')
 def export_device_inventory():
     search_params = get_search_conditions_cookie('device_inventory') or get_default_search_params()  # → device_inventory_service
@@ -1455,8 +1561,7 @@ def export_device_inventory():
 | 8   | inventory_status_master | 在庫状況マスタ         | SELECT   | 初期表示、検索、登録、更新 | 在庫状況選択肢取得（結合）                        |
 | 9   | user_master             | ユーザーマスタ         | SELECT   | 認証                       | 現在ユーザー情報取得                              |
 | 10  | organization_master     | 組織マスタ             | SELECT   | 登録、更新                 | 組織選択肢取得(結合)                              |
-| 11  | organization_closure    | 組織閉包テーブル       | SELECT   | 登録、更新                 | 組織選択肢取得(結合)                              |
-| 12  | sort_item_master        | ソート項目マスタ       | SELECT   | 初期表示、検索、ソート     | ソート項目の検証とカラム名マッピング（view_id=7） |
+| 11  | sort_item_master        | ソート項目マスタ       | SELECT   | 初期表示、検索、ソート     | ソート項目の検証とカラム名マッピング（view_id=7） |
 
 ### テーブル結合関係
 
@@ -1468,13 +1573,11 @@ device_inventory_master (dim)
     │               ON dm.device_type_id = dtm.device_type_id
     │       └── INNER JOIN organization_master (om)
     │               ON dm.organization_id = om.organization_id
-    │               └── INNER JOIN organization_closure (oc)
-    │                       ON om.organization_id = oc.parent_organization_id
-    │                       └── INNER JOIN organization_master (om2)
-    │                               ON oc.subsidiary_organization_id = om2.organization_id
     └── INNER JOIN inventory_status_master (ism)
             ON dim.inventory_status_id = ism.inventory_status_id
 ```
+
+**注:** `organization_closure` テーブルはデータスコープ制御（ユーザーの所属組織配下への絞り込み）のために他機能で使用されるが、デバイス台帳管理はシステム保守者専用機能であり全データへのアクセスが許可されているため、本機能では結合しない。`organization_closure` は登録・更新フォームの組織選択肢取得（`get_device_inventory_form_options()`、`get_organization_options()`）においても使用しない。
 
 ---
 
@@ -1529,6 +1632,7 @@ device_inventory_master (dim)
 | software_version               | 最大100文字                                  | デバイスマスタ       |
 | device_location                | 最大100文字                                  | デバイスマスタ       |
 | certificate_expiration_date    | 日付形式                                     | デバイスマスタ       |
+| inventory_status_id            | 必須（在庫状況マスタにあるレコードのみ）     | 台帳マスタ           |
 | device_model                   | 必須、最大100文字                            | 台帳マスタ           |
 | mac_address                    | 必須、XX:XX:XX:XX:XX:XX形式                  | 台帳マスタ           |
 | inventory_location             | 必須、最大100文字                            | 台帳マスタ           |
@@ -1562,13 +1666,13 @@ def get_device_uuid_validator():
     validators = {
         'azure': {
             'max_length': 128,
-            'pattern': r'^[A-Za-z0-9\-\.%_\*\?\!\(\)\,\:\=\@\$\']+$',
-            'description': 'ASCII 7ビット英数字、(- . % _ * ? ! ( ) , : = @ $ \')使用可'
+            'pattern': r'^[A-Za-z0-9\-\.%#_\*\?\,\:\']+$',
+            'description': 'ASCII 7ビット英数字、(- . % # _ * ? , : \')使用可'
         },
         'aws': {
             'max_length': 128,
-            'pattern': r'^[a-zA-Z0-9:_-]+$',
-            'description': '[a-zA-Z0-9:_-]使用可'
+            'pattern': r'^[a-zA-Z0-9_-]+$',
+            'description': '[a-zA-Z0-9_-]使用可'
         },
     }
 
@@ -1595,11 +1699,11 @@ def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
     return True, ""
 ```
 
-| AUTH_TYPE | バリデーションルール                                                      |
-| --------- | ------------------------------------------------------------------------- |
-| azure     | 最大128文字、ASCII 7ビット英数字、`(- . % _ * ? ! ( ) , : = @ $ ')`使用可 |
-| aws       | 最大128文字、`[a-zA-Z0-9:_-]`使用可                                       |
-| local     | azureと同じバリデーションを使用                                           |
+| AUTH_TYPE | バリデーションルール                                                                                 |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| azure     | 最大128文字、英大文字(`A-Z`)、英小文字(`a-z`)、半角数字(`0-9`)、記号9種類(`- . % # _ * ? , :`)使用可 |
+| aws       | 最大128文字、英大文字(`A-Z`)、英小文字(`a-z`)、半角数字(`0-9`)、記号2種類(`- _`)使用可               |
+| local     | azureと同じバリデーションを使用                                                                      |
 
 ### ログ出力ルール
 
@@ -1622,12 +1726,14 @@ def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
 ### 画面仕様
 - [機能概要 README](./README.md) - 画面の概要、データモデル、使用するテーブル一覧
 - [UI仕様書](./ui-specification.md) - UI要素の詳細、バリデーションルール定義
+- [ユースケース](./usecase-specification.md) - 想定ユースケース
 
 ### アーキテクチャ設計
 - [バックエンド設計](../../../../01-architecture/backend.md) - Flask/LDP設計、Blueprint構成
 
 ### データベース設計
-- [アプリケーションデータベース設計](../../../03-features/common/app-database-specification.md) - テーブル定義
+- [アプリケーションデータベース設計](../../common/app-database-specification.md) - テーブル定義
+- [UnityCatalogデータベース設計](../../common/unity-catalog-database-specification.md) - テーブル定義
 
 ### 共通仕様
 - [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
@@ -1639,11 +1745,15 @@ def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                                                                                                                               | 担当者      |
-| ---------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 2026-04-10 | 1.1  | 処理詳細コードブロックを forms / services / views の3層に分割（users形式に統一）                                                       | Claude (AI) |
-| 2026-04-10 | 1.2  | 検索・絞り込みルートを GET → POST に修正。CSVエクスポート views ルートを `/export` GET → `/admin/device-inventory` POST に修正 | Claude (AI) |
-| 2026-04-10 | 1.3  | 登録・更新・削除の services 実装例に Unity Catalog への反映処理（INSERT/UPDATE/論理削除）とロールバック処理を追加                | Claude (AI) |
+| 日付       | 版数 | 変更内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 担当者              |
+| ---------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 2026-01-26 | 1.0  | 初版作成                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Yoshiharu Mukaiyama |
+| 2026-04-10 | 1.1  | 処理詳細コードブロックを forms / services / views の3層に分割（users形式に統一）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Kei Sugiyama        |
+| 2026-04-10 | 1.2  | 検索・絞り込みルートを GET → POST に修正。CSVエクスポート views ルートを `/export` GET → `/export` POST に修正                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Kei Sugiyama        |
+| 2026-04-10 | 1.3  | 登録・更新・削除の services 実装例に Unity Catalog への反映処理（INSERT/UPDATE/論理削除）とロールバック処理を追加                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Kei Sugiyama        |
+| 2026-04-13 | 1.4  | ルート呼び出しマッピングにページング行追加。初期表示フロー（mermaid・viewsコード）に検索後ページング（Cookie経由）の依存関係を明記。ページングセクションにCookie設定タイミング表を追加                                                                                                                                                                                                                                                                                                                                                                                                 | Kei Sugiyama        |
+| 2026-04-13 | 1.5  | `execute_dml()` メソッド追加・全DML呼び出しを `uc.execute()` → `uc.execute_dml()` に変更。UC INSERT失敗時の補償DELETE追加。UC `device_master` INSERTに `device_id`（`flush()` 後のSEQUENCE値）追加。`search_device_inventories()` に `per_page=-1` 全件取得分岐追加。ルート呼び出しマッピングCSVエクスポート行修正（URL・トリガー・パラメータ）。テーブル結合関係から `organization_closure` 削除・未使用理由注記追加。入力検証一覧に `inventory_status_id` 追加。登録モーダル表示フローmermaid修正・`GET /create` views実装例追加。更新フローmermaidノードラベル「追加」→「更新」修正 | Kei Sugiyama        |
+| 2026-04-13 | 1.6  | `search_device_inventories()` にセカンダリソートキー（`device_inventory_id ASC`）追加。`get_organization_options()` 関数新設（組織選択肢の別関数化）。登録・更新モーダル表示フロー mermaid および GET/POST views 実装例に `organizations` 渡す処理を追加。`show_edit_device_inventory`（`GET /edit`）views 実装例追加。更新モーダル表示フロー `Query` ノードから `JOIN organization_master` 削除し `LoadMaster` ノード追加。「更新処理の概要」ステップ1〜3のフィールド説明を実装コードに合わせて更新。テーブル結合関係注記の関数例示に `get_organization_options()` を追加             | Kei Sugiyama        |
 
 ---
 

@@ -176,14 +176,15 @@
 
 | No  | ルート名             | エンドポイント                                           | メソッド | 用途                               |
 | --- | -------------------- | -------------------------------------------------------- | -------- | ---------------------------------- |
-| 1   | デバイス台帳一覧表示 | `/admin/device-inventory`                                | GET      | 一覧・検索表示                     |
-| 2   | デバイス台帳登録画面 | `/admin/device-inventory/create`                         | GET      | 登録モーダル表示                   |
-| 3   | デバイス台帳登録実行 | `/admin/device-inventory/create`                         | POST     | 登録処理                           |
-| 4   | デバイス台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>`        | GET      | 詳細モーダル表示                   |
-| 5   | デバイス台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit`   | GET      | 更新モーダル表示                   |
-| 6   | デバイス台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST     | 更新処理                           |
-| 7   | デバイス台帳削除実行 | `/admin/device-inventory/delete`                         | POST     | 削除処理（論理削除、複数選択対応） |
-| 8   | CSVエクスポート      | `/admin/device-inventory`                                | POST     | CSV出力                            |
+| 1   | デバイス台帳一覧表示 | `/admin/device-inventory`                                | GET      | 一覧表示（初期・ページング）       |
+| 2   | デバイス台帳一覧表示 | `/admin/device-inventory`                                | POST     | 検索                               |
+| 3   | デバイス台帳登録画面 | `/admin/device-inventory/create`                         | GET      | 登録モーダル表示                   |
+| 4   | デバイス台帳登録実行 | `/admin/device-inventory/create`                         | POST     | 登録処理                           |
+| 5   | デバイス台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>`        | GET      | 詳細モーダル表示                   |
+| 6   | デバイス台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit`   | GET      | 更新モーダル表示                   |
+| 7   | デバイス台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST     | 更新処理                           |
+| 8   | デバイス台帳削除実行 | `/admin/device-inventory/delete`                         | POST     | 削除処理（論理削除、複数選択対応） |
+| 9   | CSVエクスポート      | `/admin/device-inventory/export`                         | POST     | CSV出力                            |
 
 ---
 
@@ -241,6 +242,10 @@
 
 ---
 
-**作成日:** 2026-01-26
-**最終更新日:** 2026-01-29
-**作成者:** Claude
+## 変更履歴
+
+| 日付       | 版数 | 変更内容                                                                                                                                                                               | 担当者              |
+| ---------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 2026-01-26 | 1.0  | 初版作成                                                                                                                                                                               | Yoshiharu Mukaiyama |
+| 2026-04-10 | 1.1  | 検索・絞り込みルートを GET → POST に修正。CSVエクスポート views ルートを `/export` GET → `/export` POST に修正                                                                         | Kei Sugiyama        |
+| 2026-04-13 | 1.2  | ルート呼び出しマッピングにページング行追加。初期表示フロー（mermaid・viewsコード）に検索後ページング（Cookie経由）の依存関係を明記。ページングセクションにCookie設定タイミング表を追加 | Kei Sugiyama        |
