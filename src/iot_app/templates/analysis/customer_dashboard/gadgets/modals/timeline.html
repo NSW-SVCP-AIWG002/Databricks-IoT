@@ -17,17 +17,17 @@
 
         <!-- (1) タイトル行 -->
         <div class="gadget-register__title-row">
-          <label class="form__label form__label--required" for="title">タイトル</label>
-          {{ form.title(class="form__input", id="title", maxlength=20) }}
+          <label class="form-label" for="title">タイトル<span class="form-label__required">必須</span></label>
+          {{ form.title(class="form-input", id="title", maxlength=20) }}
           {% if form.title.errors %}
-            <span class="form__error">{{ form.title.errors[0] }}</span>
+            <span class="form-error">{{ form.title.errors[0] }}</span>
           {% endif %}
         </div>
 
         <!-- (2) 上部行：デバイスモード選択 + 左右測定項目ラベル -->
         <div class="gadget-register__top-row">
           <div class="gadget-register__device-mode-area">
-            <label class="form__label">表示デバイス選択</label>
+            <label class="form-label">表示デバイス選択</label>
             <div class="timeline-register__device-mode-buttons">
               <button type="button"
                       class="button timeline-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'fixed' %} timeline-register__device-mode-btn--active{% endif %}"
@@ -39,15 +39,15 @@
             <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'variable' }}">
           </div>
           <div class="gadget-register__measurement-title">
-            <label class="form__label form__label--required">左表示項目選択</label>
+            <label class="form-label">左表示項目選択<span class="form-label__required">必須</span></label>
             {% if form.left_item_id.errors %}
-              <span class="form__error">{{ form.left_item_id.errors[0] }}</span>
+              <span class="form-error">{{ form.left_item_id.errors[0] }}</span>
             {% endif %}
           </div>
           <div class="gadget-register__measurement-title">
-            <label class="form__label form__label--required">右表示項目選択</label>
+            <label class="form-label">右表示項目選択<span class="form-label__required">必須</span></label>
             {% if form.right_item_id.errors %}
-              <span class="form__error">{{ form.right_item_id.errors[0] }}</span>
+              <span class="form-error">{{ form.right_item_id.errors[0] }}</span>
             {% endif %}
           </div>
         </div>
@@ -75,15 +75,15 @@
             </div>
             <!-- (8) 左最小値/最大値 -->
             <div class="gadget-register__minmax">
-              <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">左表示項目 最小値</label>
-                {{ form.left_min_value(class="form__input gadget-register__minmax-input", id="left_min_value") }}
-                <span class="form__error form__error--reserved">{% if form.left_min_value.errors %}{{ form.left_min_value.errors[0] }}{% endif %}</span>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">左表示項目 最小値</label>
+                {{ form.left_min_value(class="form-input gadget-register__minmax-input", id="left_min_value") }}
+                <span class="form-error form-error--reserved">{% if form.left_min_value.errors %}{{ form.left_min_value.errors[0] }}{% endif %}</span>
               </div>
-              <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">左表示項目 最大値</label>
-                {{ form.left_max_value(class="form__input gadget-register__minmax-input", id="left_max_value") }}
-                <span class="form__error form__error--reserved">{% if form.left_max_value.errors %}{{ form.left_max_value.errors[0] }}{% endif %}</span>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">左表示項目 最大値</label>
+                {{ form.left_max_value(class="form-input gadget-register__minmax-input", id="left_max_value") }}
+                <span class="form-error form-error--reserved">{% if form.left_max_value.errors %}{{ form.left_max_value.errors[0] }}{% endif %}</span>
               </div>
             </div>
           </div>
@@ -93,18 +93,18 @@
             <!-- デバイス固定モード時のみ表示 -->
             <div id="device-fixed-area" style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
               <p class="gadget-register__section-title">表示デバイス指定</p>
-              <div class="form__group">
-                <label class="form__label">組織フィルター</label>
-                <select class="form__select" id="organization-filter">
+              <div class="form-group">
+                <label class="form-label">組織フィルター</label>
+                <select class="form-select" id="organization-filter">
                   <option value="">選択してください</option>
                   {% for org in organizations %}
                   <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
                   {% endfor %}
                 </select>
               </div>
-              <div class="form__group">
-                <label class="form__label form__label--required">デバイス選択</label>
-                <select class="form__select" name="device_id" id="device-select">
+              <div class="form-group">
+                <label class="form-label">デバイス選択<span class="form-label__required">必須</span></label>
+                <select class="form-select" name="device_id" id="device-select">
                   <option value="">選択してください</option>
                   {% for device in devices %}
                   <option value="{{ device.device_id }}"
@@ -115,20 +115,20 @@
                   </option>
                   {% endfor %}
                 </select>
-                <span class="form__error form__error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
+                <span class="form-error form-error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
               </div>
             </div>
             <!-- (9) 右最小値/最大値（常時表示） -->
             <div class="gadget-register__minmax">
-              <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">右表示項目 最小値</label>
-                {{ form.right_min_value(class="form__input gadget-register__minmax-input", id="right_min_value") }}
-                <span class="form__error form__error--reserved">{% if form.right_min_value.errors %}{{ form.right_min_value.errors[0] }}{% endif %}</span>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">右表示項目 最小値</label>
+                {{ form.right_min_value(class="form-input gadget-register__minmax-input", id="right_min_value") }}
+                <span class="form-error form-error--reserved">{% if form.right_min_value.errors %}{{ form.right_min_value.errors[0] }}{% endif %}</span>
               </div>
-              <div class="form__group gadget-register__minmax-row">
-                <label class="form__label">右表示項目 最大値</label>
-                {{ form.right_max_value(class="form__input gadget-register__minmax-input", id="right_max_value") }}
-                <span class="form__error form__error--reserved">{% if form.right_max_value.errors %}{{ form.right_max_value.errors[0] }}{% endif %}</span>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">右表示項目 最大値</label>
+                {{ form.right_max_value(class="form-input gadget-register__minmax-input", id="right_max_value") }}
+                <span class="form-error form-error--reserved">{% if form.right_max_value.errors %}{{ form.right_max_value.errors[0] }}{% endif %}</span>
               </div>
             </div>
           </div>
@@ -138,7 +138,7 @@
 
             <!-- (3) 左表示項目 -->
             <div class="timeline-register__measurement-list">
-              <table class="table">
+              <table class="table table--fit">
                 <thead>
                   <tr>
                     <th>選択</th>
@@ -167,7 +167,7 @@
 
             <!-- (4) 右表示項目 -->
             <div class="timeline-register__measurement-list">
-              <table class="table">
+              <table class="table table--fit">
                 <thead>
                   <tr>
                     <th>選択</th>
@@ -199,20 +199,20 @@
         </div>
 
         <!-- (10) グループ選択 / (11) 部品サイズ -->
-        <div class="form__row">
-          <div class="form__group form__group--half">
-            <div class="form__group--inline">
-              <label class="form__label form__label--required" for="group_id">グループ選択</label>
-              {{ form.group_id(class="form__select", id="group_id") }}
+        <div class="form-row">
+          <div class="form-group form-group--half">
+            <div class="form-group--inline">
+              <label class="form-label" for="group_id">グループ選択<span class="form-label__required">必須</span></label>
+              {{ form.group_id(class="form-select", id="group_id") }}
             </div>
-            <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+            <span class="form-error form-error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
           </div>
-          <div class="form__group form__group--half">
-            <div class="form__group--inline">
-              <label class="form__label form__label--required" for="gadget_size">部品サイズ</label>
-              {{ form.gadget_size(class="form__select", id="gadget_size") }}
+          <div class="form-group form-group--half">
+            <div class="form-group--inline">
+              <label class="form-label" for="gadget_size">部品サイズ<span class="form-label__required">必須</span></label>
+              {{ form.gadget_size(class="form-select", id="gadget_size") }}
             </div>
-            <span class="form__error form__error--reserved">{% if form.gadget_size.errors %}{{ form.gadget_size.errors[0] }}{% endif %}</span>
+            <span class="form-error form-error--reserved">{% if form.gadget_size.errors %}{{ form.gadget_size.errors[0] }}{% endif %}</span>
           </div>
         </div>
 

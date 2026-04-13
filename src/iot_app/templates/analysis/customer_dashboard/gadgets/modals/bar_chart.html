@@ -16,27 +16,27 @@
   <div class="modal__body">
 
     <!-- (1) タイトル -->
-    <div class="form__group">
-      <label class="form__label form__label--required" for="title">タイトル</label>
-      {{ form.title(class="form__input", id="title", value="棒グラフ", maxlength=20) }}
+    <div class="form-group">
+      <label class="form-label" for="title">タイトル<span class="form-label__required">必須</span></label>
+      {{ form.title(class="form-input", id="title", value="棒グラフ", maxlength=20) }}
       {% if form.title.errors %}
-        <span class="form__error">{{ form.title.errors[0] }}</span>
+        <span class="form-error">{{ form.title.errors[0] }}</span>
       {% endif %}
     </div>
 
     <!-- (2) 表示デバイス選択 -->
     <div class="gadget-register__top-row">
       <div class="gadget-register__device-mode-area">
-        <label class="form__label">表示デバイス選択</label>
+        <label class="form-label">表示デバイス選択</label>
         <div class="bar-chart-register__device-mode-buttons">
           <button type="button"
-                  class="button bar-chart-register__device-mode-btn"
+                  class="button bar-chart-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'fixed' %} bar-chart-register__device-mode-btn--active{% endif %}"
                   data-mode="fixed">デバイス固定</button>
           <button type="button"
-                  class="button bar-chart-register__device-mode-btn bar-chart-register__device-mode-btn--active"
+                  class="button bar-chart-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'variable' %} bar-chart-register__device-mode-btn--active{% endif %}"
                   data-mode="variable">デバイス可変</button>
         </div>
-        <input type="hidden" name="device_mode" id="device_mode" value="variable">
+        <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'variable' }}">
       </div>
     </div>
 
@@ -65,18 +65,18 @@
       <div class="gadget-register__middle" id="device-fixed-area"
            style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
         <p class="gadget-register__section-title">表示デバイス指定</p>
-        <div class="form__group">
-          <label class="form__label">組織フィルター</label>
-          <select class="form__select" id="organization-filter">
+        <div class="form-group">
+          <label class="form-label">組織フィルター</label>
+          <select class="form-select" id="organization-filter">
             <option value="">選択してください</option>
             {% for org in organizations %}
             <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="form__group">
-          <label class="form__label form__label--required">デバイス選択</label>
-          <select class="form__select" name="device_id" id="device-select" disabled>
+        <div class="form-group">
+          <label class="form-label">デバイス選択<span class="form-label__required">必須</span></label>
+          <select class="form-select" name="device_id" id="device-select" disabled>
             <option value="">選択してください</option>
             {% for device in devices %}
             <option value="{{ device.device_id }}"
@@ -87,16 +87,16 @@
             {% endfor %}
           </select>
           {% if form.device_id.errors %}
-            <span class="form__error">{{ form.device_id.errors[0] }}</span>
+            <span class="form-error">{{ form.device_id.errors[0] }}</span>
           {% endif %}
         </div>
       </div>
 
       <!-- 右カラム：(3) 表示項目選択 -->
       <div class="gadget-register__right">
-        <label class="form__label form__label--required">表示項目選択</label>
+        <label class="form-label">表示項目選択<span class="form-label__required">必須</span></label>
         <div class="bar-chart-register__measurement-list">
-            <table class="table">
+            <table class="table table--fit">
               <thead>
                 <tr>
                   <th>選択</th>
@@ -125,59 +125,59 @@
             </table>
           </div>
         {% if form.measurement_item_id.errors %}
-          <span class="form__error">{{ form.measurement_item_id.errors[0] }}</span>
+          <span class="form-error">{{ form.measurement_item_id.errors[0] }}</span>
         {% endif %}
       </div>
 
     </div>
 
     <!-- (7) グループ選択 / (8) 集約方法 -->
-    <div class="form__row">
-      <div class="form__group form__group--half">
-        <label class="form__label form__label--required" for="group_id">グループ選択</label>
-        <select class="form__select" name="group_id" id="group_id">
+    <div class="form-row">
+      <div class="form-group form-group--half">
+        <label class="form-label" for="group_id">グループ選択<span class="form-label__required">必須</span></label>
+        <select class="form-select" name="group_id" id="group_id">
           {% for gr in groups %}
           <option value="{{ gr.dashboard_group_id }}">{{ gr.dashboard_group_name }}</option>
           {% endfor %}
         </select>
         {% if form.group_id.errors %}
-          <span class="form__error">{{ form.group_id.errors[0] }}</span>
+          <span class="form-error">{{ form.group_id.errors[0] }}</span>
         {% endif %}
       </div>
-      <div class="form__group form__group--half">
-        <label class="form__label form__label--required" for="summary_method_id">集約方法</label>
-        <select class="form__select" name="summary_method_id" id="summary_method_id">
+      <div class="form-group form-group--half">
+        <label class="form-label" for="summary_method_id">集約方法<span class="form-label__required">必須</span></label>
+        <select class="form-select" name="summary_method_id" id="summary_method_id">
           {% for sm in summary_methods %}
           <option value="{{ sm.summary_method_id }}">{{ sm.summary_method_name }}</option>
           {% endfor %}
         </select>
         {% if form.summary_method_id.errors %}
-          <span class="form__error">{{ form.summary_method_id.errors[0] }}</span>
+          <span class="form-error">{{ form.summary_method_id.errors[0] }}</span>
         {% endif %}
       </div>
     </div>
 
     <!-- (9) 最小値 / (10) 最大値 / (11) 部品サイズ -->
-    <div class="form__row">
-      <div class="form__group form__group--third">
-        <label class="form__label" for="min_value">最小値</label>
-        {{ form.min_value(class="form__input", id="min_value") }}
+    <div class="form-row">
+      <div class="form-group form-group--third">
+        <label class="form-label" for="min_value">最小値</label>
+        {{ form.min_value(class="form-input", id="min_value") }}
         {% if form.min_value.errors %}
-          <span class="form__error">{{ form.min_value.errors[0] }}</span>
+          <span class="form-error">{{ form.min_value.errors[0] }}</span>
         {% endif %}
       </div>
-      <div class="form__group form__group--third">
-        <label class="form__label" for="max_value">最大値</label>
-        {{ form.max_value(class="form__input", id="max_value") }}
+      <div class="form-group form-group--third">
+        <label class="form-label" for="max_value">最大値</label>
+        {{ form.max_value(class="form-input", id="max_value") }}
         {% if form.max_value.errors %}
-          <span class="form__error">{{ form.max_value.errors[0] }}</span>
+          <span class="form-error">{{ form.max_value.errors[0] }}</span>
         {% endif %}
       </div>
-      <div class="form__group form__group--third">
-        <label class="form__label form__label--required" for="gadget_size">部品サイズ</label>
-        {{ form.gadget_size(class="form__select", id="gadget_size") }}
+      <div class="form-group form-group--third">
+        <label class="form-label" for="gadget_size">部品サイズ<span class="form-label__required">必須</span></label>
+        {{ form.gadget_size(class="form-select", id="gadget_size") }}
         {% if form.gadget_size.errors %}
-          <span class="form__error">{{ form.gadget_size.errors[0] }}</span>
+          <span class="form-error">{{ form.gadget_size.errors[0] }}</span>
         {% endif %}
       </div>
     </div>

@@ -11,17 +11,13 @@
   {{ form.hidden_tag() }}
 
   <div class="modal__body">
-    <div class="form__group">
-      <label class="form__label form__label--required" for="{{ form.gadget_name.id }}">
-        ガジェットタイトル
+    <div class="form-group">
+      <label class="form-label" for="{{ form.gadget_name.id }}">
+        ガジェットタイトル<span class="form-label__required">必須</span>
       </label>
-      {{ form.gadget_name(class="form__input") }}
+      {{ form.gadget_name(class="form-input") }}
       {% if form.gadget_name.errors %}
-        <ul class="form__errors">
-          {% for error in form.gadget_name.errors %}
-            <li class="form__error">{{ error }}</li>
-          {% endfor %}
-        </ul>
+        <span class="form-error">{{ form.gadget_name.errors[0] }}</span>
       {% endif %}
     </div>
   </div>
