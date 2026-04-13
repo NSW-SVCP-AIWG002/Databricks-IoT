@@ -56,8 +56,9 @@ def handle_gadget_data(gadget_uuid):
     start_datetime_str = params.get('start_datetime')
     end_datetime_str   = params.get('end_datetime')
 
-    if not validate_chart_params(start_datetime_str, end_datetime_str):
-        return jsonify({'error': 'パラメータが不正です'}), 400
+    error = validate_chart_params(start_datetime_str, end_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         start_datetime = datetime.strptime(start_datetime_str, _DATETIME_FORMAT)
@@ -204,7 +205,7 @@ def handle_gadget_register(gadget_type):
     try:
         register_gadget(params, current_user_id=current_user_id)
         logger.info(f'時系列グラフガジェット登録成功: user_id={current_user_id}')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットを登録しました'})
 
     except AppValidationError as e:
         db.session.rollback()
@@ -237,7 +238,7 @@ def handle_gadget_csv_export(gadget_uuid):
     start_datetime_str = request.args.get('start_datetime')
     end_datetime_str   = request.args.get('end_datetime')
 
-    if not validate_chart_params(start_datetime_str, end_datetime_str):
+    if validate_chart_params(start_datetime_str, end_datetime_str):
         abort(400)
 
     try:

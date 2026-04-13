@@ -9,8 +9,8 @@
     <form method="POST"
           action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
           id="timeline-register-form"
-          novalidate
-          data-ajax-submit>
+          class="modal-form"
+          novalidate>
       {{ form.hidden_tag() }}
 
       <div class="modal__body">
@@ -53,7 +53,8 @@
         </div>
 
         <!-- (6) デバイス名行 -->
-        <div class="gadget-register__device-name-row" id="device-name-area" style="visibility: hidden;">
+        <div class="gadget-register__device-name-row" id="device-name-area"
+             style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
           <span class="timeline-register__device-name" id="selected-device-name">-</span>
         </div>
 

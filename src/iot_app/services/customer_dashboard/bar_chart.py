@@ -37,23 +37,23 @@ def validate_chart_params(display_unit, interval, base_datetime_str):
     """チャートパラメータのバリデーション
 
     Returns:
-        bool: 全パラメータが有効な場合 True、それ以外 False
+        str | None: エラーメッセージ（正常時は None）
     """
     if display_unit not in _VALID_DISPLAY_UNITS:
-        return False
+        return '表示単位が不正です'
 
     if interval not in INTERVAL_MINUTES:
-        return False
+        return '集計間隔が不正です'
 
     if not base_datetime_str:
-        return False
+        return '日付形式が不正です'
 
     try:
         datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        return False
+        return '日付形式が不正です'
 
-    return True
+    return None
 
 
 def validate_gadget_registration(params):
@@ -339,12 +339,12 @@ def execute_gold_query(device_id, display_unit, measurement_item_id, summary_met
 
     if display_unit == "day":
         sql = """
-            SELECT collection_hour, summary_value
+            SELECT HOUR(collection_datetime) AS collection_hour, summary_value
             FROM iot_catalog.gold.gold_sensor_data_hourly_summary
             WHERE device_id = :device_id
               AND summary_item = :measurement_item_id
               AND summary_method_id = :summary_method_id
-              AND collection_date = :target_date
+              AND DATE(collection_datetime) = :target_date
             ORDER BY collection_hour ASC
             LIMIT :limit
         """

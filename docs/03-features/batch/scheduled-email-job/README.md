@@ -1,19 +1,50 @@
-# メール送信ジョブ
+# メール通知送信ジョブ
+
+## 目次
+
+- [メール通知送信ジョブ](#メール通知送信ジョブ)
+  - [目次](#目次)
+  - [概要](#概要)
+    - [主な責務](#主な責務)
+  - [機能ID](#機能id)
+  - [データモデル](#データモデル)
+    - [入力データ](#入力データ)
+    - [メール通知キューカラム一覧](#メール通知キューカラム一覧)
+    - [ステータス遷移](#ステータス遷移)
+    - [出力先](#出力先)
+    - [メール送信履歴カラム一覧](#メール送信履歴カラム一覧)
+  - [使用テーブル一覧](#使用テーブル一覧)
+    - [読み取りテーブル（OLTP DB）](#読み取りテーブルoltp-db)
+    - [読み取りテーブル（UnityCatalog）](#読み取りテーブルunitycatalog)
+    - [書き込みテーブル（OLTP DB）](#書き込みテーブルoltp-db)
+  - [処理フロー](#処理フロー)
+    - [リトライフロー](#リトライフロー)
+  - [障害時のTeams通知](#障害時のteams通知)
+  - [パフォーマンス要件](#パフォーマンス要件)
+  - [データ保持ポリシー](#データ保持ポリシー)
+  - [関連ドキュメント](#関連ドキュメント)
+    - [機能仕様](#機能仕様)
+    - [上流パイプライン](#上流パイプライン)
+    - [共通仕様](#共通仕様)
+    - [データベース設計](#データベース設計)
+    - [要件定義](#要件定義)
+  - [変更履歴](#変更履歴)
+
+---
 
 ## 概要
 
-メール送信ジョブは、IoTデバイスのアラート検出時にメール通知キューへ登録されたレコードを、Databricks Workflowで定期実行して送信するバッチジョブです。
+メール通知送信ジョブは、IoTデバイスのアラート検出時にメール通知キューへ登録されたレコードを、Databricks Workflowで定期実行して送信するバッチジョブです。
 
-シルバー層LDPパイプラインがアラートを検出するたびにメール送信キュー（`email_notification_queue`）へPENDINGステータスのレコードを登録し、本ジョブが1分間隔でそのレコードを取得してSMTP経由でメール送信を行います。LDPストリーミング処理とメール送信を非同期化することで、ストリーミング処理のレイテンシに影響を与えないアーキテクチャを実現しています。
+シルバー層LDPパイプラインがアラートを検出するたびにメール送信キュー（`email_notification_queue`）へPENDINGステータスのレコードを登録し、本ジョブが1分間隔でそのレコードを取得してSendGrid API経由でメール送信を行います。LDPストリーミング処理とメール送信を非同期化することで、ストリーミング処理のレイテンシに影響を与えないアーキテクチャを実現しています。
 
 ### 主な責務
 
 1. **メールキュー取得**: メール通知キュー（`email_notification_queue`）からPENDINGレコードを取得
-2. **メール送信**: SMTP経由でアラート通知メールを送信
+2. **メール送信**: SendGrid API経由でアラート通知メールを送信
 3. **ステータス管理**: 送信結果に応じてキューレコードのステータスを更新（SENT / PENDING / FAILED）
 4. **履歴記録**: 送信完了メールの記録を`mail_history`テーブルに保存
 5. **リカバリ処理**: ジョブ異常終了時にPROCESSING状態で滞留しているレコードを自動削除
-6. **クリーンアップ**: 30日経過したSENT/FAILEDレコードを定期削除（別ジョブ）
 
 ---
 
@@ -57,18 +88,18 @@
 
 ### ステータス遷移
 
-| ステータス | 説明                             | 遷移元     | 遷移先                  |
-| ---------- | -------------------------------- | ---------- | ----------------------- |
-| PENDING    | 送信待ち（初期状態）             | -          | PROCESSING              |
-| PROCESSING | 送信処理中                       | PENDING    | SENT / PENDING / FAILED |
-| SENT       | 送信完了                         | PROCESSING | -                       |
-| FAILED     | 送信失敗（最大リトライ回数超過） | PROCESSING | -                       |
+| ステータス | 説明                                                 | 遷移元               | 遷移先                  |
+| ---------- | ---------------------------------------------------- | -------------------- | ----------------------- |
+| PENDING    | 送信待ち（初期状態）                                 | -                    | PROCESSING              |
+| PROCESSING | 送信処理中                                           | PENDING              | SENT / PENDING / FAILED |
+| SENT       | 送信完了                                             | PROCESSING           | -                       |
+| FAILED     | 送信失敗（最大リトライ回数超過 または マスタ不整合） | PROCESSING / PENDING | -                       |
 
 ### 出力先
 
 | 出力先                   | 形式                 | 説明                                          |
 | ------------------------ | -------------------- | --------------------------------------------- |
-| SMTPサーバ               | メール送信リクエスト | アラート通知メールの送信                      |
+| SendGrid API             | HTTP POSTリクエスト  | アラート通知メールの送信                      |
 | email_notification_queue | OLTP DB テーブル更新 | ステータス・retry_count・processed_timeの更新 |
 | mail_history             | OLTP DB テーブル登録 | 送信済みメールの履歴記録                      |
 
@@ -101,13 +132,12 @@
 | ------------------------ | --------------------------------------------- |
 | email_notification_queue | PENDINGステータスのメール送信待機レコード取得 |
 
-### 読み取りテーブル（Deltaテーブル）
+### 読み取りテーブル（UnityCatalog）
 
-| テーブル名          | 用途                                                 |
-| ------------------- | ---------------------------------------------------- |
-| device_master       | メール通知時、デバイスの実在確認で利用する           |
-| organization_master | メール通知時、通知先組織の実在チェックで利用する     |
-| user_master         | メール通知先のユーザのメールアドレスの取得に利用する |
+| テーブル名          | 用途                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| organization_master | メール通知時、通知先組織の実在チェックで利用する                                   |
+| user_master         | メール送信履歴テーブルにデータ登録する際に必要な関連ユーザIDを生成するため利用する |
 
 
 ### 書き込みテーブル（OLTP DB）
@@ -135,29 +165,33 @@ flowchart TB
             QueueInsert --> PendingRecord
         end
 
-        subgraph DLTTBL["Deltaテーブル"]
+        subgraph DLTTBL["Unity Catalog"]
             direction LR
             OrganizationMaster[(organization_master<br>organization_id=<br>email_notification_queue.organization_id)]
-            UserMaster[(user_master<br>organization_id=<br>organization_master.organization_id)]
+            UserMaster[(user_master<br>email=<br>email_notification_queue.recipient_email)]
         end
     end
 
     subgraph Batch["メール送信バッチジョブ（1分間隔）"]
         Recovery[PROCESSING滞留レコード削除<br>最終更新後15分経過で<br>自動削除]
-        Fetch[抽出済メール送信<br>キューデータ<br>組織マスタ/ユーザマスタと結合]
+        Fetch[PENDINGレコード取得<br>最大100件]
+        MasterCheck[組織マスタ存在チェック<br>ユーザマスタ存在チェック<br>user_id取得]
+        InvalidFailed[無効レコードを<br>FAILEDに更新]
         UpdateProcessing[ステータス→PROCESSING]
-        SendEmail[メール送信<br>SMTP]
+        BulkSend[subject+bodyでグルーピング<br>バルク送信<br>グループごとに1 APIコール]
         Success{送信成功?}
         UpdateSent[ステータス→SENT<br>processed_time記録]
-        CheckRetry{retry_count < 3?}
+        CheckRetry{retry_count < 2?}
         UpdatePending[retry_count++<br>ステータス→PENDING]
         UpdateFailed[ステータス→FAILED]
         RecordHistory[mail_history登録]
 
-        Recovery -->|PENDINGレコード取得<br>最大100件| Fetch
-        Fetch --> UpdateProcessing
-        UpdateProcessing --> SendEmail
-        SendEmail --> Success
+        Recovery --> Fetch
+        Fetch --> MasterCheck
+        MasterCheck --> InvalidFailed
+        InvalidFailed --> UpdateProcessing
+        UpdateProcessing --> BulkSend
+        BulkSend --> Success
         Success -->|Yes| UpdateSent
         Success -->|No| CheckRetry
         CheckRetry -->|Yes| UpdatePending
@@ -166,22 +200,22 @@ flowchart TB
     end
 
     subgraph External["外部連携"]
-        SMTP[SMTPサーバ]
+        SendGrid[SendGrid API]
         MailHistory[(OLTP DB<br>mail_history)]
-        SendEmail --> SMTP
+        BulkSend --> SendGrid
         RecordHistory --> MailHistory
     end
 
     PendingRecord --> Recovery
-    OrganizationMaster -.->|参照| Fetch
-    UserMaster -.->|参照| Fetch
+    OrganizationMaster -.->|参照| MasterCheck
+    UserMaster -.->|参照| MasterCheck
 ```
 
 ### リトライフロー
 
 ```mermaid
 flowchart TB
-    A(送信失敗) --> B{retry_count < 3?}
+    A(送信失敗) --> B{retry_count < 2?}
     B -->|Yes| C[retry_count++<br>status=PENDING<br>error_message記録]
     B -->|No| D[status=FAILED<br>error_message記録]
     C --> E[次回バッチ実行まで待機<br>最大1分]
@@ -197,12 +231,12 @@ flowchart TB
 
 | エラー種別             | 通知タイミング       | 説明                                       |
 | ---------------------- | -------------------- | ------------------------------------------ |
-| SMTP接続失敗           | 最大リトライ超過後   | SMTPサーバへの接続失敗が連続した場合       |
+| SendGrid API接続失敗   | 最大リトライ超過後   | SendGrid APIへの接続失敗が連続した場合     |
 | メール送信履歴記録失敗 | INSERT失敗時（即時） | mail_historyへのINSERT失敗時               |
 | キュー取得失敗         | 例外発生時（即時）   | email_notification_queueへのアクセス失敗時 |
 | FAILED件数過多         | 日次（100件超過）    | 大量のFAILEDレコード発生時                 |
 
-詳細は[ジョブ仕様書](./job-specification.md)のエラーハンドリングセクションを参照。
+Teams通知の実装詳細は[共通仕様書](../../common/common-specification.md)を参照。
 
 ---
 
@@ -212,19 +246,21 @@ flowchart TB
 | -------------- | ------------------------ | ------------------------------------------ |
 | 実行間隔       | 1分（60秒）              | Databricks Workflowの定期実行              |
 | バッチ処理時間 | 1分以内                  | 1バッチあたり最大100件で次実行に干渉しない |
-| メール送信     | 平均100件/分             | SMTP接続タイムアウト30秒以内               |
+| メール送信     | 平均100件/分             | SendGrid APIタイムアウト30秒以内           |
 | E2Eレイテンシ  | アラート検出から70秒以内 | ストリーミング処理5秒 + キュー待機60秒     |
 
 ---
 
 ## データ保持ポリシー
 
-| テーブル                 | 保持期間 | 削除対象            | 削除方式 |
-| ------------------------ | -------- | ------------------- | -------- |
-| email_notification_queue | 30日間   | SENT/FAILEDレコード | DELETE   |
-| mail_history             | 恒久保持 | 削除しない          | -        |
+| テーブル                                    | 保持期間 | 削除対象                               | 削除方式 |
+| ------------------------------------------- | -------- | -------------------------------------- | -------- |
+| email_notification_queue（SENT / FAILED）   | 30日間   | SENT・FAILEDレコード                   | DELETE   |
+| email_notification_queue（PROCESSING 滞留） | 15分     | 最終更新後15分経過のPROCESSINGレコード | DELETE   |
+| mail_history                                | 恒久保持 | 削除しない                             | -        |
 
-クリーンアップは `email_queue_cleanup` ジョブ（日次 03:00）で実行する。
+SENT/FAILED レコードのクリーンアップは `email_queue_cleanup` ジョブ（日次 03:00）で実行する。  
+PROCESSING 滞留レコードの削除は `email_notification_sender` ジョブ起動時に毎回実行する。
 
 ---
 
@@ -232,12 +268,17 @@ flowchart TB
 
 ### 機能仕様
 
-- [ジョブ仕様書](./job-specification.md) - 処理コード・リトライ戦略・クリーンアップジョブ詳細
+- [ジョブ仕様書](./job-specification.md) - 処理コード・リトライ戦略詳細
+- [OLTPクリーンアップジョブ仕様書](../oltp-cleanup/job-specification.md) - email_queue_cleanup ジョブ詳細
 
 ### 上流パイプライン
 
 - [シルバー層LDPパイプライン概要](../../ldp-pipeline/silver-layer/README.md) - メール送信キュー登録元
 - [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
+
+### 共通仕様
+
+- [共通仕様書](../../common/common-specification.md) - Teams通知・共通エラーハンドリング仕様
 
 ### データベース設計
 
@@ -252,6 +293,8 @@ flowchart TB
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容 | 担当者       |
-| ---------- | ---- | -------- | ------------ |
-| 2026-04-01 | 1.0  | 初版作成 | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                       | 担当者       |
+| ---------- | ---- | -------------------------------------------------------------- | ------------ |
+| 2026-04-01 | 1.0  | 初版作成                                                       | Kei Sugiyama |
+| 2026-04-09 | 1.1  | SendGrid対応・フロー図修正                                     | Kei Sugiyama |
+| 2026-04-10 | 1.3  | 処理フロー図のsubgraphラベル修正・UserMasterノード参照条件修正 | Kei Sugiyama |

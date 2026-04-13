@@ -63,7 +63,7 @@ class TokenExchanger:
         result = response.json()
         return {
             'access_token': result['access_token'],
-            'expires_in': result['expires_in'],
+            'expires_in': result.get('expires_in', 3600),
         }
 
     def cache_token(self, access_token: str, expires_in: int):

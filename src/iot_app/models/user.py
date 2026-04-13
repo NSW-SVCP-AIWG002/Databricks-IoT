@@ -8,7 +8,7 @@ class User(db.Model):
     databricks_user_id      = db.Column(db.String(36),   nullable=False)
     user_name               = db.Column(db.String(20),   nullable=False)
     organization_id         = db.Column(db.Integer,      nullable=False)
-    email_address           = db.Column(db.String(254),  unique=True, nullable=False)
+    email_address           = db.Column(db.String(254),  nullable=False)
     user_type_id            = db.Column(db.Integer,      nullable=False)
     language_code           = db.Column(db.String(10),   nullable=False, default='ja')
     region_id               = db.Column(db.Integer,      nullable=False)

@@ -1,3 +1,29 @@
+/* ===== グローバル fetch インターセプター =====
+ * JWTトークン期限切れ（401 token_expired）を全AJAXで一括ハンドリングする。
+ * サーバーが {"error": "token_expired"} + 401 を返した場合、
+ * ページリロードすることで通常ページ遷移として token_refresh.html フローに乗せる。
+ */
+(function () {
+  var _originalFetch = window.fetch;
+  window.fetch = function () {
+    return _originalFetch.apply(this, arguments).then(function (response) {
+      if (response.status === 401) {
+        return response.clone().json().then(function (data) {
+          if (data && data.error === 'token_expired') {
+            window.location.reload();
+            // reload後のレスポンスを止めるため pending の Promise を返す
+            return new Promise(function () {});
+          }
+          return response;
+        }).catch(function () {
+          return response;
+        });
+      }
+      return response;
+    });
+  };
+}());
+
 /* ===== サイドバー：サブメニュークリック開閉（アコーディオン） ===== */
 document.querySelectorAll('.nav__item--parent > .nav__link').forEach(function(link) {
   link.addEventListener('click', function() {
@@ -17,49 +43,51 @@ document.querySelectorAll('.nav__item--parent > .nav__link').forEach(function(li
 });
 
 /* ===== 通常フォーム 二重送信防止 =====
- * data-ajax-submit 属性を持たない通常フォーム（ページ遷移あり）の送信ボタンを
- * submit イベント時に disabled にする。
+ * 送信ボタンを submit イベント時に disabled にする。
  * ページ遷移によって自動リセットされるため、再活性化処理は不要。
  */
 document.addEventListener('submit', function (e) {
   var form = e.target;
-  if (form.hasAttribute('data-ajax-submit')) return; // AJAXフォームは対象外
   var submitBtn = form.querySelector('[type="submit"]');
   if (submitBtn) submitBtn.disabled = true;
 });
 
-/* ===== withSubmitLock: AJAXフォーム 二重送信防止 =====
- *
- * 用途:
- *   AJAXで送信するフォーム（ページ遷移なし）の二重送信を防ぐ共通ユーティリティ。
- *   非同期処理の開始時にボタンを非活性化し、完了（成功・失敗問わず）後に再活性化する。
- *
- * 引数:
- *   form    {HTMLFormElement} - 対象フォーム要素。[type="submit"] ボタンが制御対象。
- *   asyncFn {Function}        - 送信処理を行う非同期関数（Promise を返すこと）。
- *
- * 使い方:
- *   async function _handleFormSubmit(e) {
- *     e.preventDefault();
- *     await withSubmitLock(e.currentTarget, async function () {
- *       const res = await fetch(form.action, { method: 'POST', ... });
- *       // レスポンス処理...
- *     });
- *   }
- *
- * 注意:
- *   - asyncFn 内でページリロード（window.location.reload()）が発生する場合、
- *     finally の再活性化は実行されるが画面が切り替わるため実質無害。
- *   - 400 等でモーダル内容が差し替えられた場合、元のボタン要素はDOMから除去済みの
- *     ため再活性化は no-op になる（問題なし）。
+/* ===== エラートースト表示（?error= パラメータ） =====
+ * サーバーが referrer へリダイレクトする際に付与した ?error= を読み取り、
+ * トーストで表示したうえで URL からパラメータを消去する。
  */
-function withSubmitLock(form, asyncFn) {
-  var btn = form.querySelector('[type="submit"]');
-  if (btn) btn.disabled = true;
-  return asyncFn().finally(function () {
-    if (btn) btn.disabled = false;
-  });
-}
+document.addEventListener('DOMContentLoaded', function () {
+  /* ── URL パラメータ経由トースト（バックエンド起点のリダイレクト後） ──
+   * Flask が ?error= / ?success= を付与してリダイレクトした場合に表示する。
+   * JS 起点のトーストは Toast.show() / Toast.showAfterReload() を使うこと。
+   */
+  var params  = new URLSearchParams(window.location.search);
+  var error   = params.get('error');
+  var success = params.get('success');
+
+  if (error)   Toast.show(error,   'error');
+  if (success) Toast.show(success, 'success');
+
+  if (error || success) {
+    params.delete('error');
+    params.delete('success');
+    var newSearch = params.toString();
+    var newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    history.replaceState(null, '', newUrl);
+  }
+
+  /* ── sessionStorage 経由トースト（JS 起点のリロード後） ──
+   * Toast.showAfterReload() で保存されたメッセージをリロード後に表示する。
+   */
+  var pending = sessionStorage.getItem('_pending_toast');
+  if (pending) {
+    sessionStorage.removeItem('_pending_toast');
+    try {
+      var t = JSON.parse(pending);
+      Toast.show(t.message, t.type);
+    } catch (e) {}
+  }
+});
 
 /* ===== CSVインポートモーダル ===== */
 function openImportModal() {

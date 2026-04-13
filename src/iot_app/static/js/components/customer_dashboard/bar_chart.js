@@ -43,6 +43,7 @@
       fp:          null,
       minValue:    chartConfig.min_value ?? null,
       maxValue:    chartConfig.max_value ?? null,
+      errorEl:     el.querySelector('.bar-chart__error'),
     };
 
     bindControls(el, state);
@@ -163,11 +164,15 @@
       }),
     })
       .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
+        if (!res.ok) {
+          return res.json().then(function (data) {
+            if (state.errorEl) state.errorEl.textContent = data.error;
+          }).catch(function () {});
+        }
+        return res.json().then(function (data) {
+          if (state.errorEl) state.errorEl.textContent = '';
+          renderChart(state.chart, data.chart_data, state.displayUnit, state.minValue, state.maxValue);
+        });
       })
       .catch(function (err) {
         console.error('棒グラフデータ取得エラー:', err);
@@ -226,7 +231,24 @@
       base_datetime: toFullDatetime(state.baseDatetime, state.displayUnit),
     });
     const url = CSV_ENDPOINT.replace('{uuid}', state.uuid) + '?' + params.toString();
-    window.location.href = url;
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (data) {
+            Toast.show(data.error || 'エラーが発生しました', 'error');
+          });
+        }
+        return res.blob().then(function (blob) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'sensor_data.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+      })
+      .catch(function () {
+        Toast.show('CSVのダウンロードに失敗しました', 'error');
+      });
   }
 
   // ============================================================
@@ -376,8 +398,8 @@ function bindBarChartGadgetRegister(container) {
       const mode = btn.dataset.mode;
       if (deviceModeInput) deviceModeInput.value = mode;
       const isFixed = mode === 'fixed';
-      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? '' : 'hidden';
-      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? '' : 'hidden';
+      if (deviceFixedArea) deviceFixedArea.style.visibility = isFixed ? 'visible' : 'hidden';
+      if (deviceNameArea)  deviceNameArea.style.visibility  = isFixed ? 'visible' : 'hidden';
     });
   });
 

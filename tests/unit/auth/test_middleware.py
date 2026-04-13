@@ -11,7 +11,7 @@ from flask import session
 from werkzeug.exceptions import InternalServerError, Unauthorized
 
 from iot_app.auth.middleware import is_excluded_path, _sync_session, authenticate_request
-from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError
+from iot_app.auth.exceptions import UnauthorizedError, JWTRetrievalError, TokenExchangeError, JWTExpiredError
 
 
 # ---------------------------------------------------------------------------
@@ -170,28 +170,25 @@ class TestAuthenticateRequest:
 
                 assert session.get("email") is None
 
-    def test_user_not_registered_returns_403_error_page(self, app):
-        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、403エラーページを直接返す
-        （abort(403) は使用しない。セッションはクリアしない）
+    def test_user_not_registered_aborts_403(self, app):
+        """1.3.3: IdP 認証済みだがアプリ未登録ユーザーの場合、abort(403) を発生させる
+        （セッションはクリアしない）
         """
+        from werkzeug.exceptions import Forbidden
+
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
         with app.test_request_context("/dashboard"):
             with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("iot_app.auth.middleware.render_template",
-                               return_value="<html>403</html>") as mock_render:
-                        session["email"] = "existing@example.com"
+                    session["email"] = "existing@example.com"
 
-                        result = authenticate_request()
+                    with pytest.raises(Forbidden):
+                        authenticate_request()
 
-                        # 403レスポンスをタプルで直接返す
-                        assert result[1] == 403
-                        # errors/403.html をレンダリングする
-                        mock_render.assert_called_once_with("errors/403.html")
-                        # IdP認証は成功しているためセッションはクリアしない
-                        assert session.get("email") == "existing@example.com"
+                    # IdP認証は成功しているためセッションはクリアしない
+                    assert session.get("email") == "existing@example.com"
 
     def test_idp_auth_success_syncs_session_and_returns_none(self, app):
         """2.1.1: IdP 認証成功時、セッションが同期されて None を返す"""
@@ -331,6 +328,103 @@ class TestAuthenticateRequest:
 
 
 # ---------------------------------------------------------------------------
+# JWTExpiredError ハンドリング
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestJWTExpiredHandling:
+    """JWTExpiredError 発生時のレスポンス分岐テスト
+    観点: 1.3 エラーハンドリング
+
+    JWTExpiredError（Databricks Token Exchange の JWT 期限切れ）発生時の挙動:
+      - 非AJAXリクエスト: token_refresh.html を返す（通常ページとしてリフレッシュ処理）
+      - AJAXリクエスト: 401 + {"error": "token_expired"} JSON を返す
+        （フロントのグローバル fetch インターセプターが window.location.reload() を実行）
+    """
+
+    def _make_mock_provider(self):
+        mock_provider = MagicMock()
+        mock_provider.get_user_info.return_value = {"email": "yamada@example.com"}
+        mock_provider.requires_additional_setup.return_value = False
+        return mock_provider
+
+    def _default_app_user(self):
+        return {"user_id": 42, "user_type_id": 2, "organization_id": 10}
+
+    def _make_expired_exchanger(self):
+        mock_exchanger = MagicMock()
+        mock_exchanger.ensure_valid_token.side_effect = JWTExpiredError("token expired")
+        return mock_exchanger
+
+    def test_non_ajax_jwt_expired_returns_token_refresh_template(self, app):
+        """1.3.5: 通常リクエスト（非AJAX）でJWT期限切れの場合、token_refresh.html を返す"""
+        with app.test_request_context("/dashboard"):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        with patch("iot_app.auth.middleware.render_template",
+                                   return_value="<html>token_refresh</html>") as mock_render:
+                            result = authenticate_request()
+
+        mock_render.assert_called_once()
+        assert mock_render.call_args[0][0] == "auth/token_refresh.html"
+        assert result == "<html>token_refresh</html>"
+
+    def test_xhr_header_jwt_expired_returns_401_json(self, app):
+        """1.3.5: X-Requested-With: XMLHttpRequest の場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
+
+    def test_json_content_type_jwt_expired_returns_401_json(self, app):
+        """1.3.5: Content-Type: application/json（request.is_json）の場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            content_type="application/json",
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
+
+    def test_accept_json_header_jwt_expired_returns_401_json(self, app):
+        """1.3.5: Accept: application/json ヘッダーの場合、JWT期限切れは 401 + JSON を返す"""
+        with app.test_request_context(
+            "/dashboard",
+            headers={"Accept": "application/json"},
+        ):
+            with patch("iot_app.auth.middleware.auth_provider", self._make_mock_provider()):
+                with patch("iot_app.auth.middleware.find_user_by_email",
+                           return_value=self._default_app_user()):
+                    with patch("iot_app.auth.token_exchange.TokenExchanger",
+                               return_value=self._make_expired_exchanger()):
+                        result = authenticate_request()
+
+        response, status_code = result
+        assert status_code == 401
+        assert response.get_json() == {"error": "token_expired"}
+
+
+# ---------------------------------------------------------------------------
 # ロギング
 # ---------------------------------------------------------------------------
 
@@ -361,6 +455,7 @@ class TestAuthenticateRequestLogging:
     def test_user_not_registered_logs_warning(self, app, caplog):
         """1.4.1.3: アプリ未登録ユーザーのアクセス時に WARN レベルで email フィールド付きログが出力される"""
         import logging
+        from werkzeug.exceptions import Forbidden
 
         mock_provider = self._make_mock_provider(user_info=self._default_user_info())
 
@@ -368,9 +463,8 @@ class TestAuthenticateRequestLogging:
             with patch("iot_app.auth.middleware.auth_provider", mock_provider):
                 with patch("iot_app.auth.middleware.find_user_by_email",
                            side_effect=UnauthorizedError("user not found")):
-                    with patch("iot_app.auth.middleware.render_template",
-                               return_value="<html>403</html>"):
-                        with caplog.at_level(logging.WARNING):
+                    with caplog.at_level(logging.WARNING):
+                        with pytest.raises(Forbidden):
                             authenticate_request()
 
         warn_records = [r for r in caplog.records if r.levelno == logging.WARNING]

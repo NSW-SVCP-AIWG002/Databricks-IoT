@@ -6,36 +6,6 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   gadget: ガジェット固有設定
-   -------------------------------------------------------------------------- */
-
-.gadget__setting-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 var(--spacing-1);
-  line-height: 1;
-}
-
-.gadget__setting-btn:hover {
-  opacity: 0.8;
-}
-
-/* ガジェット共通ツールバー（固有設定のみ） */
-.gadget__toolbar {
-  padding: var(--spacing-1) var(--spacing-3);
-  background: #f5f5f5;
-  border-bottom: 1px solid #ddd;
-}
-
-/* ガジェットボディ（padding追加） */
-.gadget__body {
-  padding: var(--spacing-2);
-}
-
-/* --------------------------------------------------------------------------
    timeline: 時系列グラフガジェット固有
    -------------------------------------------------------------------------- */
 
@@ -82,7 +52,7 @@
   grid-template-columns: auto auto;
   column-gap: var(--spacing-4);
   row-gap: var(--spacing-1);
-  padding-top: var(--spacing-1);
+  padding: var(--spacing-2) var(--spacing-4);
   border-top: 1px solid #eee;
 }
 
@@ -129,7 +99,7 @@
 .timeline__datetime-input {
   width: 170px;
   font-size: var(--font-size-sm);
-  padding-left: 24px;
+  padding: 2px var(--spacing-2) 2px 24px;
 }
 
 /* カレンダーアイコン（装飾のみ・クリック不可） */
@@ -154,6 +124,13 @@
 
 .timeline__refresh-btn:hover {
   color: var(--color-primary);
+}
+
+/* エラーメッセージ領域 */
+.timeline__error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  padding: 0 var(--spacing-4);
 }
 
 /* ツールバー内デバイス名（timeline固有） */
@@ -354,6 +331,7 @@
 .timeline-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .timeline-register__measurement-list thead {

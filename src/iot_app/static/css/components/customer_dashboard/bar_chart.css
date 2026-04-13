@@ -1,25 +1,5 @@
 /* ============================================================
-   ガジェット共通（固有設定のみ。共通定義は common.css を参照）
-   ============================================================ */
-
-.gadget__setting-btn {
-  position: absolute;
-  right: var(--spacing-2);
-  background: transparent;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  font-size: var(--font-size-lg);
-  padding: 0 var(--spacing-1);
-}
-
-.gadget__toolbar {
-  padding: var(--spacing-2) var(--spacing-4);
-  border-bottom: 1px solid #eee;
-}
-
-/* ============================================================
-   棒グラフガジェット
+   棒グラフガジェット（共通定義は common.css を参照）
    ============================================================ */
 
 .bar-chart {
@@ -126,6 +106,13 @@
   font-size: var(--font-size-lg);
   padding: 0;
   line-height: 1;
+}
+
+/* エラーメッセージ領域 */
+.bar-chart__error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  padding: 0 var(--spacing-4);
 }
 
 /* ============================================================
@@ -276,6 +263,7 @@
 .bar-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 0;
 }
 
 .bar-chart-register__measurement-list thead {

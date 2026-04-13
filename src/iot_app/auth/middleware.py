@@ -15,7 +15,6 @@ auth_provider = None
 EXCLUDED_PATHS = [
     '/static',
     '/auth/login',
-    '/auth/logout',
     '/auth/password-reset',
     '/.well-known',
     '/health',
@@ -51,11 +50,8 @@ def authenticate_request():
     try:
         app_user = find_user_by_email(idp_user_info['email'])
     except UnauthorizedError:
-        # IdP認証済みだがアプリ未登録 → 403エラーページを直接返却
-        # ※ abort(403) は使用しない。他の403（ロール不足）はモーダル表示だが、
-        #   このケースはページ表示前に発生するため middleware 内で直接レンダリングする。
         logger.warning("アクセス拒否：アプリ未登録ユーザー", extra={"email": idp_user_info.get("email")})
-        return render_template("errors/403.html"), 403
+        abort(403)
 
     _sync_session(idp_user_info, app_user)
 
@@ -84,7 +80,16 @@ def authenticate_request():
         except JWTRetrievalError:
             abort(500)
         except JWTExpiredError:
-            return redirect(f'/.auth/refresh?post_login_redirect_uri={request.path}')
+            redirect_uri = request.full_path.rstrip('?')
+            is_ajax = (
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                or request.is_json
+                or 'application/json' in request.headers.get('Accept', '')
+            )
+            if is_ajax:
+                from flask import jsonify as _jsonify
+                return _jsonify({'error': 'token_expired'}), 401
+            return render_template('auth/token_refresh.html', redirect_uri=redirect_uri)
         except TokenExchangeError:
             abort(500)
 

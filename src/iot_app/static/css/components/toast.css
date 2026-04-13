@@ -1,0 +1,44 @@
+/* ===== トースト通知 ===== */
+
+#toast-container {
+  position: fixed;
+  top: var(--spacing-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  pointer-events: none;
+}
+
+.toast {
+  padding: var(--spacing-3) var(--spacing-6);
+  border-radius: var(--border-radius-base);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  max-width: 480px;
+  text-align: center;
+  white-space: pre-line;
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: auto;
+}
+
+.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast--error {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
+
+.toast--success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
