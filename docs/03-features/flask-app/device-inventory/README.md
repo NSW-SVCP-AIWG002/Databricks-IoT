@@ -38,28 +38,28 @@
 
 ## 機能一覧
 
-| 機能ID | 機能名 | 概要 |
-|--------|--------|------|
+| 機能ID     | 機能名                 | 概要                               |
+| ---------- | ---------------------- | ---------------------------------- |
 | FR-004-5-1 | デバイス台帳一覧・検索 | 台帳情報の一覧表示、検索・絞り込み |
-| FR-004-5-2 | デバイス台帳登録 | デバイス台帳情報の新規登録 |
-| FR-004-5-3 | デバイス台帳更新 | 台帳情報の変更 |
-| FR-004-5-4 | デバイス台帳削除 | 台帳の論理削除 |
-| FR-004-5-5 | デバイス台帳参照 | 台帳の詳細情報表示 |
-| FR-004-5-6 | CSVエクスポート | 台帳データのCSV出力 |
+| FR-004-5-2 | デバイス台帳登録       | デバイス台帳情報の新規登録         |
+| FR-004-5-3 | デバイス台帳更新       | 台帳情報の変更                     |
+| FR-004-5-4 | デバイス台帳削除       | 台帳の論理削除                     |
+| FR-004-5-5 | デバイス台帳参照       | 台帳の詳細情報表示                 |
+| FR-004-5-6 | CSVエクスポート        | 台帳データのCSV出力                |
 
 ---
 
 ## 画面一覧
 
-| 画面ID | 画面名 | 概要 |
-|--------|--------|------|
-| ADM-013 | デバイス台帳一覧画面 | 一覧・検索・削除 |
-| ADM-014 | デバイス台帳登録画面 | 登録（モーダル） |
-| ADM-015 | デバイス台帳更新画面 | 更新（モーダル） |
-| ADM-016 | デバイス台帳参照画面 | 詳細表示（モーダル） |
-| ADM-017 | デバイス台帳登録確認画面 | 登録確認（モーダル） |
-| ADM-018 | デバイス台帳更新確認画面 | 更新確認（モーダル） |
-| ADM-019 | デバイス台帳削除確認画面 | 削除確認（モーダル） |
+| 画面ID  | 画面名                   | 概要                     |
+| ------- | ------------------------ | ------------------------ |
+| ADM-013 | デバイス台帳一覧画面     | 一覧・検索・削除         |
+| ADM-014 | デバイス台帳登録画面     | 登録（モーダル）         |
+| ADM-015 | デバイス台帳更新画面     | 更新（モーダル）         |
+| ADM-016 | デバイス台帳参照画面     | 詳細表示（モーダル）     |
+| ADM-017 | デバイス台帳登録確認画面 | 登録確認（モーダル）     |
+| ADM-018 | デバイス台帳更新確認画面 | 更新確認（モーダル）     |
+| ADM-019 | デバイス台帳削除確認画面 | 削除確認（モーダル）     |
 | ADM-020 | デバイス台帳登録完了画面 | 登録完了通知（モーダル） |
 | ADM-021 | デバイス台帳更新完了画面 | 更新完了通知（モーダル） |
 | ADM-022 | デバイス台帳削除完了画面 | 削除完了通知（モーダル） |
@@ -72,23 +72,23 @@
 
 **概要**: デバイスの在庫・配備状況を管理するテーブル
 
-| #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
-| --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
-| 1   | device_inventory_id            | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                            |
-| 2   | device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用） |
-| 3   | inventory_status_id            | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）                     |
-| 4   | device_model                   | モデル情報         | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番（オリジナル値を履歴として保持）      |
+| #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                                                                    |
+| --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | device_inventory_id            | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID（主キー、自動採番）                                                                                      |
+| 2   | device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | デバイス在庫の外部公開用識別子（URLパスパラメータとして使用）                                                           |
+| 3   | inventory_status_id            | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）                                                                               |
+| 4   | device_model                   | モデル情報         | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番（オリジナル値を履歴として保持）                                                                |
 | 5   | mac_address                    | MACアドレス        | VARCHAR(17)  | NOT NULL | -   | -   | -                 | ネットワークインターフェースの物理アドレス。コロン区切り形式（AA:BB:CC:DD:EE:FF）で格納（オリジナル値を履歴として保持） |
-| 6   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                |
-| 7   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                            |
-| 8   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                |
-| 9   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                          |
-| 10  | inventory_location             | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                            |
-| 11  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                              |
-| 12  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                      |
-| 13  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                          |
-| 14  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                      |
-| 15  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                       |
+| 6   | purchase_date                  | 購入日             | DATETIME     | NOT NULL | -   | -   | -                 | デバイス購入日                                                                                                          |
+| 7   | estimated_ship_date            | 出荷予定日         | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷予定日                                                                                                      |
+| 8   | ship_date                      | 出荷日             | DATETIME     | NULL     | -   | -   | -                 | デバイス出荷日                                                                                                          |
+| 9   | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | NOT NULL | -   | -   | -                 | メーカー保証の終了日                                                                                                    |
+| 10  | inventory_location             | 在庫場所           | VARCHAR(100) | NOT NULL | -   | -   | -                 | 現在の在庫保管場所                                                                                                      |
+| 11  | create_date                    | 作成日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                                                        |
+| 12  | creator                        | 作成者             | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                                                                                |
+| 13  | update_date                    | 更新日時           | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                                                                                    |
+| 14  | modifier                       | 更新者             | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                                                                                |
+| 15  | delete_flag                    | 削除フラグ         | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                                                                 |
 
 **外部キー:**
 - `inventory_status_id` → `inventory_status_master.inventory_status_id`
@@ -105,15 +105,15 @@
 
 **概要**: デバイス在庫状況のステータスを管理するマスタテーブル
 
-| #   | カラム物理名      | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
-| --- | ----------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
+| #   | カラム物理名          | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| --- | --------------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
 | 1   | inventory_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、在庫状況の一意識別子          |
 | 2   | inventory_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
-| 3   | create_date       | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 4   | creator           | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
-| 5   | update_date       | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
-| 6   | modifier          | 更新者       | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                |
-| 7   | delete_flag       | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| 3   | create_date           | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| 4   | creator               | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
+| 5   | update_date           | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                    |
+| 6   | modifier              | 更新者       | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                |
+| 7   | delete_flag           | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
 
 **初期データ:**
 | inventory_status_id | inventory_status_name | 説明                 |
@@ -132,31 +132,31 @@
 
 **概要**: IoTデバイスの基本情報を管理するテーブル。デバイス台帳登録時に、device_inventory_masterと同時にレコードが作成される。device_uuidは接続するクラウドサービス（Azure IoT Hubs、AWS IoT Core等）ごとにバリデーション方法が異なるため、クラウド連携時に各サービスの仕様に従った形式で登録する必要がある。
 
-| #   | カラム物理名                | カラム論理名           | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                            |
-| --- | --------------------------- | ---------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------------- |
-| 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイスの一意識別子（主キー、自動採番）        |
+| #   | カラム物理名                | カラム論理名           | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                                                |
+| --- | --------------------------- | ---------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------------------------------------------------- |
+| 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイスの一意識別子（主キー、自動採番）                                            |
 | 2   | device_uuid                 | デバイスUUID           | VARCHAR(128) | NOT NULL | -   | -   | -                 | クラウドに登録されるデバイスID（※1）128ビットの値でなくてもよいのでUUIDとも限らない |
-| 3   | device_name                 | デバイス名             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスの表示名                                |
-| 4   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）        |
-| 5   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                       |
-| 6   | device_inventory_id         | デバイス在庫ID         | INT          | NULL     | -   | ○   | -                 | デバイス在庫ID（device_inventory_master参照）   |
-| 7   | sim_id                      | SIMID                  | VARCHAR(20) | NULL     | -   | -   | -                 | デバイスのSIM ID                                |
-| 8   | mac_address                 | MACアドレス            | VARCHAR(17)  | NULL     | -   | -   | -                 | デバイスのMACアドレス。コロン区切り形式（AA:BB:CC:DD:EE:FF）で格納 |
-| 9   | organization_id             | 組織ID                 | INT          | NULL     | -   | ○   | -                 | 所属組織ID（organization_master参照）           |
-| 10  | software_version            | ソフトウェアバージョン | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのファームウェアバージョン              |
-| 11  | device_location             | 設置場所               | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスの設置場所                              |
-| 12  | certificate_expiration_date | 証明書期限             | DATETIME     | NULL     | -   | -   | -                 | SSL証明書期限                                   |
-| 13  | delete_flag                 | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE         |
-| 14  | create_date                 | 作成日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                |
-| 15  | creator                     | 作成者                 | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                        |
-| 16  | update_date                 | 更新日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                            |
-| 17  | modifier                    | 更新者                 | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                        |
+| 3   | device_name                 | デバイス名             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスの表示名                                                                    |
+| 4   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）                                            |
+| 5   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                                                            |
+| 6   | device_inventory_id         | デバイス在庫ID         | INT          | NULL     | -   | ○   | -                 | デバイス在庫ID（device_inventory_master参照）                                       |
+| 7   | sim_id                      | SIMID                  | VARCHAR(20)  | NULL     | -   | -   | -                 | デバイスのSIM ID                                                                    |
+| 8   | mac_address                 | MACアドレス            | VARCHAR(17)  | NULL     | -   | -   | -                 | デバイスのMACアドレス。コロン区切り形式（AA:BB:CC:DD:EE:FF）で格納                  |
+| 9   | organization_id             | 組織ID                 | INT          | NULL     | -   | ○   | -                 | 所属組織ID（organization_master参照）                                               |
+| 10  | software_version            | ソフトウェアバージョン | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのファームウェアバージョン                                                  |
+| 11  | device_location             | 設置場所               | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスの設置場所                                                                  |
+| 12  | certificate_expiration_date | 証明書期限             | DATETIME     | NULL     | -   | -   | -                 | SSL証明書期限                                                                       |
+| 13  | delete_flag                 | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                             |
+| 14  | create_date                 | 作成日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                    |
+| 15  | creator                     | 作成者                 | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                                                            |
+| 16  | update_date                 | 更新日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                                                |
+| 17  | modifier                    | 更新者                 | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザID                                                            |
 
 **※1 device_uuidのクラウド別バリデーション:**
-| クラウドサービス | 形式・制約 |
-|------------------|------------|
+| クラウドサービス | 形式・制約                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
 | Azure IoT Hubs   | 最大128文字、ASCII 7 ビット英数字の大文字と小文字が区別される文字列、(- . % _ * ? ! ( ) , : = @ $ ')使用可 |
-| AWS IoT Core     | 最大128文字、[a-zA-Z0-9:_-]使用可 |
+| AWS IoT Core     | 最大128文字、[a-zA-Z0-9:_-]使用可                                                                          |
 
 **外部キー:**
 - `device_type_id` → `device_type_master.device_type_id`
@@ -174,16 +174,16 @@
 
 ## Flaskルート一覧
 
-| No | ルート名 | エンドポイント | メソッド | 用途 |
-|----|---------|---------------|---------|------|
-| 1 | デバイス台帳一覧表示 | `/admin/device-inventory` | GET | 一覧・検索表示 |
-| 2 | デバイス台帳登録画面 | `/admin/device-inventory/create` | GET | 登録モーダル表示 |
-| 3 | デバイス台帳登録実行 | `/admin/device-inventory/create` | POST | 登録処理 |
-| 4 | デバイス台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>` | GET | 詳細モーダル表示 |
-| 5 | デバイス台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit` | GET | 更新モーダル表示 |
-| 6 | デバイス台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST | 更新処理 |
-| 7 | デバイス台帳削除実行 | `/admin/device-inventory/delete` | POST | 削除処理（論理削除、複数選択対応） |
-| 8 | CSVエクスポート | `/admin/device-inventory?export=csv` | GET | CSV出力 |
+| No  | ルート名             | エンドポイント                                           | メソッド | 用途                               |
+| --- | -------------------- | -------------------------------------------------------- | -------- | ---------------------------------- |
+| 1   | デバイス台帳一覧表示 | `/admin/device-inventory`                                | GET      | 一覧・検索表示                     |
+| 2   | デバイス台帳登録画面 | `/admin/device-inventory/create`                         | GET      | 登録モーダル表示                   |
+| 3   | デバイス台帳登録実行 | `/admin/device-inventory/create`                         | POST     | 登録処理                           |
+| 4   | デバイス台帳詳細表示 | `/admin/device-inventory/<device_inventory_uuid>`        | GET      | 詳細モーダル表示                   |
+| 5   | デバイス台帳更新画面 | `/admin/device-inventory/<device_inventory_uuid>/edit`   | GET      | 更新モーダル表示                   |
+| 6   | デバイス台帳更新実行 | `/admin/device-inventory/<device_inventory_uuid>/update` | POST     | 更新処理                           |
+| 7   | デバイス台帳削除実行 | `/admin/device-inventory/delete`                         | POST     | 削除処理（論理削除、複数選択対応） |
+| 8   | CSVエクスポート      | `/admin/device-inventory`                                | POST     | CSV出力                            |
 
 ---
 
@@ -191,14 +191,14 @@
 
 ### 機能別アクセス権限
 
-| 機能 | システム保守者 | 管理者 | 販社ユーザ | サービス利用者 |
-|------|--------------|--------|----------|--------------|
-| デバイス台帳一覧 | ○ | - | - | - |
-| デバイス台帳参照 | ○ | - | - | - |
-| デバイス台帳登録 | ○ | - | - | - |
-| デバイス台帳更新 | ○ | - | - | - |
-| デバイス台帳削除 | ○ | - | - | - |
-| CSVエクスポート | ○ | - | - | - |
+| 機能             | システム保守者 | 管理者 | 販社ユーザ | サービス利用者 |
+| ---------------- | -------------- | ------ | ---------- | -------------- |
+| デバイス台帳一覧 | ○              | -      | -          | -              |
+| デバイス台帳参照 | ○              | -      | -          | -              |
+| デバイス台帳登録 | ○              | -      | -          | -              |
+| デバイス台帳更新 | ○              | -      | -          | -              |
+| デバイス台帳削除 | ○              | -      | -          | -              |
+| CSVエクスポート  | ○              | -      | -          | -              |
 
 **注:** デバイス台帳管理はシステム保守者（NSW内部）専用の機能です。
 
