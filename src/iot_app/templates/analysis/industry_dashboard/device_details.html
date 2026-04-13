@@ -145,6 +145,9 @@
         <span class="form-option__label">自動更新</span>
       </label>
     </div>
+    {% if period_error %}
+    <p class="form__error" style="width:100%; margin:0; font-size:var(--font-size-lg);">{{ period_error }}</p>
+    {% endif %}
   </form>
   <div class="ids-period-control__csv">
     <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, export='csv') }}"
@@ -208,6 +211,14 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  (function() {
+    var navEntries = performance.getEntriesByType('navigation');
+    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+      window.location.replace('{{ url_for("analysis.device_details", device_uuid=device.device_uuid) }}');
+    }
+  })();
+</script>
 <script type="application/json" id="graph-data-json">{{ graph_data | tojson }}</script>
 <script>
   var graphData = JSON.parse(document.getElementById('graph-data-json').textContent);

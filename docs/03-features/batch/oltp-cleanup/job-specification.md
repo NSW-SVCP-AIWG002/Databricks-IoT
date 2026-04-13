@@ -85,15 +85,17 @@
 import pymysql
 import pymysql.cursors
 
+DB_SECRET_SCOPE = "my_sql_secrets"
+
 
 def get_db_connection() -> pymysql.Connection:
     """OLTP DB接続を返す"""
     return pymysql.connect(
-        host=dbutils.secrets.get("scope", "mysql-host"),
-        port=int(dbutils.secrets.get("scope", "mysql-port")),
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password"),
-        database=dbutils.secrets.get("scope", "mysql-database"),
+        host=dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-host"),
+        port=int(dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-port")),
+        user=dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-user"),
+        password=dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-password"),
+        database=dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-database"),
         cursorclass=pymysql.cursors.DictCursor,
         charset="utf8mb4",
     )
@@ -105,6 +107,7 @@ def cleanup_oltp_table(
     timestamp_col: str,
     retain_months: int,
     label: str,
+    date_format: str = None,
 ) -> None:
     """保持期間超過レコードをOLTP DBから削除する共通処理
 
@@ -114,13 +117,22 @@ def cleanup_oltp_table(
         timestamp_col:  保持期間判定に使用するタイムスタンプカラム名
         retain_months:  データ保持月数（これを超えたレコードを削除）
         label:          ログ出力用のテーブル識別ラベル
+        date_format:    タイムスタンプカラムがVARCHAR型の場合の日付フォーマット文字列
+                        （例: "%Y/%m"）。Noneの場合はDATE_SUB()をそのまま使用する。
     """
+    # date_format指定時はVARCHAR型カラムとの比較用に日付文字列へ変換する
+    if date_format:
+        cutoff_expr = f"DATE_FORMAT(DATE_SUB(NOW(), INTERVAL {retain_months} MONTH), '{date_format}')"
+    else:
+        cutoff_expr = f"DATE_SUB(NOW(), INTERVAL {retain_months} MONTH)"
+
+    # table・timestamp_col はコード内定数のみ使用。外部入力を混入させないこと。
     with conn.cursor() as cursor:
         # 削除対象件数を確認
         cursor.execute(f"""
             SELECT COUNT(*) AS cnt
             FROM {table}
-            WHERE {timestamp_col} < DATE_SUB(NOW(), INTERVAL {retain_months} MONTH)
+            WHERE {timestamp_col} < {cutoff_expr}
         """)
         count = cursor.fetchone()["cnt"]
 
@@ -133,10 +145,11 @@ def cleanup_oltp_table(
     with conn.cursor() as cursor:
         cursor.execute(f"""
             DELETE FROM {table}
-            WHERE {timestamp_col} < DATE_SUB(NOW(), INTERVAL {retain_months} MONTH)
+            WHERE {timestamp_col} < {cutoff_expr}
         """)
+        deleted_count = cursor.rowcount
     conn.commit()
-    print(f"[{label}] 削除完了: {count}件")
+    print(f"[{label}] 削除完了: {deleted_count}件")
 ```
 
 ---
@@ -175,14 +188,16 @@ flowchart TD
 import pymysql
 import pymysql.cursors
 
+DB_SECRET_SCOPE = "my_sql_secrets"
+
 def cleanup_email_queue():
     """30日経過したSENT/FAILEDレコードを削除"""
     db_config = {
-        "host": dbutils.secrets.get("scope", "mysql-host"),
-        "port": int(dbutils.secrets.get("scope", "mysql-port")),
-        "user": dbutils.secrets.get("scope", "mysql-user"),
-        "password": dbutils.secrets.get("scope", "mysql-password"),
-        "database": dbutils.secrets.get("scope", "mysql-database"),
+        "host": dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-host"),
+        "port": int(dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-port")),
+        "user": dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-user"),
+        "password": dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-password"),
+        "database": dbutils.secrets.get(DB_SECRET_SCOPE, "mysql-database"),
         "cursorclass": pymysql.cursors.DictCursor,
         "charset": "utf8mb4",
     }
@@ -449,6 +464,7 @@ def gold_sensor_data_monthly_summary_cleanup():
             timestamp_col="collection_year_month",
             retain_months=36,
             label="gold_sensor_data_monthly_summary",
+            date_format="%Y/%m",
         )
 
 
@@ -478,8 +494,10 @@ gold_sensor_data_monthly_summary_cleanup()
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                                                  | 担当者       |
-| ---------- | ---- | --------------------------------------------------------- | ------------ |
-| 2026-01-19 | 1.0  | 初版作成                                                  | Kei Sugiyama |
-| 2026-04-07 | 1.1  | 共通関数追加・Silver/Gold各タスクの処理コード・設定を実装 | Kei Sugiyama |
-| 2026-04-07 | 1.2  | 各テーブルの保持期間を変更・共通関数をretain_months対応   | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                                                                                                           | 担当者       |
+| ---------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 2026-01-19 | 1.0  | 初版作成                                                                                                                                           | Kei Sugiyama |
+| 2026-04-07 | 1.1  | 共通関数追加・Silver/Gold各タスクの処理コード・設定を実装                                                                                          | Kei Sugiyama |
+| 2026-04-07 | 1.2  | 各テーブルの保持期間を変更・共通関数をretain_months対応                                                                                            | Kei Sugiyama |
+| 2026-04-10 | 1.3  | M-2: Secretsスコープ定数化・M-3: 月次サマリVARCHAR型対応（date_formatパラメータ追加）・L-1: cursor.rowcount使用・L-2: f-string SQL安全コメント追加 | Kei Sugiyama |
+| 2026-04-10 | 1.4  | M-1: cursor.rowcount をwithブロック内で退避（deleted_count変数に格納）                                                                             | Kei Sugiyama |

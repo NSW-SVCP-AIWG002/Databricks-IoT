@@ -1,28 +1,25 @@
-# メール送信ジョブ
+# ゴールド層データ再生成ジョブ
 
 ## 概要
 
-メール送信ジョブは、IoTデバイスのアラート検出時にメール通知キューへ登録されたレコードを、Databricks Workflowで定期実行して送信するバッチジョブです。
-
-シルバー層LDPパイプラインがアラートを検出するたびにメール送信キュー（`email_notification_queue`）へPENDINGステータスのレコードを登録し、本ジョブが1分間隔でそのレコードを取得してSMTP経由でメール送信を行います。LDPストリーミング処理とメール送信を非同期化することで、ストリーミング処理のレイテンシに影響を与えないアーキテクチャを実現しています。
+ゴールド層データ再生成ジョブは、ゴールド層LDPパイプラインによって生成された時次サマリデータ、日次サマリデータを再生成するバッチジョブです。
+再生成対象日のシルバー層センサーデータを全件取得し、時次サマリデータ、日次サマリデータを再生成します。
+このバッチジョブの作用によって、Catalog内に存在するDeltaテーブルに登録されている時次サマリデータ、日次サマリデータと、OLTP DBに登録されている時次サマリデータ、日次サマリデータの間でのデータ不整合を解消し、業種別/顧客作成ダッシュボードから閲覧できるサマリデータと、対話型AIチャットで取得可能なサマリデータを一致させます。
 
 ### 主な責務
 
-1. **メールキュー取得**: メール通知キュー（`email_notification_queue`）からPENDINGレコードを取得
-2. **メール送信**: SMTP経由でアラート通知メールを送信
-3. **ステータス管理**: 送信結果に応じてキューレコードのステータスを更新（SENT / PENDING / FAILED）
-4. **履歴記録**: 送信完了メールの記録を`mail_history`テーブルに保存
-5. **リカバリ処理**: ジョブ異常終了時にPROCESSING状態で滞留しているレコードを自動削除
-6. **クリーンアップ**: 30日経過したSENT/FAILEDレコードを定期削除（別ジョブ）
+1. **時次サマリデータ生成**: シルバー層センサーデータ（iot_catalog.silver.silver_sensor_data）からデータを取得、時次サマリデータを生成
+2. **日次サマリデータ生成**: シルバー層センサーデータ（iot_catalog.silver.silver_sensor_data）からデータを取得、日次サマリデータを生成
+3. **時次サマリデータUPSERT**: 再生成した時次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_hourly_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_hourly_summary）上のデータをUPSERTする
+4. **日次サマリデータUPSERT**: 再生成した日次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_daily_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_daily_summary）上のデータをUPSERTする
 
 ---
 
 ## 機能ID
 
-| 機能ID   | 機能名           | 説明                                             |
-| -------- | ---------------- | ------------------------------------------------ |
-| FR-003-2 | アラート通知     | メール送信キューからのメール送信（バッチジョブ） |
-| OP-002   | クリーンアップ   | 送信済み・失敗レコードの定期削除                 |
+| 機能ID   | 機能名                     | 説明                                                   |
+| -------- | -------------------------- | ------------------------------------------------------ |
+| FR-002-2 | 表示用データ変換・保存処理 | シルバー層センサーデータからゴールド層サマリデータ生成 |
 
 ---
 
@@ -30,125 +27,164 @@
 
 ### 入力データ
 
-| データソース               | 形式              | 説明                                                             |
-| -------------------------- | ----------------- | ---------------------------------------------------------------- |
-| email_notification_queue   | OLTP DB テーブル  | シルバー層パイプラインがアラート検出時に登録するメール送信待機列 |
+| データソース       | 形式          | 説明                                                       |
+| ------------------ | ------------- | ---------------------------------------------------------- |
+| silver_sensor_data | Deltaテーブル | シルバー層パイプラインが成形、登録したセンサーデータを保持 |
 
 ### 出力先
 
-| 出力先                     | 形式                    | 説明                                          |
-| -------------------------- | ----------------------- | --------------------------------------------- |
-| SMTPサーバ                 | メール送信リクエスト    | アラート通知メールの送信                      |
-| email_notification_queue   | OLTP DB テーブル更新    | ステータス・retry_count・processed_timeの更新 |
-| mail_history               | OLTP DB INSERT          | 送信済みメールの履歴記録                      |
+| 出力先                          | 形式                 | 説明                                |
+| ------------------------------- | -------------------- | ----------------------------------- |
+| gold_sensor_data_hourly_summary | OLTP DB UPSERT       | センサーデータ時次サマリの登録/更新 |
+| gold_sensor_data_daily_summary  | OLTP DB UPSERT       | センサーデータ日次サマリの登録/更新 |
+| gold_sensor_data_hourly_summary | Deltaテーブル UPSERT | センサーデータ時次サマリの登録/更新 |
+| gold_sensor_data_daily_summary  | Deltaテーブル UPSERT | センサーデータ日次サマリの登録/更新 |
 
-### メール通知キューカラム一覧
+### センサーデータ時次サマリ（Deltaテーブル）カラム一覧
 
-| #   | カラム物理名       | カラム論理名         | データ型      | NULL     | 説明                                                                   |
-| --- | ------------------ | -------------------- | ------------- | -------- | ---------------------------------------------------------------------- |
-| 1   | queue_id           | キューID             | BIGINT        | NOT NULL | キューレコードの一意識別子（自動採番）                                 |
-| 2   | device_id          | デバイスID           | INT           | NOT NULL | アラート発生元デバイスID                                               |
-| 3   | organization_id    | 組織ID               | INT           | NOT NULL | デバイス所属組織ID                                                     |
-| 4   | alert_id           | アラートID           | INT           | NOT NULL | 発生したアラート設定ID                                                 |
-| 5   | recipient_email    | 送信先メールアドレス | VARCHAR(2000) | NOT NULL | 通知送信先のメールアドレス                                             |
-| 6   | subject            | 件名                 | VARCHAR(500)  | NOT NULL | メール件名                                                             |
-| 7   | body               | 本文                 | VARCHAR(2000) | NOT NULL | メール本文                                                             |
-| 8   | alert_detail_json  | アラート詳細JSON     | JSON          | NOT NULL | アラート詳細情報（測定項目・値・閾値等）                               |
-| 9   | status             | ステータス           | VARCHAR(20)   | NOT NULL | `PENDING` / `PROCESSING` / `SENT` / `FAILED`                          |
-| 10  | retry_count        | リトライ回数         | INT           | NOT NULL | 送信リトライ回数（初期値: 0、最大: 3）                                 |
-| 11  | error_message      | エラーメッセージ     | JSON          | NULL     | 送信失敗時のエラー内容                                                 |
-| 12  | event_timestamp    | イベント発生日時     | TIMESTAMP     | NOT NULL | アラートが発生した日時                                                 |
-| 13  | queued_time        | キュー登録日時       | TIMESTAMP     | NOT NULL | キューに登録された日時                                                 |
-| 14  | processed_time     | 処理完了日時         | TIMESTAMP     | NULL     | メール送信処理が完了した日時                                           |
-| 15  | create_date        | 作成日時             | TIMESTAMP     | NOT NULL | レコード作成日時                                                       |
-| 16  | update_date        | 更新日時             | TIMESTAMP     | NOT NULL | レコード更新日時                                                       |
+| #   | カラム物理名        | カラム論理名 | データ型  | NULL     | 説明                                                        |
+| --- | ------------------- | ------------ | --------- | -------- | ----------------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT       | NOT NULL | システム内でのIoTデバイスの一意識別子                       |
+| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 所属組織ID                                                  |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 |
+| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 集約対象の項目                                              |
+| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL | 集約方法ID（平均、分散など）                                |
+| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL | 集約結果                                                    |
+| 7   | data_count          | データ数     | INT       | NOT NULL | 集約したデータ数                                            |
+| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL | レコード作成日時                                            |
 
-### ステータス遷移
+### センサーデータ時次サマリ（OLTP）カラム一覧
 
-| ステータス   | 説明                                 | 遷移元     | 遷移先                     |
-| ------------ | ------------------------------------ | ---------- | -------------------------- |
-| PENDING      | 送信待ち（初期状態）                 | -          | PROCESSING                 |
-| PROCESSING   | 送信処理中                           | PENDING    | SENT / PENDING / FAILED    |
-| SENT         | 送信完了                             | PROCESSING | -                          |
-| FAILED       | 送信失敗（最大リトライ回数超過）     | PROCESSING | -                          |
+| #   | カラム物理名        | カラム論理名 | データ型  | NULL     | 説明                                                        |
+| --- | ------------------- | ------------ | --------- | -------- | ----------------------------------------------------------- |
+| 1   | device_id           | デバイスID   | INT       | NOT NULL | システム内でのIoTデバイスの一意識別子                       |
+| 2   | organization_id     | 組織ID       | INT       | NOT NULL | 所属組織ID                                                  |
+| 3   | collection_datetime | 集約日時     | DATETIME  | NOT NULL | センサーデータを集約した日時。形式は「YYYY/MM/DD HH:00:00」 |
+| 4   | summary_item        | 集約対象項目 | INT       | NOT NULL | 集約対象の項目                                              |
+| 5   | summary_method_id   | 集約方法ID   | INT       | NOT NULL | 集約方法ID（平均、分散など）                                |
+| 6   | summary_value       | 集約値       | DOUBLE    | NOT NULL | 集約結果                                                    |
+| 7   | data_count          | データ数     | INT       | NOT NULL | 集約したデータ数                                            |
+| 8   | create_time         | 作成日時     | TIMESTAMP | NOT NULL | レコード作成日時                                            |
+
+### センサーデータ日次サマリ（Deltaテーブル）カラム一覧
+
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | 説明                                  |
+| --- | ----------------- | ------------ | --------- | -------- | ------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | システム内でのIoTデバイスの一意識別子 |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | 所属組織ID                            |
+| 3   | collection_date   | 集約日       | DATE      | NOT NULL | センサーデータを集約した日時          |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | 集約対象の項目                        |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL | 集約方法ID（平均、分散など）          |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL | 集約結果                              |
+| 7   | data_count        | データ数     | INT       | NOT NULL | 集約したデータ数                      |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL | レコード作成日時                      |
+
+### センサーデータ日次サマリ（OLTP）カラム一覧
+
+| #   | カラム物理名      | カラム論理名 | データ型  | NULL     | 説明                                  |
+| --- | ----------------- | ------------ | --------- | -------- | ------------------------------------- |
+| 1   | device_id         | デバイスID   | INT       | NOT NULL | システム内でのIoTデバイスの一意識別子 |
+| 2   | organization_id   | 組織ID       | INT       | NOT NULL | 所属組織ID                            |
+| 3   | collection_date   | 集約日       | DATE      | NOT NULL | センサーデータを集約した日時          |
+| 4   | summary_item      | 集約対象項目 | INT       | NOT NULL | 集約対象の項目                        |
+| 5   | summary_method_id | 集約方法ID   | INT       | NOT NULL | 集約方法ID（平均、分散など）          |
+| 6   | summary_value     | 集約値       | DOUBLE    | NOT NULL | 集約結果                              |
+| 7   | data_count        | データ数     | INT       | NOT NULL | 集約したデータ数                      |
+| 8   | create_time       | 作成日時     | TIMESTAMP | NOT NULL | レコード作成日時                      |
 
 ---
 
 ## 使用テーブル一覧
 
-### 読み取りテーブル（OLTP DB）
+### 読み取りテーブル（Deltaテーブル）
 
-| テーブル名                 | 用途                                         |
-| -------------------------- | -------------------------------------------- |
-| email_notification_queue   | PENDINGステータスのメール送信待機レコード取得 |
+| テーブル名                 | 用途                     |
+| -------------------------- | ------------------------ |
+| silver_sensor_data         | 再生成対象のデータを取得 |
+| gold_summary_method_master | 再生成時の集計方法を取得 |
 
-### 書き込みテーブル（OLTP DB）
+### 読み取りテーブル（OLTP）
 
-| テーブル名               | 用途                                        |
-| ------------------------ | ------------------------------------------- |
-| email_notification_queue | ステータス・retry_count・processed_time更新 |
-| mail_history             | 送信済みメールの履歴記録                    |
+なし
+
+### 書き込みテーブル（Deltaテーブル）
+
+| テーブル名                      | 用途                                                 |
+| ------------------------------- | ---------------------------------------------------- |
+| gold_sensor_data_hourly_summary | 対話側AIチャット機能で参照する時次サマリデータを格納 |
+| gold_sensor_data_daily_summary  | 対話側AIチャット機能で参照する日次サマリデータを格納 |
+
+### 書き込みテーブル（OLTP）
+
+| テーブル名                      | 用途                                                              |
+| ------------------------------- | ----------------------------------------------------------------- |
+| gold_sensor_data_hourly_summary | 業種別/顧客作成ダッシュボード機能で参照する時次サマリデータを格納 |
+| gold_sensor_data_daily_summary  | 業種別/顧客作成ダッシュボード機能で参照する日次サマリデータを格納 |
 
 ---
 
 ## 処理フロー
 
 ```mermaid
-flowchart TB
-    subgraph Silver["シルバー層LDPパイプライン（foreachBatch）"]
-        AlertDetect[アラート検出<br>alert_triggered=TRUE]
-        QueueInsert[メール送信キュー登録<br>status=PENDING]
-        AlertDetect --> QueueInsert
+flowchart TD
+    subgraph Batch["ゴールド層データ再生成ジョブ（1日間隔）"]
+        GetData[シルバー層からデータ取得]
+
+        subgraph Hourly[時次サマリ作成タスク]
+            SummaryHourly[時次サマリ作成]
+            UpsertHourly[時次サマリUPSERT]
+        
+            SummaryHourly --> UpsertHourly
+        end
+
+        subgraph Daily[日次サマリ作成タスク]
+            SummaryDaily[日次サマリ作成]
+            UpsertDaily[日次サマリUPSERT]
+
+            SummaryDaily --> UpsertDaily
+        end
+
+        GetData --> SummaryHourly
+        UpsertHourly --> SummaryDaily
+
     end
 
-    subgraph Queue["メール通知キュー（OLTP DB）"]
-        PendingRecord[(email_notification_queue<br>status=PENDING)]
-        QueueInsert --> PendingRecord
+    subgraph DeltaTable["Deltaテーブル"]
+        direction TD
+        SilverData[(silver_sensor_data)]
+        DHourlySummary[(gold_sensor_data_hourly_summary)]
+        DDailySummary[(gold_sensor_data_daily_summary)]
+        SummaryMethod[(gold_summary_method_master)]
     end
 
-    subgraph Batch["メール送信バッチジョブ（1分間隔）"]
-        Recovery[PROCESSING滞留レコード削除<br>15分経過で自動削除]
-        Fetch[PENDINGレコード取得<br>最大100件]
-        UpdateProcessing[ステータス→PROCESSING]
-        SendEmail[メール送信<br>SMTP]
-        Success{送信成功?}
-        UpdateSent[ステータス→SENT<br>processed_time記録]
-        CheckRetry{retry_count < 3?}
-        UpdatePending[retry_count++<br>ステータス→PENDING]
-        UpdateFailed[ステータス→FAILED]
-        RecordHistory[mail_history登録]
-
-        Recovery --> Fetch
-        Fetch --> UpdateProcessing
-        UpdateProcessing --> SendEmail
-        SendEmail --> Success
-        Success -->|Yes| UpdateSent
-        Success -->|No| CheckRetry
-        CheckRetry -->|Yes| UpdatePending
-        CheckRetry -->|No| UpdateFailed
-        UpdateSent --> RecordHistory
+    subgraph OLTP["OLTP DB"]
+        OHourlySummary[(gold_sensor_data_hourly_summary)]
+        ODailySummary[(gold_sensor_data_daily_summary)]
     end
 
-    subgraph External["外部連携"]
-        SMTP[SMTPサーバ]
-        MailHistory[(OLTP DB<br>mail_history)]
-        SendEmail --> SMTP
-        RecordHistory --> MailHistory
-    end
-
-    PendingRecord --> Recovery
+    GetData -.-> |データ取得|SilverData
+    SummaryHourly　-.-> |サマリ方法取得|SummaryMethod
+    UpsertHourly -.-> |データUPSERT|DHourlySummary
+    UpsertHourly -.-> |データUPSERT|OHourlySummary
+    SummaryDaily　-.-> |サマリ方法取得|SummaryMethod
+    UpsertDaily -.-> |データUPSERT|DDailySummary
+    UpsertDaily -.-> |データUPSERT|ODailySummary
 ```
 
 ### リトライフロー
 
 ```mermaid
 flowchart TB
-    A(送信失敗) --> B{retry_count < 3?}
-    B -->|Yes| C[retry_count++<br>status=PENDING<br>error_message記録]
-    B -->|No| D[status=FAILED<br>error_message記録]
-    C --> E[次回バッチ実行まで待機<br>最大1分]
-    E --> F(再送信試行)
-    D --> G(処理終了)
+    UpsertFail[UPSERT失敗] --> RetryCheck{リトライ回数<br>3回未満?}
+    RetryCheck -->|はい| Wait[待機<br>指数バックオフ<br>1秒・2秒・4秒]
+    Wait --> Retry[UPSERT再試行]
+    Retry --> RetryCheck
+    RetryCheck -->|いいえ| TaskFail[タスク異常終了<br>例外 raise]
+    TaskFail --> WorkflowRetry{Workflowリトライ<br>1回未満?}
+    WorkflowRetry -->|はい| JobRerun[ジョブ全体を再実行]
+    JobRerun --> UpsertFail
+    WorkflowRetry -->|いいえ| Alert[Teams通知<br>運用担当者へアラート]
+    Alert --> End([終了])
 ```
 
 ---
@@ -157,12 +193,10 @@ flowchart TB
 
 以下のエラー発生時、Teamsのシステム保守者連絡チャネルに通知を行い、運用担当者が迅速に対応できるようにする。
 
-| エラー種別               | 通知タイミング       | 説明                                          |
-| ------------------------ | -------------------- | --------------------------------------------- |
-| SMTP接続失敗             | 最大リトライ超過後   | SMTPサーバへの接続失敗が連続した場合          |
-| メール履歴記録失敗       | INSERT失敗時（即時） | mail_historyへのINSERT失敗時                  |
-| キュー取得失敗           | 例外発生時（即時）   | email_notification_queueへのアクセス失敗時   |
-| FAILED件数過多           | 日次（100件超過）    | 大量のFAILEDレコード発生時                    |
+| エラー種別              | 通知タイミング       | 説明                             |
+| ----------------------- | -------------------- | -------------------------------- |
+| OLTP接続失敗            | 最大リトライ超過後   | OLTPへの接続失敗が連続した場合   |
+| DeltaテーブルUPSERT失敗 | UPSERT失敗時（即時） | ゴールド層テーブルへの登録失敗時 |
 
 詳細は[ジョブ仕様書](./job-specification.md)のエラーハンドリングセクションを参照。
 
@@ -170,23 +204,23 @@ flowchart TB
 
 ## パフォーマンス要件
 
-| 要件           | 値                       | 対応策                                     |
-| -------------- | ------------------------ | ------------------------------------------ |
-| 実行間隔       | 1分（60秒）              | Databricks Workflowの定期実行              |
-| バッチ処理時間 | 1分以内                  | 1バッチあたり最大100件で次実行に干渉しない |
-| メール送信     | 平均100件/分             | SMTP接続タイムアウト30秒以内               |
-| E2Eレイテンシ  | アラート検出から70秒以内 | ストリーミング処理5秒 + キュー待機60秒     |
+| 要件           | 値       | 対応策                                                         |
+| -------------- | -------- | -------------------------------------------------------------- |
+| 実行間隔       | 1日      | Databricks Workflowの定期実行（毎日定時実行）                  |
+| バッチ処理時間 | 60分以内 | 再生成対象日はバッチ実行日の前日のデータのみとし、データ量削減 |
 
 ---
 
 ## データ保持ポリシー
 
-| テーブル                 | 保持期間 | 削除対象                 | 削除方式        |
-| ------------------------ | -------- | ------------------------ | --------------- |
-| email_notification_queue | 30日間   | SENT/FAILEDレコード      | DELETE          |
-| mail_history             | 恒久保持 | 削除しない               | -               |
+| テーブル                                         | 保持期間 | 削除対象                  | 削除方式        |
+| ------------------------------------------------ | -------- | ------------------------- | --------------- |
+| iot_catalog.gold.gold_sensor_data_hourly_summary | 10年     | データ受信日から10年経過  | DELETE + VACUUM |
+| iot_catalog.gold.gold_sensor_data_daily_summary  | 10年     | データ受信日から10年経過  | DELETE + VACUUM |
+| iot_app_db.gold_sensor_data_hourly_summary       | 2か月    | データ受信日から2か月経過 | DELETE          |
+| iot_app_db.gold_sensor_data_daily_summary        | 2か月    | データ受信日から2か月経過 | DELETE          |
 
-クリーンアップは `email_queue_cleanup` ジョブ（日次 03:00）で実行する。
+クリーンアップは Deltaテーブル最適化ジョブ、OLTPデータ削除ジョブで実行する。詳細は各設計書を参照のこと。
 
 ---
 
@@ -194,21 +228,29 @@ flowchart TB
 
 ### 機能仕様
 
-- [ジョブ仕様書](./job-specification.md) - 処理コード・リトライ戦略・クリーンアップジョブ詳細
+- [ジョブ仕様書](./job-specification.md) - 処理コード・リトライ戦略・ジョブ詳細
 
 ### 上流パイプライン
 
-- [シルバー層LDPパイプライン概要](../../ldp-pipeline/silver-layer/README.md) - メール送信キュー登録元
-- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - メールキュー登録処理の詳細
+- [シルバー層LDPパイプライン概要](../../ldp-pipeline/silver-layer/README.md) - silver_sensor_data への書き込み元パイプライン概要
+- [シルバー層LDPパイプライン仕様書](../../ldp-pipeline/silver-layer/ldp-pipeline-specification.md) - silver_sensor_data への書き込み処理の詳細
 
 ### データベース設計
 
-- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - email_notification_queue・mail_historyテーブル定義
+- [アプリケーションデータベース設計書](../../common/app-database-specification.md) - OLTP DB上のテーブルのテーブル定義
+- [UnityCatalogデータベース設計書](../../common/unity-catalog-database-specification.md) - Deltaテーブルのテーブル定義
 
 ### 要件定義
 
-- [機能要件定義書](../../../02-requirements/functional-requirements.md) - FR-003-2
+- [機能要件定義書](../../../02-requirements/functional-requirements.md) - FR-002-2
 - [非機能要件定義書](../../../02-requirements/non-functional-requirements.md) - NFR-PERF, NFR-AVAIL
+
+### 他関連機能
+
+- [Deltaテーブル最適化ジョブ概要](../optimization/README.md)
+- [Deltaテーブル最適化ジョブ仕様書](../optimization/job-specification.md)
+- [OLTPデータ削除ジョブ概要](../oltp-cleanup/README.md)
+- [OLTPデータ削除ジョブ仕様書](../oltp-cleanup/job-specification.md)
 
 ---
 
@@ -216,4 +258,6 @@ flowchart TB
 
 | 日付       | 版数 | 変更内容 | 担当者       |
 | ---------- | ---- | -------- | ------------ |
-| 2026-04-01 | 1.0  | 初版作成 | Kei Sugiyama |
+| 2026-04-01 | 1.0  | 初版作成                                                                                                             | Kei Sugiyama |
+| 2026-04-09 | 1.1  | リトライフロー図追加・上流パイプライン説明誤記修正（メール送信ジョブの記述混入箇所を修正）                           | Kei Sugiyama |
+| 2026-04-09 | 1.2  | 誤記修正（日次サマリ関連「時次」「日時」→「日次」・主な責務「日次サマリデータ生成」表記統一・機能要件定義書参照 FR-003-2→FR-002-2） | Kei Sugiyama |
