@@ -347,7 +347,20 @@ def device_details_search(device_uuid):
 
         errors = validate_date_range(start_str, end_str)
         if errors:
-            abort(400)
+            current_params = _get_device_details_search_params()
+            alerts, alerts_total = get_device_alerts_with_count(device.device_id, current_params)
+            graph_data = get_graph_data(device.device_id, current_params)
+            return render_template(
+                "analysis/industry_dashboard/device_details.html",
+                device=device,
+                alerts=alerts,
+                alerts_total=alerts_total,
+                graph_data=graph_data,
+                page=current_params.get("page", 1),
+                per_page=_ITEM_PER_PAGE,
+                search_params={"search_start_datetime": start_str, "search_end_datetime": end_str},
+                period_error=errors[0],
+            ), 400
 
         search_params = {
             "search_start_datetime": start_str,
