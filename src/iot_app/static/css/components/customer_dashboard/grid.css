@@ -300,8 +300,8 @@
 .grid-register__table-scroll {
   width: 100%;
   overflow-x: auto;
-  max-height: 200px;
   overflow-y: auto;
+  height: 280px;
 }
 
 .grid-register__table {

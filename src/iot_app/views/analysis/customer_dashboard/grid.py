@@ -205,6 +205,7 @@ def handle_gadget_create(gadget_type):
 
 def handle_gadget_register(gadget_type):
     """表ガジェット登録実行"""
+    logger.info(f'表ガジェット登録開始: user_id={g.current_user.user_id}')
     form = GridGadgetForm()
 
     submitted_group_id = request.form.get('group_id', type=int) or 0
@@ -289,5 +290,6 @@ def handle_gadget_csv_export(gadget_uuid):
         )
 
     except Exception as e:
+        g.last_exception_type = type(e).__name__
         logger.error(f'表CSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}', exc_info=True)
         abort(500)

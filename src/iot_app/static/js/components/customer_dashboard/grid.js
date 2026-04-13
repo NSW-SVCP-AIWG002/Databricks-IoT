@@ -171,10 +171,16 @@
       }),
     })
       .then(function (res) {
+        if (res.status === 400) {
+          showDatetimeError(state.uuid);
+          return null;
+        }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function (data) {
+        if (data === null) return;
+        clearError(state.uuid);
         console.log('[grid] fetchAndRender data:', data);
         renderTable(state, data);
         renderPagination(state, data);
@@ -293,6 +299,24 @@
     container.appendChild(nav);
   }
 
+  const DATETIME_ERROR_MSG = '日時の指定が不正です（取得期間は24時間以内、終了は開始より後に設定してください）';
+
+  function showDatetimeError(uuid) {
+    const errEl = document.getElementById('error-msg-' + uuid);
+    if (errEl) errEl.innerHTML = '<span class="form__error">' + DATETIME_ERROR_MSG + '</span>';
+    const thead = document.getElementById('thead-' + uuid);
+    if (thead) thead.innerHTML = '<tr></tr>';
+    const tbody = document.getElementById('tbody-' + uuid);
+    if (tbody) tbody.innerHTML = '';
+    const pagination = document.getElementById('pagination-' + uuid);
+    if (pagination) pagination.innerHTML = '';
+  }
+
+  function clearError(uuid) {
+    const errEl = document.getElementById('error-msg-' + uuid);
+    if (errEl) errEl.innerHTML = '';
+  }
+
   function showError(uuid) {
     const tbody = document.getElementById('tbody-' + uuid);
     if (tbody) {
@@ -379,10 +403,16 @@
         body: JSON.stringify({ start_datetime: start, end_datetime: end, page: previewPage }),
       })
         .then(function (res) {
+          if (res.status === 400) {
+            showPreviewDatetimeError();
+            return null;
+          }
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
         })
         .then(function (data) {
+          if (data === null) return;
+          clearPreviewError();
           renderPreviewTable(data);
           renderPreviewPagination(data, function (page) {
             previewPage = page;
@@ -393,6 +423,22 @@
           console.error('プレビューデータ取得エラー:', err);
         });
     }
+  }
+
+  function showPreviewDatetimeError() {
+    const errEl = document.getElementById('preview-error-msg');
+    if (errEl) errEl.innerHTML = '<span class="form__error">' + DATETIME_ERROR_MSG + '</span>';
+    const thead = document.getElementById('preview-thead');
+    if (thead) thead.innerHTML = '<tr></tr>';
+    const tbody = document.getElementById('preview-tbody');
+    if (tbody) tbody.innerHTML = '';
+    const pagination = document.getElementById('preview-pagination');
+    if (pagination) pagination.innerHTML = '';
+  }
+
+  function clearPreviewError() {
+    const errEl = document.getElementById('preview-error-msg');
+    if (errEl) errEl.innerHTML = '';
   }
 
   function renderPreviewPagination(data, onPageChange) {

@@ -9,7 +9,8 @@
 <form method="POST"
       action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
       id="bar-chart-register-form"
-      novalidate>
+      novalidate
+      data-ajax-submit>
   {{ form.hidden_tag() }}
 
   <div class="modal__body">

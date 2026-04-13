@@ -44,6 +44,11 @@ def validate_chart_params(start_datetime_str, end_datetime_str):
     if end < start:
         return False
 
+    # 日時範囲の上限は24時間以内
+    from datetime import timedelta
+    if (end - start) > timedelta(hours=24):
+        return False
+
     return True
 
 

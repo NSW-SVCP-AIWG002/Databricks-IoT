@@ -92,6 +92,43 @@ const CustomerDashboard = (function () {
 
     // 各ガジェット種別のバインド処理（各ガジェットJSが registerModalBinder で登録）
     _modalBinders.forEach(function (fn) { fn(container); });
+
+    // AJAX フォーム送信（data-ajax-submit が付いたフォーム）
+    const ajaxForm = container.querySelector('form[data-ajax-submit]');
+    if (ajaxForm) {
+      ajaxForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(ajaxForm);
+        try {
+          const res = await fetch(ajaxForm.action, {
+            method: 'POST',
+            body: formData,
+            redirect: 'follow',
+          });
+          // 成功時（302リダイレクト後）→ リダイレクト先へ遷移
+          if (res.redirected) {
+            window.location.href = res.url;
+            return;
+          }
+          // 500以上 → エラーページを表示
+          if (res.status >= 500) {
+            document.documentElement.innerHTML = await res.text();
+            return;
+          }
+          // 400（バリデーションエラー）→ モーダル内を再描画してエラーを表示
+          if (!res.ok) {
+            const html = await res.text();
+            container.innerHTML = html;
+            _bindModalEvents(container);
+            return;
+          }
+          // 200系（想定外）→ リロード
+          window.location.reload();
+        } catch (err) {
+          window.location.reload();
+        }
+      });
+    }
   }
 
   /* =========================================================

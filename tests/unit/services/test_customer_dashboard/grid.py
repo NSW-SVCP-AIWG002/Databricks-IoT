@@ -49,9 +49,7 @@ class TestGridGadgetFormTitle:
         from iot_app.forms.customer_dashboard.grid import GridGadgetForm
         # Act
         with app.test_request_context():
-            # NOTE: group_id・gadget_size を省略しているため、それらの必須バリデーションが
-            # あると result が False になる可能性がある。実装時にデフォルト値の有無を確認すること。
-            form = GridGadgetForm(data={'gadget_name': '表ガジェット'})
+            form = GridGadgetForm(data={'gadget_name': '表ガジェット', 'group_id': 1, 'gadget_size': '0'})
             result = form.validate()
         # Assert
         assert result is True
@@ -98,9 +96,7 @@ class TestGridGadgetFormTitle:
         from iot_app.forms.customer_dashboard.grid import GridGadgetForm
         # Act
         with app.test_request_context():
-            # NOTE: group_id・gadget_size を省略しているため、それらの必須バリデーションが
-            # あると result が False になる可能性がある。実装時にデフォルト値の有無を確認すること。
-            form = GridGadgetForm(data={'gadget_name': 'a' * 19})
+            form = GridGadgetForm(data={'gadget_name': 'a' * 19, 'group_id': 1, 'gadget_size': '0'})
             result = form.validate()
         # Assert
         assert result is True
@@ -111,9 +107,7 @@ class TestGridGadgetFormTitle:
         from iot_app.forms.customer_dashboard.grid import GridGadgetForm
         # Act
         with app.test_request_context():
-            # NOTE: group_id・gadget_size を省略しているため、それらの必須バリデーションが
-            # あると result が False になる可能性がある。実装時にデフォルト値の有無を確認すること。
-            form = GridGadgetForm(data={'gadget_name': 'a' * 20})
+            form = GridGadgetForm(data={'gadget_name': 'a' * 20, 'group_id': 1, 'gadget_size': '0'})
             result = form.validate()
         # Assert
         assert result is True
@@ -164,9 +158,7 @@ class TestGridGadgetFormGroup:
         from iot_app.forms.customer_dashboard.grid import GridGadgetForm
         # Act
         with app.test_request_context():
-            # NOTE: gadget_size を省略しているため、必須バリデーションがあると
-            # result が False になる可能性がある。実装時にデフォルト値の有無を確認すること。
-            form = GridGadgetForm(data={'gadget_name': 'テスト', 'group_id': 1})
+            form = GridGadgetForm(data={'gadget_name': 'テスト', 'group_id': 1, 'gadget_size': '0'})
             result = form.validate()
         # Assert
         assert result is True
@@ -769,7 +761,7 @@ class TestRegisterGridGadget:
 
     @patch(f'{_SERVICE_MODULE}.db')
     def test_register_data_source_config_has_empty_device_id(self, mock_db):
-        """3.2.1.1: data_source_config の device_id は空文字で登録される"""
+        """3.2.1.1: data_source_config の device_id は None で登録される（可変デバイスモード）"""
         import json
         from unittest.mock import Mock
         from iot_app.services.customer_dashboard.grid import register_grid_gadget
@@ -784,7 +776,7 @@ class TestRegisterGridGadget:
         # Assert
         data_source_config = json.loads(captured['gadget'].data_source_config)
         assert 'device_id' in data_source_config
-        assert data_source_config['device_id'] == ''
+        assert data_source_config['device_id'] is None
 
     @patch(f'{_SERVICE_MODULE}.db')
     def test_register_position_y_increments_from_existing_max(self, mock_db):
