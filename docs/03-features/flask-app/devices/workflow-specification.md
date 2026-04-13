@@ -54,11 +54,11 @@
 | 2   | デバイス一覧表示 | `/admin/devices`                    | POST      | デバイス一覧検索結果表示    | HTML               | デバイス一覧の検索、ページング対応               |
 | 3   | デバイス登録画面 | `/admin/devices/create`             | GET      | デバイス登録フォーム表示    | HTML（モーダル）   | 組織選択肢を含む                                 |
 | 4   | デバイス登録実行 | `/admin/devices/register`             | POST     | デバイス登録処理            | リダイレクト (302) | 成功時: `/admin/devices`、失敗時: フォーム再表示 |
-| 5   | デバイス参照画面 | `/admin/devices/<device_id>`        | GET      | デバイス詳細情報表示        | HTML（モーダル）   | -                                                |
-| 6   | デバイス更新画面 | `/admin/devices/<device_id>/edit`   | GET      | デバイス更新フォーム表示    | HTML（モーダル）   | 現在の値を初期表示                               |
-| 7   | デバイス更新実行 | `/admin/devices/<device_id>/update` | POST     | デバイス更新処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
-| 8   | デバイス削除実行 | `/admin/devices/<device_id>/delete` | POST     | デバイス削除処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
-| 9   | CSVエクスポート  | `/admin/devices?export=csv`         | POST      | デバイス一覧CSVダウンロード | CSV                | 現在の検索条件を適用                             |
+| 5   | デバイス参照画面 | `/admin/devices/<device_uuid>`        | GET      | デバイス詳細情報表示        | HTML（モーダル）   | -                                                |
+| 6   | デバイス更新画面 | `/admin/devices/<device_uuid>/edit`   | GET      | デバイス更新フォーム表示    | HTML（モーダル）   | 現在の値を初期表示                               |
+| 7   | デバイス更新実行 | `/admin/devices/<device_uuid>/update` | POST     | デバイス更新処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
+| 8   | デバイス削除実行 | `/admin/devices/delete` | POST     | デバイス削除処理            | リダイレクト (302) | 成功時: `/admin/devices`                         |
+| 9   | CSVエクスポート  | `/admin/devices/export`            | POST      | デバイス一覧CSVダウンロード | CSV                | 現在の検索条件を適用                             |
 
 **注:**
 - **レスポンス形式**:
@@ -71,18 +71,18 @@
 
 ## ルート呼び出しマッピング
 
-| ユーザー操作     | トリガー        | 呼び出すルート                           | パラメータ                                                                                                                  | レスポンス                          | エラー時の挙動                         |
-| ---------------- | --------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
-| 画面初期表示     | URL直接アクセス | `GET /admin/devices`                     | `page=1`                                                                                                                    | HTML（デバイス一覧画面）            | エラーページ表示                       |
-| 検索ボタン押下   | フォーム送信    | `POST /admin/devices`                     | `device_id, device_name, device_type, location, organization_id, certificate_expiration_date, status, sort_by, order, page` | HTML（検索結果画面）                | エラーメッセージ表示                   |
-| ページボタン押下 | フォーム送信    | `GET /admin/devices`                     | `page`                                                                                                                      | HTML（検索結果画面）                | エラーメッセージ表示                   |
-| 登録ボタン押下   | ボタンクリック  | `GET /admin/devices/create`              | なし                                                                                                                        | HTML（登録モーダル）                | エラーページ表示                       |
+| ユーザー操作     | トリガー        | 呼び出すルート                             | パラメータ                                                                                                                  | レスポンス                           | エラー時の挙動                         |
+| ---------------- | --------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------- |
+| 画面初期表示     | URL直接アクセス | `GET /admin/devices`                       | `page=1`                                                                                                                    | HTML（デバイス一覧画面）             | エラーページ表示                       |
+| 検索ボタン押下   | フォーム送信    | `POST /admin/devices`                      | `device_id, device_name, device_type, location, organization_id, certificate_expiration_date, status, sort_by, order, page` | HTML（検索結果画面）                 | エラーメッセージ表示                   |
+| ページボタン押下 | フォーム送信    | `GET /admin/devices`                       | `page`                                                                                                                      | HTML（検索結果画面）                 | エラーメッセージ表示                   |
+| 登録ボタン押下   | ボタンクリック  | `GET /admin/devices/create`                | なし                                                                                                                        | HTML（登録モーダル）                 | エラーページ表示                       |
 | 登録実行         | フォーム送信    | `POST /admin/devices/register`             | フォームデータ                                                                                                              | リダイレクト → `GET /admin/devices` | フォーム再表示（エラーメッセージ付き） |
-| 参照ボタン押下   | ボタンクリック  | `GET /admin/devices/<device_id>`         | device_id                                                                                                                   | HTML（参照モーダル）                | 404エラーページ                        |
-| 更新ボタン押下   | ボタンクリック  | `GET /admin/devices/<device_id>/edit`    | device_id                                                                                                                   | HTML（更新モーダル）                | 404エラーページ                        |
-| 更新実行         | フォーム送信    | `POST /admin/devices/update` | フォームデータ                                                                                                              | リダイレクト → `GET /admin/devices` | フォーム再表示（エラーメッセージ付き） |
-| 削除実行         | フォーム送信    | `POST /admin/devices/delete` | device_id                                                                                                                   | リダイレクト → `GET /admin/devices` | エラーメッセージ表示                   |
-| CSVエクスポート  | ボタンクリック  | `POST /admin/devices?export=csv`          | 検索条件                                                                                                                    | CSVダウンロード                     | エラーメッセージ表示                   |
+| 参照ボタン押下   | ボタンクリック  | `GET /admin/devices/<device_uuid>`         | device_uuid                                                                                                                 | HTML（参照モーダル）                 | 404エラーページ                        |
+| 更新ボタン押下   | ボタンクリック  | `GET /admin/devices/<device_uuid>/edit`    | device_uuid                                                                                                                 | HTML（更新モーダル）                 | 404エラーページ                        |
+| 更新実行         | フォーム送信    | `POST /admin/devices/<device_uuid>/update` | フォームデータ                                                                                                              | リダイレクト → `GET /admin/devices` | フォーム再表示（エラーメッセージ付き） |
+| 削除実行         | フォーム送信    | `POST /admin/devices/delete`               | device_id                                                                                                                   | リダイレクト → `GET /admin/devices` | エラーメッセージ表示                   |
+| CSVエクスポート  | ボタンクリック  | `POST /admin/devices/export`               | 検索条件                                                                                                                    | CSVダウンロード                      | エラーメッセージ表示                   |
 
 ---
 
@@ -90,7 +90,7 @@
 
 ### 初期表示
 
-**トリガー:** URL直接アクセス時（ユーザーが画面にアクセスしたとき）
+**トリガー:** URL直接アクセス時（ユーザーが `/admin/devices` にアクセスしたとき）
 
 **前提条件:**
 - ユーザーがログイン済み（Databricks認証完了）
@@ -100,46 +100,100 @@
 
 ```mermaid
 flowchart TD
-    Start([URL直接アクセス]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Start([GET /admin/devices]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| CheckPage{request.args に<br>'page' パラメータあり?}
 
-    CheckAuth -->|認証OK| Init[検索条件を初期化<br>page=1,<br>sort_by=device_id, order=asc]
-    Init --> Scope[データスコープ制限を適用<br>販社ユーザ・サービス利用者: organization_id]
-    Scope --> SetParams[Cookieに検索条件を格納]
-    SetParams --> Count[検索結果件数取得DBクエリ実行]
+    CheckPage -->|なし<br>初期表示| ClearCookie[Cookie検索条件をクリア<br>response.delete_cookie]
+    CheckPage -->|あり<br>ページング| GetCookie[Cookieから検索条件取得<br>request.cookies.get]
+
+    ClearCookie --> InitParams[検索条件を初期化<br>page=1,<br>sort_by=device_id, order=asc]
+    GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
+
+    InitParams --> Scope[データスコープ制限適用<br>v_device_master_by_userにuser_idを渡して絞り込み]
+    OverridePage --> Scope
+
+    Scope --> Count[検索結果件数取得DBクエリ実行]
     Count --> CheckDB0{DBクエリ結果}
 
     CheckDB0 -->|成功| Query[検索結果取得DBクエリ実行]
-    CheckDB0 -->|失敗| ClearParams[セッション内のCookieの設定内容をクリア]
-    
-    ClearParams --> Error500[500エラーページ表示]
+    CheckDB0 -->|失敗| Error500[500エラーページ表示]
 
     Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>admin/devices/list.html<br>devices=devices, total=total]
-    Template --> Response[HTMLレスポンス返却]
+    CheckDB -->|成功| CheckInitial{初期表示?<br>page not in args}
+    CheckDB -->|失敗| Error500
 
-    CheckDB -->|失敗| ClearParams
+    CheckInitial -->|Yes 初期表示| SaveCookie[レンダリング直前<br>Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
+    CheckInitial -->|No ページング| Template[Jinja2テンプレートレンダリング<br>render_template<br>admin/devices/list.html]
+
+    SaveCookie --> Template
+    Template --> Response[HTMLレスポンス返却]
 
     LoginRedirect --> End([処理完了])
     Response --> End
     Error500 --> End
 ```
 
+**ルート実装例:**
+
+- `get_default_search_params()` / `search_devices()` は `device_service.py` に定義
+- Cookie操作は `common` の `get_search_conditions_cookie` / `set_search_conditions_cookie` / `clear_search_conditions_cookie` を使用
+
+```python
+# views/admin/devices.py
+@admin_bp.route('/devices', methods=['GET'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
+def devices_list():
+    """初期表示・ページング（統合）"""
+
+    if 'page' not in request.args:
+        # 初期表示: デフォルト検索条件
+        search_params = get_default_search_params()  # → device_service
+        save_cookie = True
+    else:
+        # ページング: Cookie から検索条件取得 → page 上書き
+        search_params = get_search_conditions_cookie('devices') or get_default_search_params()
+        search_params['page'] = request.args.get('page', 1, type=int)
+        save_cookie = False
+
+    try:
+        devices, total = search_devices(search_params, g.current_user.user_id)  # → device_service
+        device_types, organizations, sort_items = get_device_form_options(g.current_user.user_id)  # → device_service
+    except Exception:
+        abort(500)
+
+    response = make_response(render_template(
+        'admin/devices/list.html',
+        devices=devices,
+        total=total,
+        search_params=search_params,
+        device_types=device_types,
+        organizations=organizations,
+        sort_items=sort_items,
+    ))
+    if save_cookie:
+        response = clear_search_conditions_cookie(response, 'devices')
+        response = set_search_conditions_cookie(response, 'devices', search_params)
+    return response
+```
+
 #### Flaskルート
 
-| ルート           | エンドポイント       | 詳細                                                                                                                                                            |
-| ---------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| デバイス一覧表示 | `GET /admin/devices` | クエリパラメータ: `page`, `device_id`, `device_name`, `device_type`, `location`, `organization_id`, `certificate_expiration_date`, `status`, `sort_by`, `order` |
+| ルート           | エンドポイント       | 詳細                    |
+| ---------------- | -------------------- | --------------------- |
+| デバイス一覧表示 | `GET /admin/devices` | クエリパラメータ: `page` |
 
 #### バリデーション
 
 **実行タイミング:** なし（初期表示のため、デフォルト値を使用）
 
 **データスコープ制限:**
-- システム保守者・管理者: 全データにアクセス可能
-- 販社ユーザ・サービス利用者: ログインユーザーの `organization_id` でフィルタリング
+- **フィルタリングロジックは全ユーザーで共通、実質的なアクセス可能範囲に差分あり**
+- システム保守者・管理者: すべてのユーザーにアクセス可能
+- 販社ユーザ・サービス利用者: ログインユーザーの `organization_id` に紐づく全子組織でフィルタリング
 
 #### 処理詳細（サーバーサイド）
 
@@ -149,45 +203,34 @@ flowchart TD
 
 **処理内容:**
 - ヘッダ `X-Forwarded-User` からユーザーIDを取得
-- データベースから現在ユーザー情報を取得（ロール、組織ID）
-- ロールに応じてデータスコープを決定
+- データベースから現在ユーザー情報を取得（ユーザー種別、組織ID）
+- 組織に応じてデータスコープを決定
 
 **変数・パラメータ:**
 - `current_user_id`: string - リバースプロキシヘッダから取得したユーザーID
 - `current_user`: User - データベースから取得したユーザーオブジェクト
-- `role`: string - ユーザーのロール
+- `user_type_id`: int - ユーザー種別ID（user_type_masterへの外部キー）
 - `organization_id`: string - データスコープ制限用の組織ID
 
 **実装例:**
 ```python
-from flask import request, abort
+from flask import request, abort, g
 from functools import wraps
 
-def get_current_user():
-    """リバースプロキシヘッダからユーザー情報取得"""
-    user_id = request.headers.get('X-Forwarded-User')
-    if not user_id:
-        abort(401)
+def require_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = request.headers.get('X-Forwarded-User')
+        if not user_id:
+            abort(401)
 
-    user = User.query.filter_by(user_id=user_id, delete_flag=0).first()
-    if not user:
-        abort(403)
+        user = User.query.filter_by(user_id=user_id, delete_flag=FALSE).first()
+        if not user:
+            abort(403)
 
-    return user
-
-def require_permission(permission):
-    """権限チェックデコレーター"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            current_user = get_current_user()
-            if not has_permission(current_user, permission):
-                abort(403)
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-current_user = get_current_user()
+        g.current_user = user
+        return f(*args, **kwargs)
+    return decorated_function
 ```
 
 **② クエリパラメータ取得**
@@ -199,37 +242,26 @@ per_page = ITEM_PER_PAGE  # 設定ファイルから取得
 
 **③ データスコープ制限の適用**
 
-ロールに応じてWHERE句の条件を追加します。
+`v_device_master_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
 
-**実装例:**
-```python
-
-# DBクエリで組織のフィルタを活性化するフラグ
-organization_limit_active = True
-
-"""ロールに応じたデータスコープを適用"""
-if current_user.role != '販社ユーザ' and current_user.role != 'サービス利用者':
-    organization_limit_active = False
-```
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
 
 **④ データベースクエリ実行**
 
 デバイスマスタからデータを取得します。
 
-**使用テーブル:** device_master（デバイスマスタ）、organization_master（組織マスタ）, device_status_data (デバイスステータス)
+**使用テーブル:** v_device_master_by_user（デバイスマスタ）、organization_master（組織マスタ）, device_status_data (デバイスステータス)
 
 **SQL実装例:**
 - 検索結果件数取得DBクエリ
 ```sql
 SELECT
-  COUNT(d.device_id) AS data_count
+  COUNT(device_id) AS data_count
 FROM
-  device_master d
-  LEFT JOIN organization_master o ON d.organization_id = o.organization_id
-  INNER JOIN device_status_data s ON d.device_id = s.device_id
+  v_device_master_by_user
 WHERE
-  d.delete_flag = 0
-  AND CASE WHEN :organization_limit_active THEN d.organization_id = :organization_id ELSE TRUE END
+  user_id = :user_id
+  AND delete_flag = FALSE
 ```
 
 - 検索結果取得DBクエリ
@@ -238,22 +270,24 @@ SELECT
   d.device_id,
   d.device_name,
   t.device_type_name,
-  d.model_info,
-  d.sim_id,
-  d.mac_address,
   d.device_location,
-  d.organization_id,
+  o.organization_name,
   d.certificate_expiration_date,
-  s.status,
-  o.organization_name
+  TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) AS timediff
 FROM
-  device_master d
-  LEFT JOIN organization_master o ON d.organization_id = o.organization_id
-  INNER JOIN device_status_data s ON d.device_id = s.device_id
-  INNER JOIN device_type_master t ON d.device_type_id = t.device_type_id
+  v_device_master_by_user d
+  LEFT JOIN organization_master o
+    ON d.device_organization_id = o.organization_id
+    AND o.delete_flag = FALSE
+  LEFT JOIN device_status_data s
+    ON d.device_id = s.device_id
+    AND s.delete_flag = FALSE
+  LEFT JOIN device_type_master t
+    ON d.device_type_id = t.device_type_id
+    AND t.delete_flag = FALSE
 WHERE
-  d.delete_flag = 0
-  AND CASE WHEN :organization_limit_active THEN d.organization_id = :organization_id ELSE TRUE END
+  d.user_id = :user_id
+  AND d.delete_flag = FALSE
 ORDER BY
   d.device_id ASC
 LIMIT :item_per_page OFFSET 0
@@ -261,60 +295,121 @@ LIMIT :item_per_page OFFSET 0
 
 一覧として出力する「ステータス」カラムの表示内容について、現在時刻とdevice_status_data.last_received_timeの差が、設定ファイルに記載されたデバイスデータの送信間隔の2倍より長い場合、「未接続」と表示し、それ以下である場合、「接続済み」と表示する。
 
+**実装例:**
+```python
+# services/device_service.py
+def get_default_search_params() -> dict:
+    """デバイス一覧検索のデフォルトパラメータを返す"""
+    return {
+        'page': 1,
+        'per_page': ITEM_PER_PAGE,
+        'sort_by': '',
+        'order': '',
+        'device_id': '',
+        'device_name': '',
+        'device_type_id': None,
+        'location': '',
+        'organization_id': None,
+        'certificate_expiration_date': '',
+        'status': None,
+    }
+
+
+def search_devices(search_params: dict, user_id: int) -> tuple[list, int]:
+    """デバイス一覧をスコープ制限付きで検索する
+
+    Args:
+        search_params: 検索条件（page, per_page, sort_by, order, 各検索項目）
+        user_id: ログインユーザーID（スコープ制限に使用）
+
+    Returns:
+        (devices, total): デバイスリストと総件数のタプル
+    """
+    page = search_params['page']
+    per_page = search_params['per_page']
+    sort_by = search_params['sort_by']
+    order = search_params['order']
+    offset = (page - 1) * per_page
+
+    query = db.session.query(
+        DeviceMasterByUser,
+        OrganizationMaster.organization_name,
+        DeviceTypeMaster.device_type_name,
+        DeviceStatusData.last_received_time,
+    ).outerjoin(
+        OrganizationMaster,
+        and_(
+            DeviceMasterByUser.device_organization_id == OrganizationMaster.organization_id,
+            OrganizationMaster.delete_flag == False,
+        )
+    ).outerjoin(
+        DeviceStatusData,
+        and_(
+            DeviceMasterByUser.device_id == DeviceStatusData.device_id,
+            DeviceStatusData.delete_flag == False,
+        )
+    ).outerjoin(
+        DeviceTypeMaster,
+        and_(
+            DeviceMasterByUser.device_type_id == DeviceTypeMaster.device_type_id,
+            DeviceTypeMaster.delete_flag == False,
+        )
+    ).filter(
+        DeviceMasterByUser.user_id == user_id,
+        DeviceMasterByUser.delete_flag == False,
+    )
+
+    sort_col = getattr(DeviceMasterByUser, sort_by, None)
+    # 検索条件フィルタ（フロー2: 検索・絞り込みでも共用）
+    if search_params.get('device_id'):
+        query = query.filter(DeviceMasterByUser.device_id.like(f"%{search_params['device_id']}%"))
+    if search_params.get('device_name'):
+        query = query.filter(DeviceMasterByUser.device_name.like(f"%{search_params['device_name']}%"))
+    if search_params.get('device_type_id') is not None:
+        query = query.filter(DeviceMasterByUser.device_type_id == search_params['device_type_id'])
+    if search_params.get('location'):
+        query = query.filter(DeviceMasterByUser.device_location.like(f"%{search_params['location']}%"))
+    if search_params.get('organization_id') is not None:
+        query = query.filter(DeviceMasterByUser.device_organization_id == search_params['organization_id'])
+    if search_params.get('certificate_expiration_date'):
+        query = query.filter(DeviceMasterByUser.certificate_expiration_date == search_params['certificate_expiration_date'])
+    if search_params.get('status') is not None:
+        threshold = current_app.config['DEVICE_DATA_INTERVAL_SECONDS']
+        timediff = func.timestampdiff(text('SECOND'), DeviceStatusData.last_received_time, func.now())
+        if search_params['status'] == 'connected':
+            query = query.filter(
+                DeviceStatusData.last_received_time.isnot(None),
+                timediff <= threshold * 2,
+            )
+        elif search_params['status'] == 'disconnected':
+            query = query.filter(
+                or_(
+                    DeviceStatusData.last_received_time.is_(None),
+                    timediff > threshold * 2,
+                )
+            )
+
+    if sort_col is None:
+        query = query.order_by(DeviceMasterByUser.device_id.asc())
+    else:
+        query = query.order_by(
+            sort_col.asc() if order == 'asc' else sort_col.desc(),
+            DeviceMasterByUser.device_id.asc(),
+        )
+
+    total = query.count()
+    devices = query.limit(per_page).offset(offset).all()
+    return devices, total
+```
+
 **⑤ HTMLレンダリング**
 
 Jinja2テンプレートをレンダリングしてHTMLレスポンスを返却します。
 
 **実装例:**
 ```python
-@admin_bp.route('/devices', methods=['GET'])
-@require_permission('device_list')
-def list_devices():
-
-    # ユーザ情報取得
-    current_user = get_current_user()
-
-    # DBクエリで組織のフィルタを活性化するフラグ
-    organization_limit_active = True
-
-    """ロールに応じたデータスコープを適用"""
-    if current_user.role != '販社ユーザ' and current_user.role != 'サービス利用者':
-        organization_limit_active = False
-
-    # パラメータ抽出
-    page = request.args.get('page', 1, type=int)
-    per_page = ITEM_PER_PAGE #  設定ファイル内で定義する
-
-    # 検索結果件数取得DBクエリ実行
-    data_count = ... # 検索結果件数取得DBクエリ実行処理を記載
-
-    # 結果で返却される配列
-    devices = []
-
-    # パラメータをセッターに登録
-    params = Params(per_page, data_count, organization_limit_active, current_user.organization_id)
-
-    # パラメータ格納
-    param = {
-        'item_per_page': params.per_page,
-        'total_count': params.data_count,
-        'organization_limit_active': params.organization_limit_active,
-        'organization_id': params.organization_id,
-        } 
-
-    # 検索結果取得DBクエリ実行
-    query = ... # 検索結果取得DBクエリ実行処理を記載
-
-    # 返却する配列に検索結果を格納
-    for row in query:
-        devices.append(row)
-
-    # 返却
-    return render_template('admin/devices/list.html',
-                          devices=devices,
-                          total=data_count,
-                          page=page,
-                          per_page=per_page)
+# views/admin/devices.py（devices_list 内）
+return responese # make_response + render_template は上記ルート実装例を参照
 ```
 
 #### 表示メッセージ
@@ -364,26 +459,30 @@ Cookieに検索条件を保持する
 
 ```mermaid
 flowchart TD
-    Start([検索ボタンクリック]) --> PutParams[Cookieに検索条件を格納]
-    PutParams --> Convert[検索条件をクエリパラメータに変換<br>page: 1（リセット）]
+    Start([検索ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| ClearCookie[Cookieの検索条件をクリア]
+
+    ClearCookie --> Convert[検索条件をクエリパラメータに変換<br>page: 1（リセット）]
     Convert --> Scope[データスコープ制限を適用]
     Scope -->  Count[検索結果件数取得DBクエリ実行<br>検索条件を適用]
     Count --> CheckDB0{DBクエリ結果}
 
-    CheckDB0 -->|成功|Query[検索結果DBクエリ実行<br>検索条件を適用]
-    CheckDB0 -->|失敗| ClearParams[セッション内のCookieの設定内容をクリア]
-    
-    ClearParams --> Error500[500エラーページ表示]
+    CheckDB0 -->|成功| Query[検索結果DBクエリ実行<br>検索条件を適用]
+    CheckDB0 -->|失敗| Error500[500エラーページ表示]
 
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|成功| Template[Jinja2テンプレートレンダリング]
-    Template --> Response[HTMLレスポンス返却]
+    Template --> PutParams[Cookieに検索条件を格納<br>max_age=86400]
+    PutParams --> Response[HTMLレスポンス返却]
 
-    CheckDB -->|失敗| ClearParams
+    CheckDB -->|失敗| Error500
 
-    Response --> 処理完了
-    Error500 --> 処理完了
+    LoginRedirect --> End([処理完了])
+    Response --> End
+    Error500 --> End
 ```
 
 #### 処理詳細（サーバーサイド）
@@ -394,18 +493,31 @@ flowchart TD
 SELECT
   COUNT(d.device_id) AS data_count
 FROM
-  device_master d
-  LEFT JOIN organization_master o ON d.organization_id = o.organization_id
-  INNER JOIN device_status_data s ON d.device_id = s.device_id
+  v_device_master_by_user d
+  LEFT JOIN organization_master o
+    ON d.device_organization_id = o.organization_id
+    AND o.delete_flag = FALSE
+  LEFT JOIN device_status_data s
+    ON d.device_id = s.device_id
+    AND s.delete_flag = FALSE
+  LEFT JOIN device_type_master t
+    ON d.device_type_id = t.device_type_id
+    AND t.delete_flag = FALSE
 WHERE
-  d.delete_flag = 0
+  d.user_id = :user_id
+  AND d.delete_flag = FALSE
   AND CASE WHEN :device_uuid IS NULL THEN TRUE ELSE d.device_id LIKE CONCAT('%', :device_uuid, '%') END
   AND CASE WHEN :device_name IS NULL THEN TRUE ELSE d.device_name LIKE CONCAT('%', :device_name, '%') END
-  AND CASE WHEN :device_category_id < 0 THEN TRUE ELSE d.device_type_id = :device_category_id END
+  AND CASE WHEN :device_category_id IS NULL THEN TRUE ELSE d.device_type_id = :device_category_id END
   AND CASE WHEN :location IS NULL THEN TRUE ELSE d.device_location LIKE CONCAT('%', :location, '%') END
+  AND CASE WHEN :organization_id IS NULL THEN TRUE ELSE d.device_organization_id = :organization_id END
   AND CASE WHEN :certificate_expiration_date IS NULL THEN TRUE ELSE d.certificate_expiration_date = :certificate_expiration_date END
-  AND CASE WHEN :status < 0 THEN TRUE ELSE s.status = :status END
-  AND CASE WHEN :organization_limit_active THEN d.organization_id = :organization_id ELSE TRUE END
+  AND CASE
+      WHEN :status IS NULL THEN TRUE
+      WHEN :status = 'connected'    THEN (s.last_received_time IS NOT NULL AND TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) <= :threshold * 2)
+      WHEN :status = 'disconnected' THEN (s.last_received_time IS NULL     OR  TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) >  :threshold * 2)
+      ELSE TRUE
+  END
 ```
 
 - 検索結果取得DBクエリ
@@ -414,38 +526,128 @@ SELECT
   d.device_id,
   d.device_name,
   t.device_type_name,
-  d.model_info,
-  d.sim_id,
-  d.mac_address,
   d.device_location,
-  d.organization_id,
+  o.organization_name,
   d.certificate_expiration_date,
-  s.status,
-  o.organization_name
+  TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) AS timediff
 FROM
-  device_master d
-  LEFT JOIN organization_master o ON d.organization_id = o.organization_id
-  INNER JOIN device_status_data s ON d.device_id = s.device_id
-  INNER JOIN device_type_master t ON d.device_type_id = t.device_type_id
+  v_device_master_by_user d
+  LEFT JOIN organization_master o
+    ON d.device_organization_id = o.organization_id
+    AND o.delete_flag = FALSE
+  LEFT JOIN device_status_data s
+    ON d.device_id = s.device_id
+    AND s.delete_flag = FALSE
+  LEFT JOIN device_type_master t
+    ON d.device_type_id = t.device_type_id
+    AND t.delete_flag = FALSE
 WHERE
-  d.delete_flag = 0
+  d.user_id = :user_id
+  AND d.delete_flag = FALSE
   AND CASE WHEN :device_uuid IS NULL THEN TRUE ELSE d.device_id LIKE CONCAT('%', :device_uuid, '%') END
   AND CASE WHEN :device_name IS NULL THEN TRUE ELSE d.device_name LIKE CONCAT('%', :device_name, '%') END
-  AND CASE WHEN :device_category_id < 0 THEN TRUE ELSE d.device_type_id = :device_category_id END
+  AND CASE WHEN :device_category_id IS NULL THEN TRUE ELSE d.device_type_id = :device_category_id END
   AND CASE WHEN :location IS NULL THEN TRUE ELSE d.device_location LIKE CONCAT('%', :location, '%') END
+  AND CASE WHEN :organization_id IS NULL THEN TRUE ELSE d.device_organization_id = :organization_id END
   AND CASE WHEN :certificate_expiration_date IS NULL THEN TRUE ELSE d.certificate_expiration_date = :certificate_expiration_date END
-  AND CASE WHEN :status < 0 THEN TRUE ELSE s.status = :status END
-  AND CASE WHEN :organization_limit_active THEN d.organization_id = :organization_id ELSE TRUE END
+  AND CASE
+      WHEN :status IS NULL THEN TRUE
+      WHEN :status = 'connected'    THEN (s.last_received_time IS NOT NULL AND TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) <= :threshold * 2)
+      WHEN :status = 'disconnected' THEN (s.last_received_time IS NULL     OR  TIMESTAMPDIFF(SECOND, s.last_received_time, CURRENT_TIMESTAMP()) >  :threshold * 2)
+      ELSE TRUE
+  END
 ORDER BY
-  CASE WHEN (:sort_item_id = 1 AND :sort_order = 1) THEN d.device_id END ASC
-  , CASE WHEN (:sort_item_id = 1 AND :sort_order = 2) THEN d.device_id END DESC
+  {sort_by} {order}
 LIMIT :item_per_page OFFSET (:page -1) * :item_per_page
 ```
+
+**実装例:**
+
+- `search_devices()` はフロー1と共用（フィルタ条件はすべてサービス内で処理）
+- `DeviceSearchForm` は `forms/device.py` に定義
+- Cookie操作は共通関数を使用
+
+```python
+# forms/device.py
+class DeviceSearchForm(FlaskForm):
+    device_id                   = StringField('デバイスID')
+    device_name                 = StringField('デバイス名')
+    device_type_id              = StringField('デバイス種別')
+    location                    = StringField('設置場所')
+    organization_id             = StringField('所属組織')
+    certificate_expiration_date = StringField('証明書期限')
+    status                      = SelectField('ステータス', coerce=str, choices=[('', 'すべて'), ('connected', '接続済み'), ('disconnected', '未接続')])
+    sort_by                     = SelectField('ソート項目', coerce=str)   # 選択肢は sort_item_master から動的取得（空白=デフォルトソート）
+    order                       = SelectField('ソート順', coerce=str, choices=[('', ''), ('asc', '昇順'), ('desc', '降順')])
+```
+
+```python
+# views/admin/devices.py
+@admin_bp.route('/devices', methods=['POST'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
+def search_devices_view():
+    form = DeviceSearchForm(request.form)
+    if not form.validate():
+        abort(400)
+
+    search_params = {
+        'page': 1,
+        'per_page': ITEM_PER_PAGE,
+        'sort_by': form.sort_by.data or '',   # 空白選択時はデフォルトソート（デバイスID昇順）
+        'order': form.order.data or '',
+        'device_id': form.device_id.data or '',
+        'device_name': form.device_name.data or '',
+        'device_type_id': form.device_type_id.data,
+        'location': form.location.data or '',
+        'organization_id': form.organization_id.data,
+        'certificate_expiration_date': form.certificate_expiration_date.data or '',
+        'status': form.status.data or None,
+    }
+
+    try:
+        devices, total = search_devices(search_params, g.current_user.user_id)  # → device_service
+        device_types, organizations, sort_items = get_device_form_options(g.current_user.user_id)  # → device_service
+    except Exception:
+        abort(500)
+
+    response = make_response(render_template(
+        'admin/devices/list.html',
+        devices=devices,
+        total=total,
+        search_params=search_params,
+        device_types=device_types,
+        organizations=organizations,
+        sort_items=sort_items,
+    ))
+    response = clear_search_conditions_cookie(response, 'devices')
+    response = set_search_conditions_cookie(response, 'devices', search_params)
+    return response
+```
+
+#### 表示メッセージ
+
+| メッセージID | 表示内容                   | 表示タイミング | 表示場所     |
+| ------------ | -------------------------- | -------------- | ------------ |
+| ERR_001      | データの取得に失敗しました | DBクエリ失敗時 | エラーページ |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                   |
+| -------------- | ------------------ | -------------------------- | -------------------------- |
+| 401            | 認証エラー         | ログイン画面へリダイレクト | -                          |
+| 500            | データベースエラー | 500エラーページ表示        | データの取得に失敗しました |
+
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
 
 #### 検索条件の保持方法
 Cookieに検索条件を保持する
+
+#### UI状態
+- 検索条件: 入力値を保持（フォームに再設定）
+- テーブル: 検索結果データ表示
+- ページネーション: 1ページ目を選択状態
 
 ---
 
@@ -473,35 +675,16 @@ Cookieに検索条件を保持する
 
 **トリガー:** (6.10) ページネーションのページ番号ボタンクリック
 
-#### 処理フロー
-
-```mermaid
-flowchart TD
-    Start([ページ番号ボタンクリック]) --> GetParams[Cookieから検索条件を取得]
-    GetParams --> Convert[検索条件をクエリパラメータに変換]
-    Convert --> Scope[データスコープ制限を適用]
-    Scope --> Count[検索結果件数取得DBクエリ実行<br>検索条件を適用]
-    Count --> CheckDB0{DBクエリ結果}
-    
-    CheckDB0 -->|成功| Query[検索結果DBクエリ実行<br>検索条件を適用]
-    CheckDB0 -->|失敗| ClearParams[セッション内のCookieの設定内容をクリア]
-    
-    ClearParams --> Error500[500エラーページ表示]
-    
-    Query --> CheckDB{DBクエリ結果}
-
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング]
-    Template --> Response[HTMLレスポンス返却]
-
-    CheckDB -->|失敗| ClearParams
-
-    Response --> 処理完了
-    Error500 --> 処理完了
-```
-
 #### 処理詳細
 ページネーションのページ番号を選択することで、選択されたページ番号に対応するデータをデータテーブルに表示する。
-具体的な処理は[検索・絞り込み](#検索絞り込み)の処理と同様とする。
+具体的な処理は[初期表示](#初期表示)の処理と同様とする。
+
+#### UI状態
+
+- 検索条件: 保持
+- ソート条件: 保持
+- テーブル: 選択ページのデータ表示
+- ページネーション: 選択ページをアクティブ状態
 
 ---
 
@@ -518,17 +701,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start([登録ボタンクリック]) --> Permission[権限チェック]
+    Start([登録ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Permission[権限チェック]
+
     Permission --> CheckPerm{権限OK?}
-    CheckPerm -->|権限なし| Error403[403エラー ※1]
+    CheckPerm -->|権限なし| Error403[403エラートースト表示 ※1]
+    CheckPerm -->|権限OK| LoadCategory[デバイス種別マスタを取得<br>SELECT * FROM device_type_master]
 
-    CheckPerm -->|権限OK| LoadOrgs[組織マスタを取得<br>SELECT * FROM organization_master<br>データスコープ制限適用]
-    LoadOrgs --> CheckDB0{DBクエリ結果}
+    LoadCategory --> CheckDB0{DBクエリ結果}
 
-    CheckDB0 -->|成功| LoadCategory[デバイス種別マスタを取得<br>SELECT * FROM device_type_master]
+    CheckDB0 -->|成功| LoadOrgs[データスコープ制限適用<br>組織マスタを取得<br>SELECT * FROM v_organization_master_by_user<br>WHERE user_id = :user_id]
     CheckDB0 -->|失敗| Error500[500エラーページ表示]
 
-    LoadCategory --> CheckDB{DBクエリ結果}
+    LoadOrgs --> CheckDB{DBクエリ結果}
     
     CheckDB -->|成功| Template[登録モーダルをレンダリング<br>render_template<br>admin/devices/form.html]
     CheckDB -->|失敗| Error500
@@ -536,11 +723,84 @@ flowchart TD
     Template --> View[モーダル表示]
     Error403 --> View
 
-    Error500 --> End([処理完了])
+    LoginRedirect --> End([処理完了])
+    Error500 --> End
     View --> End
 ```
 
 ※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
+
+##### 処理詳細（サーバーサイド）
+
+**実装例:**
+
+- `get_device_form_options()` は `device_service.py` に定義（フロー5: 更新ボタン押下でも共用）
+
+```python
+# services/device_service.py
+def get_device_form_options(user_id: int) -> tuple[list, list, list]:
+    """検索・登録・更新フォーム用マスターデータを取得する
+
+    Args:
+        user_id: ログインユーザーID（組織スコープ制限に使用）
+
+    Returns:
+        (device_types, organizations, sort_items)
+    """
+    device_types = db.session.query(DeviceTypeMaster).filter(
+        DeviceTypeMaster.delete_flag == False,
+    ).order_by(DeviceTypeMaster.device_type_id).all()
+
+    organizations = db.session.query(OrganizationMasterByUser).filter(
+        OrganizationMasterByUser.user_id == user_id,
+        OrganizationMasterByUser.delete_flag == False,
+    ).order_by(OrganizationMasterByUser.organization_id).all()
+
+    # TODO: デバイス一覧画面の view_id を sort_item_master 初期データに追加後、定数化すること
+    DEVICE_LIST_VIEW_ID = None  # TODO: view_id 未定義。app-database-specification.md の sort_item_master 初期データに追加が必要
+    sort_items = db.session.query(SortItem).filter(
+        SortItem.view_id == DEVICE_LIST_VIEW_ID,
+        SortItem.delete_flag == False,
+    ).order_by(SortItem.sort_order).all()
+
+    return device_types, organizations, sort_items
+```
+
+```python
+# views/admin/devices.py
+@admin_bp.route('/devices/create', methods=['GET'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def create_device_form():
+    try:
+        device_types, organizations, _ = get_device_form_options(g.current_user.user_id)  # → device_service（sort_itemsは登録フォームでは不要）
+    except Exception:
+        abort(500)
+
+    return render_template(
+        'admin/devices/form.html',
+        mode='create',
+        device_types=device_types,
+        organizations=organizations,
+    )
+```
+
+#### 表示メッセージ
+
+| メッセージID | 表示内容                           | 表示タイミング | 表示場所       |
+| ------------ | ---------------------------------- | -------------- | -------------- |
+| ERR_001      | データの取得に失敗しました         | DBクエリ失敗時 | エラーページ   |
+| -            | この操作を実行する権限がありません | 権限不足時     | エラートースト |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                   |
+| -------------- | ------------------ | -------------------------- | -------------------------- |
+| 401            | 認証エラー         | ログイン画面へリダイレクト | -                          |
+| 403            | 権限エラー         | 403エラートースト表示     | この操作を実行する権限がありません |
+| 500            | データベースエラー | 500エラーページ表示        | データの取得に失敗しました |
+
+---
 
 #### 登録実行
 
@@ -550,12 +810,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start([登録ボタンクリック]) --> CheckAuth{権限チェック}
-    
-    CheckAuth --> |権限OK|FrontValidate[フロントサイドバリデーション]
-    CheckAuth --> |権限なし|Error403[403エラー ※1]
-    
-    FrontValidate --> DupCheck[デバイスID重複チェック<br>SELECT * FROM device_master<br>WHERE device_id = :device_uuid]
+    Start([登録ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Permission[権限チェック]
+
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラートースト表示 ※1]
+    CheckPerm -->|権限OK| ServerValidate[サーバーサイドバリデーション]
+
+    ServerValidate --> DupCheck[デバイスID重複チェック<br>SELECT * FROM device_master<br>WHERE device_uuid = :device_uuid]
 
     DupCheck --> CheckDB0{DBクエリ結果}
 
@@ -577,10 +841,10 @@ flowchart TD
 
     InsertUC --> CheckUC{UnityCatalog<br>操作結果}
 
-    CheckUC -->|成功|Insert[デバイス登録<br>INSERT INTO device_masters]
+    CheckUC -->|成功|Insert[デバイス登録<br>INSERT INTO device_master]
     Insert --> CheckDB{DB操作結果}
-    CheckDB --> |成功|Flash[フラッシュメッセージ設定<br>デバイスを登録しました]
-    Flash --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
+    CheckDB --> |成功|Toast[成功メッセージトースト設定<br>デバイスを登録しました]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
 
     CheckUC -->|失敗| RollbackUC[UnityCatalog.<br>device_master<br>ロールバック]
     CheckDB -->|失敗| Rollback[DB.device_master<br>ロールバック]
@@ -588,166 +852,189 @@ flowchart TD
     RollbackUC --> Error500
     Rollback --> RollbackUC
 
-    ValidEnd --> End([処理完了])
+    LoginRedirect --> End([処理完了])
+    ValidEnd --> End
     Redirect --> End
     Error500 --> End
     Error403 --> End
 ```
 
-※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
+※1　403エラー発生時、登録モーダルを閉じる。
 
 ##### 処理詳細（サーバーサイド）
 
 **実装例:**
 ```python
-@admin_bp.route('/devices/create', methods=['GET', 'POST'])
-# MySQL接続設定
-DB_CONFIG = {
-    'host': os.getenv('MYSQL_HOST', 'localhost'),
-    'port': int(os.getenv('MYSQL_PORT', 3306)),
-    'user': os.getenv('MYSQL_USER', 'user'),
-    'password': os.getenv('MYSQL_PASSWORD', 'password'),
-    'database': os.getenv('MYSQL_DATABASE', 'iot_platform')
-}
+# forms/device.py
+class DeviceCreateForm(FlaskForm):
+    device_id = StringField('デバイスID', validators=[
+        DataRequired(message='デバイスIDは必須です'),
+        Length(min=1, max=128, message='デバイスIDは128文字以内で入力してください'),
+    ])
+    device_name = StringField('デバイス名', validators=[
+        DataRequired(message='デバイス名は必須です'),
+        Length(min=1, max=100, message='デバイス名は100文字以内で入力してください'),
+    ])
+    device_type_id = StringField('デバイス種別', validators=[
+        DataRequired(message='デバイス種別は必須です'),
+    ])
+    device_model = StringField('モデル情報', validators=[
+        DataRequired(message='モデル情報は必須です'),
+        Length(min=1, max=100, message='モデル情報は100文字以内で入力してください'),
+    ])
+    sim_id = StringField('SIMID', validators=[
+        Optional(),
+        Length(min=1, max=20, message='SIMIDは20文字以内で入力してください'),
+    ])
+    mac_address = StringField('MACアドレス', validators=[
+        Optional(),
+        Regexp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', message='MACアドレスの形式が正しくありません'),
+    ])
+    device_location = StringField('設置場所', validators=[
+        Optional(),
+        Length(min=1, max=100, message='設置場所は100文字以内で入力してください'),
+    ])
+    device_organization_id = StringField('所属組織', validators=[
+        DataRequired(message='所属組織は必須です'),
+    ])
+    certificate_expiration_date = StringField('証明書期限', validators=[
+        Optional(),
+        Date(message='証明書期限の形式が正しくありません'),
+    ])
+```
 
-# Databricks接続設定
-DATABRICKS_CONFIG = {
-    'server_hostname': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
-    'http_path': os.getenv('DATABRICKS_HTTP_PATH'),
-    'access_token': os.getenv('DATABRICKS_TOKEN')
-}
+```python
+# services/device_service.py
+def _insert_unity_catalog_device(device_id: str, device_data: dict, creator_id: int) -> None:
+    """UC device_master に新規レコードを INSERT する"""
+    uc = UnityCatalogConnector()
+    uc.execute_dml(
+        """
+        INSERT INTO iot_catalog.oltp_db.device_master (
+            device_id, device_name, device_type_id, device_organization_id,
+            device_location, mac_address, certificate_expiration_date,
+            create_date, creator, update_date, modifier, delete_flag
+        ) VALUES (
+            :device_id, :device_name, :device_type_id, :device_organization_id,
+            :device_location, :mac_address, :certificate_expiration_date,
+            CURRENT_TIMESTAMP(), :creator_id, CURRENT_TIMESTAMP(), :creator_id, FALSE
+        )
+        """,
+        {
+            'device_id':                    device_id,
+            'device_name':                  device_data['device_name'],
+            'device_type_id':               device_data['device_type_id'],
+            'device_organization_id':       device_data['device_organization_id'],
+            'device_location':              device_data['device_location'],
+            'mac_address':                  device_data['mac_address'],
+            'certificate_expiration_date':  device_data['certificate_expiration_date'],
+            'creator_id':                   creator_id,
+        },
+        operation="UC device_master INSERT",
+    )
 
-def get_mysql_connection():
-    """MySQL接続取得"""
-    return mysql.connector.connect(**DB_CONFIG)
 
-def get_databricks_connection():
-    """Databricks SQL Warehouse接続取得"""
-    return databricks_sql.connect(**DATABRICKS_CONFIG)
-
-@admin_bp.route('/devices/register', methods=['GET', 'POST'])
-def register_device():
-    """デバイス登録"""
-    import time
-
-    SERVICE_NAME = register_device
-    current_timestamp = time.time()
-    logger.info(f'{current_timestamp} : {SERVICE_NAME} START')
-
-    if request.method == 'GET':
-        return render_template('register_device.html')
-    
-    # フロントサイドバリデーション後のデータ取得
-    device_id = request.form.get('device_id')
-    device_name = request.form.get('device_name')
-    mac_address = request.form.get('mac_address')
-    organization_id = request.form.get('organization_id')
-    device_type = request.form.get('device_type')
-    location = request.form.get('location')
-    certificate_expiry = request.form.get('certificate_expiry')
-    status = request.form.get('status', 'inactive')
-    
-    mysql_conn = None
-    databricks_conn = None
-    
+def _rollback_create_device(device_id: str | None) -> None:
+    """UC への INSERT を削除する補償トランザクション（ベストエフォート）"""
     try:
-        # MySQL接続
-        mysql_conn = get_mysql_connection()
-        mysql_cursor = mysql_conn.cursor(dictionary=True)
-        
-        # デバイスID重複チェック
-        mysql_cursor.execute(
-            "SELECT * FROM device_master WHERE device_id = %s",
-            (device_id,)
+        if device_id is not None:
+            uc = UnityCatalogConnector()
+            uc.execute_dml(
+                "DELETE FROM iot_catalog.oltp_db.device_master WHERE device_id = :device_id",
+                {'device_id': device_id},
+                operation="UC device_master 登録ロールバック",
+            )
+    except Exception:
+        logger.error("デバイス登録ロールバック失敗", exc_info=True)
+
+
+def create_device(device_data: dict, creator_id: int) -> None:
+    """デバイス登録（Sagaパターン）
+
+    Args:
+        device_data: フォームから取得したデバイスデータ
+        creator_id: 登録者のユーザーID
+
+    Returns:
+        None
+
+    Raises:
+        DuplicateDeviceIdError: デバイスID重複時
+        DuplicateMacAddressError: MACアドレス重複時
+        Exception: 登録処理失敗時（ロールバック済み）
+    """
+    device_id = device_data['device_id']
+
+    # デバイスID重複チェック
+    if DeviceMaster.query.filter_by(device_id=device_id, delete_flag=False).first():
+        raise DuplicateDeviceIdError(device_id)
+
+    # MACアドレス重複チェック
+    if DeviceMaster.query.filter_by(mac_address=device_data['mac_address'], delete_flag=False).first():
+        raise DuplicateMacAddressError(device_data['mac_address'])
+
+    try:
+        # ① Unity Catalog device_master INSERT
+        _insert_unity_catalog_device(device_id, device_data, creator_id)
+
+        # ② OLTP DB device_master INSERT
+        device = DeviceMaster(
+            device_id=device_id,
+            device_name=device_data['device_name'],
+            device_type_id=device_data['device_type_id'],
+            device_organization_id=device_data['device_organization_id'],
+            device_location=device_data['device_location'],
+            mac_address=device_data['mac_address'],
+            certificate_expiration_date=device_data['certificate_expiration_date'],
+            creator=creator_id,
+            modifier=creator_id,
         )
-        if mysql_cursor.fetchone():
-            flash('このデバイスIDは既に登録されています', 'error')
-            return render_template('register_device.html', form_data=request.form)
-        
-        # MACアドレス重複チェック
-        mysql_cursor.execute(
-            "SELECT * FROM device_master WHERE mac_address = %s",
-            (mac_address,)
-        )
-        if mysql_cursor.fetchone():
-            flash('指定されたMACアドレスは既に登録されています', 'error')
-            return render_template('register_device.html', form_data=request.form)
-        
-        # MySQLへデバイス登録
-        insert_query = """
-            INSERT INTO device_master 
-            (device_id, device_name, mac_address, organization_id, device_type, 
-             location, certificate_expiry, status, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-        """
-        mysql_cursor.execute(insert_query, (
-            device_id, device_name, mac_address, organization_id, device_type,
-            location, certificate_expiry, status
-        ))
-        mysql_conn.commit()
-        logger.info(f"MySQL insert successful: {device_id}")
-        
-        # Unity Catalogへデバイス登録
-        databricks_conn = get_databricks_connection()
-        databricks_cursor = databricks_conn.cursor()
-        
-        uc_insert_query = """
-            INSERT INTO iot_platform.master_data.device_master 
-            (device_id, device_name, mac_address, organization_id, device_type,
-             location, certificate_expiry, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, current_timestamp(), current_timestamp())
-        """
-        databricks_cursor.execute(uc_insert_query, (
-            device_id, device_name, mac_address, organization_id, device_type,
-            location, certificate_expiry, status
-        ))
-        databricks_cursor.close()
-        logger.info(f"Unity Catalog insert successful: {device_id}")
-        
-        # 成功時
-        flash('デバイスを登録しました', 'success')
-        return redirect(url_for('list_devices'))
-        
-    except Error as mysql_error:
-        # MySQL エラー時
-        logger.error(f"MySQL error: {mysql_error}")
-        if mysql_conn:
-            mysql_conn.rollback()
-        flash('データベースエラーが発生しました', 'error')
-        return render_template('error.html', error_message=str(mysql_error)), 500
-        
-    except Exception as uc_error:
-        # Unity Catalog エラー時
-        logger.error(f"Unity Catalog error: {uc_error}")
-        
-        # Unity Catalog ロールバック（削除）
-        try:
-            if databricks_conn:
-                rollback_cursor = databricks_conn.cursor()
-                rollback_cursor.execute(
-                    "DELETE FROM iot_platform.master_data.device_master WHERE device_id = ?",
-                    (device_id,)
-                )
-                rollback_cursor.close()
-                logger.info(f"Unity Catalog rollback successful: {device_id}")
-        except Exception as rollback_error:
-            logger.error(f"Unity Catalog rollback error: {rollback_error}")
-        
-        # MySQL ロールバック
-        if mysql_conn:
-            mysql_conn.rollback()
-            logger.info(f"MySQL rollback successful: {device_id}")
-        
-        flash('データ同期エラーが発生しました', 'error')
-        return render_template('error.html', error_message=str(uc_error)), 500
-        
-    finally:
-        if mysql_cursor:
-            mysql_cursor.close()
-        if mysql_conn:
-            mysql_conn.close()
-        if databricks_conn:
-            databricks_conn.close()
+        db.session.add(device)
+
+        # ③ OLTP DB COMMIT
+        db.session.commit()
+
+    except (DuplicateDeviceIdError, DuplicateMacAddressError):
+        raise
+    except Exception:
+        db.session.rollback()
+        _rollback_create_device(device_id)
+        raise
+
+
+# views/admin/devices.py
+@admin_bp.route('/devices/register', methods=['POST'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def create_device_view():
+    form = DeviceCreateForm(request.form)
+    if not form.validate():
+        return render_template('admin/devices/form.html', mode='create', form=form), 400
+
+    device_data = {
+        'device_id':                    form.device_id.data,
+        'device_name':                  form.device_name.data,
+        'device_type_id':               form.device_type_id.data,
+        'device_organization_id':       form.device_organization_id.data,
+        'device_location':              form.device_location.data or '',
+        'mac_address':                  form.mac_address.data,
+        'certificate_expiration_date':  form.certificate_expiration_date.data,
+    }
+
+    try:
+        create_device(device_data, g.current_user.user_id)  # → device_service
+    except DuplicateDeviceIdError:
+        form.device_id.errors.append('このデバイスIDは既に登録されています')
+        return render_template('admin/devices/form.html', mode='create', form=form), 400
+    except DuplicateMacAddressError:
+        form.mac_address.errors.append('このMACアドレスは既に登録されています')
+        return render_template('admin/devices/form.html', mode='create', form=form), 400
+    except Exception:
+        abort(500)
+
+    flash('デバイスを登録しました', 'success')
+
+    return redirect(url_for('admin.devices.devices_list'))
 ```
 
 ##### バリデーション
@@ -758,12 +1045,21 @@ def register_device():
 
 ##### 表示メッセージ
 
-| メッセージID | 表示内容                              | 表示タイミング | 表示場所                               |
-| ------------ | ------------------------------------- | -------------- | -------------------------------------- |
-| SUC_001      | デバイスを登録しました                | 登録成功時     | ステータスメッセージモーダル（成功）   |
-| ERR_002      | デバイスの登録に失敗しました          | DB操作失敗時   | ステータスメッセージモーダル（エラー） |
-| ERR_003      | このデバイスIDは既に登録されています  | 重複エラー     | ステータスメッセージモーダル（エラー） |
-| ERR_004      | このMACアドレスは既に登録されています | 重複エラー     | ステータスメッセージモーダル（エラー） |
+| メッセージID | 表示内容                              | 表示タイミング | 表示場所       |
+| ------------ | ------------------------------------- | -------------- | -------------- |
+| SUC_001      | デバイスを登録しました                | 登録成功時     | 成功トースト   |
+| ERR_002      | デバイスの登録に失敗しました          | DB操作失敗時   | エラートースト |
+| ERR_003      | このデバイスIDは既に登録されています  | 重複エラー     | フォーム再表示 |
+| ERR_004      | このMACアドレスは既に登録されています | 重複エラー     | フォーム再表示 |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別           | 処理内容                               | 表示内容                           |
+| -------------- | -------------------- | -------------------------------------- | ---------------------------------- |
+| 400            | バリデーションエラー | フォーム再表示（エラーメッセージ表示） | バリデーションエラーメッセージ     |
+| 401            | 認証エラー           | ログイン画面へリダイレクト             | -                                  |
+| 403            | 権限エラー           | 403エラートースト表示                  | この操作を実行する権限がありません |
+| 500            | データベースエラー   | 500エラーページ表示                    | データの取得に失敗しました         |
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -780,310 +1076,379 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ```mermaid
 flowchart TD
-    Start([更新ボタンクリック]) --> CheckPerm{権限チェック}
-    CheckPerm -->|権限なし| Error403[403エラー ※1]
+    Start([更新ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Permission[権限チェック]
 
-    CheckPerm -->|権限OK| LoadDevice["デバイス情報を取得<br>SELECT 1 FROM device_master<br>WHERE device_uuid LIKE CONCAT('%', :device_uuid, '%')"]
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラートースト表示 ※1]
+    CheckPerm -->|権限OK| LoadDevice[デバイス情報を取得（スコープ制限適用）<br>SELECT 1 FROM v_device_master_by_user<br>WHERE user_id = :user_id<br>AND device_uuid = :device_uuid]
+
     LoadDevice --> CheckDB{DBクエリ結果}
-    
-    CheckDB -->|成功| CheckData{データ存在?}
+    CheckDB -->|成功| CheckData{データ存在?<br>※スコープ外も存在なしと同等}
     CheckDB -->|失敗| Error500[500エラーページ]
 
-    CheckData -->|なし| Error404[404エラー]
+    CheckData -->|なし| Error404[404エラートースト表示]
+    CheckData -->|あり| LoadTypes[デバイス種別を取得<br>SELECT * FROM device_type_master]
 
-    CheckData -->|あり| ScopeCheck[データスコープチェック]
-    ScopeCheck --> CheckScope{スコープOK?}
-    CheckScope -->|NG| Error404
-
-    CheckScope -->|OK| LoadOrgs["デバイス情報を取得<br>SELECT * FROM device_master<br>WHERE device_uuid LIKE CONCAT('%', :device_uuid, '%')"]
-    LoadOrgs --> CheckDB1{DBクエリ結果}
-
-    CheckDB1 -->|成功| Template[更新モーダルをレンダリング<br>現在の値を初期表示]
+    LoadTypes --> CheckDB1{DBクエリ結果}
+    CheckDB1 -->|成功| LoadOrgs[組織情報を取得（スコープ制限適用）<br>SELECT * FROM v_organization_master_by_user<br>WHERE user_id = :user_id]
     CheckDB1 -->|失敗| Error500
+
+    LoadOrgs --> CheckDB2{DBクエリ結果}
+    CheckDB2 -->|成功| Template[更新モーダルをレンダリング<br>現在の値を初期表示]
+    CheckDB2 -->|失敗| Error500
 
     Template --> View[モーダル表示]
 
     Error403 --> View
     Error404 --> View
 
-    View --> End([処理完了])
+    LoginRedirect --> End([処理完了])
+    View --> End
     Error500 --> End
 ```
 
 ※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
 
+##### 処理詳細（サーバーサイド）
+
+**実装例:**
+```python
+# services/device_service.py
+def get_device_by_uuid(device_uuid: str, user_id: int):
+    """デバイス情報を取得（スコープ制限適用）
+
+    フロー5（更新ボタン押下）・フロー6（更新実行）で共用。
+
+    Args:
+        device_uud: 取得対象のデバイスUUID
+        user_id: ログインユーザーID（スコープ制限に使用）
+
+    Returns:
+        DeviceMasterByUser or None（スコープ外・存在しない場合）
+    """
+    return db.session.query(DeviceMasterByUser).filter(
+        DeviceMasterByUser.user_id == user_id,
+        DeviceMasterByUser.device_uuid == device_uuid,
+        DeviceMasterByUser.delete_flag == False,
+    ).first()
+
+# get_device_form_options(user_id) → フロー3定義済み、共用
+
+# views/admin/devices.py
+@admin_bp.route('/devices/<device_uuid>/edit', methods=['GET'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def edit_device_form(device_uuid):
+    try:
+        device = get_device_by_uuid(device_uuid, g.current_user.user_id)  # → device_service
+    except Exception:
+        abort(500)
+    if not device:
+        abort(404)
+
+    try:
+        device_types, organizations, _ = get_device_form_options(g.current_user.user_id)  # → device_service（フロー3と共用、sort_itemsは更新フォームでは不要）
+    except Exception:
+        abort(500)
+
+    return render_template(
+        'admin/devices/form.html',
+        mode='edit',
+        device=device,
+        device_types=device_types,
+        organizations=organizations,
+    )
+```
+
+##### 表示メッセージ
+
+| メッセージID | 表示内容                           | 表示タイミング | 表示場所       |
+| ------------ | ---------------------------------- | -------------- | -------------- |
+| -            | この操作を実行する権限がありません | 権限不足時     | エラートースト |
+| -            | 指定されたデバイスが見つかりません | リソース不在時 | エラートースト |
+| -            | データの取得に失敗しました         | DBクエリ失敗時 | エラーページ   |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                           |
+| -------------- | ------------------ | -------------------------- | ---------------------------------- |
+| 401            | 認証エラー         | ログイン画面へリダイレクト | -                                  |
+| 403            | 権限エラー         | 403エラートースト表示      | この操作を実行する権限がありません |
+| 404            | リソース不在       | 404エラートースト表示      | 指定されたデバイスが見つかりません |
+| 500            | データベースエラー | 500エラーページ表示        | データの取得に失敗しました         |
+
+---
+
 #### 更新実行
 
 **トリガー:** (7.11) 更新ボタン（モーダル内）クリック後に表示される更新実行確認モーダルで「はい」を選択
+
+##### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([更新ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Permission[権限チェック]
+
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラートースト表示 ※1]
+    CheckPerm -->|権限OK| ServerValidate[サーバーサイドバリデーション]
+
+    ServerValidate --> ExistCheck[デバイス存在チェック（スコープ制限適用）<br>SELECT 1 FROM v_device_master_by_user<br>WHERE user_id = :user_id AND device_id = :device_id]
+
+    ExistCheck --> CheckDB0{DBクエリ結果}
+    CheckDB0 -->|成功| ExistResult{データ存在?<br>※スコープ外も存在なしと同等}
+    CheckDB0 -->|失敗| Error500[500エラーページ表示]
+
+    ExistResult -->|なし| Error404[404エラートースト表示]
+    ExistResult -->|あり| DupCheck[MACアドレス重複チェック（自分以外）<br>SELECT * FROM device_master<br>WHERE mac_address = :mac_address<br>AND device_id != :device_id]
+
+    Error404 --> ValidEnd[処理中断]
+
+    DupCheck --> CheckDB1{DBクエリ結果}
+    CheckDB1 -->|成功| DupResult{重複あり?}
+    CheckDB1 -->|失敗| Error500
+
+    DupResult -->|重複あり| DupError[フォーム再表示<br>このMACアドレスは既に登録されています]
+    DupError --> ValidEnd
+
+    DupResult -->|重複なし| UpdateUC[UnityCatalog.<br>device_masterを更新<br>UPDATE device_master]
+
+    UpdateUC --> CheckUC{UnityCatalog<br>操作結果}
+
+    CheckUC -->|成功| Update[デバイス更新<br>UPDATE device_master]
+    Update --> CheckDB{DB操作結果}
+    CheckDB -->|成功| Toast[成功メッセージトースト設定<br>デバイスを更新しました]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
+
+    CheckUC -->|失敗| RollbackUC[UnityCatalog.<br>device_master<br>ロールバック]
+    CheckDB -->|失敗| Rollback[DB.device_master<br>ロールバック]
+
+    RollbackUC --> Error500
+    Rollback --> RollbackUC
+
+    LoginRedirect --> End([処理完了])
+    ValidEnd --> End
+    Error403 --> End
+    Redirect --> End
+    Error500 --> End
+```
+
+※1　403エラー発生時、更新モーダルを閉じる。
 
 ##### 処理詳細（サーバーサイド）
 
 **実装例:**
 ```python
-# MySQL接続設定
-DB_CONFIG = {
-    'host': os.getenv('MYSQL_HOST', 'localhost'),
-    'port': int(os.getenv('MYSQL_PORT', 3306)),
-    'user': os.getenv('MYSQL_USER', 'user'),
-    'password': os.getenv('MYSQL_PASSWORD', 'password'),
-    'database': os.getenv('MYSQL_DATABASE', 'iot_platform')
-}
+# forms/device.py
+class DeviceUpdateForm(FlaskForm):
+    device_name = StringField('デバイス名', validators=[
+        DataRequired(message='デバイス名は必須です'),
+        Length(min=1, max=100, message='デバイス名は100文字以内で入力してください'),
+    ])
+    device_type_id = StringField('デバイス種別', validators=[
+        DataRequired(message='デバイス種別は必須です'),
+    ])
+    device_model = StringField('モデル情報', validators=[
+        DataRequired(message='モデル情報は必須です'),
+        Length(min=1, max=100, message='モデル情報は100文字以内で入力してください'),
+    ])
+    sim_id = StringField('SIMID', validators=[
+        Optional(),
+        Length(min=1, max=20, message='SIMIDは20文字以内で入力してください'),
+    ])
+    mac_address = StringField('MACアドレス', validators=[
+        Optional(),
+        Regexp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', message='MACアドレスの形式が正しくありません'),
+    ])
+    device_location = StringField('設置場所', validators=[
+        Optional(),
+        Length(min=1, max=100, message='設置場所は100文字以内で入力してください'),
+    ])
+    device_organization_id = StringField('所属組織', validators=[
+        DataRequired(message='所属組織は必須です'),
+    ])
+    certificate_expiration_date = StringField('証明書期限', validators=[
+        Optional(),
+        Date(message='証明書期限の形式が正しくありません'),
+    ])
 
-# Databricks接続設定
-DATABRICKS_CONFIG = {
-    'server_hostname': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
-    'http_path': os.getenv('DATABRICKS_HTTP_PATH'),
-    'access_token': os.getenv('DATABRICKS_TOKEN')
-}
 
-def get_mysql_connection():
-    """MySQL接続取得"""
-    return mysql.connector.connect(**DB_CONFIG)
+# services/device_service.py
+# get_device_by_uuid(device_uuid, user_id) → フロー5定義済み、共用
 
-def get_databricks_connection():
-    """Databricks SQL Warehouse接続取得"""
-    return databricks_sql.connect(**DATABRICKS_CONFIG)
+def _update_unity_catalog_device(device_uuid: str, device_data: dict, modifier_id: int) -> None:
+    """UC device_master の更新可能項目を UPDATE する"""
+    uc = UnityCatalogConnector()
+    uc.execute_dml(
+        """
+        UPDATE iot_catalog.oltp_db.device_master
+        SET device_name=:device_name, device_type_id=:device_type_id,
+            device_organization_id=:device_organization_id, device_location=:device_location,
+            mac_address=:mac_address, certificate_expiration_date=:certificate_expiration_date,
+            update_date=CURRENT_TIMESTAMP(), modifier=:modifier_id
+        WHERE device_uuid=:device_uuid
+        """,
+        {
+            'device_name':                  device_data['device_name'],
+            'device_type_id':               device_data['device_type_id'],
+            'device_organization_id':       device_data['device_organization_id'],
+            'device_location':              device_data['device_location'],
+            'mac_address':                  device_data['mac_address'],
+            'certificate_expiration_date':  device_data['certificate_expiration_date'],
+            'modifier_id':                  modifier_id,
+            'device_uuid':                  device_uuid,
+        },
+        operation="UC device_master UPDATE",
+    )
 
-@admin_bp.route('/devices/<device_id>/update', methods=['GET', 'POST'])
-def update_device(device_id):
-    """デバイス更新"""
-    
-    if request.method == 'GET':
-        # 既存データ取得
-        try:
-            conn = get_mysql_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                "SELECT * FROM device_master WHERE device_id = %s",
-                (device_id,)
-            )
-            device = cursor.fetchone()
-            cursor.close()
-            conn.close()
-            
-            if not device:
-                flash('指定されたデバイスが見つかりません', 'error')
-                return redirect(url_for('list_devices'))
-            
-            return render_template('update_device.html', device=device)
-            
-        except Error as e:
-            logger.error(f"Error: {e}")
-            flash('デバイスの更新に失敗しました', 'error')
-            return redirect(url_for('list_devices'))
-    
-    # POST処理
-    original_device_id = device_id
-    new_device_id = request.form.get('device_id')
-    device_name = request.form.get('device_name')
-    mac_address = request.form.get('mac_address')
-    organization_id = request.form.get('organization_id')
-    device_type = request.form.get('device_type')
-    location = request.form.get('location')
-    certificate_expiry = request.form.get('certificate_expiry')
-    status = request.form.get('status', 'inactive')
-    
-    mysql_conn = None
-    databricks_conn = None
-    mysql_original_data = None
-    uc_original_data = None
-    
+
+def _rollback_update_device(device_uuid: str) -> None:
+    """db.session.rollback() 後に UC を元データで復元する（ベストエフォート）
+
+    db.session.rollback() 後は OLTP が元データに戻っているため、
+    OLTP から元値を取得して UC を復元する。
+    ロールバック自体の失敗はログ出力のみでエラーを握りつぶす（ベストエフォート）。
+    """
     try:
-        # MySQL接続
-        mysql_conn = get_mysql_connection()
-        mysql_cursor = mysql_conn.cursor(dictionary=True)
-        
-        # 既存データを取得（ロールバック用）
-        mysql_cursor.execute(
-            "SELECT * FROM device_master WHERE device_id = %s",
-            (original_device_id,)
+        original = DeviceMaster.query.get(device_uuid)
+        if not original:
+            return
+        uc = UnityCatalogConnector()
+        uc.execute_dml(
+            """
+            UPDATE iot_catalog.oltp_db.device_master
+            SET device_name=:device_name, device_type_id=:device_type_id,
+                device_organization_id=:device_organization_id, device_location=:device_location,
+                mac_address=:mac_address, certificate_expiration_date=:certificate_expiration_date,
+                update_date=CURRENT_TIMESTAMP(), modifier=:modifier
+            WHERE device_uuid=:device_uuid
+            """,
+            {
+                'device_name':                  original.device_name,
+                'device_type_id':               original.device_type_id,
+                'device_organization_id':       original.device_organization_id,
+                'device_location':              original.device_location,
+                'mac_address':                  original.mac_address,
+                'certificate_expiration_date':  original.certificate_expiration_date,
+                'modifier':                     original.modifier,
+                'device_uuid':                  device_uuid,
+            },
+            operation="UC device_master 更新ロールバック",
         )
-        mysql_original_data = mysql_cursor.fetchone()
-        
-        if not mysql_original_data:
-            flash('指定されたデバイスが見つかりません', 'error')
-            return redirect(url_for('list_devices'))
-        
-        # MACアドレス重複チェック（自分自身以外）
-        mysql_cursor.execute(
-            "SELECT * FROM device_master WHERE mac_address = %s AND device_id != %s",
-            (mac_address, original_device_id)
-        )
-        if mysql_cursor.fetchone():
-            flash('指定されたMACアドレスは既に登録されています', 'error')
-            return render_template('update_device.html', device=request.form)
-        
-        # MySQLでデバイス更新
-        update_query = """
-            UPDATE device_master 
-            SET device_name = %s, mac_address = %s, organization_id = %s, 
-                device_type = %s, location = %s, certificate_expiry = %s, 
-                status = %s, updated_at = NOW()
-            WHERE device_id = %s
-        """
-        mysql_cursor.execute(update_query, (
-            device_name, mac_address, organization_id, device_type,
-            location, certificate_expiry, status, original_device_id
-        ))
-        
-        mysql_conn.commit()
-        logger.info(f"MySQL update successful: {original_device_id} -> {new_device_id}")
-        
-        # Unity Catalogでデバイス更新
-        databricks_conn = get_databricks_connection()
-        databricks_cursor = databricks_conn.cursor()
-        
-        # Unity Catalogの既存データを取得（ロールバック用）
-        databricks_cursor.execute(
-            "SELECT * FROM iot_platform.master_data.device_master WHERE device_id = ?",
-            (original_device_id,)
-        )
-        uc_original_data = databricks_cursor.fetchone()
-        
-        uc_merge_query = """
-            MERGE INTO iot_platform.master_data.device_master AS target
-            USING (
-                SELECT ? as device_id, ? as device_name, ? as mac_address,
-                        ? as organization_id, ? as device_type, ? as location,
-                        ? as certificate_expiry, ? as status
-            ) AS source
-            ON target.device_id = source.device_id
-            WHEN MATCHED THEN UPDATE SET
-                device_name = source.device_name,
-                mac_address = source.mac_address,
-                organization_id = source.organization_id,
-                device_type = source.device_type,
-                location = source.location,
-                certificate_expiry = source.certificate_expiry,
-                status = source.status,
-                updated_at = current_timestamp()
-        """
-        databricks_cursor.execute(uc_merge_query, (
-            new_device_id, device_name, mac_address, organization_id, device_type,
-            location, certificate_expiry, status
-        ))
-        
-        databricks_cursor.close()
-        logger.info(f"Unity Catalog update successful: {original_device_id} -> {new_device_id}")
-        
-        # 成功時
-        flash('デバイスを更新しました', 'success')
-        return redirect(url_for('list_devices'))
-        
-    except Error as mysql_error:
-        # MySQL エラー時
-        logger.error(f"MySQL error: {mysql_error}")
-        if mysql_conn:
-            mysql_conn.rollback()
-        flash('デバイスの更新に失敗しました', 'error')
-        return render_template('error.html', error_message=str(mysql_error)), 500
-        
-    except Exception as uc_error:
-        # Unity Catalog エラー時
-        logger.error(f"Unity Catalog error: {uc_error}")
-        
-        # Unity Catalog ロールバック
-        try:
-            if databricks_conn and uc_original_data:
-                rollback_cursor = databricks_conn.cursor()
-                
-                # 新規データを削除
-                if new_device_id != original_device_id:
-                    rollback_cursor.execute(
-                        "DELETE FROM iot_platform.master_data.device_master WHERE device_id = ?",
-                        (new_device_id,)
-                    )
-                
-                # 元のデータを復元
-                restore_query = """
-                    MERGE INTO iot_platform.master_data.device_master AS target
-                    USING (
-                        SELECT ? as device_id, ? as device_name, ? as mac_address,
-                               ? as organization_id, ? as device_type, ? as location,
-                               ? as certificate_expiry, ? as status, ? as created_at, ? as updated_at
-                    ) AS source
-                    ON target.device_id = source.device_id
-                    WHEN MATCHED THEN UPDATE SET *
-                    WHEN NOT MATCHED THEN INSERT *
-                """
-                rollback_cursor.execute(restore_query, (
-                    uc_original_data[0], uc_original_data[1], uc_original_data[2],
-                    uc_original_data[3], uc_original_data[4], uc_original_data[5],
-                    uc_original_data[6], uc_original_data[7], uc_original_data[8],
-                    uc_original_data[9]
-                ))
-                rollback_cursor.close()
-                logger.info(f"Unity Catalog rollback successful: {original_device_id}")
-        except Exception as rollback_error:
-            logger.error(f"Unity Catalog rollback error: {rollback_error}")
-        
-        # MySQL ロールバック
-        if mysql_conn and mysql_original_data:
-            try:
-                rollback_cursor = mysql_conn.cursor()
-                
-                # 新規データを削除
-                if new_device_id != original_device_id:
-                    rollback_cursor.execute(
-                        "DELETE FROM device_master WHERE device_id = %s",
-                        (new_device_id,)
-                    )
-                
-                # 元のデータを復元
-                restore_query = """
-                    INSERT INTO device_master 
-                    (device_id, device_name, mac_address, organization_id, device_type,
-                     location, certificate_expiry, status, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        device_name = VALUES(device_name),
-                        mac_address = VALUES(mac_address),
-                        organization_id = VALUES(organization_id),
-                        device_type = VALUES(device_type),
-                        location = VALUES(location),
-                        certificate_expiry = VALUES(certificate_expiry),
-                        status = VALUES(status),
-                        updated_at = VALUES(updated_at)
-                """
-                rollback_cursor.execute(restore_query, (
-                    mysql_original_data['device_id'],
-                    mysql_original_data['device_name'],
-                    mysql_original_data['mac_address'],
-                    mysql_original_data['organization_id'],
-                    mysql_original_data['device_type'],
-                    mysql_original_data['location'],
-                    mysql_original_data['certificate_expiry'],
-                    mysql_original_data['status'],
-                    mysql_original_data['created_at'],
-                    mysql_original_data['updated_at']
-                ))
-                mysql_conn.commit()
-                rollback_cursor.close()
-                logger.info(f"MySQL rollback successful: {original_device_id}")
-            except Exception as mysql_rollback_error:
-                logger.error(f"MySQL rollback error: {mysql_rollback_error}")
-                mysql_conn.rollback()
-        
-        flash('デバイスの更新に失敗しました', 'error')
-        return render_template('error.html', error_message=str(uc_error)), 500
-        
-    finally:
-        if mysql_cursor:
-            mysql_cursor.close()
-        if mysql_conn:
-            mysql_conn.close()
-        if databricks_conn:
-            databricks_conn.close()
+    except Exception:
+        logger.error("デバイス更新ロールバック失敗", exc_info=True)
+
+
+def _update_oltp_device(device_uuid: str, device_data: dict, modifier_id: int) -> None:
+    """OLTP DB device_master を UPDATE する"""
+    device = DeviceMaster.query.get(device_uuid)
+    device.device_name = device_data['device_name']
+    device.device_type_id = device_data['device_type_id']
+    device.device_organization_id = device_data['device_organization_id']
+    device.device_location = device_data['device_location']
+    device.mac_address = device_data['mac_address']
+    device.certificate_expiration_date = device_data['certificate_expiration_date']
+    device.modifier = modifier_id
+    db.session.flush()
+
+
+def update_device(device_uuid: str, device_data: dict, modifier_id: int) -> None:
+    """デバイス更新（Sagaパターン）
+
+    Args:
+        device_uuid: 対象デバイスUUID（OLTP/UC更新に使用）
+        device_data: 更新データ（新値）
+        modifier_id: 更新者ID
+
+    Raises:
+        DuplicateMacAddressError: MACアドレス重複時
+        Exception: 更新失敗時（ロールバック済み）
+    """
+    # MACアドレス重複チェック（自分以外）
+    if DeviceMaster.query.filter(
+        DeviceMaster.mac_address == device_data['mac_address'],
+        DeviceMaster.device_uuid != device_uuid,
+        DeviceMaster.delete_flag == False,
+    ).first():
+        raise DuplicateMacAddressError(device_data['mac_address'])
+
+    try:
+        # ① UC device_master 更新
+        _update_unity_catalog_device(device_uuid, device_data, modifier_id)
+
+        # ② OLTP DB 更新
+        _update_oltp_device(device_uuid, device_data, modifier_id)
+        db.session.commit()
+
+    except DuplicateMacAddressError:
+        raise
+    except Exception:
+        db.session.rollback()  # OLTPは自動巻き戻し（元データに復元済み）
+        _rollback_update_device(device_uuid)  # rollback後にOLTPから元データ取得してUC復元
+        raise
+
+
+# views/admin/devices.py
+@admin_bp.route('/devices/<device_uuid>/update', methods=['POST'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def update_device_view(device_uuid):
+    form = DeviceUpdateForm(request.form)
+    if not form.validate():
+        return render_template('admin/devices/form.html', mode='edit', form=form), 400
+
+    try:
+        device = get_device_by_uuid(device_uuid, g.current_user.user_id)  # → device_service（フロー5と共用）
+    except Exception:
+        abort(500)
+    if not device:
+        abort(404)
+
+    device_data = {
+        'device_name':                  form.device_name.data,
+        'device_type_id':               form.device_type_id.data,
+        'device_organization_id':       form.device_organization_id.data,
+        'device_location':              form.device_location.data or '',
+        'mac_address':                  form.mac_address.data,
+        'certificate_expiration_date':  form.certificate_expiration_date.data,
+    }
+
+    try:
+        update_device(device_uuid, device_data, g.current_user.user_id)  # → device_service
+    except DuplicateMacAddressError:
+        form.mac_address.errors.append('このMACアドレスは既に登録されています')
+        return render_template('admin/devices/form.html', mode='edit', form=form), 400
+    except Exception:
+        abort(500)
+
+    flash('デバイスを更新しました', 'success')
+    return redirect(url_for('admin.devices.devices_list'))
 ```
 
 ##### 表示メッセージ
 
-| メッセージID | 表示内容                              | 表示タイミング | 表示場所                               |
-| ------------ | ------------------------------------- | -------------- | -------------------------------------- |
-| SUC_002      | デバイスを更新しました                | 更新成功時     | ステータスメッセージモーダル（成功）   |
-| ERR_005      | デバイスの更新に失敗しました          | DB操作失敗時   | ステータスメッセージモーダル（エラー） |
-| ERR_006      | このMACアドレスは既に登録されています | 重複チェック時 | ステータスメッセージモーダル（エラー） |
-| ERR_007      | 指定されたデバイスが見つかりません    | 存在チェック時 | ステータスメッセージモーダル（エラー） |
+| メッセージID | 表示内容                              | 表示タイミング | 表示場所       |
+| ------------ | ------------------------------------- | -------------- | -------------- |
+| SUC_002      | デバイスを更新しました                | 更新成功時     | 成功トースト   |
+| ERR_005      | デバイスの更新に失敗しました          | DB操作失敗時   | エラートースト |
+| ERR_006      | このMACアドレスは既に登録されています | 重複チェック時 | フォーム再表示 |
+| ERR_007      | 指定されたデバイスが見つかりません    | 存在チェック時 | エラートースト |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別           | 処理内容                               | 表示内容                           |
+| -------------- | -------------------- | -------------------------------------- | ---------------------------------- |
+| 400            | バリデーションエラー | フォーム再表示（エラーメッセージ表示） | バリデーションエラーメッセージ     |
+| 401            | 認証エラー           | ログイン画面へリダイレクト             | -                                  |
+| 403            | 権限エラー           | 403エラートースト表示                  | この操作を実行する権限がありません |
+| 404            | リソース不在         | 404エラートースト表示                  | 指定されたデバイスが見つかりません |
+| 500            | データベースエラー   | 500エラーページ表示                    | データの取得に失敗しました         |
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -1095,25 +1460,69 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 **トリガー:** (6.9) 参照ボタンクリック
 
+**前提条件:**
+- データスコープ制限内のデバイスである
+
+#### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([参照ボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| GetDevice[デバイス詳細情報取得（スコープ制限適用）<br>SELECT * FROM v_device_master_by_user<br>WHERE user_id = :user_id<br>AND device_uuid = :device_uuid]
+
+    GetDevice --> CheckDevice{DBクエリ結果}
+    CheckDevice -->|成功| CheckData{データ存在?<br>※スコープ外も存在なしと同等}
+    CheckDevice -->|失敗| Error500[500エラーメッセージ表示]
+
+    CheckData -->|なし| Error404[404エラートースト表示]
+    CheckData -->|あり| Template[参照モーダルをレンダリング]
+
+    Template --> View[モーダル表示]
+
+    LoginRedirect --> End([処理完了])
+    View --> End
+    Error404 --> End
+    Error500 --> End
+```
+
 ##### 処理詳細（サーバーサイド）
 
 **実装例:**
 ```python
-@admin_bp.route('/devices/<device_id>', methods=['GET'])
-@require_permission('device_read')
-def view_device(device_id):
-    current_user = get_current_user()
+# services/device_service.py
+# get_device_by_uuid(device_uuid, g.current_user.user_id) → フロー5定義済み、共用
 
-    device = device_master.query.filter_by(device_id=device_id, delete_flag=False).first()
+# views/admin/devices.py
+@admin_bp.route('/devices/<device_uuid>', methods=['GET'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
+def view_device_detail(device_uuid):
+    try:
+        device = get_device_by_uuid(device_uuid, g.current_user.user_id)  # → device_service（フロー5と共用）
+    except Exception:
+        abort(500)
     if not device:
         abort(404)
-
-    # データスコープチェック
-    if not check_device_scope(device, current_user):
-        abort(404)
-
     return render_template('admin/devices/detail.html', device=device)
 ```
+
+##### 表示メッセージ
+
+| メッセージID | 表示内容                           | 表示タイミング | 表示場所       |
+| ------------ | ---------------------------------- | -------------- | -------------- |
+| -            | 指定されたデバイスが見つかりません | リソース不在時 | エラートースト |
+| -            | データの取得に失敗しました         | DBクエリ失敗時 | エラーページ   |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                           |
+| -------------- | ------------------ | -------------------------- | ---------------------------------- |
+| 401            | 認証エラー         | ログイン画面へリダイレクト | -                                  |
+| 404            | リソース不在       | 404エラートースト表示      | 指定されたデバイスが見つかりません |
+| 500            | データベースエラー | 500エラーページ表示        | データの取得に失敗しました         |
+
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
 
@@ -1121,198 +1530,174 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 ### デバイス削除
 
-**トリガー:** (3.2) 削除ボタンクリック → (9) 削除確認モーダル → 削除するボタンクリック
+**トリガー:** (3.2) 削除ボタンクリック（確認モーダル経由）
+
+**前提条件:**
+- ユーザーが適切な権限を持っている（システム保守者、管理者、販社ユーザ）
+- データスコープ制限内のデバイスである
+- 1件以上のデバイスが選択されている
 
 ##### 処理フロー
 
 ```mermaid
 flowchart TD
     Start([削除ボタンクリック]) --> Confirm[削除確認ダイアログ表示<br>本当に削除してもよろしいですか？]
-    Confirm --> CheckAuth{権限チェック}
+    Confirm --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
+    CheckAuth -->|認証OK| Permission[権限チェック]
 
-    CheckAuth -->|権限OK| ConfirmResult{ユーザー確認}
-    CheckAuth -->|権限なし| Error403[403エラー ※1]
-    
+    Permission --> CheckPerm{権限OK?}
+    CheckPerm -->|権限なし| Error403[403エラートースト表示]
+    CheckPerm -->|権限OK| ConfirmResult{ユーザー確認}
+
+    ConfirmResult -->|削除| GetOriginal[元データ取得（スコープ制限適用）<br>SELECT * FROM v_device_master_by_user<br>WHERE user_id = :user_id<br>AND device_uuid = :device_uuid]
     ConfirmResult -->|キャンセル| ValidEnd[処理中断]
-    
-    ConfirmResult -->|OK| GetOriginal[元データ取得<br>SELECT * FROM device_master<br>WHERE device_id = :device_uuid]
 
     GetOriginal --> CheckDB0{DBクエリ結果}
     
-    CheckDB0 -->|成功| CheckExists{デバイス存在?}
+    CheckDB0 -->|成功| CheckExists{デバイス存在?<br>※スコープ外も存在なしと同等}
     CheckDB0 -->|失敗|　Error500[500エラーページ表示]
 
-    CheckExists -->|存在しない| NotFoundError[エラー表示<br>指定されたデバイスが見つかりません]
-    NotFoundError --> ValidEnd
+    CheckExists -->|存在しない| Error404[404エラートースト表示]
     
-    CheckExists -->|存在する| Delete[デバイス削除<br>UPDATE device_master<br> SET delete_flag = TRUE<br>WHERE device_id = :device_uuid]
+    CheckExists -->|存在する| Delete[デバイス削除<br>UPDATE device_master<br> SET delete_flag = TRUE<br>WHERE device_uuid = :device_uuid]
     
     Delete --> CheckDB{DB操作結果}
     
-    CheckDB -->|成功| DeleteUC[UnityCatalog.<br>device_masterから<br>デバイス削除<br>UPDATE device_master<br>SET delete_flag = TRUE<br>WHERE device_id = :device_uuid]
+    CheckDB -->|成功| DeleteUC[UnityCatalog.<br>device_masterから<br>デバイス削除<br>UPDATE device_master<br>SET delete_flag = TRUE<br>WHERE device_uuid = :device_uuid]
 
     DeleteUC --> CheckUC{UnityCatalog<br>操作結果}
 
-    CheckUC -->|成功| Flash[フラッシュメッセージ設定<br>デバイスを削除しました]
-    Flash --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
+    CheckUC -->|成功| Toast[成功メッセージトースト設定<br>デバイスを削除しました]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
     
     CheckDB -->|失敗| Rollback[DB.device_master<br>元データを復元<br>UPDATE device_master]
     CheckUC -->|失敗| RollbackUC[UnityCatalog.<br>device_master<br>元データを復元<br>UPDATE device_master<br>SET delete_flag = FALSE<br>WHERE device_uuid = :device_uuid]
     RollbackUC --> Rollback
     Rollback --> Error500
     
-    ValidEnd --> End([処理完了])
+    LoginRedirect --> End([処理完了])
+    ValidEnd --> End
     Redirect --> End
     Error500 --> End
     Error403 --> End
+    Error404 --> End
 ```
-
-※1　403エラー発生時、ドロップダウン、テキストボックスに具体的なデータは表示せず、空で表示する。
 
 ##### 処理詳細（サーバーサイド）
 
 **実装例:**
 ```python
-# MySQL接続設定
-DB_CONFIG = {
-    'host': os.getenv('MYSQL_HOST', 'localhost'),
-    'port': int(os.getenv('MYSQL_PORT', 3306)),
-    'user': os.getenv('MYSQL_USER', 'user'),
-    'password': os.getenv('MYSQL_PASSWORD', 'password'),
-    'database': os.getenv('MYSQL_DATABASE', 'iot_platform')
-}
+# services/device_service.py
+# get_device_by_uuid(device_uuid, user_id) → フロー5定義済み、共用
 
-# Databricks接続設定
-DATABRICKS_CONFIG = {
-    'server_hostname': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
-    'http_path': os.getenv('DATABRICKS_HTTP_PATH'),
-    'access_token': os.getenv('DATABRICKS_TOKEN')
-}
+def _soft_delete_unity_catalog_device(device_id: int) -> None:
+    """UC device_master から対象デバイスを SOFT_DELETE（論理削除）する"""
+    uc = UnityCatalogConnector()
+    uc.execute_dml(
+        "UPDATE iot_catalog.oltp_db.device_master SET delete_flag = true WHERE device_id = :device_id",
+        {'device_id': device_id},
+        operation="UC device_master SOFT_DELETE",
+    )
 
-def get_mysql_connection():
-    """MySQL接続取得"""
-    return mysql.connector.connect(**DB_CONFIG)
 
-def get_databricks_connection():
-    """Databricks SQL Warehouse接続取得"""
-    return databricks_sql.connect(**DATABRICKS_CONFIG)
+def _rollback_soft_delete_device(device_id: int) -> None:
+    """UC device_master の削除フラグを FALSE にする（db.session.rollback() 後に呼ぶこと）
 
-@admin_bp.route('/devices/<device_id>/delete', methods=['POST'])
-def delete_device(device_id):
-    """デバイス削除"""
-    
-    mysql_conn = None
-    databricks_conn = None
-    mysql_original_data = None
-    
+    ロールバック自体の失敗はログ出力のみでエラーを握りつぶす（ベストエフォート）。
+    """
     try:
-        # MySQL接続
-        mysql_conn = get_mysql_connection()
-        mysql_cursor = mysql_conn.cursor(dictionary=True)
-        
-        # 既存データを取得（ロールバック用）
-        mysql_cursor.execute(
-            "SELECT * FROM device_master WHERE device_id = %s",
-            (device_id,)
+        uc = UnityCatalogConnector()
+        uc.execute_dml(
+            "UPDATE iot_catalog.oltp_db.device_master SET delete_flag = false WHERE device_id = :device_id",
+            {'device_id': device_id},
+            operation="UC device_master 論理削除ロールバック",
         )
-        mysql_original_data = mysql_cursor.fetchone()
-        
-        if not mysql_original_data:
-            flash('指定されたデバイスが見つかりません', 'error')
-            return redirect(url_for('list_devices'))
-        
-        # MySQLからデバイス削除
-        mysql_cursor.execute(
-            "DELETE FROM device_master WHERE device_id = %s",
-            (device_id,)
-        )
-        mysql_conn.commit()
-        logger.info(f"MySQL delete successful: {device_id}")
-        
-        # Unity Catalogからデバイス削除
-        databricks_conn = get_databricks_connection()
-        databricks_cursor = databricks_conn.cursor()
-        
-        databricks_cursor.execute(
-            "DELETE FROM iot_platform.master_data.device_master WHERE device_id = ?",
-            (device_id,)
-        )
-        databricks_cursor.close()
-        logger.info(f"Unity Catalog delete successful: {device_id}")
-        
-        # 成功時
-        flash('デバイスを削除しました', 'success')
-        return redirect(url_for('list_devices'))
-        
-    except Error as mysql_error:
-        # MySQL エラー時
-        logger.error(f"MySQL error: {mysql_error}")
-        if mysql_conn:
-            mysql_conn.rollback()
-        flash('データベースエラーが発生しました', 'error')
-        return render_template('error.html', error_message=str(mysql_error)), 500
-        
-    except Exception as uc_error:
-        # Unity Catalog エラー時
-        logger.error(f"Unity Catalog error: {uc_error}")
-        
-        # Unity Catalog ロールバック（元データを復元）
+    except Exception:
+        logger.error("デバイス論理削除ロールバック失敗", exc_info=True)
+
+
+def delete_device(device: DeviceMasterByUser, deleter_id: int) -> None:
+    """デバイス削除（Sagaパターン）1件分
+
+    Args:
+        device: 削除対象デバイス（DeviceMasterByUser）
+        deleter_id: 削除実行者のユーザーID
+
+    Raises:
+        Exception: 削除失敗時（ロールバック済み）
+    """
+    uc_deleted = False
+    try:
+        # ① UC device_master 論理削除
+        _soft_delete_unity_catalog_device(device.device_id)
+        uc_deleted = True
+
+        # ② OLTP DB 論理削除
+        device.delete_flag = True
+        device.modifier = deleter_id
+        db.session.flush()
+
+        db.session.commit()  # 全成功後にコミット
+
+    except Exception:
+        db.session.rollback()  # OLTPは自動巻き戻し
+        if uc_deleted:
+            _rollback_soft_delete_device(device.device_id)  # UCのみ補償トランザクション
+        raise
+
+
+# views/admin/devices.py
+@admin_bp.route('/devices/delete', methods=['POST'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def delete_device_view():
+    device_uuids = request.form.getlist('device_uuids')
+    if not device_uuids:
+        flash('削除する組織を選択してください', 'error')
+        return redirect(url_for('admin.devices.devices_list'))
+
+    deleted_count = 0
+    for device_uuid in device_uuids:
         try:
-            if databricks_conn and mysql_original_data:
-                rollback_cursor = databricks_conn.cursor()
-                
-                restore_query = """
-                    UPDATE iot_platform.master_data.device_master 
-                    SET delete_flag = FALSE
-                    WHERE device_id = %d
-                """
-                rollback_cursor.execute(restore_query, (
-                    mysql_original_data['device_id']
-                ))
-                rollback_cursor.close()
-                logger.info(f"Unity Catalog rollback successful: {device_id}")
-        except Exception as rollback_error:
-            logger.error(f"Unity Catalog rollback error: {rollback_error}")
+            device = get_device_by_uuid(device_uuid, g.current_user.user_id)  # → device_service（フロー5と共用）
+        except Exception:
+            abort(500)
+
+        if not device:
+            flash('指定されたデバイスが見つかりません', 'error')
+            continue
+
+        try:
+            delete_device(device, g.current_user.user_id)  # → device_service
+        except Exception:
+            abort(500)
         
-        # MySQL ロールバック（元データを復元）
-        if mysql_conn and mysql_original_data:
-            try:
-                rollback_cursor = mysql_conn.cursor()
-                
-                restore_query = """
-                    UPDATE device_master 
-                    SET delete_flag - FALSE
-                    WHERE debice_id = %d
-                """
-                rollback_cursor.execute(restore_query, (
-                    mysql_original_data['device_id']
-                ))
-                mysql_conn.commit()
-                rollback_cursor.close()
-                logger.info(f"MySQL rollback successful: {device_id}")
-            except Exception as mysql_rollback_error:
-                logger.error(f"MySQL rollback error: {mysql_rollback_error}")
-                mysql_conn.rollback()
-        
-        flash('データ同期エラーが発生しました', 'error')
-        return render_template('error.html', error_message=str(uc_error)), 500
-        
-    finally:
-        if mysql_cursor:
-            mysql_cursor.close()
-        if mysql_conn:
-            mysql_conn.close()
-        if databricks_conn:
-            databricks_conn.close()
+        deleted_count += 1
+
+    if deleted_count > 0:
+        flash(f'{deleted_count}件のデバイスを削除しました', 'success')
+    return redirect(url_for('admin.devices.devices_list'))
 ```
 
 ##### 表示メッセージ
 
-| メッセージID | 表示内容                           | 表示タイミング | 表示場所                               |
-| ------------ | ---------------------------------- | -------------- | -------------------------------------- |
-| SUC_003      | デバイスを削除しました             | 削除成功時     | ステータスメッセージモーダル（成功）   |
-| ERR_008      | デバイスの削除に失敗しました       | DB操作失敗時   | ステータスメッセージモーダル（エラー） |
-| ERR_009      | 指定されたデバイスが見つかりません | 存在チェック時 | ステータスメッセージモーダル（エラー） |
+| メッセージID | 表示内容                           | 表示タイミング | 表示場所       |
+| ------------ | ---------------------------------- | -------------- | -------------- |
+| SUC_003      | デバイスを削除しました             | 削除成功時     | 成功トースト   |
+| ERR_008      | デバイスの削除に失敗しました       | DB操作失敗時   | エラートースト |
+| ERR_009      | 指定されたデバイスが見つかりません | 存在チェック時 | エラートースト |
+| -            | この操作を実行する権限がありません | 権限不足時     | エラートースト |
+
+#### エラーハンドリング
+
+| HTTPステータス | エラー種別           | 処理内容                   | 表示内容                           |
+| -------------- | -------------------- | -------------------------- | ---------------------------------- |
+| 401            | 認証エラー           | ログイン画面へリダイレクト | -                                  |
+| 403            | 権限エラー           | 403エラートースト表示      | この操作を実行する権限がありません |
+| 404            | リソース不在         | 404エラートースト表示      | 指定されたデバイスが見つかりません |
+| 500            | データベースエラー   | 500エラーページ表示        | データの取得に失敗しました         |
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -1327,57 +1712,147 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 **実装例:**
 ```python
-def export_devices_csv(devices):
-    """デバイス一覧をCSVとしてエクスポート"""
-    import csv
-    from io import StringIO
-    from flask import make_response
-    from datetime import datetime
+# services/device_service.py
 
+def get_all_devices_for_export(search_params: dict, user_id: int) -> list:
+    """CSVエクスポート用：検索条件を適用しつつ全件取得（ページングなし）
+
+    Args:
+        search_params: 検索条件（page/per_page は無視）
+        user_id: ログインユーザーID（スコープ制限に使用）
+
+    Returns:
+        デバイスリスト（全件）
+    """
+    query = db.session.query(
+        DeviceMasterByUser,
+        OrganizationMaster.organization_name,
+        DeviceTypeMaster.device_type_name,
+        DeviceStatusData.last_received_time,
+    ).outerjoin(
+        OrganizationMaster,
+        and_(
+            DeviceMasterByUser.device_organization_id == OrganizationMaster.organization_id,
+            OrganizationMaster.delete_flag == False,
+        )
+    ).outerjoin(
+        DeviceStatusData,
+        and_(
+            DeviceMasterByUser.device_id == DeviceStatusData.device_id,
+            DeviceStatusData.delete_flag == False,
+        )
+    ).outerjoin(
+        DeviceTypeMaster,
+        and_(
+            DeviceMasterByUser.device_type_id == DeviceTypeMaster.device_type_id,
+            DeviceTypeMaster.delete_flag == False,
+        )
+    ).filter(
+        DeviceMasterByUser.user_id == user_id,
+        DeviceMasterByUser.delete_flag == False,
+    )
+
+    if search_params.get('device_id'):
+        query = query.filter(DeviceMasterByUser.device_id.like(f"%{search_params['device_id']}%"))
+    if search_params.get('device_name'):
+        query = query.filter(DeviceMasterByUser.device_name.like(f"%{search_params['device_name']}%"))
+    if search_params.get('device_type_id') is not None:
+        query = query.filter(DeviceMasterByUser.device_type_id == search_params['device_type_id'])
+    if search_params.get('location'):
+        query = query.filter(DeviceMasterByUser.device_location.like(f"%{search_params['location']}%"))
+    if search_params.get('organization_id') is not None:
+        query = query.filter(DeviceMasterByUser.device_organization_id == search_params['organization_id'])
+    if search_params.get('certificate_expiration_date'):
+        query = query.filter(DeviceMasterByUser.certificate_expiration_date == search_params['certificate_expiration_date'])
+    if search_params.get('status') is not None:
+        threshold = current_app.config['DEVICE_DATA_INTERVAL_SECONDS']
+        timediff = func.timestampdiff(text('SECOND'), DeviceStatusData.last_received_time, func.now())
+        if search_params['status'] == 'connected':
+            query = query.filter(
+                DeviceStatusData.last_received_time.isnot(None),
+                timediff <= threshold * 2,
+            )
+        elif search_params['status'] == 'disconnected':
+            query = query.filter(
+                or_(
+                    DeviceStatusData.last_received_time.is_(None),
+                    timediff > threshold * 2,
+                )
+            )
+
+    sort_col = getattr(DeviceMasterByUser, search_params.get('sort_by', ''), None)
+    if sort_col is None:
+        query = query.order_by(DeviceMasterByUser.device_id.asc())
+    else:
+        query = query.order_by(
+            sort_col.asc() if search_params.get('order', 'asc') == 'asc' else sort_col.desc(),
+            DeviceMasterByUser.device_id.asc(),
+        )
+
+    return query.all()  # limitなし・全件取得
+
+
+def _get_device_status_label(last_received_time) -> str:
+    """last_received_time から接続ステータスのラベル文字列を返す
+
+    Args:
+        last_received_time: device_status_data.last_received_time（NULLの場合あり）
+
+    Returns:
+        '接続済み' または '未接続'
+    """
+    if last_received_time is None:
+        return '未接続'
+    threshold = current_app.config['DEVICE_DATA_INTERVAL_SECONDS']
+    elapsed = (datetime.now(timezone.utc) - last_received_time).total_seconds()
+    return '接続済み' if elapsed <= threshold * 2 else '未接続'
+
+
+def generate_devices_csv(devices: list) -> bytes:
+    """デバイスリストをCSV形式に変換する（BOM付きUTF-8）
+
+    Args:
+        devices: デバイスリスト
+
+    Returns:
+        CSV データ（bytes）
+    """
     output = StringIO()
     writer = csv.writer(output)
-
-    # ヘッダー行
-    writer.writerow([
-        'device_uuid',
-        'device_name',
-        'device_type_id',
-        'device_model',
-        'sim_id',
-        'mac_address',
-        'organization_id',
-        'software_version',
-        'device_location',
-        'certificate_expiration_date'
-    ])
-
-    # データ行
-    for device in devices:
+    writer.writerow(['デバイスID', 'デバイス名', 'デバイス種別', '設置場所',
+                     '所属組織', '証明書期限', 'ステータス'])
+    for device, organization_name, device_type_name, last_received_time in devices:
         writer.writerow([
-            device.device_uuid,
+            device.device_id,
             device.device_name,
-            device.device_type_id,
-            device.model_info or '',
-            device.sim_id or '',
-            device.mac_address,
-            device.organization_id,
-            device.software_version,
-            device.location or '',
-            device.certificate_expiration_date or None
+            device_type_name or '',
+            device.device_location or '',
+            organization_name or '',
+            device.certificate_expiration_date.strftime('%Y-%m-%d') if device.certificate_expiration_date else '',
+            _get_device_status_label(last_received_time),
         ])
+    return output.getvalue().encode('utf-8-sig')
 
-    # CSVレスポンス作成
-    csv_data = output.getvalue().encode('utf-8-sig')  # BOM付きUTF-8
+
+# views/admin/devices.py
+@admin_bp.route('/devices/export', methods=['POST'])
+@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user')
+def export_devices_csv_view():
+    search_params = get_search_conditions_cookie('devices') or get_default_search_params()
+
+    try:
+        devices = get_all_devices_for_export(search_params, g.current_user.user_id)  # → device_service
+        csv_data = generate_devices_csv(devices)  # → device_service
+    except Exception:
+        abort(500)
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'devices_{timestamp}.csv'
-
     response = make_response(csv_data)
     response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
-    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.headers['Content-Disposition'] = f'attachment; filename="devices_{timestamp}.csv"'
     return response
 ```
-#### CSV出力内容
-デバイス一覧で選択されたレコードに紐づくデバイスマスタのレコードを出力する
 
 #### ログ出力タイミング
 DBクエリ実行の直前、直後に操作ログを出力する
@@ -1440,15 +1915,34 @@ DBクエリ実行の直前、直後に操作ログを出力する
 - Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
 
 **認可ロジック:**
-- システム保守者: すべてのデバイスを管理可能
-- 管理者: すべてのデバイスを管理可能
-- 販社ユーザ: 自社に紐づく、または自社の傘下組織のデバイスのみ管理可能
-- サービス利用者: 自社のデバイスのみ参照可能（登録・更新・削除不可）
+
+組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
+
+**処理内容:**
+- **全ユーザー共通**: 各リソース用VIEW（`v_organization_master_by_user` 等）に `user_id` を渡すことでスコープ制限を自動適用
+  - VIEWが内部で `organization_closure` を参照し、アクセス可能な組織配下のデータのみ返す
+  - **ロールによる条件分岐は一切行わない**
+
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
+
+**実装例:**
+```python
+# 使用例: デバイス一覧取得
+@admin_bp.route('/devices', methods=['GET'])
+@require_auth
+def list_devices():
+    # v_device_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
+    devices = db.session.query(DeviceMasterByUser).filter(
+        DeviceMasterByUser.user_id == g.current_user.user_id,
+        DeviceMasterByUser.delete_flag == False,
+    ).all()
+    return render_template('devices/list.html', devices=devices)
+```
 
 ### 入力検証
 
 **検証項目:**
-- device_id: 英数字とハイフンのみ、最大50文字、重複チェック
+- device_id: 英数字とハイフンのみ、最大128文字、重複チェック
 - device_name: 最大100文字、必須
 - device_type: 許可された値のみ（センサー、ゲートウェイ、その他）
 - mac_address: MACアドレス形式
