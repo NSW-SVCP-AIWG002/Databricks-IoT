@@ -27,6 +27,13 @@ from iot_app.services.customer_dashboard.common import check_gadget_access, get_
 
 logger = get_logger(__name__)
 
+from iot_app.common.messages import (
+    ERR_ACCESS_DENIED,
+    ERR_MEASUREMENT_NOT_FOUND,
+    err_fetch_failed,
+    err_not_found,
+    msg_created,
+)
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # noqa: E402
 
 
@@ -38,11 +45,11 @@ def handle_gadget_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
     gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
-        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+        return jsonify({'error': err_not_found('ガジェット')}), 404
 
     accessible_org_ids = get_accessible_org_ids(get_organization_id_by_user(g.current_user.user_id))
     if check_gadget_access(gadget_uuid, accessible_org_ids) is None:
-        return jsonify({'error': 'アクセス権限がありません'}), 404
+        return jsonify({'error': ERR_ACCESS_DENIED}), 404
 
     params = request.get_json() or {}
     display_unit = params.get('display_unit', 'hour')
@@ -68,7 +75,7 @@ def handle_gadget_data(gadget_uuid):
         if display_unit == 'hour':
             column_name = get_measurement_item_column_name(measurement_item_id)
             if column_name is None:
-                return jsonify({'error': '測定項目が見つかりません'}), 500
+                return jsonify({'error': ERR_MEASUREMENT_NOT_FOUND}), 500
 
         rows = fetch_bar_chart_data(
             device_id=device_id, display_unit=display_unit,
@@ -86,7 +93,7 @@ def handle_gadget_data(gadget_uuid):
     except Exception as e:
         g.last_exception_type = type(e).__name__
         logger.error(f'棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
-        return jsonify({'error': 'データの取得に失敗しました'}), 500
+        return jsonify({'error': err_fetch_failed('データ')}), 500
 
 
 def handle_gadget_create(gadget_type):
@@ -183,7 +190,7 @@ def handle_gadget_register(gadget_type):
             params=params,
             current_user_id=g.current_user.user_id,
         )
-        return jsonify({'message': 'ガジェットを登録しました'})
+        return jsonify({'message': msg_created('ガジェット')})
 
     except NotFoundError:
         abort(404)

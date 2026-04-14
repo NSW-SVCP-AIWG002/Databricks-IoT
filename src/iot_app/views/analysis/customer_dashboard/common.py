@@ -40,6 +40,17 @@ from iot_app.services.customer_dashboard.common import (
     update_group_title,
     upsert_dashboard_user_setting,
 )
+from iot_app.common.messages import (
+    ERR_ACCESS_DENIED,
+    ERR_GADGET_NOT_AVAILABLE,
+    err_fetch_failed,
+    err_not_found,
+    err_save_failed,
+    msg_created,
+    msg_deleted,
+    msg_saved,
+    msg_updated,
+)
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
 logger = get_logger(__name__)
@@ -236,7 +247,7 @@ def dashboard_register():
         upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
         logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
-        return jsonify({'message': 'ダッシュボードを登録しました'})
+        return jsonify({'message': msg_created('ダッシュボード')})
 
     except Exception as e:
         db.session.rollback()
@@ -305,7 +316,7 @@ def dashboard_update(dashboard_uuid):
     try:
         update_dashboard_title(dashboard, form.dashboard_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ダッシュボードタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -359,7 +370,7 @@ def dashboard_delete(dashboard_uuid):
     try:
         delete_dashboard_with_cascade(dashboard, accessible_org_ids, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードを削除しました'})
+        return jsonify({'message': msg_deleted('ダッシュボード')})
 
     except Exception as e:
         db.session.rollback()
@@ -432,7 +443,7 @@ def group_register():
         )
         db.session.commit()
         logger.info(f'グループ登録成功: dashboard_id={dashboard.dashboard_id}')
-        return jsonify({'message': 'ダッシュボードグループを登録しました'})
+        return jsonify({'message': msg_created('ダッシュボードグループ')})
 
     except Exception as e:
         db.session.rollback()
@@ -501,7 +512,7 @@ def group_update(dashboard_group_uuid):
     try:
         update_group_title(group, form.dashboard_group_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードグループタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ダッシュボードグループタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -555,7 +566,7 @@ def group_delete(dashboard_group_uuid):
     try:
         delete_group_with_cascade(group, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードグループを削除しました'})
+        return jsonify({'message': msg_deleted('ダッシュボードグループ')})
 
     except Exception as e:
         db.session.rollback()
@@ -587,7 +598,7 @@ def gadget_create(gadget_type):
     gadget_name = _SLUG_TO_NAME.get(gadget_type)
     if gadget_name is None:
         logger.info(f'未実装のガジェット種別が選択されました: gadget_type={gadget_type}')
-        return jsonify({'error': '追加予定のガジェットです'}), 404
+        return jsonify({'error': ERR_GADGET_NOT_AVAILABLE}), 404
     handler = _get_handler(gadget_name, 'handle_gadget_create')
     return handler(gadget_type)
 
@@ -669,7 +680,7 @@ def gadget_update(gadget_uuid):
     try:
         update_gadget_title(gadget, form.gadget_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ガジェットタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ガジェットタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -723,7 +734,7 @@ def gadget_delete(gadget_uuid):
     try:
         delete_gadget(gadget, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ガジェットを削除しました'})
+        return jsonify({'message': msg_deleted('ガジェット')})
 
     except Exception as e:
         db.session.rollback()
@@ -774,12 +785,12 @@ def layout_save():
         save_layout(gadgets, g.current_user.user_id)
         db.session.commit()
         logger.info(f'レイアウト保存成功: user_id={g.current_user.user_id}')
-        return jsonify({'message': 'レイアウトを保存しました'}), 200
+        return jsonify({'message': msg_saved('レイアウト')}), 200
 
     except Exception as e:
         db.session.rollback()
         logger.error(f'レイアウト保存エラー: {str(e)}')
-        return jsonify({'error': 'レイアウトの保存に失敗しました'}), 500
+        return jsonify({'error': err_save_failed('レイアウト')}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -806,7 +817,7 @@ def organization_devices(org_id):
 
     except Exception as e:
         logger.error(f'デバイス一覧取得エラー: {str(e)}')
-        return jsonify({'error': 'デバイス一覧の取得に失敗しました'}), 500
+        return jsonify({'error': err_fetch_failed('デバイス一覧')}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -832,4 +843,4 @@ def datasource_save():
     except Exception as e:
         db.session.rollback()
         logger.error(f'データソース設定保存エラー: {str(e)}')
-        return jsonify({'error': 'データソース設定の保存に失敗しました'}), 500
+        return jsonify({'error': err_save_failed('データソース設定')}), 500

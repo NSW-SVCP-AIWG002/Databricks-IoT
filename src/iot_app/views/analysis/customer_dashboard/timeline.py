@@ -28,6 +28,7 @@ from iot_app.services.customer_dashboard.timeline import (
     validate_chart_params,
 )
 from iot_app.services.customer_dashboard.common import get_organization_id_by_user
+from iot_app.common.messages import ERR_ACCESS_DENIED, err_fetch_failed, err_not_found, msg_created
 
 logger = get_logger(__name__)
 
@@ -46,11 +47,11 @@ def handle_gadget_data(gadget_uuid):
     # ① ガジェット設定取得
     gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
-        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+        return jsonify({'error': err_not_found('ガジェット')}), 404
 
     # データスコープ制限チェック
     if not check_gadget_access(gadget, accessible_org_ids):
-        return jsonify({'error': 'アクセス権限がありません'}), 404
+        return jsonify({'error': ERR_ACCESS_DENIED}), 404
 
     params = request.get_json() or {}
     start_datetime_str = params.get('start_datetime')
@@ -108,7 +109,7 @@ def handle_gadget_data(gadget_uuid):
         })
     except Exception as e:
         logger.error(f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}', exc_info=True)
-        return jsonify({'error': 'データの取得に失敗しました'}), 500
+        return jsonify({'error': err_fetch_failed('データ')}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ def handle_gadget_register(gadget_type):
     try:
         register_gadget(params, current_user_id=current_user_id)
         logger.info(f'時系列グラフガジェット登録成功: user_id={current_user_id}')
-        return jsonify({'message': 'ガジェットを登録しました'})
+        return jsonify({'message': msg_created('ガジェット')})
 
     except AppValidationError as e:
         db.session.rollback()
