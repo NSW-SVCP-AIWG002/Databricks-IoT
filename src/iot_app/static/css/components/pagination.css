@@ -20,7 +20,7 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-base);
   background-color: var(--color-white);
   color: var(--color-gray-700);
   cursor: pointer;

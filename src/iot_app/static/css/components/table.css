@@ -130,6 +130,11 @@
   background-color: var(--color-primary-hover);
 }
 
+/* モーダル・コンテナ内テーブル（min-width: 1200px を無効化） */
+.table--fit {
+  min-width: 0;
+}
+
 /* テキストの切り詰め */
 .table__truncate {
   max-width: 200px;

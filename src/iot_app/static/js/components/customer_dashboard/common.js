@@ -93,46 +93,8 @@ const CustomerDashboard = (function () {
     // 各ガジェット種別のバインド処理（各ガジェットJSが registerModalBinder で登録）
     _modalBinders.forEach(function (fn) { fn(container); });
 
-    // modal-form の AJAX 送信（common系モーダル共通）
-    const modalForm = container.querySelector('form.modal-form');
-    if (modalForm) {
-      modalForm.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const formData = new FormData(modalForm);
-        try {
-          const res = await fetch(modalForm.action, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          });
-          if (res.status >= 500) {
-            const html = await res.text();
-            document.documentElement.innerHTML = html;
-            return;
-          }
-          if (res.status === 400) {
-            // バリデーションエラー: モーダルHTML再描画
-            const html = await res.text();
-            const content = document.getElementById('ajax-modal-content');
-            content.innerHTML = html;
-            _bindModalEvents(content);
-            return;
-          }
-          if (!res.ok) {
-            const data = await res.json();
-            _closeModal();
-            Toast.show(data.error || 'エラーが発生しました', 'error');
-            return;
-          }
-          const data = await res.json();
-          _closeModal();
-          Toast.showAfterReload(data.message || '完了しました', 'success');
-          window.location.reload();
-        } catch (err) {
-          window.location.reload();
-        }
-      });
-    }
+    // modal-form の AJAX 送信（Modal.bindForm に委譲）
+    Modal.bindForm(container, { onClose: _closeModal, onRebind: _bindModalEvents });
   }
 
   /* =========================================================

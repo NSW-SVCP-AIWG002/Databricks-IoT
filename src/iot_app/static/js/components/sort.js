@@ -47,7 +47,7 @@ class TableSort {
 
     var self = this;
     var dir = this._state.dir;
-    var rows = Array.from(this.tbody.querySelectorAll('tr'));
+    var rows = Array.from(this._originalRows);
     rows.sort(function(a, b) {
       var aVal = self._getCellValue(a, colIndex);
       var bVal = self._getCellValue(b, colIndex);

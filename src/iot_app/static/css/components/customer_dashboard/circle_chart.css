@@ -82,15 +82,15 @@
 
 .circle-chart-register__device-mode-btn {
   padding: var(--spacing-1) var(--spacing-3);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
 }
 
 .circle-chart-register__device-mode-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -111,26 +111,25 @@
   min-width: 0;
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
 }
 
 .circle-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 0;
 }
 
 .circle-chart-register__measurement-list thead {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--color-white);
   z-index: 1;
 }
 
 .circle-chart-register__measurement-list th,
 .circle-chart-register__measurement-list td {
-  border: 1px solid #ddd;
+  border: var(--border-width) solid var(--color-border);
 }
 
 .circle-chart-register__measurement-list td:first-child {

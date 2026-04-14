@@ -24,7 +24,7 @@
   align-items: center;
   gap: var(--spacing-3);
   padding: var(--spacing-2) var(--spacing-4);
-  border-top: 1px solid #eee;
+  border-top: var(--border-width) solid var(--color-border);
   font-size: var(--font-size-sm);
 }
 
@@ -46,8 +46,8 @@
 
 .belt-chart__unit-btn {
   padding: 2px var(--spacing-2);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
   border-radius: 2px;
@@ -55,7 +55,7 @@
 
 .belt-chart__unit-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -160,15 +160,15 @@
 
 .belt-chart-register__device-mode-btn {
   padding: var(--spacing-1) var(--spacing-3);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
 }
 
 .belt-chart-register__device-mode-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -206,32 +206,31 @@
   min-width: 0;
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
 }
 
 .belt-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 0;
 }
 
 .belt-chart-register__measurement-list thead {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--color-white);
   z-index: 1;
 }
 
 .belt-chart-register__measurement-list th,
 .belt-chart-register__measurement-list td {
-  border: 1px solid #ddd;
+  border: var(--border-width) solid var(--color-border);
 }
 
 .belt-chart-register__measurement-list td:first-child {
   text-align: center;
 }
 
-.form__row--top {
+.form-row--top {
   align-items: flex-start;
 }

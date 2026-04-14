@@ -92,7 +92,7 @@
         <span class="nav__arrow">▼</span>
       </div>
       <div class="nav__submenu">
-        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('industry_dashboard.') %} nav__item--active{% endif %}"
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('analysis.') %} nav__item--active{% endif %}"
            href="/analysis/industry-dashboard/store-monitoring">店舗モニタリング</a>
         <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('customer_dashboard.') %} nav__item--active{% endif %}"
            href="/analysis/customer-dashboard">顧客作成ダッシュボード</a>
@@ -154,6 +154,7 @@
 <div id="toast-container"></div>
 
 <script src="{{ url_for('static', filename='js/components/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/modal.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/sort.js') }}"></script>
 {% block extra_js %}{% endblock %}

@@ -39,8 +39,8 @@
 }
 
 .chat-message__bubble--user {
-    background-color: #2272B4;
-    color: #fff;
+    background-color: var(--color-primary);
+    color: var(--color-white);
     padding: 12px 16px;
     border-radius: 16px 4px 16px 16px;
     max-width: 80%;
@@ -50,7 +50,7 @@
 
 .chat-message__meta {
     font-size: 12px;
-    color: #757575;
+    color: var(--color-secondary);
     margin-top: 4px;
 }
 
@@ -60,7 +60,7 @@
     display: inline;
     background: none;
     border: none;
-    color: #2272B4;
+    color: var(--color-primary);
     text-decoration: underline;
     font-size: 12px;
     cursor: pointer;
@@ -81,8 +81,8 @@
 }
 
 .chat-message__bubble--ai {
-    background-color: #F5F5F5;
-    color: #212121;
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-900);
     padding: 12px 16px;
     border-radius: 16px 16px 16px 4px;
     max-width: 80%;
@@ -95,16 +95,16 @@
 .chat-message__bubble--ai ul,
 .chat-message__bubble--ai ol { padding-left: 20px; margin: 4px 0; }
 .chat-message__bubble--ai code {
-    background: #e8e8e8;
+    background: var(--color-gray-200);
     padding: 2px 4px;
     border-radius: 3px;
     font-family: monospace;
     font-size: 13px;
 }
 .chat-message__bubble--ai pre {
-    background: #e8e8e8;
+    background: var(--color-gray-200);
     padding: 8px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-base);
     overflow-x: auto;
 }
 .chat-message__bubble--ai table {
@@ -114,7 +114,7 @@
 }
 .chat-message__bubble--ai th,
 .chat-message__bubble--ai td {
-    border: 1px solid #ccc;
+    border: var(--border-width) solid var(--color-border);
     padding: 4px 8px;
     text-align: left;
 }
@@ -136,15 +136,15 @@
 
 .chat-table th {
     background-color: #E3EEF8;
-    color: #2272B4;
+    color: var(--color-primary);
     font-weight: bold;
-    border: 1px solid #BDBDBD;
+    border: var(--border-width) solid var(--color-border);
     padding: 6px 12px;
     text-align: left;
 }
 
 .chat-table td {
-    border: 1px solid #E0E0E0;
+    border: var(--border-width) solid var(--color-border);
     padding: 5px 12px;
     text-align: left;
 }
@@ -166,7 +166,7 @@
 .hitl-view {
     background-color: #FFF9E6;
     border: 1px solid #FFD54F;
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     padding: 12px 16px;
     margin-top: 8px;
     max-width: 80%;
@@ -178,8 +178,8 @@
 }
 
 .hitl-view__preview {
-    background: #F5F5F5;
-    border-radius: 4px;
+    background: var(--color-gray-100);
+    border-radius: var(--border-radius-base);
     padding: 8px;
     font-size: 12px;
     font-family: monospace;
@@ -202,10 +202,10 @@
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    background-color: #F5F5F5;
+    background-color: var(--color-gray-100);
     border-radius: 16px 16px 16px 4px;
     max-width: 80%;
-    color: #757575;
+    color: var(--color-secondary);
 }
 
 .loading-indicator__icon {
@@ -221,9 +221,9 @@
 /* --- (4) 入力エリア --- */
 
 .input-area {
-    border-top: 1px solid #E0E0E0;
+    border-top: var(--border-width) solid var(--color-border);
     padding: 12px 16px;
-    background: #fff;
+    background: var(--color-white);
     flex-shrink: 0;
 }
 
@@ -248,14 +248,14 @@
     font-size: 14px;
     line-height: 1.5;
     padding: 8px 12px;
-    border: 1px solid #BDBDBD;
-    border-radius: 4px;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--border-radius-base);
     font-family: 'メイリオ', 'Meiryo', sans-serif;
 }
 
 .input-textarea:focus {
     outline: none;
-    border-color: #2272B4;
+    border-color: var(--color-primary);
     box-shadow: 0 0 0 2px rgba(34, 114, 180, 0.2);
 }
 
@@ -272,19 +272,19 @@
 
 .char-count {
     font-size: 12px;
-    color: #757575;
+    color: var(--color-secondary);
 }
 
 .char-count--warn {
-    color: #F44336;
+    color: var(--color-danger);
 }
 
 /* --- (5) フッター --- */
 
 .chat-footer {
-    border-top: 1px solid #E0E0E0;
+    border-top: var(--border-width) solid var(--color-border);
     padding: 10px 16px;
-    background: #fff;
+    background: var(--color-white);
     display: flex;
     justify-content: flex-start;
     flex-shrink: 0;
