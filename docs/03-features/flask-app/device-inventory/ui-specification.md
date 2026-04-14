@@ -401,13 +401,13 @@
 | (1.5)  | 削除ボタン             | delete_button                  | Button     | I   | -    | -      | -           | 固定値: 「削除」                                                                        | デンジャーボタン、チェックボックス未選択時は非活性 |
 | (2.1)  | デバイスUUID           | device_uuid_search             | Text       | I/O | -    | 128    | -           | -                                                                                       | 部分一致検索                                       |
 | (2.2)  | デバイス名             | device_name_search             | Text       | I/O | -    | 100    | -           | -                                                                                       | 部分一致検索                                       |
-| (2.3)  | デバイス種別           | device_type                    | Select     | I/O | -    | -      | すべて      | マスタ: device_type_master                                                              | ドロップダウン                                     |
-| (2.4)  | 在庫状況               | inventory_status               | Select     | I/O | -    | -      | すべて      | マスタ: inventory_status_master                                                         | ドロップダウン                                     |
+| (2.3)  | デバイス種別           | device_type                    | Select     | I/O | -    | -      | すべて      | マスタ: device_type_master                                                              | ドロップダウン、すべて選択時は `-1` をサーバーへ送信 |
+| (2.4)  | 在庫状況               | inventory_status               | Select     | I/O | -    | -      | すべて      | マスタ: inventory_status_master                                                         | ドロップダウン、すべて選択時は `-1` をサーバーへ送信 |
 | (2.5)  | 在庫場所               | inventory_location             | Text       | I/O | -    | 100    | -           | -                                                                                       | 部分一致検索                                       |
 | (2.6)  | 購入日（開始）         | purchase_date_from             | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
 | (2.7)  | 購入日（終了）         | purchase_date_to               | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (2.8)  | ソート項目             | sort_item_id                   | Select     | I/O | -    | -      | 0（未選択） | マスタ: sort_item_master（view_id=7）から取得。未選択時はsort_item_id=0をサーバーへ送信 | ドロップダウン                                     |
-| (2.9)  | ソート順               | sort_order                     | Select     | I/O | -    | -      | 未選択      | 固定値: 未選択/昇順/降順                                                                | ドロップダウン                                     |
+| (2.8)  | ソート項目             | sort_item_id                   | Select     | I/O | -    | -      | -1（未選択）| マスタ: sort_item_master（view_id=7）から取得。未選択時はsort_item_id=-1をサーバーへ送信 | ドロップダウン                                     |
+| (2.9)  | ソート順               | sort_order                     | Select     | I/O | -    | -      | -1（未選択）| 固定値: -1（未選択）/ 1（昇順）/ 2（降順）。未選択時は -1 をサーバーへ送信              | ドロップダウン                                     |
 | (2.10) | 検索ボタン             | search_button                  | Button     | I   | -    | -      | -           | 固定値: 「検索」                                                                        | プライマリボタン、中央揃え                         |
 | (3.1)  | チェックボックス       | select_checkbox                | Checkbox   | I   | -    | -      | -           | -                                                                                       | 削除対象選択用                                     |
 | (3.2)  | デバイス名             | device_name                    | Label      | O   | -    | 100    | -           | DB: device_master.device_name                                                           | ソート可                                           |
@@ -546,7 +546,7 @@
 - 概要: 検索結果のソート基準を選択
 - ラベル: 「ソート項目」
 - 選択肢: `sort_item_master`（view_id=7）から動的に取得
-  - 未選択（sort_item_id=0, デフォルト。デバイス在庫IDがソート項目になる）
+  - 未選択（sort_item_id=-1, デフォルト。デバイス在庫ID降順で表示）
   - クラウドに登録するデバイスID（sort_item_id=1）
   - デバイス名（sort_item_id=2）
   - デバイス種別（sort_item_id=3）
@@ -556,15 +556,15 @@
   - 購入日（sort_item_id=7）
   - 保証期限（sort_item_id=8）
   - 在庫場所（sort_item_id=9）
-- 未選択時はサーバーへ `sort_item_id=0` を送信する
+- 未選択時はサーバーへ `sort_item_id=-1` を送信する
 
 **2.9: ソート順ドロップダウン**
 - 概要: ソートの昇順・降順を選択
 - ラベル: 「ソート順」
 - 選択肢:
-  - 未選択 (デフォルト(降順がソート順になる))
-  - 昇順
-  - 降順
+  - `''`（未選択, デフォルト。sort_order=-1 をサーバーへ送信。デバイス在庫ID降順で表示）
+  - 昇順（sort_order=1）
+  - 降順（sort_order=2）
 
 **2.10: 検索ボタン**
 - 概要: 入力した条件で検索を実行

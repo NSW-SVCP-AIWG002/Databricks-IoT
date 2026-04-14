@@ -161,13 +161,13 @@ flowchart TD
 class DeviceInventorySearchForm(FlaskForm):
     device_uuid         = StringField('デバイスUUID')
     device_name         = StringField('デバイス名')
-    device_type         = SelectField('デバイス種別', coerce=str)
-    inventory_status    = SelectField('在庫状況', coerce=str)
+    device_type         = SelectField('デバイス種別', coerce=int)
+    inventory_status    = SelectField('在庫状況', coerce=int)
     inventory_location  = StringField('在庫場所')
     purchase_date_from  = DateField('購入日（From）', validators=[Optional()])
     purchase_date_to    = DateField('購入日（To）', validators=[Optional()])
     sort_item_id        = SelectField('ソート項目', coerce=int)
-    sort_order          = SelectField('ソート順', choices=[('asc', '昇順'), ('desc', '降順')])
+    sort_order          = SelectField('ソート順', choices=[(-1, ''), (1, '昇順'), (2, '降順')], coerce=int)
 ```
 
 ```python
@@ -186,13 +186,13 @@ def get_default_search_params() -> dict:
         'per_page': PER_PAGE,
         'device_uuid': '',
         'device_name': '',
-        'device_type': 'all',
-        'inventory_status': 'all',
+        'device_type': -1,
+        'inventory_status': -1,
         'inventory_location': '',
         'purchase_date_from': None,
         'purchase_date_to': None,
-        'sort_item_id': 0,
-        'sort_order': 'desc',
+        'sort_item_id': -1,
+        'sort_order': -1,
     }
 
 
@@ -253,9 +253,9 @@ def search_device_inventories(search_params: dict) -> tuple[list, int]:
         query = query.filter(DeviceMaster.device_uuid.like(f"%{search_params['device_uuid']}%"))
     if search_params.get('device_name'):
         query = query.filter(DeviceMaster.device_name.like(f"%{search_params['device_name']}%"))
-    if search_params.get('device_type') and search_params['device_type'] != 'all':
+    if search_params.get('device_type') and search_params['device_type'] != -1:
         query = query.filter(DeviceMaster.device_type_id == search_params['device_type'])
-    if search_params.get('inventory_status') and search_params['inventory_status'] != 'all':
+    if search_params.get('inventory_status') and search_params['inventory_status'] != -1:
         query = query.filter(DeviceInventoryMaster.inventory_status_id == search_params['inventory_status'])
     if search_params.get('inventory_location'):
         query = query.filter(DeviceInventoryMaster.inventory_location.like(f"%{search_params['inventory_location']}%"))
@@ -265,18 +265,24 @@ def search_device_inventories(search_params: dict) -> tuple[list, int]:
         query = query.filter(DeviceInventoryMaster.purchase_date <= search_params['purchase_date_to'])
 
     # ソート項目IDをカラム名にマッピング（sort_item_master テーブルで検証）
-    # sort_item_id=0（未選択）の場合は device_inventory_id をデフォルトとして使用
-    sort_item = SortItemMaster.query.filter_by(
-        view_id=DEVICE_INVENTORY_VIEW_ID, sort_item_id=sort_item_id, delete_flag=False
-    ).first()
-    sort_column     = sort_item.sort_item_name if sort_item else 'device_inventory_id'
-    order_direction = sort_order if sort_order in ['asc', 'desc'] else 'desc'
-    sort_model      = DeviceMaster if sort_column in _DEVICE_MASTER_SORT_COLUMNS else DeviceInventoryMaster
-    sort_attr       = getattr(sort_model, sort_column)
-    query = query.order_by(
-        sort_attr.desc() if order_direction == 'desc' else sort_attr.asc(),
-        DeviceInventoryMaster.device_inventory_id.asc(),  # セカンダリソートキー（ページング時の並び順を一定に保つ）
-    )
+    # sort_item_id=-1 または sort_order=-1（未選択）の場合はデフォルトソート: device_inventory_id DESC
+    if sort_item_id != -1 and sort_order != -1:
+        sort_item = SortItemMaster.query.filter_by(
+            view_id=DEVICE_INVENTORY_VIEW_ID, sort_item_id=sort_item_id, delete_flag=False
+        ).first()
+        if sort_item:
+            sort_column     = sort_item.sort_item_name
+            order_direction = 'asc' if sort_order == 1 else 'desc'  # 1: 昇順, 2: 降順
+            sort_model      = DeviceMaster if sort_column in _DEVICE_MASTER_SORT_COLUMNS else DeviceInventoryMaster
+            sort_attr       = getattr(sort_model, sort_column)
+            query = query.order_by(
+                sort_attr.desc() if order_direction == 'desc' else sort_attr.asc(),
+                DeviceInventoryMaster.device_inventory_id.asc(),  # セカンダリソートキー（ページング時の並び順を一定に保つ）
+            )
+        else:
+            query = query.order_by(DeviceInventoryMaster.device_inventory_id.desc())
+    else:
+        query = query.order_by(DeviceInventoryMaster.device_inventory_id.desc())
 
     total       = query.count()
 
@@ -331,13 +337,9 @@ def list_device_inventory():
 
 #### エラーハンドリング
 
-| HTTPステータス | エラー種別         | 処理内容                   | 表示内容                           |
-| -------------- | ------------------ | -------------------------- | ---------------------------------- |
-| 401            | 認証エラー         | ログイン画面へリダイレクト | -                                  |
-| 403            | 権限エラー         | 403エラーモーダル表示      | この操作を実行する権限がありません |
-| 500            | データベースエラー | 500エラーモーダル表示      | データの取得に失敗しました         |
+エラーハンドリングは [共通仕様書 §4 エラーハンドリング](../../common/common-specification.md#4-エラーハンドリング) に従う。
 
-500エラー発生時のエラー通知については、共通仕様書参照。
+500エラー時の表示内容: データの取得に失敗しました
 
 ---
 
@@ -425,13 +427,13 @@ def search_device_inventory():
         'per_page': PER_PAGE,
         'device_uuid':        form.device_uuid.data or '',
         'device_name':        form.device_name.data or '',
-        'device_type':        form.device_type.data or 'all',
-        'inventory_status':   form.inventory_status.data or 'all',
+        'device_type':        form.device_type.data if form.device_type.data is not None else -1,
+        'inventory_status':   form.inventory_status.data if form.inventory_status.data is not None else -1,
         'inventory_location': form.inventory_location.data or '',
         'purchase_date_from': form.purchase_date_from.data,
         'purchase_date_to':   form.purchase_date_to.data,
-        'sort_item_id':       form.sort_item_id.data or 0,
-        'sort_order':         form.sort_order.data or 'desc',
+        'sort_item_id':       form.sort_item_id.data if form.sort_item_id.data is not None else -1,
+        'sort_order':         form.sort_order.data if form.sort_order.data is not None else -1,
     }
 
     try:
@@ -495,19 +497,19 @@ def search_device_inventory():
 | 7       | 9            | inventory_location             | 9          | FALSE       | 在庫場所                               |
 
 **注意事項:**
-- `sort_item_id=0`（デバイス在庫ID）は未選択時のデフォルトソート項目
-- 未選択時（sort_item_id=0）はフロントエンドからサーバーへ `sort_item_id=0` を送信する
+- `sort_item_id=-1` または `sort_order=-1` の場合はデフォルトソート: `device_inventory_id DESC`
+- 未選択時（sort_item_id=-1）はフロントエンドからサーバーへ `sort_item_id=-1` を送信する
 - 昇順/降順の情報はテーブルに保持しない
-- 現在のソート状態（昇順/降順）はフロントエンドで管理し、リクエストパラメータ `sort_order` (asc/desc) で送信される
+- 現在のソート状態はフロントエンドで管理し、リクエストパラメータ `sort_order` の値は `1`（昇順）/ `2`（降順）/ `-1`（未選択）で送信される
 - 第2ソートキーとして常に `device_inventory_id ASC` を使用し、ページング時の並び順を一定に保つ
 - `device_uuid`・`device_name`・`device_type_id`・`sim_id` は `device_master`、それ以外は `device_inventory_master` のカラムを参照する
 
 ```
-# デバイス名でソート（昇順） - 項目ID: 2
-GET /admin/device-inventory?sort_item_id=2&sort_order=asc&page=1
+# デバイス名でソート（昇順） - 項目ID: 2, sort_order: 1
+GET /admin/device-inventory?sort_item_id=2&sort_order=1&page=1
 
-# 未選択（デバイス在庫IDデフォルト降順） - 項目ID: 0
-GET /admin/device-inventory?sort_item_id=0&sort_order=desc&page=1
+# 未選択（ソートなし） - 項目ID: -1, sort_order: -1
+GET /admin/device-inventory?sort_item_id=-1&sort_order=-1&page=1
 ```
 
 ---
@@ -1583,21 +1585,13 @@ device_inventory_master (dim)
 
 ## トランザクション管理
 
-### 登録・更新・削除処理
+トランザクション管理の共通方針は [共通仕様書 §10 トランザクション管理](../../common/common-specification.md#10-トランザクション管理) に従う。
 
-**トランザクション開始:**
-- ワークフロー: デバイス台帳登録、更新、削除
-- 開始タイミング: バリデーション完了後、DB操作開始前
-- 開始条件: フォームバリデーションが成功
+### 本機能のトランザクション対象ワークフロー
 
-**トランザクション終了（コミット）:**
-- 終了タイミング: すべてのDB操作完了後
-- 終了条件: INSERT/UPDATE操作が成功
-
-**トランザクション終了（ロールバック）:**
-- ロールバックタイミング: DB操作失敗時
-- ロールバック対象: 該当トランザクション内のすべての変更
-- ロールバック条件: IntegrityError、その他の例外発生時
+- デバイス台帳登録
+- デバイス台帳更新
+- デバイス台帳削除
 
 ---
 
@@ -1605,8 +1599,7 @@ device_inventory_master (dim)
 
 ### 認証・認可実装
 
-**認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`, `X-Forwarded-Email`）
+認証方式の詳細は [認証仕様書](../../common/authentication-specification.md) を参照。
 
 **認可ロジック:**
 - `system_admin` ロールのみアクセス可能
@@ -1646,9 +1639,8 @@ device_inventory_master (dim)
 - 登録処理でユニーク制約違反が発生した場合、トランザクションをロールバックし、500エラーモーダルを表示する
 
 **セキュリティ対策:**
-- SQLインジェクション対策: SQLAlchemy ORM使用
-- XSS対策: Jinja2自動エスケープ
-- CSRF対策: Flask-WTF CSRF保護
+
+[共通仕様書 §8 セキュリティ](../../common/common-specification.md#8-セキュリティ) に従う。
 
 **■ device_uuidバリデーション実装例:**
 
@@ -1707,17 +1699,11 @@ def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
 
 ### ログ出力ルール
 
-**出力する情報:**
-- リクエストID
-- ユーザーID（操作者）
-- 操作種別（登録、更新、削除）
-- 対象リソースID（device_inventory_id）
-- 処理結果（成功/失敗）
-- 在庫状況変更時: 変更前後の値
+共通ログ出力方針は [共通仕様書 §11 ログ出力ポリシー](../../common/common-specification.md#11-ログ出力ポリシー) に従う。
 
-**出力しない情報:**
-- 認証トークン
-- 個人情報（デバイスID以外の詳細）→ IDのみ記録
+**本機能固有の出力項目:**
+- 対象リソースID（device_inventory_id）
+- 在庫状況変更時: 変更前後の値
 
 ---
 
