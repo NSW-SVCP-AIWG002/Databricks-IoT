@@ -108,10 +108,13 @@ def update_datasource_setting(user_id, organization_id, device_id, modifier):
 # ---------------------------------------------------------------------------
 
 def get_dashboard_by_id(dashboard_id):
-    """dashboard_idでダッシュボードを取得する"""
+    """dashboard_idでダッシュボードを取得する（論理削除済みは除外）"""
     return (
         db.session.query(DashboardMaster)
-        .filter(DashboardMaster.dashboard_id == dashboard_id)
+        .filter(
+            DashboardMaster.dashboard_id == dashboard_id,
+            DashboardMaster.delete_flag == False,
+        )
         .first()
     )
 

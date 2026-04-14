@@ -28,7 +28,7 @@ def validate_chart_params(start_datetime_str, end_datetime_str):
         end_datetime_str (str): 終了日時文字列（YYYY/MM/DD HH:mm:ss）
 
     Returns:
-        bool: 両パラメータが有効な形式かつ end >= start の場合 True
+        bool: 両パラメータが有効な形式かつ end > start の場合 True
     """
     if not start_datetime_str or not end_datetime_str:
         return False
@@ -40,8 +40,8 @@ def validate_chart_params(start_datetime_str, end_datetime_str):
     except (ValueError, TypeError):
         return False
 
-    # 終了日時は開始日時以降（以降 = >= なので同一日時も有効）
-    if end < start:
+    # 終了日時は開始日時より後（設計書: 開始日時 < 終了日時、等値は不可）
+    if end <= start:
         return False
 
     # 日時範囲の上限は24時間以内
@@ -127,7 +127,7 @@ def execute_silver_query(device_id, start_datetime, end_datetime, limit=1000, of
         _device = db.session.query(DeviceMaster).filter_by(device_id=device_id, delete_flag=False).first()
         _MOCK_DEVICE_NAME = _device.device_name if _device else '--'
         from datetime import timedelta
-        _TOTAL = 250
+        _TOTAL = 51
         _INTERVAL = timedelta(minutes=10)
         # end_datetime から遡る形で生成し昇順に並べ替える
         all_rows = []
@@ -226,7 +226,7 @@ def count_grid_data(device_id, start_datetime, end_datetime):
     # UC接続確認後（開発環境でも Unity Catalog に疎通できる状態になったら）以下ブロックごと削除すること
     import os
     if os.environ.get('FLASK_ENV') == 'development':
-        return 250
+        return 51
     # ── /開発用モック ──────────────────────────────────────────────────────
 
     from iot_app.databricks.unity_catalog_connector import UnityCatalogConnector

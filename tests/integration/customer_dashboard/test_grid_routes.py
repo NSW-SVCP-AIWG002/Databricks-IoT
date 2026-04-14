@@ -793,6 +793,67 @@ class TestGadgetGridData:
         # Assert
         assert response.status_code == 500
 
+    def test_data_range_exactly_24hours_returns_200(self, client, grid_gadget, mocker):
+        """3.8.8: 終了日時 - 開始日時 = ちょうど24時間は正常（境界値OK）
+
+        設計書バリデーション: 「終了日時 - 開始日時 ≤ 24時間」
+        ちょうど24時間は ≤ に含まれるため 200 を返す。
+        """
+        # Arrange
+        mocker.patch(_SILVER_QUERY, return_value=[])
+        mocker.patch(_COUNT_QUERY, return_value=0)
+
+        # Act
+        response = client.post(
+            self._url(grid_gadget.gadget_uuid),
+            json=self._valid_payload(
+                start_datetime='2026/03/06 00:00:00',
+                end_datetime='2026/03/07 00:00:00',  # ちょうど24時間
+            ),
+        )
+
+        # Assert
+        assert response.status_code == 200
+
+    def test_data_start_equals_end_datetime_returns_400(self, client, grid_gadget):
+        """3.8.4: 開始日時 == 終了日時で400エラー
+
+        設計書バリデーションルール: 「開始日時 < 終了日時」（等値は不可）
+        """
+        # Act
+        response = client.post(
+            self._url(grid_gadget.gadget_uuid),
+            json=self._valid_payload(
+                start_datetime=_VALID_START_DATETIME,
+                end_datetime=_VALID_START_DATETIME,  # 等値
+            ),
+        )
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_data_no_device_selected_returns_empty_grid_data(self, client, grid_gadget, mocker):
+        """4.2.7: デバイス未選択時（device_id=0）はセンサーデータなしで空の grid_data を返す
+
+        dashboard_user_setting.device_id=0 の場合、Unity Catalog クエリは device_id=None
+        で呼ばれ、データなしの正常レスポンスを返す。
+        """
+        # Arrange: device_id=None でクエリが呼ばれる想定（device 未選択）
+        mocker.patch(_SILVER_QUERY, return_value=[])
+        mocker.patch(_COUNT_QUERY, return_value=0)
+
+        # Act
+        response = client.post(
+            self._url(grid_gadget.gadget_uuid),
+            json=self._valid_payload(),
+        )
+
+        # Assert: 200 かつ空の grid_data
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body['grid_data'] == []
+        assert body['total_count'] == 0
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. ガジェット登録モーダル表示
@@ -857,6 +918,47 @@ class TestGadgetGridCreate:
         db_session.add(setting)
         db_session.flush()
         db_session.execute(_text('SET FOREIGN_KEY_CHECKS=1'))
+
+        # Act
+        response = client.get(self._URL)
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_create_modal_deleted_dashboard_master_returns_404(self, client, db_session):
+        """2.2.4: delete_flag=True の DashboardMaster は取得されず 404 になる
+
+        ワークフロー仕様書SQL: WHERE delete_flag = FALSE
+        DashboardUserSetting は存在するが、参照先の DashboardMaster が論理削除済みの場合、
+        get_dashboard_by_id が None を返し abort(404) となることを検証する。
+        """
+        # Arrange: 論理削除済み DashboardMaster + それを参照する DashboardUserSetting を作成
+        from iot_app.models.customer_dashboard import DashboardMaster, DashboardUserSetting
+        from iot_app.models.organization import OrganizationClosure, OrganizationMaster
+
+        deleted_dm = DashboardMaster(
+            dashboard_id=1,
+            dashboard_uuid=str(uuid.uuid4()),
+            dashboard_name='削除済みダッシュボード',
+            organization_id=_TEST_ORG_ID,
+            creator=1,
+            modifier=1,
+            delete_flag=True,  # 論理削除済み
+        )
+        db_session.add(deleted_dm)
+        db_session.flush()
+
+        setting = DashboardUserSetting(
+            user_id=_TEST_USER_ID,
+            dashboard_id=1,
+            organization_id=_TEST_ORG_ID,
+            device_id=0,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(setting)
+        db_session.flush()
 
         # Act
         response = client.get(self._URL)
@@ -964,6 +1066,66 @@ class TestGadgetGridCreate:
 
         # Assert: グループが存在しなくてもモーダルは正常表示される
         assert response.status_code == 200
+
+    def test_create_modal_has_default_title(
+        self, client, dashboard_user_setting, dashboard_master,
+    ):
+        """① タイトル入力欄の初期値が「表」であること
+
+        UI仕様書: タイトル 初期値: 「表」
+        登録モーダルのHTMLに value="表" または「表」がデフォルト表示されることを確認する。
+        """
+        # Act
+        response = client.get(self._URL)
+
+        # Assert
+        assert response.status_code == 200
+        text = response.data.decode('utf-8')
+        assert '表' in text
+
+    def test_create_modal_deleted_groups_excluded(
+        self, client, db_session, dashboard_user_setting, dashboard_master,
+    ):
+        """③ delete_flag=True の DashboardGroupMaster は取得されず HTML に表示されない
+
+        ワークフロー仕様書SQL: WHERE delete_flag = FALSE
+        論理削除済みグループは選択肢から除外される。
+        """
+        from iot_app.models.customer_dashboard import DashboardGroupMaster
+
+        # Arrange: 有効グループ1件 + 削除済みグループ1件
+        active_grp = DashboardGroupMaster(
+            dashboard_group_id=1,
+            dashboard_group_uuid=str(uuid.uuid4()),
+            dashboard_id=dashboard_master.dashboard_id,
+            dashboard_group_name='有効グループ',
+            display_order=1,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        deleted_grp = DashboardGroupMaster(
+            dashboard_group_id=2,
+            dashboard_group_uuid=str(uuid.uuid4()),
+            dashboard_id=dashboard_master.dashboard_id,
+            dashboard_group_name='削除済みグループ',
+            display_order=2,
+            creator=1,
+            modifier=1,
+            delete_flag=True,
+        )
+        db_session.add(active_grp)
+        db_session.add(deleted_grp)
+        db_session.flush()
+
+        # Act
+        response = client.get(self._URL)
+
+        # Assert: 有効グループは存在、削除済みグループは非表示
+        assert response.status_code == 200
+        text = response.data.decode('utf-8')
+        assert '有効グループ' in text
+        assert '削除済みグループ' not in text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1411,6 +1573,18 @@ class TestGadgetGridRegister:
         # Assert
         assert any('表ガジェット登録エラー' in r.message for r in caplog.records)
 
+    def test_register_gadget_size_invalid_returns_400(self, client, measurement_item):
+        """3.1.4: gadget_size に無効値（選択肢外）を送ると400エラー
+
+        UI仕様書: 選択肢は '0'(2x2) / '1'(2x4) のみ。
+        それ以外の値はフォームバリデーションで弾かれる。
+        """
+        # Act
+        response = client.post(self._URL, data=self._valid_form(gadget_size='2'))
+
+        # Assert
+        assert response.status_code == 400
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. CSVエクスポート
@@ -1505,6 +1679,22 @@ class TestGadgetGridCsvExport:
 
         # Act
         response = client.get(self._url(nonexistent_uuid))
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_csv_export_deleted_gadget_returns_404(self, client, grid_gadget, db_session):
+        """2.2.4: delete_flag=True の論理削除済みガジェットへのCSVエクスポートは404
+
+        データAPI（test_data_deleted_gadget_returns_404）と同様に、
+        CSVエクスポートでも論理削除済みガジェットへのアクセスは404になることを検証する。
+        """
+        # Arrange: ガジェットを論理削除
+        grid_gadget.delete_flag = True
+        db_session.flush()
+
+        # Act
+        response = client.get(self._url(grid_gadget.gadget_uuid))
 
         # Assert
         assert response.status_code == 404
@@ -1685,6 +1875,124 @@ class TestGadgetGridCsvExport:
         assert mock_silver.call_args.kwargs.get('limit') == 100_000
         assert mock_silver.call_args.kwargs.get('offset') == 0
 
+    def test_csv_export_missing_start_datetime_returns_400(self, client, grid_gadget):
+        """3.1.5: start_datetime 未指定で400エラー
+
+        設計書バリデーション: 開始日時は必須（日付形式チェック）。
+        """
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':       'csv',
+            'end_datetime': _VALID_END_DATETIME,
+            # start_datetime を省略
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_csv_export_missing_end_datetime_returns_400(self, client, grid_gadget):
+        """3.1.6: end_datetime 未指定で400エラー
+
+        設計書バリデーション: 終了日時は必須（日付形式チェック）。
+        """
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':         'csv',
+            'start_datetime': _VALID_START_DATETIME,
+            # end_datetime を省略
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_csv_export_start_equals_end_datetime_returns_400(self, client, grid_gadget):
+        """3.8.5: 開始日時 == 終了日時で400エラー
+
+        設計書バリデーションルール: 「開始日時 < 終了日時」（等値は不可）
+        """
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':         'csv',
+            'start_datetime': _VALID_START_DATETIME,
+            'end_datetime':   _VALID_START_DATETIME,  # 等値
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_csv_export_invalid_export_param_returns_404(self, client, grid_gadget):
+        """2.2.3: export パラメータが 'csv' 以外（例: 'json'）の場合 404
+
+        ワークフロー仕様書実装例: if request.args.get('export') != 'csv': abort(404)
+        """
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':         'json',   # csv 以外
+            'start_datetime': _VALID_START_DATETIME,
+            'end_datetime':   _VALID_END_DATETIME,
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_csv_export_start_after_end_datetime_returns_400(self, client, grid_gadget):
+        """3.8.9: 開始日時 > 終了日時で400エラー
+
+        設計書バリデーションルール: 「開始日時 < 終了日時」
+        DataAPI と同様に CSV エクスポートでも逆転はバリデーションエラー。
+        """
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':         'csv',
+            'start_datetime': _VALID_END_DATETIME,    # 終了日時を開始に
+            'end_datetime':   _VALID_START_DATETIME,  # 開始日時を終了に（逆転）
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_csv_export_response_has_bom(self, client, grid_gadget, measurement_item, mocker):
+        """4.6.9: CSVレスポンスの先頭に UTF-8 BOM（\\xef\\xbb\\xbf）が付与される
+
+        Excelでの文字化けを防ぐためにBOM付きUTF-8で出力する。
+        レスポンスバイト列の先頭3バイトが BOM であることを確認する。
+        """
+        # Arrange
+        mocker.patch(_SILVER_QUERY, return_value=[])
+
+        # Act
+        response = client.get(self._url(grid_gadget.gadget_uuid))
+
+        # Assert
+        assert response.status_code == 200
+        assert response.data[:3] == b'\xef\xbb\xbf', "CSVレスポンスの先頭にBOMがない"
+
+    def test_csv_export_range_exactly_24hours_returns_200(self, client, grid_gadget, measurement_item, mocker):
+        """3.8.10: 終了日時 - 開始日時 = ちょうど24時間は正常（境界値OK）
+
+        設計書バリデーション: 「終了日時 - 開始日時 ≤ 24時間」
+        DataAPI と同様に CSV エクスポートでもちょうど24時間は ≤ に含まれるため 200 を返す。
+        """
+        # Arrange
+        mocker.patch(_SILVER_QUERY, return_value=[])
+
+        # Act
+        from urllib.parse import urlencode
+        params = urlencode({
+            'export':         'csv',
+            'start_datetime': '2026/03/06 00:00:00',
+            'end_datetime':   '2026/03/07 00:00:00',  # ちょうど24時間
+        })
+        response = client.get(f"{BASE_URL}/gadgets/{grid_gadget.gadget_uuid}?{params}")
+
+        # Assert
+        assert response.status_code == 200
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. 登録モーダル プレビューデータ取得（AJAX）
@@ -1778,3 +2086,90 @@ class TestGadgetGridPreviewData:
 
         # Assert
         assert response.status_code == 500
+
+    def test_preview_start_after_end_datetime_returns_400(self, client, measurement_item):
+        """3.8.6: 開始日時 > 終了日時で400エラー
+
+        設計書バリデーションルール: 「開始日時 < 終了日時」
+        """
+        # Act
+        response = client.post(self._URL, json=self._valid_payload(
+            start_datetime=_VALID_END_DATETIME,
+            end_datetime=_VALID_START_DATETIME,
+        ))
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_preview_start_equals_end_datetime_returns_400(self, client, measurement_item):
+        """3.8.7: 開始日時 == 終了日時で400エラー
+
+        設計書バリデーションルール: 「開始日時 < 終了日時」（等値は不可）
+        """
+        # Act
+        response = client.post(self._URL, json=self._valid_payload(
+            start_datetime=_VALID_START_DATETIME,
+            end_datetime=_VALID_START_DATETIME,  # 等値
+        ))
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_preview_missing_start_datetime_returns_400(self, client, measurement_item):
+        """3.1.7: start_datetime 未指定で400エラー
+
+        設計書バリデーション: 開始日時は必須（日付形式チェック）。
+        """
+        # Act
+        response = client.post(self._URL, json={'end_datetime': _VALID_END_DATETIME})
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_preview_missing_end_datetime_returns_400(self, client, measurement_item):
+        """3.1.8: end_datetime 未指定で400エラー
+
+        設計書バリデーション: 終了日時は必須（日付形式チェック）。
+        """
+        # Act
+        response = client.post(self._URL, json={'start_datetime': _VALID_START_DATETIME})
+
+        # Assert
+        assert response.status_code == 400
+
+    def test_preview_response_does_not_contain_gadget_uuid(self, client, measurement_item, mocker):
+        """4.2.8: プレビューレスポンスに gadget_uuid が含まれない
+
+        プレビューは登録前のため gadget_uuid が存在しない。
+        ガジェットデータ取得API（登録済み）のレスポンスとは異なる。
+        """
+        # Arrange
+        mocker.patch(_SILVER_QUERY, return_value=[])
+        mocker.patch(_COUNT_QUERY, return_value=0)
+
+        # Act
+        response = client.post(self._URL, json=self._valid_payload())
+
+        # Assert
+        assert response.status_code == 200
+        body = response.get_json()
+        assert 'gadget_uuid' not in body
+
+    def test_preview_range_exactly_24hours_returns_200(self, client, measurement_item, mocker):
+        """3.8.11: 終了日時 - 開始日時 = ちょうど24時間は正常（境界値OK）
+
+        設計書バリデーション: 「終了日時 - 開始日時 ≤ 24時間」
+        DataAPI と同様にプレビューでもちょうど24時間は ≤ に含まれるため 200 を返す。
+        """
+        # Arrange
+        mocker.patch(_SILVER_QUERY, return_value=[])
+        mocker.patch(_COUNT_QUERY, return_value=0)
+
+        # Act
+        response = client.post(self._URL, json=self._valid_payload(
+            start_datetime='2026/03/06 00:00:00',
+            end_datetime='2026/03/07 00:00:00',  # ちょうど24時間
+        ))
+
+        # Assert
+        assert response.status_code == 200
