@@ -869,35 +869,36 @@ flowchart TD
     CheckScope --> |OK| InsertDBMstr[OLTP DB<br>organization_master<br>組織登録]
 
     InsertDBMstr --> CheckInsertDBMstr{DB操作結果}
-    CheckInsertDBMstr -->|成功| InsertUCMstr[UnitiyCatalog<br>organization_master<br>組織登録]
+    CheckInsertDBMstr -->|成功| InsertDBClosure[OLTP DB<br>organization_closure<br>組織登録]
     CheckInsertDBMstr -->|失敗| Error500
 
-    InsertUCMstr --> CheckInsertUCMstr{UnitiyCatalog<br>操作結果}
-    CheckInsertUCMstr -->|成功| InsertUCClosure[UnitiyCatalog<br>organization_closure<br>組織登録]
-    CheckInsertUCMstr -->|失敗| RollbackDBMstr[ロールバック<br>OLTP DB.<br>organization_master]
+    InsertDBClosure --> CheckInsertDBClosure{DB操作結果}
+    CheckInsertDBClosure -->|成功| DBCommit[OLTP DB Commit]
+    CheckInsertDBClosure -->|失敗| RollbackDBMstr[ロールバック<br>OLTP DB.<br>organization_master]
 
     RollbackDBMstr --> Error500
 
+    DBCommit --> InsertUCMstr[UnitiyCatalog<br>organization_master<br>組織登録]
+    InsertUCMstr --> CheckInsertUCMstr{UnitiyCatalog<br>操作結果}
+    CheckInsertUCMstr -->|成功| InsertUCClosure[UnitiyCatalog<br>organization_closure<br>組織登録]
+    CheckInsertUCMstr -->|失敗| DeleteDB[作成したレコードを物理削除<br>OLTP DB]
+
+    DeleteDB --> Error500
+
     InsertUCClosure --> CheckInsertUCClosure{UnitiyCatalog<br>操作結果}
-    CheckInsertUCClosure -->|成功| InsertDBClosure[OLTP DB<br>organization_closure<br>組織登録]
-    CheckInsertUCClosure -->|失敗| RollbackUCMstr[ロールバック<br>UnitiyCatalog.<br>organization_master]
+    CheckInsertUCClosure -->|成功| Toast[トーストメッセージ設定<br>組織情報を登録しました]
+    CheckInsertUCClosure -->|失敗| DeleteUCMstr[作成したレコードを物理削除<br>UnitiyCatalog.<br>organization_master]
 
-    RollbackUCMstr --> RollbackDBMstr
+    DeleteUCMstr --> DeleteDB
 
-    InsertDBClosure --> CheckInsertDBClosure{DB操作結果}
-    CheckInsertDBClosure -->|成功| Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
-    CheckInsertDBClosure -->|失敗| RollbackUCClosure[ロールバック<br>UnitiyCatalog.<br>organization_closure]
-
-    RollbackUCClosure --> RollbackUCMstr
-
-    Redirect --> Success[成功メッセージトースト表示]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
 
     LoginRedirect --> End([処理完了])
     Error400 --> End
     Error403 --> End
     Error404 --> End
     Error500 --> End
-    Success --> End
+    Redirect --> End
 ```
 
 ※1　403エラー発生時、登録モーダルを閉じる。
@@ -968,6 +969,7 @@ def check_organization_id_scope(user_id: int, organization_id: int) -> bool:
         delete_flag=False,
     ).first() is not None
 
+
 def _insert_unity_catalog_organization(organization_id: int, organization_uuid: str, organization_data: dict, creator_id: int) -> None:
     """UC organization_master に新規レコードを INSERT する"""
     uc = UnityCatalogConnector()
@@ -996,11 +998,12 @@ def _insert_unity_catalog_organization(organization_id: int, organization_uuid: 
             'contract_status_id':    organization_data['contract_status_id'],
             'contract_start_date':   organization_data['contract_start_date'],
             'contract_end_date':     organization_data['contract_end_date'],
-            'organization_uuid':   organization_uuid,
+            'organization_uuid':     organization_uuid,
             'creator_id':            creator_id,
         },
         operation="UC organization_master INSERT",
     )
+
 
 def _insert_unity_catalog_organization_closure(organization_id: int, affiliated_organization_id: int) -> None:
     """UC organization_closure に新規レコードを INSERT する"""
@@ -1043,22 +1046,40 @@ def _insert_unity_catalog_organization_closure(organization_id: int, affiliated_
 
 
 def _rollback_create_organization(organization_id: int | None) -> None:
-    """UC への INSERT を逆順で削除する補償トランザクション（ベストエフォート）"""
+    """UC と OLTP DB の INSERT を逆順で削除する補償トランザクション（ベストエフォート）"""
+    if organization_id is None:
+        return
+
+    # UC ロールバック（UC organization_closure → UC organization_master の順）
     try:
-        if organization_id is not None:
-            uc = UnityCatalogConnector()
-            uc.execute_dml(
-                "DELETE FROM iot_catalog.oltp_db.organization_closure WHERE parent_organization_id = :id OR subsidiary_organization_id = :id",
-                {'id': organization_id},
-                operation="UC organization_closure 登録ロールバック",
-            )
-            uc.execute_dml(
-                "DELETE FROM iot_catalog.oltp_db.organization_master WHERE organization_id = :organization_id",
-                {'organization_id': organization_id},
-                operation="UC organization_master 登録ロールバック",
-            )
+        uc = UnityCatalogConnector()
+        uc.execute_dml(
+            "DELETE FROM iot_catalog.oltp_db.organization_closure WHERE parent_organization_id = :id OR subsidiary_organization_id = :id",
+            {'id': organization_id},
+            operation="UC organization_closure 登録ロールバック",
+        )
+        uc.execute_dml(
+            "DELETE FROM iot_catalog.oltp_db.organization_master WHERE organization_id = :organization_id",
+            {'organization_id': organization_id},
+            operation="UC organization_master 登録ロールバック",
+        )
     except Exception:
-        logger.error("組織登録ロールバック失敗", exc_info=True)
+        logger.error("UC 組織登録ロールバック失敗", exc_info=True)
+
+    # OLTP DB ロールバック（物理削除）
+    try:
+        db.session.execute(
+            text("DELETE FROM organization_closure WHERE parent_organization_id = :id OR subsidiary_organization_id = :id"),
+            {'id': organization_id},
+        )
+        db.session.execute(
+            text("DELETE FROM organization_master WHERE organization_id = :organization_id"),
+            {'organization_id': organization_id},
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error("OLTP DB 組織登録ロールバック失敗", exc_info=True)
 
 
 def create_organization(organization_data: dict, creator_id: int) -> None:
@@ -1077,6 +1098,7 @@ def create_organization(organization_data: dict, creator_id: int) -> None:
     organization_id = None
     organization_uuid = str(uuid.uuid4())
 
+    # === OLTP DB フェーズ ===
     try:
         # ① OLTP DB organization_master INSERT
         organization = Organization(
@@ -1097,14 +1119,8 @@ def create_organization(organization_data: dict, creator_id: int) -> None:
         db.session.flush()
         organization_id = organization.organization_id
 
-        # ② Unity Catalog organization_master INSERT
-        _insert_unity_catalog_organization(organization_id, organization_uuid, organization_data, creator_id)
-
-        # ③ Unity Catalog organization_closure INSERT
-        _insert_unity_catalog_organization_closure(organization_id, organization_data['affiliated_organization_id'])
-
-        # ④ OLTP DB organization_closure INSERT
-        # ④-1 自己参照レコードを INSERT する
+        # ② OLTP DB organization_closure INSERT
+        # ②-1 自己参照レコードを INSERT する
         db.session.execute(
             text("""
                 INSERT INTO organization_closure (
@@ -1116,7 +1132,7 @@ def create_organization(organization_data: dict, creator_id: int) -> None:
             {'organization_id': organization_id},
         )
 
-        # ④-2 全親組織 → 新規組織への経路を INSERT する
+        # ②-2 全親組織 → 新規組織への経路を INSERT する
         db.session.execute(
             text("""
                 INSERT INTO organization_closure (
@@ -1137,11 +1153,22 @@ def create_organization(organization_data: dict, creator_id: int) -> None:
             },
         )
 
-        # ⑤ OLTP DB COMMIT
+        # ③ OLTP DB COMMIT
         db.session.commit()
 
     except Exception:
         db.session.rollback()
+        raise
+
+    # === Unity Catalog フェーズ ===
+    try:
+        # ④ Unity Catalog organization_master INSERT
+        _insert_unity_catalog_organization(organization_id, organization_uuid, organization_data, creator_id)
+
+        # ⑤ Unity Catalog organization_closure INSERT
+        _insert_unity_catalog_organization_closure(organization_id, organization_data['affiliated_organization_id'])
+
+    except Exception:
         _rollback_create_organization(organization_id)
         raise
 
@@ -1368,19 +1395,19 @@ flowchart TD
 
     UpdateDBMstr --> CheckUpdateDBMstr{DB操作結果}
 
-    CheckUpdateDBMstr -->|成功| Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
-    CheckUpdateDBMstr -->|失敗| RollbackUCMstr[UnitiyCatalog<br>oraganization_master<br>元データを復元]
+    CheckUpdateDBMstr -->|成功| Toast[トーストメッセージ設定<br>組織情報を更新しました]
+    CheckUpdateDBMstr -->|失敗| RollbackUCMstr[元データを復元<br>UnitiyCatalog.<br>oraganization_master]
 
     RollbackUCMstr --> Error500
 
-    Redirect --> Success[成功メッセージトースト表示]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
 
     LoginRedirect --> End([処理完了])
     Error400 --> End
     Error403 --> End
     Error404 --> End
     Error500 --> End
-    Success --> End
+    Redirect --> End
 ```
 
 ※1　403エラー発生時、更新モーダルを閉じる。
@@ -1765,30 +1792,30 @@ flowchart TD
 
     DeleteUCClosure --> CheckDeleteUCClosure{UnityCatalog<br>操作結果}
     CheckDeleteUCClosure -->|成功| DeleteDBMstr[OLTP DB<br>organization_master<br>組織削除]
-    CheckDeleteUCClosure -->|失敗| RollbackUCMstr[ロールバック<br>UnitiyCatalog.<br>organization_master]
+    CheckDeleteUCClosure -->|失敗| RollbackUCMstr[元データを復元<br>UnitiyCatalog.<br>organization_master]
 
     RollbackUCMstr --> Error500
 
     DeleteDBMstr --> CheckDeleteDBMstr{DB操作結果}
     CheckDeleteDBMstr -->|成功| DeleteDBClosure[OLTP DB<br>organization_closure<br>組織削除]
-    CheckDeleteDBMstr -->|失敗| RollbackUCClosure[ロールバック<br>UnitiyCatalog.<br>organization_closure]
+    CheckDeleteDBMstr -->|失敗| RollbackUCClosure[元データを復元<br>UnitiyCatalog.<br>organization_closure]
 
     RollbackUCClosure --> RollbackUCMstr
 
     DeleteDBClosure --> CheckDeleteDBClosure{DB操作結果}
-    CheckDeleteDBClosure -->|成功| Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
+    CheckDeleteDBClosure -->|成功| Toast[トーストメッセージ設定<br>組織情報を削除しました]
     CheckDeleteDBClosure -->|失敗| RollbackDBMstr[ロールバック<br>OLTP DB.<br>organization_master]
 
     RollbackDBMstr --> RollbackUCClosure
 
-    Redirect --> Success[成功メッセージトースト表示]
+    Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
 
     LoginRedirect --> End([処理完了])
     ValidEnd --> End
     Error403 --> End
     Error404 --> End
     Error500 --> End
-    Success --> End
+    Redirect --> End
 ```
 
 ##### 処理詳細（サーバーサイド）
