@@ -1481,7 +1481,7 @@ def enqueue_email_notification(batch_df, batch_id):
             F.col("device_id"),
             F.col("organization_id"),
             F.col("alert_id"),
-            F.col("email_address").alias("recipient_email"),
+            F.to_json(F.struct(F.array(F.col("email_address")).alias("to"))).alias("recipient_email"),
             F.concat(
                 F.lit("[アラート] "),
                 F.col("alert_name"),

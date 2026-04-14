@@ -695,13 +695,13 @@
 
 **概要**: デバイスの接続状態を保持するテーブル
 
-| #   | カラム物理名       | カラム論理名 | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
-| --- | ------------------ | ------------ | --------- | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
-| 1   | device_id          | デバイスID   | INT       | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
-| 2   | last_received_time | 最終受信時刻 | TIMESTAMP | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 ※1|
-| 3   | delete_flag        | 削除フラグ   | BOOLEAN   | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
-| 4   | create_date        | 作成日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
-| 5   | update_date        | 更新日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
+| #   | カラム物理名       | カラム論理名 | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                                                                 |
+| --- | ------------------ | ------------ | --------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------------------------------ |
+| 1   | device_id          | デバイスID   | INT       | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                     |
+| 2   | last_received_time | 最終受信時刻 | TIMESTAMP | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 ※1 |
+| 3   | delete_flag        | 削除フラグ   | BOOLEAN   | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                              |
+| 4   | create_date        | 作成日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                     |
+| 5   | update_date        | 更新日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                     |
 
 ※1　このテーブルでは、アラート発生中かどうかといったステータスではなく、テレメトリデータが一度も受信されていない（未接続）か、受信している（接続済み）かのステータスを管理する。
 
@@ -920,24 +920,23 @@
 
 **概要**: メール送信の待機列を保持するテーブル
 
-| #   | カラム物理名      | カラム論理名         | データ型      | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
-| --- | ----------------- | -------------------- | ------------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
-| 1   | queue_id          | キューID             | BIGINT        | NOT NULL | 〇  | -   | -                 | キューレコードの一意識別子（自動採番）                       |
-| 2   | device_id         | デバイスID           | INT           | NOT NULL | -   | 〇  | -                 | アラート発生元デバイスID                                     |
-| 3   | organization_id   | 組織ID               | INT           | NOT NULL | -   | 〇  | -                 | デバイス所属組織ID                                           |
-| 4   | alert_id          | アラートID           | INT           | NOT NULL | -   | 〇  | -                 | 発生したアラートの設定ID                                     |
-| 5   | recipient_email   | 送信先メールアドレス | VARCHAR(2000) | NOT NULL | -   | -   | -                 | 通知送信先のメールアドレス。複数ある場合、カンマ区切りで結合 |
-| 6   | subject           | 件名                 | VARCHAR(500)  | NOT NULL | -   | -   | -                 | メール件名                                                   |
-| 7   | body              | 本文                 | VARCHAR(2000) | NOT NULL | -   | -   | -                 | メール本文（HTML形式可）                                     |
-| 8   | alert_detail_json | アラート詳細JSON     | JSON          | NOT NULL | -   | -   | -                 | アラート詳細情報（測定項目、値、閾値等）                     |
-| 9   | status            | ステータス           | VARCHAR(20)   | NOT NULL | -   | -   | -                 | PENDING/PROCESSING/SENT/FAILED                               |
-| 10  | retry_count       | リトライ回数         | INT           | NOT NULL | -   | -   | -                 | 送信リトライ回数（初期値0、最大3）                           |
-| 11  | error_message     | エラーメッセージ     | JSON          | NULL     | -   | -   | -                 | 送信失敗時のエラー内容                                       |
-| 12  | event_timestamp   | イベント発生日時     | TIMESTAMP     | NOT NULL | -   | -   | -                 | アラートが発生した日時                                       |
-| 13  | queued_time       | キュー登録日時       | TIMESTAMP     | NOT NULL | -   | -   | -                 | キューに登録された日時                                       |
-| 14  | processed_time    | 処理完了日時         | TIMESTAMP     | NULL     | -   | -   | -                 | メール送信処理が完了した日時                                 |
-| 15  | create_date       | 作成日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
-| 16  | update_date       | 更新日時             | TIMESTAMP     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                             |
+| #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                           |
+| --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ---------------------------------------------- |
+| 1   | queue_id          | キューID             | BIGINT       | NOT NULL | 〇  | -   | -                 | キューレコードの一意識別子（自動採番）         |
+| 2   | device_id         | デバイスID           | INT          | NOT NULL | -   | 〇  | -                 | アラート発生元デバイスID                       |
+| 3   | organization_id   | 組織ID               | INT          | NOT NULL | -   | 〇  | -                 | デバイス所属組織ID                             |
+| 4   | alert_id          | アラートID           | INT          | NOT NULL | -   | 〇  | -                 | 発生したアラート設定ID                         |
+| 5   | recipient_email   | 送信先メールアドレス | JSON         | NOT NULL | -   | -   | -                 | 通知送信先のメールアドレス（JSON形式）         |
+| 6   | subject           | メール件名           | VARCHAR(500) | NOT NULL | -   | -   | -                 | メール件名                                     |
+| 7   | body              | メール本文           | TEXT         | NOT NULL | -   | -   | -                 | メール本文                                     |
+| 8   | alert_detail_json | アラート詳細JSON     | JSON         | NOT NULL | -   | -   | -                 | アラート詳細情報（測定項目・値・閾値等）       |
+| 9   | status            | ステータス           | VARCHAR(20)  | NOT NULL | -   | -   | -                 | `PENDING` / `PROCESSING` / `SENT` / `FAILED`   |
+| 10  | retry_count       | リトライ回数         | INT          | NOT NULL | -   | -   | -                 | 送信リトライ回数（初期値: 0、最大: 3）         |
+| 11  | error_message     | エラーメッセージ     | JSON         | NULL     | -   | -   | -                 | 送信失敗時のエラー内容                         |
+| 12  | event_timestamp   | イベント発生日時     | DATETIME     | NOT NULL | -   | -   | -                 | アラートが発生した日時                         |
+| 13  | processed_time    | 処理日時             | DATETIME     | NULL     | -   | -   | -                 | 送信処理を実施した日時（成功・失敗問わず記録） |
+| 14  | create_date       | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
+| 15  | update_date       | 更新日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                               |
 
 **外部キー:**
 
