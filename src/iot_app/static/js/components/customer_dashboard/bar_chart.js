@@ -247,7 +247,7 @@
         });
       })
       .catch(function () {
-        Toast.show('CSVのダウンロードに失敗しました', 'error');
+        Toast.show(MESSAGES.ERR_CSV_DOWNLOAD_FAILED, 'error');
       });
   }
 
