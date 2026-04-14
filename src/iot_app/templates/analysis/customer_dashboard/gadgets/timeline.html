@@ -1,0 +1,47 @@
+<!-- 時系列グラフガジェット固有UI -->
+<div class="gadget__body">
+  <div class="timeline" data-gadget-uuid="{{ gadget.gadget_uuid }}">
+
+    <!-- グラフエリア -->
+    <div class="timeline__canvas-wrapper">
+      <div class="timeline__canvas" id="chart-{{ gadget.gadget_uuid }}"></div>
+    </div>
+
+    <!-- 凡例エリア -->
+    <div class="timeline__legends" id="legends-{{ gadget.gadget_uuid }}"></div>
+
+    <!-- 日時選択エリア -->
+    <div class="timeline__controls">
+      <!-- ラベル行 -->
+      <div class="timeline__controls-label-row">
+        <span class="timeline__label">開始日時：</span>
+        <span class="timeline__label">終了日時：</span>
+      </div>
+      <!-- 入力行 -->
+      <div class="timeline__controls-input-row">
+        <div class="timeline__datetime-input-group">
+          <div class="timeline__datetime-input-wrap">
+            <span class="timeline__calendar-icon">📅</span>
+            <input class="form-input timeline__datetime-input" type="text"
+                   id="start-datetime-{{ gadget.gadget_uuid }}"
+                   placeholder="YYYY/MM/DD HH:mm:ss">
+          </div>
+          <button class="timeline__refresh-btn" type="button" title="現在日時-1時間に更新">🔄</button>
+        </div>
+        <div class="timeline__datetime-input-group">
+          <div class="timeline__datetime-input-wrap">
+            <span class="timeline__calendar-icon">📅</span>
+            <input class="form-input timeline__datetime-input" type="text"
+                   id="end-datetime-{{ gadget.gadget_uuid }}"
+                   placeholder="YYYY/MM/DD HH:mm:ss">
+          </div>
+          <button class="timeline__refresh-btn" type="button" title="現在日時に更新">🔄</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- エラーメッセージ領域 -->
+    <div class="timeline__error" id="error-{{ gadget.gadget_uuid }}"></div>
+
+  </div>
+</div>

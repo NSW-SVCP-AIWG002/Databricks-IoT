@@ -1,5 +1,6 @@
 import logging
 import re
+
 from flask import g, request, has_request_context
 
 _MASKING_RULES = {
@@ -19,7 +20,8 @@ class AppLoggerAdapter(logging.LoggerAdapter):
             extra["method"] = request.method
             extra["endpoint"] = request.path
             extra["ipAddress"] = request.headers.get("X-Forwarded-For", request.remote_addr)
-            user_id = getattr(g, "current_user_id", None)
+            current_user = getattr(g, "current_user", None)
+            user_id = getattr(current_user, "user_id", None)
             if user_id is not None:
                 extra["userId"] = user_id
 

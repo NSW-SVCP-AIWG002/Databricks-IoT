@@ -1,0 +1,52 @@
+<div class="modal__header">
+  <h2 class="modal__title">ガジェット追加</h2>
+</div>
+
+<div class="modal__body gadget-add">
+  <div class="gadget-add__layout">
+
+    {# ガジェット種別リスト #}
+    <div class="gadget-add__list-wrapper">
+      <div class="gadget-add__tabs">
+        <button type="button" class="gadget-add__tab" data-source-type="0">組織</button>
+        <button type="button" class="gadget-add__tab gadget-add__tab--active" data-source-type="1">デバイス</button>
+      </div>
+      <ul class="gadget-add__list" id="gadget-type-list">
+        {% for gadget_type in gadget_types %}
+          <li
+            class="gadget-add__item"
+            data-gadget-type="{{ gadget_type.gadget_type_id }}"
+            data-source-type="{{ gadget_type.data_source_type }}"
+            data-name="{{ gadget_type.gadget_type_name }}"
+            data-image="{{ gadget_type.gadget_image_path }}"
+            data-description="{{ gadget_type.gadget_description }}"
+            data-create-url="{{ url_for('customer_dashboard.gadget_create', gadget_type=gadget_type_slug_map.get(gadget_type.gadget_type_name, gadget_type.gadget_type_name)) }}"
+          >{{ gadget_type.gadget_type_name }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    {# プレビュー #}
+    <div class="gadget-add__preview">
+      <div class="gadget-add__preview-image-wrapper">
+        <img id="gadget-preview-image" src="" alt="ガジェットイメージ" style="display:none;">
+        <div id="gadget-preview-placeholder" class="gadget-add__preview-placeholder">
+          ガジェットを選択してください
+        </div>
+      </div>
+      <p id="gadget-preview-description" class="gadget-add__preview-description"></p>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal__footer">
+  <button
+    type="button"
+    class="button button--primary"
+    id="gadget-register-screen-btn"
+    disabled
+    data-base-url=""
+  >登録画面</button>
+  <button type="button" class="button button--secondary" id="modal-close-btn">キャンセル</button>
+</div>

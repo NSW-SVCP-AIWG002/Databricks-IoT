@@ -1,0 +1,29 @@
+<div class="modal__header">
+  <h2 class="modal__title">ダッシュボード登録</h2>
+</div>
+
+<form
+  method="POST"
+  action="{{ url_for('customer_dashboard.dashboard_register') }}"
+  class="modal-form"
+  novalidate
+>
+  {{ form.hidden_tag() }}
+
+  <div class="modal__body">
+    <div class="form-group">
+      <label class="form-label" for="{{ form.dashboard_name.id }}">
+        ダッシュボードタイトル<span class="form-label__required">必須</span>
+      </label>
+      {{ form.dashboard_name(class="form-input", placeholder="ダッシュボードタイトルを入力してください") }}
+      {% if form.dashboard_name.errors %}
+        <span class="form-error">{{ form.dashboard_name.errors[0] }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="modal__footer">
+    <button type="submit" class="button button--primary">登録</button>
+    <button type="button" class="button button--secondary" id="modal-close-btn">キャンセル</button>
+  </div>
+</form>

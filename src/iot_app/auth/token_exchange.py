@@ -4,7 +4,7 @@ import time
 import requests
 from flask import session
 
-from iot_app.auth.exceptions import TokenExchangeError, JWTRetrievalError, UnauthorizedError
+from iot_app.auth.exceptions import TokenExchangeError, JWTExpiredError, JWTRetrievalError, UnauthorizedError
 from iot_app.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +35,7 @@ class TokenExchanger:
         payload = {
             'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',
             'subject_token': idp_jwt,
-            'subject_token_type': 'urn:ietf:params:oauth:token-type:id_token',
+            'subject_token_type': 'urn:ietf:params:oauth:token-type:access_token',
             'scope': 'all-apis',
         }
 
@@ -50,6 +50,8 @@ class TokenExchanger:
                 "duration_ms": duration_ms,
                 "failure_reason": response.text[:200],
             })
+            if 'TOKEN_EXPIRED' in response.text:
+                raise JWTExpiredError(f"Token Exchange failed: {response.text}")
             raise TokenExchangeError(f"Token Exchange failed: {response.text}")
 
         logger.info("外部API完了", extra={
@@ -61,7 +63,7 @@ class TokenExchanger:
         result = response.json()
         return {
             'access_token': result['access_token'],
-            'expires_in': result['expires_in'],
+            'expires_in': result.get('expires_in', 3600),
         }
 
     def cache_token(self, access_token: str, expires_in: int):

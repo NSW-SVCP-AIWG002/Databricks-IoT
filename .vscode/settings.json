@@ -1,0 +1,15 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "Databricks IoT (Local MySQL)",
+      "driver": "MySQL",
+      "server": "db",
+      "port": 3306,
+      "database": "databricks_iot",
+      "username": "user",
+      "password": "password"
+    }
+  ],
+  "jupyter.interactiveWindow.cellMarker.codeRegex": "^# COMMAND ----------|^# Databricks notebook source|^(#\\s*%%|#\\s*\\<codecell\\>|#\\s*In\\[\\d*?\\]|#\\s*In\\[ \\])",
+  "jupyter.interactiveWindow.cellMarker.default": "# COMMAND ----------"
+}

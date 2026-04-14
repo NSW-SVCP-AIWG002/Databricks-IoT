@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+
+{% block title %}店舗モニタリング{% endblock %}
+
+{% block content %}
+
+{# (1) 画面タイトル #}
+<h1 class="page-title">店舗モニタリング</h1>
+
+{# (2) 検索フォーム #}
+<div class="search-form" id="search-form-container">
+  <div class="search-form__header" id="search-form-toggle">
+    <span class="search-form__title">検索条件</span>
+    <span class="search-form__toggle-icon" id="search-toggle-icon">▼</span>
+  </div>
+  <div class="search-form__body" id="search-form-body">
+    <form method="POST" action="{{ url_for('analysis.store_monitoring_search') }}">
+      <input type="hidden" id="organization_id" name="organization_id" value="{{ search_params.get('organization_id', '') }}">
+      <div class="ids-search-fields">
+        <div class="form-group" style="position:relative;">
+          <label class="form-label" for="organization_name">店舗名</label>
+          <input
+            type="text"
+            id="organization_name"
+            name="organization_name"
+            class="form-input"
+            placeholder="店舗を検索..."
+            maxlength="200"
+            value="{{ search_params.get('organization_name', '') }}"
+            autocomplete="off"
+          >
+          <ul id="organization_name_dropdown" class="ids-autocomplete-dropdown" style="display:none;"></ul>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="device_name">デバイス名</label>
+          <input
+            type="text"
+            id="device_name"
+            name="device_name"
+            class="form-input"
+            maxlength="100"
+            value="{{ search_params.get('device_name', '') }}"
+          >
+        </div>
+      </div>
+      <div class="ids-search-center">
+        <button type="submit" class="button button--primary">検索</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# メインコンテンツ: 左（アラート一覧 + デバイス一覧）/ 右（センサー情報表示） #}
+<div class="ids-content-layout">
+
+  {# 左カラム #}
+  <div class="ids-content-main">
+
+    {# (3) アラート一覧 #}
+    <div class="card">
+      <div class="ids-section-header">
+        <h2 class="ids-section-header__title">アラート一覧</h2>
+        <span class="ids-section-header__count">合計：{{ alerts_total }}件</span>
+      </div>
+      <div class="table-container">
+        <table class="table" style="min-width:800px;">
+          <thead class="table__head">
+            <tr>
+              <th style="width:20%;">アラート発生日時 <span class="sort-indicator" data-column="alert_occurrence_datetime">↕</span></th>
+              <th style="width:25%;">デバイス名 <span class="sort-indicator" data-column="device_name">↕</span></th>
+              <th style="width:25%;">アラート名 <span class="sort-indicator" data-column="alert_name">↕</span></th>
+              <th style="width:15%;">アラートレベル <span class="sort-indicator" data-column="alert_level">↕</span></th>
+              <th style="width:15%;">ステータス <span class="sort-indicator" data-column="alert_status">↕</span></th>
+            </tr>
+          </thead>
+          <tbody class="table__body">
+            {% for alert in alerts %}
+            <tr>
+              <td>
+                {% if alert.alert_occurrence_datetime %}
+                  {{ alert.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+                {% endif %}
+              </td>
+              <td>{{ alert.device_name }}</td>
+              <td>{{ alert.alert_name }}</td>
+              <td>
+                <span class="table__badge
+                  {% if alert.alert_level_name == '重大' %}table__badge--danger
+                  {% elif alert.alert_level_name == '警告' %}table__badge--warning
+                  {% elif alert.alert_level_name == '情報' %}table__badge--info
+                  {% else %}table__badge--info{% endif %}">
+                  {{ alert.alert_level_name }}
+                </span>
+              </td>
+              <td>
+                <span class="table__badge
+                  {% if alert.alert_status_name == '発生中' %}table__badge--danger
+                  {% else %}table__badge--info{% endif %}">
+                  {{ alert.alert_status_name }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# (3.7) ページネーション #}
+      {% set alert_total_pages = (alerts_total // per_page) + (1 if alerts_total % per_page > 0 else 0) %}
+      {% if alert_total_pages >= 1 %}
+      <div class="pagination">
+        {% if alert_page > 1 %}
+          <a class="pagination__button"
+             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page - 1 }}&page={{ page }}">&lt;</a>
+        {% endif %}
+        {% set ns = namespace(pages=[]) %}
+        {% if alert_total_pages <= 5 %}
+          {% for i in range(1, alert_total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+        {% else %}
+          {% set ns.pages = [1] %}
+          {% if alert_page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+          {% set pstart = [2, alert_page - 1] | max %}
+          {% set pend = [alert_total_pages - 1, alert_page + 1] | min %}
+          {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+          {% if alert_page < alert_total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+          {% set ns.pages = ns.pages + [alert_total_pages] %}
+        {% endif %}
+        {% for p in ns.pages %}
+          {% if p == '...' %}
+            <span class="pagination__ellipsis">...</span>
+          {% else %}
+            <a class="pagination__button {% if p == alert_page %}pagination__button--active{% endif %}"
+               href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ p }}&page={{ page }}">{{ p }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if alert_page < alert_total_pages %}
+          <a class="pagination__button"
+             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page + 1 }}&page={{ page }}">&gt;</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {# (4) デバイス一覧 #}
+    <div class="card">
+      <div class="ids-section-header">
+        <h2 class="ids-section-header__title">デバイス一覧</h2>
+        <span class="ids-section-header__count">合計：{{ devices_total }}台</span>
+      </div>
+      <div class="table-container">
+        <table class="table" style="min-width:800px;">
+          <thead class="table__head">
+            <tr>
+              <th style="width:30%;">店舗名 <span class="sort-indicator" data-column="organization_name">↕</span></th>
+              <th style="width:25%;">デバイス名 <span class="sort-indicator" data-column="device_name">↕</span></th>
+              <th style="width:15%;">ステータス <span class="sort-indicator" data-column="status">↕</span></th>
+              <th style="width:30%;">操作</th>
+            </tr>
+          </thead>
+          <tbody class="table__body">
+            {% for device in devices %}
+            <tr {% if selected_device and selected_device.device_uuid == device.device_uuid %}class="ids-row--selected"{% endif %}>
+              <td>{{ device.organization_name if device.organization_name else '' }}</td>
+              <td>{{ device.device_name }}</td>
+              <td>
+                <span class="table__badge">未接続</span>
+              </td>
+              <td>
+                <div class="table__actions">
+                  <a href="{{ url_for('analysis.show_sensor_info', device_uuid=device.device_uuid) }}"
+                     class="table__action-btn">センサー情報表示</a>
+                  <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid) }}"
+                     class="table__action-btn">デバイス詳細</a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# (4.6) ページネーション #}
+      {% set device_total_pages = (devices_total // per_page) + (1 if devices_total % per_page > 0 else 0) %}
+      {% if device_total_pages >= 1 %}
+      <div class="pagination">
+        {% if page > 1 %}
+          <a class="pagination__button"
+             href="{{ url_for('analysis.store_monitoring') }}?page={{ page - 1 }}&alert_page={{ alert_page }}">&lt;</a>
+        {% endif %}
+        {% set ns = namespace(pages=[]) %}
+        {% if device_total_pages <= 5 %}
+          {% for i in range(1, device_total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+        {% else %}
+          {% set ns.pages = [1] %}
+          {% if page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+          {% set pstart = [2, page - 1] | max %}
+          {% set pend = [device_total_pages - 1, page + 1] | min %}
+          {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+          {% if page < device_total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+          {% set ns.pages = ns.pages + [device_total_pages] %}
+        {% endif %}
+        {% for p in ns.pages %}
+          {% if p == '...' %}
+            <span class="pagination__ellipsis">...</span>
+          {% else %}
+            <a class="pagination__button {% if p == page %}pagination__button--active{% endif %}"
+               href="{{ url_for('analysis.store_monitoring') }}?page={{ p }}&alert_page={{ alert_page }}">{{ p }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page < device_total_pages %}
+          <a class="pagination__button"
+             href="{{ url_for('analysis.store_monitoring') }}?page={{ page + 1 }}&alert_page={{ alert_page }}">&gt;</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>{# /ids-content-main #}
+
+  {# (5) センサー情報表示（右カラム: 常時表示。初期状態はラベルのみ、ボタン押下後にデータを表示） #}
+  <div class="ids-content-side">
+    <div class="ids-sensor-panel">
+      <h2 class="ids-sensor-panel__title">センサー情報表示</h2>
+      {% if show_sensor_info and selected_device and sensor_data and sensor_data.event_timestamp %}
+      <p class="ids-sensor-panel__updated">
+        最終更新時刻: {{ sensor_data.event_timestamp.strftime('%Y/%m/%d %H:%M:%S') }}
+      </p>
+      {% endif %}
+      <dl class="ids-sensor-panel__list">
+        <dt class="ids-sensor-panel__label">デバイス名:</dt>
+        <dd class="ids-sensor-panel__value">{{ selected_device.device_name if show_sensor_info and selected_device else '' }}</dd>
+        <dt class="ids-sensor-panel__label">デバイス種別:</dt>
+        <dd class="ids-sensor-panel__value">{{ selected_device.device_type_name if show_sensor_info and selected_device and selected_device.device_type_name else '' }}</dd>
+        <dt class="ids-sensor-panel__label">モデル情報:</dt>
+        <dd class="ids-sensor-panel__value">{{ selected_device.device_model if show_sensor_info and selected_device and selected_device.device_model else '' }}</dd>
+        {% if show_sensor_info and selected_device and sensor_data %}
+        <dt class="ids-sensor-panel__label">外気温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.external_temp }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 設定温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.set_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 庫内センサー温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.internal_sensor_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 庫内温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.internal_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 DF温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.df_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 凝縮温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.condensing_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 微調整後庫内温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.adjusted_internal_temp_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 設定温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.set_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 庫内センサー温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.internal_sensor_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 庫内温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.internal_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 DF温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.df_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 凝縮温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.condensing_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 微調整後庫内温度:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.adjusted_internal_temp_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第1冷凍 圧縮機:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.compressor_freezer_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第2冷凍 圧縮機:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.compressor_freezer_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第1ファンモータ:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.fan_motor_1 }}</dd>
+        <dt class="ids-sensor-panel__label">第2ファンモータ:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.fan_motor_2 }}</dd>
+        <dt class="ids-sensor-panel__label">第3ファンモータ:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.fan_motor_3 }}</dd>
+        <dt class="ids-sensor-panel__label">第4ファンモータ:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.fan_motor_4 }}</dd>
+        <dt class="ids-sensor-panel__label">第5ファンモータ:</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.fan_motor_5 }}</dd>
+        <dt class="ids-sensor-panel__label">防露ヒータ出力(1):</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.defrost_heater_output_1 }}</dd>
+        <dt class="ids-sensor-panel__label">防露ヒータ出力(2):</dt>
+        <dd class="ids-sensor-panel__value">{{ sensor_data.defrost_heater_output_2 }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+</div>{# /ids-content-layout #}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    var navEntries = performance.getEntriesByType('navigation');
+    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+      window.location.replace('{{ url_for("analysis.store_monitoring") }}');
+    }
+  })();
+
+  (function() {
+    var toggle = document.getElementById('search-form-toggle');
+    var icon   = document.getElementById('search-toggle-icon');
+    var container = document.getElementById('search-form-container');
+    if (!toggle) return;
+    toggle.style.cursor = 'pointer';
+    toggle.addEventListener('click', function() {
+      var collapsed = container.classList.toggle('search-form--collapsed');
+      icon.textContent = collapsed ? '\u25b6' : '\u25bc';
+    });
+  })();
+
+  (function() {
+    var input    = document.getElementById('organization_name');
+    var hidden   = document.getElementById('organization_id');
+    var dropdown = document.getElementById('organization_name_dropdown');
+    if (!input || !hidden || !dropdown) return;
+
+    var debounceTimer = null;
+
+    function closeDropdown() {
+      dropdown.style.display = 'none';
+      dropdown.innerHTML = '';
+    }
+
+    function selectItem(orgId, orgName) {
+      input.value  = orgName;
+      hidden.value = orgId;
+      closeDropdown();
+    }
+
+    function fetchCandidates(q) {
+      var url = '{{ url_for("analysis.store_monitoring_organizations") }}?q=' + encodeURIComponent(q);
+      fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          dropdown.innerHTML = '';
+          if (!data || data.length === 0) {
+            closeDropdown();
+            return;
+          }
+          data.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'ids-autocomplete-dropdown__item';
+            li.textContent = item.organization_name;
+            li.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              selectItem(item.organization_id, item.organization_name);
+            });
+            dropdown.appendChild(li);
+          });
+          dropdown.style.display = 'block';
+        })
+        .catch(function() { closeDropdown(); });
+    }
+
+    input.addEventListener('focus', function() {
+      fetchCandidates(input.value);
+    });
+
+    input.addEventListener('input', function() {
+      hidden.value = '';
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        fetchCandidates(input.value);
+      }, 200);
+    });
+
+    input.addEventListener('blur', function() {
+      setTimeout(closeDropdown, 150);
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        closeDropdown();
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -13,4 +13,9 @@
 @import url('./components/modal.css');
 @import url('./components/sort.css');
 @import url('./components/spinner.css');
+@import url('./components/toast.css');
 @import url('./components/sidebar.css');
+@import url('./components/industry-dashboard.css');
+@import url('./components/chat.css');
+@import url('./components/customer_dashboard/common.css');
+@import url('./components/error.css');

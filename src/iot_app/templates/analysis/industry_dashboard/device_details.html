@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+
+{% block title %}デバイス詳細{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="ids-dd-page">
+
+{# (6) 画面タイトル / (7) アクションボタン #}
+<div class="ids-dd-header">
+  <h1 class="page-title" style="margin-bottom:0;">デバイス詳細</h1>
+  <div>
+    <a href="{{ url_for('analysis.store_monitoring') }}" class="button button--primary">デバイス変更</a>
+  </div>
+</div>
+
+{# 上段: (8) デバイス情報 + (9) アラート一覧 #}
+<div class="ids-top-layout">
+
+  {# (8) デバイス情報表示 #}
+  <div class="card ids-device-info">
+    <dl class="ids-device-info__list">
+      <dt class="ids-device-info__label">デバイス名:</dt>
+      <dd class="ids-device-info__value">{{ device.device_name }}</dd>
+      <dt class="ids-device-info__label">デバイス種別:</dt>
+      <dd class="ids-device-info__value">{{ device.device_type_name if device.device_type_name else '' }}</dd>
+      <dt class="ids-device-info__label">モデル情報:</dt>
+      <dd class="ids-device-info__value">{{ device.device_model if device.device_model else '' }}</dd>
+      <dt class="ids-device-info__label">店舗名:</dt>
+      <dd class="ids-device-info__value">{{ device.organization_name if device.organization_name else '' }}</dd>
+    </dl>
+  </div>
+
+  {# (9) アラート一覧 #}
+  <div class="card ids-alert-section">
+    <div class="ids-section-header">
+      <h2 class="ids-section-header__title">アラート一覧</h2>
+      <span class="ids-section-header__count">合計：{{ alerts_total }}件</span>
+    </div>
+    <div class="table-container">
+      <table class="table" style="min-width:800px;">
+        <thead class="table__head">
+          <tr>
+            <th style="width:25%;">アラート発生日時 <span class="sort-indicator" data-column="alert_occurrence_datetime">↕</span></th>
+            <th style="width:35%;">アラート名 <span class="sort-indicator" data-column="alert_name">↕</span></th>
+            <th style="width:20%;">アラートレベル <span class="sort-indicator" data-column="alert_level">↕</span></th>
+            <th style="width:20%;">ステータス <span class="sort-indicator" data-column="alert_status">↕</span></th>
+          </tr>
+        </thead>
+        <tbody class="table__body">
+          {% for alert in alerts %}
+          <tr>
+            <td>
+              {% if alert.alert_occurrence_datetime %}
+                {{ alert.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+              {% endif %}
+            </td>
+            <td>{{ alert.alert_name }}</td>
+            <td>
+              <span class="table__badge
+                {% if alert.alert_level_name == '重大' %}table__badge--danger
+                {% elif alert.alert_level_name == '警告' %}table__badge--warning
+                {% else %}table__badge--info{% endif %}">
+                {{ alert.alert_level_name }}
+              </span>
+            </td>
+            <td>
+              <span class="table__badge
+                {% if alert.alert_status_name == '発生中' %}table__badge--danger
+                {% else %}table__badge--info{% endif %}">
+                {{ alert.alert_status_name }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {# (9.6) ページネーション #}
+    {% set total_pages = (alerts_total // per_page) + (1 if alerts_total % per_page > 0 else 0) %}
+    {% if total_pages >= 1 %}
+    <div class="pagination">
+      {% if page > 1 %}
+        <a class="pagination__button"
+           href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid) }}?page={{ page - 1 }}">&lt;</a>
+      {% endif %}
+      {% set ns = namespace(pages=[]) %}
+      {% if total_pages <= 5 %}
+        {% for i in range(1, total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+      {% else %}
+        {% set ns.pages = [1] %}
+        {% if page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+        {% set pstart = [2, page - 1] | max %}
+        {% set pend = [total_pages - 1, page + 1] | min %}
+        {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+        {% if page < total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+        {% set ns.pages = ns.pages + [total_pages] %}
+      {% endif %}
+      {% for p in ns.pages %}
+        {% if p == '...' %}
+          <span class="pagination__ellipsis">...</span>
+        {% else %}
+          <a class="pagination__button {% if p == page %}pagination__button--active{% endif %}"
+             href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid) }}?page={{ p }}">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page < total_pages %}
+        <a class="pagination__button"
+           href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid) }}?page={{ page + 1 }}">&gt;</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>{# /ids-top-layout #}
+
+{# (10) 表示期間変更 + (11) CSVエクスポート #}
+<div class="card ids-period-control">
+  <form method="POST" action="{{ url_for('analysis.device_details_search', device_uuid=device.device_uuid) }}"
+        class="ids-period-control__form">
+    <div class="ids-period-control__inputs">
+      <input
+        type="datetime-local"
+        id="search_start_datetime"
+        name="search_start_datetime"
+        class="form-input"
+        value="{{ search_params.get('search_start_datetime', '') }}"
+      >
+      <span class="ids-period-control__separator">～</span>
+      <input
+        type="datetime-local"
+        id="search_end_datetime"
+        name="search_end_datetime"
+        class="form-input"
+        value="{{ search_params.get('search_end_datetime', '') }}"
+      >
+    </div>
+    <div class="ids-period-control__actions">
+      <button type="submit" class="button button--primary" id="btn-period">表示期間変更</button>
+      <label class="form-option">
+        <input type="checkbox" id="auto_update" class="form-option__input" checked>
+        <span class="form-option__label">自動更新</span>
+      </label>
+    </div>
+    {% if period_error %}
+    <p class="form__error" style="width:100%; margin:0; font-size:var(--font-size-lg);">{{ period_error }}</p>
+    {% endif %}
+  </form>
+  <div class="ids-period-control__csv">
+    <a href="{{ url_for('analysis.device_details', device_uuid=device.device_uuid, export='csv') }}"
+       class="button button--primary">CSVエクスポート</a>
+  </div>
+</div>
+
+{# (12) 時系列グラフ + (13) 凡例 #}
+<div class="card ids-graph-layout">
+
+  {# グラフエリア #}
+  <div class="ids-graph-section">
+    <div class="ids-graph-section__header">
+      <span class="ids-graph-section__updated" id="graph-updated-time"></span>
+    </div>
+    <div id="time-series-chart" style="width:100%;"></div>
+  </div>
+
+  {# (13) 凡例 #}
+  <div class="ids-legend" id="chart-legend">
+    <p class="ids-legend__title">凡例</p>
+    <label class="ids-legend__item">
+      <input type="checkbox" class="ids-legend__checkbox" id="select-all" checked>
+      <span>全選択/全解除</span>
+    </label>
+    {% set series_items = [
+      ['外気温度',               '℃'],
+      ['第1冷凍 設定温度',        '℃'],
+      ['第1冷凍 庫内センサー温度', '℃'],
+      ['第1冷凍 表示温度',        '℃'],
+      ['第1冷凍 DF温度',          '℃'],
+      ['第1冷凍 凝縮温度',        '℃'],
+      ['第1冷凍 微調整後庫内温度', '℃'],
+      ['第2冷凍 設定温度',        '℃'],
+      ['第2冷凍 庫内センサー温度', '℃'],
+      ['第2冷凍 表示温度',        '℃'],
+      ['第2冷凍 DF温度',          '℃'],
+      ['第2冷凍 凝縮温度',        '℃'],
+      ['第2冷凍 微調整後庫内温度', '℃'],
+      ['第1冷凍 圧縮機',          'rpm'],
+      ['第2冷凍 圧縮機',          'rpm'],
+      ['第1ファンモータ',          'rpm'],
+      ['第2ファンモータ',          'rpm'],
+      ['第3ファンモータ',          'rpm'],
+      ['第4ファンモータ',          'rpm'],
+      ['第5ファンモータ',          'rpm'],
+      ['防露ヒータ出力(1)',        '%'],
+      ['防露ヒータ出力(2)',        '%'],
+    ] %}
+    {% for item in series_items %}
+    <label class="ids-legend__item">
+      <input type="checkbox" class="ids-legend__checkbox legend__series-cb" value="{{ item[0] }}" checked>
+      <span>{{ item[0] }} ({{ item[1] }})</span>
+    </label>
+    {% endfor %}
+  </div>
+
+</div>{# /ids-graph-layout #}
+
+</div>{# /ids-dd-page #}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    var navEntries = performance.getEntriesByType('navigation');
+    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+      window.location.replace('{{ url_for("analysis.device_details", device_uuid=device.device_uuid) }}');
+    }
+  })();
+</script>
+<script type="application/json" id="graph-data-json">{{ graph_data | tojson }}</script>
+<script>
+  var graphData = JSON.parse(document.getElementById('graph-data-json').textContent);
+</script>
+<script src="{{ url_for('static', filename='js/analysis/device_details.js') }}"></script>
+<script>
+  (function() {
+    var autoUpdateCb = document.getElementById('auto_update');
+    var inputStart   = document.getElementById('search_start_datetime');
+    var inputEnd     = document.getElementById('search_end_datetime');
+    var btnPeriod    = document.getElementById('btn-period');
+    function setDisabled(disabled) {
+      if (inputStart) { inputStart.disabled = disabled; }
+      if (inputEnd)   { inputEnd.disabled   = disabled; }
+      if (btnPeriod)  { btnPeriod.disabled  = disabled; }
+    }
+    if (autoUpdateCb) {
+      setDisabled(autoUpdateCb.checked);
+      autoUpdateCb.addEventListener('change', function() {
+        setDisabled(autoUpdateCb.checked);
+      });
+    }
+  })();
+</script>
+{% endblock %}

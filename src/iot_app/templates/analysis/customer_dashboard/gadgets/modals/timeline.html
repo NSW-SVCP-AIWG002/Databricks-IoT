@@ -1,0 +1,230 @@
+<div class="modal-content--lg">
+
+    <!-- モーダルヘッダー -->
+    <div class="modal__header">
+      <h2 class="modal__title">折れ線</h2>
+    </div>
+
+    <!-- モーダルボディ -->
+    <form method="POST"
+          action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
+          id="timeline-register-form"
+          class="modal-form"
+          novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="modal__body">
+
+        <!-- (1) タイトル行 -->
+        <div class="gadget-register__title-row">
+          <label class="form-label" for="title">タイトル<span class="form-label__required">必須</span></label>
+          {{ form.title(class="form-input", id="title", maxlength=20) }}
+          {% if form.title.errors %}
+            <span class="form-error">{{ form.title.errors[0] }}</span>
+          {% endif %}
+        </div>
+
+        <!-- (2) 上部行：デバイスモード選択 + 左右測定項目ラベル -->
+        <div class="gadget-register__top-row">
+          <div class="gadget-register__device-mode-area">
+            <label class="form-label">表示デバイス選択</label>
+            <div class="timeline-register__device-mode-buttons">
+              <button type="button"
+                      class="button timeline-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'fixed' %} timeline-register__device-mode-btn--active{% endif %}"
+                      data-mode="fixed">デバイス固定</button>
+              <button type="button"
+                      class="button timeline-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'variable' %} timeline-register__device-mode-btn--active{% endif %}"
+                      data-mode="variable">デバイス可変</button>
+            </div>
+            <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'variable' }}">
+          </div>
+          <div class="gadget-register__measurement-title">
+            <label class="form-label">左表示項目選択<span class="form-label__required">必須</span></label>
+            {% if form.left_item_id.errors %}
+              <span class="form-error">{{ form.left_item_id.errors[0] }}</span>
+            {% endif %}
+          </div>
+          <div class="gadget-register__measurement-title">
+            <label class="form-label">右表示項目選択<span class="form-label__required">必須</span></label>
+            {% if form.right_item_id.errors %}
+              <span class="form-error">{{ form.right_item_id.errors[0] }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- (6) デバイス名行 -->
+        <div class="gadget-register__device-name-row" id="device-name-area"
+             style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
+          <span class="timeline-register__device-name" id="selected-device-name">-</span>
+        </div>
+
+        <!-- メインエリア（3カラム） -->
+        <div class="gadget-register__body">
+
+          <!-- 左カラム：ガジェットイメージ + 最小値/最大値 -->
+          <div class="gadget-register__left">
+            <div class="gadget-register__preview">
+              <div class="gadget-register__preview-timeline">
+                <svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg" class="gadget-register__preview-svg">
+                  <polyline points="10,80 40,50 70,60 100,30 130,45 160,20 190,35"
+                            fill="none" stroke="var(--color-primary)" stroke-width="2"/>
+                  <polyline points="10,70 40,75 70,45 100,55 130,35 160,50 190,25"
+                            fill="none" stroke="#F5A623" stroke-width="2"/>
+                </svg>
+              </div>
+            </div>
+            <!-- (8) 左最小値/最大値 -->
+            <div class="gadget-register__minmax">
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">左表示項目 最小値</label>
+                {{ form.left_min_value(class="form-input gadget-register__minmax-input", id="left_min_value") }}
+                <span class="form-error form-error--reserved">{% if form.left_min_value.errors %}{{ form.left_min_value.errors[0] }}{% endif %}</span>
+              </div>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">左表示項目 最大値</label>
+                {{ form.left_max_value(class="form-input gadget-register__minmax-input", id="left_max_value") }}
+                <span class="form-error form-error--reserved">{% if form.left_max_value.errors %}{{ form.left_max_value.errors[0] }}{% endif %}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 中カラム：表示デバイス指定（デバイス固定モード時のみ） + 右最小値/最大値（常時表示） -->
+          <div class="gadget-register__middle">
+            <!-- デバイス固定モード時のみ表示 -->
+            <div id="device-fixed-area" style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
+              <p class="gadget-register__section-title">表示デバイス指定</p>
+              <div class="form-group">
+                <label class="form-label">組織フィルター</label>
+                <select class="form-select" id="organization-filter">
+                  <option value="">選択してください</option>
+                  {% for org in organizations %}
+                  <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">デバイス選択<span class="form-label__required">必須</span></label>
+                <select class="form-select" name="device_id" id="device-select">
+                  <option value="">選択してください</option>
+                  {% for device in devices %}
+                  <option value="{{ device.device_id }}"
+                          data-org="{{ device.organization_id }}"
+                          data-name="{{ device.device_name }}"
+                          {% if form.device_id.data == device.device_id %}selected{% endif %}>
+                    {{ device.device_name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <span class="form-error form-error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
+              </div>
+            </div>
+            <!-- (9) 右最小値/最大値（常時表示） -->
+            <div class="gadget-register__minmax">
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">右表示項目 最小値</label>
+                {{ form.right_min_value(class="form-input gadget-register__minmax-input", id="right_min_value") }}
+                <span class="form-error form-error--reserved">{% if form.right_min_value.errors %}{{ form.right_min_value.errors[0] }}{% endif %}</span>
+              </div>
+              <div class="form-group gadget-register__minmax-row">
+                <label class="form-label">右表示項目 最大値</label>
+                {{ form.right_max_value(class="form-input gadget-register__minmax-input", id="right_max_value") }}
+                <span class="form-error form-error--reserved">{% if form.right_max_value.errors %}{{ form.right_max_value.errors[0] }}{% endif %}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右カラム：左右表示項目選択リスト -->
+          <div class="gadget-register__right">
+
+            <!-- (3) 左表示項目 -->
+            <div class="timeline-register__measurement-list">
+              <table class="table table--fit">
+                <thead>
+                  <tr>
+                    <th>選択</th>
+                    <th>表示名称</th>
+                    <th>単位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in measurement_items %}
+                  <tr>
+                    <td>
+                      <input type="radio" name="left_item_id"
+                             value="{{ item.measurement_item_id }}"
+                             id="left-{{ item.measurement_item_id }}"
+                             {% if form.left_item_id.data == item.measurement_item_id %}checked{% endif %}>
+                    </td>
+                    <td>
+                      <label for="left-{{ item.measurement_item_id }}">{{ item.display_name }}</label>
+                    </td>
+                    <td>{{ item.unit_name }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- (4) 右表示項目 -->
+            <div class="timeline-register__measurement-list">
+              <table class="table table--fit">
+                <thead>
+                  <tr>
+                    <th>選択</th>
+                    <th>表示名称</th>
+                    <th>単位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in measurement_items %}
+                  <tr>
+                    <td>
+                      <input type="radio" name="right_item_id"
+                             value="{{ item.measurement_item_id }}"
+                             id="right-{{ item.measurement_item_id }}"
+                             {% if form.right_item_id.data == item.measurement_item_id %}checked{% endif %}>
+                    </td>
+                    <td>
+                      <label for="right-{{ item.measurement_item_id }}">{{ item.display_name }}</label>
+                    </td>
+                    <td>{{ item.unit_name }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- (10) グループ選択 / (11) 部品サイズ -->
+        <div class="form-row">
+          <div class="form-group form-group--half">
+            <div class="form-group--inline">
+              <label class="form-label" for="group_id">グループ選択<span class="form-label__required">必須</span></label>
+              {{ form.group_id(class="form-select", id="group_id") }}
+            </div>
+            <span class="form-error form-error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+          </div>
+          <div class="form-group form-group--half">
+            <div class="form-group--inline">
+              <label class="form-label" for="gadget_size">部品サイズ<span class="form-label__required">必須</span></label>
+              {{ form.gadget_size(class="form-select", id="gadget_size") }}
+            </div>
+            <span class="form-error form-error--reserved">{% if form.gadget_size.errors %}{{ form.gadget_size.errors[0] }}{% endif %}</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- モーダルフッター：登録/キャンセル -->
+      <div class="modal__footer">
+        <button type="submit" class="button button--primary" id="register-btn">登録</button>
+        <button type="button" class="button button--secondary"
+                id="modal-close-btn">キャンセル</button>
+      </div>
+
+    </form>
+</div>
+

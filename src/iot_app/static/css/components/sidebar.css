@@ -45,7 +45,7 @@
   padding: 15px 0 10px 5px;
   cursor: pointer;
   white-space: nowrap;
-  color: #ecf0f1;           /* 親・直接リンク共通テキスト色。子要素は .nav__item--child で上書き */
+  color: var(--color-gray-200);           /* 親・直接リンク共通テキスト色。子要素は .nav__item--child で上書き */
   text-decoration: none;
   transition: background-color 0.2s;
 }
@@ -107,14 +107,14 @@
 /* 背景色・テキスト色：現在地（C色） */
 .nav__item--child.nav__item--active {
   background-color: var(--nav-bkg-color-c);
-  color: #ecf0f1;             /* C色(#596775)に対するコントラスト比4.9:1 → WCAG AA合格 */
+  color: var(--color-gray-200);             /* C色(#596775)に対するコントラスト比4.9:1 → WCAG AA合格 */
 }
 
 /* テキスト色・インデント：子メニュー */
 .nav__item--child {
   display: block;
   padding: 12px 15px 12px 55px;  /* 縦12px・右15px・左55px（アイコン幅分） */
-  color: #bdc3c7;
+  color: var(--color-gray-400);
   text-decoration: none;
   opacity: 0;                    /* 折りたたみ時は非表示（nav__link-text と同様） */
   transition: opacity 0.3s ease, background-color 0.2s, color 0.2s, padding-left 0.2s;
@@ -127,7 +127,7 @@
 }
 
 .nav__item--child:hover {
-  color: #ecf0f1;
+  color: var(--color-gray-200);
   padding-left: 60px;            /* +5px マイクロインタラクション */
 }
 
