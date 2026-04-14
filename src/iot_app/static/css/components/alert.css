@@ -1,0 +1,64 @@
+/* 未使用につき問題がなければ削除予定 */
+
+/* ===== アラート・通知 ===== */
+
+/* アラート基本スタイル */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  border-radius: var(--border-radius-base);
+  border: var(--border-width) solid transparent;
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-4);
+}
+
+/* アラートアイコン */
+.alert__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+/* アラートコンテンツ */
+.alert__content {
+  flex: 1;
+}
+
+.alert__title {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-1);
+}
+
+.alert__message {
+  line-height: var(--line-height-normal);
+}
+
+/* バリエーション：成功 */
+.alert--success {
+  background-color: var(--color-success-light);
+  border-color: var(--color-success);
+  color: var(--color-success-dark);
+}
+
+/* バリエーション：エラー */
+.alert--error {
+  background-color: var(--color-danger-light);
+  border-color: var(--color-danger);
+  color: var(--color-danger-dark);
+}
+
+/* バリエーション：警告 */
+.alert--warning {
+  background-color: var(--color-warning-light);
+  border-color: var(--color-warning);
+  color: var(--color-warning-dark);
+}
+
+/* バリエーション：情報 */
+.alert--info {
+  background-color: var(--color-info-light);
+  border-color: var(--color-info);
+  color: var(--color-info-dark);
+}

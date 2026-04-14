@@ -1,4 +1,4 @@
-﻿﻿# A5:ER FORMAT:21
+﻿﻿# A5:ER FORMAT:19
 # A5:ER ENCODING:UTF8
 # A5:ER Mk-1 Copyright © 2007 m.matsubara
 # A5:SQL Mk-2 Version 2.20.4 Copyright © 1997 - 2025 m.matsubara
@@ -1236,7 +1236,7 @@ LName=シルバー層センサーデータ
 Comment=シルバー層センサーデータ（UnityCatalog内のsilver_sensor_dataに対応するテーブル）\nauthor:ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=400
 Top=3800
 Field="行ID","my_row_id","BIGINT","NOT NULL",0,"","INVISIBLE",$000028FF,""
@@ -1271,7 +1271,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260331141208
-Position="Main",400,3800,1164,1089
+Position="MAIN",400,3800,1164,1089
 ZOrder=92
 
 [Relation]
@@ -1322,7 +1322,7 @@ LName=センサーデータ時次サマリ
 Comment=センサーデータ時次サマリ（Gold層のセンサーデータ時次サマリテーブルに対応）\nauthor: ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=2300
 Top=3800
 Field="デバイスID","device_id","INT","NOT NULL",0,"","",$0079009A,""
@@ -1337,7 +1337,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260331141629
-Position="Main",2300,3800,745,336
+Position="MAIN",2300,3800,745,336
 ZOrder=95
 
 [Relation]
@@ -1409,7 +1409,7 @@ LName=サマリー計算手法マスタ
 Comment=サマリー計算手法マスタ\nauthor: ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=4450
 Top=3150
 Field="集約方法ID","summary_method_id","INT","NOT NULL",0,"","",$000028FF,""
@@ -1424,7 +1424,7 @@ EffectMode=None
 Color=$000000
 BkColor=$00F5FF
 ModifiedDateTime=20260331142421
-Position="Main",4450,3150,866,370
+Position="MAIN",4450,3150,866,370
 ZOrder=99
 
 [Relation]
@@ -1454,7 +1454,7 @@ LName=センサーデータ日次サマリ
 Comment=センサーデータ日次サマリ（Gold層のセンサーデータ日次サマリテーブルに対応）\nauthor: ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=3400
 Top=4050
 Field="デバイスID","device_id","INT","NOT NULL",0,"","",$0079009A,""
@@ -1469,7 +1469,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260331143838
-Position="Main",3400,4050,745,336
+Position="MAIN",3400,4050,745,336
 ZOrder=101
 
 [Relation]
@@ -1562,7 +1562,7 @@ LName=センサーデータ月次サマリ
 Comment=センサーデータ月次サマリ（Gold層のセンサーデータ月次サマリテーブルに対応）\nauthor: ksugiya1
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=2800
 Top=4600
 Field="デバイスID","device_id","INT","NOT NULL",0,"","",$0079009A,""
@@ -1577,7 +1577,7 @@ EffectMode=None
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20260331144103
-Position="Main",2800,4600,771,336
+Position="MAIN",2800,4600,771,336
 ZOrder=106
 
 [Relation]
@@ -1663,111 +1663,3 @@ Bar3=418
 TermPos1=R
 TermPos2=R
 ZOrder=110
-
-[Entity]
-PName=gold_sensor_data_yearly_summary
-LName=センサーデータ年次サマリ
-Comment=センサーデータ年次サマリ（Gold層のセンサーデータ年次サマリテーブルに対応）\nauthor: ksugiya1
-TableInnerOption=
-TableOption=
-Page=Main
-Left=4250
-Top=4500
-Field="デバイスID","device_id","INT","NOT NULL",0,"","",$0079009A,""
-Field="組織ID","organization_id","INT","NOT NULL",1,"","",$0079009A,""
-Field="集約年","collection_year","INT","NOT NULL",2,"","",$000028FF,""
-Field="測定項目ID","measurement_item_id","INT","NOT NULL",3,"","",$0079009A,""
-Field="集約方法ID","summary_method_id","INT","NOT NULL",4,"","",$0079009A,""
-Field="集約値","summary_value","DOUBLE","NOT NULL",,"","",$FFFFFFFF,""
-Field="データ数","data_count","INT","NOT NULL",,"","",$FFFFFFFF,""
-Field="作成日時","create_date","DATETIME","NOT NULL",,"","",$FFFFFFFF,""
-EffectMode=None
-Color=$000000
-BkColor=$FFFFFF
-ModifiedDateTime=20260401114503
-Position="Main",4250,4500,771,336
-ZOrder=111
-
-[Relation]
-Entity1=measurement_item_master
-Entity2=gold_sensor_data_yearly_summary
-RelationType1=2
-RelationType2=3
-Fields1=measurement_item_id
-Fields2=measurement_item_id
-Cardinarity1=
-Cardinarity2=
-Position="MAIN",0,8181,925,751,R,R,""
-Dependence=1
-Caption=
-PName=
-LineMode=0
-Bar1=818
-Bar2=92
-Bar3=75
-TermPos1=R
-TermPos2=R
-ZOrder=112
-
-[Relation]
-Entity1=gold_summary_method_master
-Entity2=gold_sensor_data_yearly_summary
-RelationType1=2
-RelationType2=3
-Fields1=summary_method_id
-Fields2=summary_method_id
-Cardinarity1=
-Cardinarity2=
-Position="MAIN",0,4207,5793,4207,R,R,""
-Dependence=1
-Caption=
-PName=
-LineMode=0
-Bar1=421
-Bar2=579
-Bar3=421
-TermPos1=R
-TermPos2=R
-ZOrder=113
-
-[Relation]
-Entity1=device_master
-Entity2=gold_sensor_data_yearly_summary
-RelationType1=2
-RelationType2=3
-Fields1=device_id
-Fields2=device_id
-Cardinarity1=
-Cardinarity2=
-Position="MAIN",0,3601,3582,1696,R,R,""
-Dependence=1
-Caption=
-PName=
-LineMode=0
-Bar1=360
-Bar2=358
-Bar3=170
-TermPos1=R
-TermPos2=R
-ZOrder=114
-
-[Relation]
-Entity1=organization_master
-Entity2=gold_sensor_data_yearly_summary
-RelationType1=2
-RelationType2=3
-Fields1=organization_id
-Fields2=organization_id
-Cardinarity1=
-Cardinarity2=
-Position="MAIN",0,4612,8283,2284,R,R,""
-Dependence=1
-Caption=
-PName=
-LineMode=0
-Bar1=461
-Bar2=828
-Bar3=228
-TermPos1=R
-TermPos2=R
-ZOrder=115

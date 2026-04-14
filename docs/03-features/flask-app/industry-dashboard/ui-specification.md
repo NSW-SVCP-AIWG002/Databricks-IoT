@@ -35,7 +35,7 @@
 |------|------|
 | 画面ID | `IDS-001` |
 | 画面名 | 店舗モニタリング画面 |
-| 画面パス | `/industry-dashboard/store-monitoring` |
+| 画面パス | `/analysis/industry-dashboard/store-monitoring` |
 | アクセス権限 | システム保守者、管理者、販社ユーザ、サービス利用者（すべてのロール） |
 | 親画面 | なし |
 | 子画面 | IDS-002（デバイス詳細画面） |
@@ -165,14 +165,15 @@
 | No | 項目名 | オブジェクト名 | 入力タイプ | I/O | 必須 | 最大桁 | 初期値 | 表示内容 | 備考 |
 |------|------|------|------|------|------|------|------|------|------|
 | (1) | 画面タイトル | page_title | - | O | - | - | - | 固定値: 「店舗モニタリング」 | 固定表示 |
-| (2.1) | 店舗名検索 | organization_name | Text | I/O | - | 200 | - | - | 部分一致検索 |
+| (2.1) | 店舗名検索 | organization_name | Text | I/O | - | 200 | - | - | 入力値で部分一致するドロップダウン表示。ドロップダウン選択時は organization_id で完全一致検索、未選択時は入力文字列で部分一致検索 |
+| (2.1.1) | 店舗ID（隠しフィールド） | organization_id | Hidden | I | - | - | - | - | ドロップダウン選択時に組織IDをセット。入力欄を手動変更した場合はクリア |
 | (2.2) | デバイス名検索 | search_device_name | Text | I/O | - | 100 | - | - | 部分一致検索 |
 | (2.3) | 検索ボタン | search_button | Button | I | - | - | - | 固定値: 「検索」 | プライマリボタン |
 | (2.4) | 展開縮小ボタン | collapse_button | Label | I | - | - | - | 検索欄縮小時：▶　検索欄拡大時：▼ | |
 | (3.1) | アラート発生日時 | alert_occurrence_datetime | Label | O | - | - | - | DB: `alert_history.alert_occurrence_datetime` | YYYY/MM/DD HH:mm:ss 形式、ソート可 |
 | (3.2) | デバイス名 | device_name | Label | O | - | - | - | DB: `device_master.device_name` | ソート可 |
 | (3.3) | アラート名 | alert_name | Label | O | - | - | - | DB: `alert_setting_master.alert_name` | ソート可 |
-| (3.4) | アラートレベル | alert_level | Badge | O | - | - | - | DB: `alert_level_master.alert_level_name` | バッジ表示（Critical: 赤、Warning: 黄、Info: 青）、ソート可 |
+| (3.4) | アラートレベル | alert_level | Badge | O | - | - | - | DB: `alert_level_master.alert_level_name` | バッジ表示（重大: 赤、警告: 黄、情報: 青）、ソート可 |
 | (3.5) | ステータス | alert_status | Badge | O | - | - | - | DB: `alert_status_master.alert_status_name` | バッジ表示（発生中: 赤、復旧済み: 青）、ソート可 |
 | (3.6) | アラート件数 | alert_count | Label | O | - | - | - | 検索結果件数 | |
 | (3.7) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号、総件数 | 中央揃え |
@@ -186,7 +187,7 @@
 | (5.2) | デバイス名 | device_name | Label | O | - | - | - | DB: `device_master.device_name` | |
 | (5.3) | デバイス種別 | device_type | Label | O | - | - | - | DB: `device_type_master.device_type_name` | |
 | (5.4) | モデル情報 | device_model | Label | O | - | - | - | DB: `device_master.device_model` | |
-| (5.5) | センサーデータ | sensor_data | Label | O | - | - | - | UnityCatalog: `sensor_data_view` | センサー情報表示ボタンを押下したデバイスのセンサーデータを表示 |
+| (5.5) | センサーデータ | sensor_data | Label | O | - | - | - | DB: `silver_sensor_data`（MySQL）、データなしの場合は空表示 | センサー情報表示ボタンを押下したデバイスのセンサーデータを表示 |
 | (6) | 画面タイトル | page_title | - | O | - | - | - | 固定値: 「デバイス詳細」 | 固定表示 |
 | (7) | デバイス変更ボタン | change_device_button | Button | I | - | - | - | 固定値: 「デバイス変更」 | プライマリボタン |
 | (8.1) | デバイス名 | device_name | Label | O | - | - | - | DB: `device_master.device_name` | |
@@ -195,7 +196,7 @@
 | (8.4) | 店舗名 | store_name | Label | O | - | - | - | DB: `organization_master.organization_name` | |
 | (9.1) | アラート発生日時 | alert_occurrence_datetime | Label | O | - | - | - | DB: `alert_history.alert_occurrence_datetime` | YYYY/MM/DD HH:mm:ss 形式、ソート可 |
 | (9.2) | アラート名 | alert_name | Label | O | - | - | - | DB: `alert_setting_master.alert_name` | ソート可 |
-| (9.3) | アラートレベル | alert_level | Badge | O | - | - | - | DB: `alert_level_master.alert_level_name` | バッジ表示（Critical: 赤、Warning: 黄、Info: 青）、ソート可 |
+| (9.3) | アラートレベル | alert_level | Badge | O | - | - | - | DB: `alert_level_master.alert_level_name` | バッジ表示（重大: 赤、警告: 黄、情報: 青）、ソート可 |
 | (9.4) | ステータス | alert_status | Badge | O | - | - | - | DB: `alert_status_master.alert_status_name` | バッジ表示（発生中: 赤、復旧済み: 青）、ソート可 |
 | (9.5) | アラート件数 | alert_count | Label | O | - | - | - | 検索結果件数 | |
 | (9.6) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号、総件数 | 中央揃え |
@@ -204,9 +205,9 @@
 | (10.3) | 表示期間変更ボタン | display_period_change_button | Button | I | - | - | - | 固定値: 「表示期間変更」 | プライマリボタン |
 | (10.4) | 自動更新チェックボックス | automatic_update_checkbox | Checkbox | I/O | - | - | 選択 | 固定値: 「自動更新」 | |
 | (11) | CSVエクスポートボタン | export_button | Button | I | - | - | - | 固定値: 「CSVエクスポート」 | プライマリボタン |
-| (12.1) | 時系列グラフ | time_series_graph | Graph | O | - | - | - | UnityCatalog: `sensor_data_view` | 折れ線グラフ |
+| (12.1) | 時系列グラフ | time_series_graph | Graph | O | - | - | - | DB: `silver_sensor_data`（MySQL）、データなしの場合はグラフ非表示 | 折れ線グラフ |
 | (12.2) | 最終更新時刻表示 | last_updated_time | Label | O | - | - | - | 時系列グラフデータを更新した最終時刻を表示 | YYYY/MM/DD HH:mm:ss 形式 |
-| (13) | 凡例 | legend | Checkbox | I/O | - | - | 選択 | UnityCatalog: `sensor_data_view` | |
+| (13) | 凡例 | legend | Checkbox | I/O | - | - | 選択 | DB: `silver_sensor_data`（MySQL） | |
 
 ---
 
@@ -222,22 +223,29 @@
 ├──────────────────────────────────────────────────────────────┤
 │ (2.1) 店舗名　　　　(2.2) デバイス名　　　　　　　　　　　　　　　│
 │ ┌─────────────────┐　┌─────────────────┐　　　　　　　　　　　 │
-│ │ 店舗を検索...　▼ │  │                 │　　　　　　　　　　　 │
-│ └─────────────────┘　└─────────────────┘　　　　　　　　　　　 │
-│　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　│
+│ │ 店舗を検索...　  │  │                 │　　　　　　　　　　　 │
+│ ├─────────────────┤　└─────────────────┘　　　　　　　　　　　 │
+│ │ 店舗A           │　　　　　　　　　　　　　　　　　　　　　　　 │
+│ │ 店舗AB          │　　　　　　　　　　　　　　　　　　　　　　　 │
+│ │ 新店舗A         │　　　　　　　　　　　　　　　　　　　　　　　 │
+│ └─────────────────┘　　　　　　　　　　　　　　　　　　　　　　　 │
 │　　　　　　　　　　　　(2.3) [検索]　　　　　　　　　　　　 　　　│
 └──────────────────────────────────────────────────────────────┘
 ```
 
 **2-1: 店舗名検索**
-- 概要: 店舗名で完全一致または部分一致検索
+- 概要: 組織IDによる完全一致または入力文字列による部分一致検索
 - ラベル: 「店舗名」
 - プレースホルダー： 「店舗を検索...」
 - 入力制限：入力可能文字列長は最大200文字
 - ドロップダウン仕様：
-  - 「店舗を検索...」の部分が入力エリアになり、入力された値でドロップダウンリストが検索される
-  - ドロップダウンリストが選択されている場合、完全一致検索となる
-  - ドロップダウンリストが選択されていない場合、入力エリアの内容で部分一致検索となる
+  - 入力エリアに文字を入力すると、部分一致する店舗名をドロップダウンリストとして入力欄の下に表示する
+  - ドロップダウンリストから店舗を選択すると、店舗名が入力エリアにセットされ、隠しフィールド（organization_id）に組織IDがセットされる
+  - 入力エリアを手動で変更した場合（ドロップダウン未選択で直接入力した場合）、隠しフィールド（organization_id）はクリアされる
+- 検索動作：
+  - リクエストに `organization_id` がある場合: その組織IDで完全一致検索（対象組織のみ）
+  - リクエストに `organization_id` がなく `organization_name` がある場合: 入力文字列で部分一致検索
+  - どちらもない場合: 全件取得（絞り込みなし）
 
 **2-2: デバイス名検索**
 - 概要: デバイス名で部分一致検索
@@ -304,9 +312,9 @@
 - 概要: アラートのレベルを表示
 - スタイル: バッチ
 - バッチ色:
-  - Critical: 赤
-  - Warning: 黄
-  - Info: 青
+  - 重大: 赤
+  - 警告: 黄
+  - 情報: 青
 
 **3-5: ステータスカラム**
 - 概要: アラートのステータスを表示
@@ -435,22 +443,22 @@
 **5-2: デバイス名**
 - 概要: デバイスの名称を表示
 - ラベル: 「デバイス名:」
-- 初期表示: ラベルのみ
+- 初期表示: デバイス一覧の先頭デバイスのデータを表示
 
 **5-3: デバイス種別**
 - 概要: デバイスの種別を表示
 - ラベル: 「デバイス種別:」
-- 初期表示: ラベルのみ
+- 初期表示: デバイス一覧の先頭デバイスのデータを表示
 
 **5-4: モデル情報**
 - 概要: デバイスのモデル情報を表示
 - ラベル: 「モデル情報:」
-- 初期表示: ラベルのみ
+- 初期表示: デバイス一覧の先頭デバイスのデータを表示
 
 **5-5: センサーデータ**
 - 概要: デバイスのセンサーデータを表示
 - ラベル: センサーデータの名称
-- 初期表示: ラベルのみ
+- 初期表示: デバイス一覧の先頭デバイスのセンサーデータを表示（デバイスが0件の場合は非表示）
 
 ---
 
@@ -556,9 +564,9 @@
 - 概要: アラートのレベルを表示
 - スタイル: バッチ
 - バッチ色:
-  - Critical: 赤
-  - Warning: 黄
-  - Info: 青
+  - 重大: 赤
+  - 警告: 黄
+  - 情報: 青
 
 **9-4: ステータスカラム**
 - 概要: アラートのステータスを表示
@@ -642,7 +650,7 @@
 **CSVエクスポートボタン:**
 - 概要: 現在の検索条件でセンサーデータをCSVダウンロード
 - スタイル: セカンダリボタン
-- クリック時: `/industry-dashboard/device-details/<device_uuid>?export=csv`にリクエスト
+- クリック時: `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv`にリクエスト
 
 ---
 
@@ -679,11 +687,11 @@
 - スタイル: 折れ線グラフ
 - 使用ライブラリ: Apache ECharts
 - 横軸:
-  - 値: UnityCatalog: `sensor_data_view.event_timestamp`
+  - 値: `event_timestamp`（DB: `silver_sensor_data`（MySQL））
   - 表示形式: YYYY/MM/DD HH:mm
   - ラベル名: なし
-- 縦軸: 
-  - 値: UnityCatalog: `sensor_data_view（ダッシュボード内グラフ縦軸表示項目）`
+- 縦軸:
+  - 値: センサーデータ各カラム（DB: `silver_sensor_data`（MySQL））
   - 表示形式: 値 + 単位（例: 10℃）
   - ラベル名: なし
   - 軸数: 複数軸対応

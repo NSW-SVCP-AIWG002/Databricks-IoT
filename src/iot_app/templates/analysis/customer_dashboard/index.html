@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+
+{% block title %}顧客作成ダッシュボード{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/customer_dashboard/common.css') }}">
+{% for info in gadget_static_files %}
+<link rel="stylesheet" href="{{ url_for('static', filename=info['css']) }}">
+{% endfor %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+
+
+<div class="customer-dashboard">
+
+  {# ── ツールバー行1: タイトル + 管理ツール ──────────────── #}
+  <div class="customer-dashboard__toolbar">
+    <h1 class="customer-dashboard__title">顧客作成ダッシュボード</h1>
+    <div class="dashboard-mgmt-tools">
+      <label class="toggle" id="edit-mode-toggle-label">
+        <span class="toggle__label">編集モード</span>
+        <input type="checkbox" id="edit-mode-toggle" class="toggle__input">
+        <span class="toggle__track"></span>
+      </label>
+      <button
+        type="button"
+        id="save-layout-btn"
+        class="button button--primary"
+        disabled
+        data-url="{{ url_for('customer_dashboard.layout_save') }}"
+      >レイアウト保存</button>
+      <button
+        type="button"
+        id="dashboard-mgmt-btn"
+        class="button button--primary"
+        data-modal-url="{{ url_for('customer_dashboard.dashboard_management') }}"
+      >ダッシュボード管理</button>
+    </div>
+  </div>
+
+  {# ── ツールバー行2: データソース選択 + 日時設定 ─────────── #}
+  <div class="customer-dashboard__subbar">
+
+    {# (3) データソース選択フォーム #}
+    <div class="datasource-form">
+      <label class="datasource-form__label" for="select-organization">組織</label>
+      <select
+        id="select-organization"
+        class="datasource-form__select"
+        data-devices-url="{{ url_for('customer_dashboard.organization_devices', org_id=0) | replace('/0/', '/') }}"
+        data-save-url="{{ url_for('customer_dashboard.datasource_save') }}"
+      >
+        <option value="">-- 選択してください --</option>
+        {% for org in organizations %}
+          <option
+            value="{{ org.organization_id }}"
+            {% if user_setting and user_setting.organization_id == org.organization_id %}selected{% endif %}
+          >{{ org.organization_name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="datasource-form__label" for="select-device">デバイス</label>
+      <select
+        id="select-device"
+        class="datasource-form__select"
+        {% if not user_setting or user_setting.organization_id is none %}disabled{% endif %}
+        data-save-url="{{ url_for('customer_dashboard.datasource_save') }}"
+      >
+        <option value="">-- 選択してください --</option>
+        {% for device in devices %}
+          <option
+            value="{{ device.device_id }}"
+            {% if user_setting and user_setting.device_id == device.device_id %}selected{% endif %}
+          >{{ device.device_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# (4) 日時設定ツール #}
+    <div class="datetime-tools">
+      <button type="button" class="button button--primary datetime-btn" data-range="today">今日</button>
+      <button type="button" class="button button--primary datetime-btn" data-range="yesterday">昨日</button>
+      <button type="button" class="button button--primary datetime-btn" data-range="this_week">今週</button>
+      <button type="button" class="button button--primary datetime-btn" data-range="this_month">今月</button>
+      <button type="button" class="button button--primary datetime-btn" data-range="this_year">今年</button>
+
+      <div class="custom-datetime-wrapper">
+        <button type="button" class="button button--primary" id="custom-datetime-btn">カスタム ▼</button>
+        <div class="custom-datetime-dropdown" id="custom-datetime-dropdown" hidden>
+          <div class="custom-datetime-dropdown__row">
+            <label for="custom-start">開始日時</label>
+            <input type="datetime-local" id="custom-start" step="1">
+          </div>
+          <div class="custom-datetime-dropdown__row">
+            <label for="custom-end">終了日時</label>
+            <input type="datetime-local" id="custom-end" step="1">
+          </div>
+          <div class="custom-datetime-dropdown__actions">
+            <button type="button" class="button button--primary" id="custom-apply-btn">適用</button>
+            <button type="button" class="button button--secondary" id="custom-cancel-btn">キャンセル</button>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="button button--primary" id="datetime-reset-btn">日時初期化</button>
+
+      <label class="toggle" id="auto-refresh-toggle-label">
+        <span class="toggle__label">自動更新</span>
+        <input type="checkbox" id="auto-refresh-toggle" class="toggle__input" checked>
+        <span class="toggle__track"></span>
+      </label>
+
+      <span class="datetime-tools__last-updated">
+        最終更新時刻: <span id="last-updated-time">--</span>
+      </span>
+    </div>
+
+  </div>{# /subbar #}
+
+  {# ── 編集モード中バナー ───────────────────────────────── #}
+  <div class="edit-mode-banner" id="edit-mode-banner" hidden>編集モード中です</div>
+
+  {# ── ダッシュボード本体 ───────────────────────────────── #}
+  {% if dashboard %}
+
+    {# (5) ダッシュボードヘッダー #}
+    <div class="dashboard-header" data-dashboard-uuid="{{ dashboard.dashboard_uuid }}">
+      <h2 class="dashboard-header__title">{{ dashboard.dashboard_name }}</h2>
+      <div class="setting-menu">
+        <button type="button" class="button button--icon setting-menu__trigger" aria-label="ダッシュボード設定">⚙</button>
+        <ul class="setting-menu__list" hidden>
+          <li>
+            <a
+              class="setting-menu__item"
+              href="#"
+              data-modal-url="{{ url_for('customer_dashboard.dashboard_edit', dashboard_uuid=dashboard.dashboard_uuid) }}"
+            >ダッシュボードタイトル更新</a>
+          </li>
+          <li>
+            <a
+              class="setting-menu__item"
+              href="#"
+              data-modal-url="{{ url_for('customer_dashboard.group_create', dashboard_uuid=dashboard.dashboard_uuid) }}"
+            >ダッシュボードグループ登録</a>
+          </li>
+        </ul>
+      </div>
+    </div>{# /dashboard-header #}
+
+    {# グループ一覧 #}
+    {% for group in groups %}
+        {# グループに属するガジェットを抽出 #}
+        {% set group_gadgets = gadgets | selectattr('dashboard_group_id', 'equalto', group.dashboard_group_id) | list %}
+
+        {# (6) ダッシュボードグループヘッダー + (7) コンテンツエリア #}
+        <div class="dashboard-group" data-group-uuid="{{ group.dashboard_group_uuid }}">
+
+          <div class="dashboard-group__header">
+            <button
+              type="button"
+              class="dashboard-group__collapse-btn"
+              aria-expanded="true"
+              aria-controls="group-content-{{ group.dashboard_group_id }}"
+            >▼</button>
+            <h3 class="dashboard-group__title">{{ group.dashboard_group_name }}</h3>
+            <div class="setting-menu">
+              <button type="button" class="button button--icon setting-menu__trigger" aria-label="グループ設定">⚙</button>
+              <ul class="setting-menu__list" hidden>
+                <li>
+                  <a
+                    class="setting-menu__item"
+                    href="#"
+                    data-modal-url="{{ url_for('customer_dashboard.gadget_add', dashboard_uuid=dashboard.dashboard_uuid, group_uuid=group.dashboard_group_uuid) }}"
+                  >ガジェット追加</a>
+                </li>
+                <li>
+                  <a
+                    class="setting-menu__item"
+                    href="#"
+                    data-modal-url="{{ url_for('customer_dashboard.group_edit', dashboard_group_uuid=group.dashboard_group_uuid) }}"
+                  >ダッシュボードグループタイトル更新</a>
+                </li>
+                <li>
+                  <a
+                    class="setting-menu__item setting-menu__item--danger"
+                    href="#"
+                    data-modal-url="{{ url_for('customer_dashboard.group_delete_confirm', dashboard_group_uuid=group.dashboard_group_uuid) }}"
+                  >ダッシュボードグループ削除</a>
+                </li>
+              </ul>
+            </div>
+          </div>{# /dashboard-group__header #}
+
+          {# (7) ダッシュボードコンテンツエリア #}
+          <div
+            class="dashboard-content"
+            id="group-content-{{ group.dashboard_group_id }}"
+            data-group-id="{{ group.dashboard_group_id }}"
+          >
+            {% for gadget in group_gadgets %}
+                {# (8) ガジェット #}
+                <div
+                  class="gadget{% if gadget.gadget_size == 1 %} gadget--wide{% endif %}"
+                  data-gadget-uuid="{{ gadget.gadget_uuid }}"
+                  data-gadget-id="{{ gadget.gadget_id }}"
+                  data-gadget-type-id="{{ gadget.gadget_type_id }}"
+                  data-gadget-size="{{ gadget.gadget_size }}"
+                  data-position-x="{{ gadget.position_x }}"
+                  data-position-y="{{ gadget.position_y }}"
+                  data-display-order="{{ gadget.display_order }}"
+                  data-chart-config='{{ gadget.chart_config | tojson }}'
+                  data-datasource-config='{{ gadget.data_source_config | tojson }}'
+                  data-data-url="{{ url_for('customer_dashboard.gadget_data', gadget_uuid=gadget.gadget_uuid) }}"
+                >
+                  {# ガジェットヘッダー #}
+                  <div class="gadget__header">
+                    <span class="gadget__drag-handle" aria-hidden="true">⠿</span>
+                    <h4 class="gadget__title">{{ gadget.gadget_name }}</h4>
+                    <div class="setting-menu">
+                      <button type="button" class="button button--icon setting-menu__trigger" aria-label="ガジェット設定">⚙</button>
+                      <ul class="setting-menu__list" hidden>
+                        <li>
+                          <a
+                            class="setting-menu__item"
+                            href="#"
+                            data-modal-url="{{ url_for('customer_dashboard.gadget_edit', gadget_uuid=gadget.gadget_uuid) }}"
+                          >ガジェットタイトル更新</a>
+                        </li>
+                        <li>
+                          <a
+                            class="setting-menu__item setting-menu__item--danger"
+                            href="#"
+                            data-modal-url="{{ url_for('customer_dashboard.gadget_delete_confirm', gadget_uuid=gadget.gadget_uuid) }}"
+                          >ガジェット削除</a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>{# /gadget__header #}
+
+                  {# データソース・CSVエクスポート行 #}
+                  <div class="gadget__subheader">
+                    <span class="gadget__datasource-name">{{ gadget_device_names.get(gadget.gadget_uuid, '--') }}</span>
+                    <a
+                      class="button button--primary gadget__csv-btn"
+                      href="{{ url_for('customer_dashboard.gadget_csv_export', gadget_uuid=gadget.gadget_uuid) }}?export=csv"
+                      {% if gadget.gadget_type_id == gadget_type_ids['円グラフ'] %}style="visibility: hidden;"{% endif %}
+                    >CSVエクスポート</a>
+                  </div>
+
+                  {# ガジェット種別固有UI #}
+                  {% set tmpl = gadget_id_to_template.get(gadget.gadget_type_id) %}
+                  {% if tmpl %}
+                    {% include tmpl %}
+                  {% endif %}
+
+                </div>{# /gadget #}
+            {% endfor %}
+          </div>{# /dashboard-content #}
+
+        </div>{# /dashboard-group #}
+      {% endfor %}
+
+  {% endif %}{# /dashboard exists #}
+
+</div>{# /customer-dashboard #}
+
+{# ── 日時初期化 確認モーダル（インライン） ─────────────── #}
+<div class="modal-overlay" id="datetime-reset-modal">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">日時初期化</h2>
+    </div>
+    <div class="modal__body">
+      <p>ガジェットの日時を最新時刻に更新します。よろしいですか？</p>
+    </div>
+    <div class="modal__footer">
+      <button type="button" class="button button--primary" id="datetime-reset-confirm-btn">はい</button>
+      <button type="button" class="button button--secondary" id="datetime-reset-cancel-btn">いいえ</button>
+    </div>
+  </div>
+</div>
+
+{# ── AJAXモーダルコンテナ ───────────────────────────── #}
+<div class="modal-overlay" id="ajax-modal-overlay">
+  <div class="modal" id="ajax-modal-content"></div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script src="{{ url_for('static', filename='js/components/customer_dashboard/common.js') }}"></script>
+{% for info in gadget_static_files %}
+<script src="{{ url_for('static', filename=info['js']) }}"></script>
+{% endfor %}
+<script>
+  CustomerDashboard.init({
+    selectedOrganizationId: {{ (user_setting.organization_id if user_setting and user_setting.organization_id is not none else none) | tojson }},
+    selectedDeviceId: {{ (user_setting.device_id if user_setting and user_setting.device_id is not none else none) | tojson }},
+    dashboardUuid: {{ dashboard.dashboard_uuid | tojson if dashboard else 'null' }}
+  });
+</script>
+{% endblock %}

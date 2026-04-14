@@ -157,15 +157,9 @@ def set_request_id():
 
 全環境で標準出力（stdout）に JSON を出力する。Azure App Service は標準出力を収集するため、この形式で統一する。開発環境のみ、追加でテキスト形式のログファイルを出力する。
 
-<<<<<<< HEAD
 | 環境     | 出力先    | 形式                   |
 | -------- | --------- | ---------------------- |
 | 全環境   | stdout    | JSON（構造化）         |
-=======
-| 環境 | 出力先 | 形式 |
-|---|---|---|
-| 全環境 | stdout | JSON（構造化） |
->>>>>>> origin/feature/alert_settings_v2
 | dev のみ | `app.log` | テキスト（可読性確保） |
 
 ```python
@@ -190,7 +184,6 @@ if ENV == "dev":
 
 LoggerAdapter がリクエストコンテキストから自動付与するフィールド。
 
-<<<<<<< HEAD
 | フィールド  | 取得元                                                       | 認証前の値 | 備考                                               |
 | ----------- | ------------------------------------------------------------ | ---------- | -------------------------------------------------- |
 | `requestId` | `g.request_id`                                               | `-`        | UUID v4（before_request で生成）                   |
@@ -198,15 +191,6 @@ LoggerAdapter がリクエストコンテキストから自動付与するフィ
 | `endpoint`  | `request.path`                                               | `-`        |                                                    |
 | `ipAddress` | `X-Forwarded-For` ヘッダー（なければ `request.remote_addr`） | `-`        | Azure App Service はリバースプロキシ構成のため優先 |
 | `userId`    | `g.current_user.user_id`                                     | 出力しない | 認証後に設定される                                 |
-=======
-| フィールド | 取得元 | 認証前の値 | 備考 |
-|---|---|---|---|
-| `requestId` | `g.request_id` | `-` | UUID v4（before_request で生成） |
-| `method` | `request.method` | `-` | |
-| `endpoint` | `request.path` | `-` | |
-| `ipAddress` | `X-Forwarded-For` ヘッダー（なければ `request.remote_addr`） | `-` | Azure App Service はリバースプロキシ構成のため優先 |
-| `userId` | `g.current_user_id` | 出力しない | 認証後に設定される |
->>>>>>> origin/feature/alert_settings_v2
 
 > `organizationId` はセッション管理から除外されたため出力しない。userId があれば組織情報は追跡可能。
 > `userAgent` は不採用。BtoB システムのためブラウザ固有調査の需要が低く、ノイズになるため。
@@ -219,17 +203,10 @@ LoggerAdapter がリクエストコンテキストから自動付与するフィ
 
 LoggerAdapter は以下のキー名を検出して自動マスキングする。**個人情報をログ出力する場合は必ず下記のキー名を使用すること。**
 
-<<<<<<< HEAD
 | キー名  | マスキング方式                            | 入力例               | 出力例               |
 | ------- | ----------------------------------------- | -------------------- | -------------------- |
 | `email` | ローカル部の先頭2文字以外を `****` に置換 | `yamada@example.com` | `ya****@example.com` |
 | `phone` | 中間4桁を `****` に置換                   | `090-1234-5678`      | `090-****-5678`      |
-=======
-| キー名 | マスキング方式 | 入力例 | 出力例 |
-|---|---|---|---|
-| `email` | ローカル部の先頭2文字以外を `****` に置換 | `yamada@example.com` | `ya****@example.com` |
-| `phone` | 中間4桁を `****` に置換 | `090-1234-5678` | `090-****-5678` |
->>>>>>> origin/feature/alert_settings_v2
 
 ### 5.2 認証失敗時の非マスク出力
 
@@ -252,7 +229,6 @@ logger.warning("認証失敗", extra={"raw_email": "unknown@external.com"})
 
 ### 6.1 タイミング一覧
 
-<<<<<<< HEAD
 | カテゴリ                  | タイミング                                    | 実装場所                                 | レベル       |
 | ------------------------- | --------------------------------------------- | ---------------------------------------- | ------------ |
 | リクエスト                | 開始                                          | `before_request` フック                  | INFO         |
@@ -264,18 +240,6 @@ logger.warning("認証失敗", extra={"raw_email": "unknown@external.com"})
 | MySQL                     | SELECT                                        | `src/__init__.py`（SQLAlchemy イベント） | DEBUG        |
 | エラー                    | 500 系例外                                    | `error_handlers.py`                      | ERROR        |
 | エラー                    | 400 系例外（abort(4xx)）                      | `error_handlers.py`                      | WARN         |
-=======
-| カテゴリ | タイミング | 実装場所 | レベル |
-|---|---|---|---|
-| リクエスト | 開始 | `before_request` フック | INFO |
-| リクエスト | 終了（processingTime 含む） | `after_request` フック | INFO |
-| 認証 | IdP 認証成功 | `authenticate_request()` | INFO |
-| 外部API | 呼び出し前後・失敗（SCIM / Unity Catalog 等） | Connector クラス内 | INFO / ERROR |
-| MySQL | 書き込み（INSERT / UPDATE / DELETE） | `src/__init__.py`（SQLAlchemy イベント） | INFO |
-| MySQL | SELECT | `src/__init__.py`（SQLAlchemy イベント） | DEBUG |
-| エラー | 500 系例外 | `error_handlers.py` | ERROR |
-| エラー | 400 系例外（abort(4xx)） | `error_handlers.py` | WARN |
->>>>>>> origin/feature/alert_settings_v2
 
 ### 6.2 リクエスト前後（自動）
 
@@ -378,7 +342,6 @@ def delete_user(self, user_id):
 
 > **注意**: `failure_reason` の抽出方法は API のレスポンス構造によって異なる。各 Connector で適切に実装すること（例: SCIM は `message` フィールド、Unity Catalog は独自構造）。
 
-<<<<<<< HEAD
 ### 6.5 Token Exchangeパターン
 
 Token Exchange は Connector クラスの `_request()` 抽象化を持たないため、`exchange_token()` メソッド内で直接ログを出力する。フィールド構造は Connector パターンと同じ（`service`, `operation`, `duration_ms` 等）。
@@ -413,9 +376,6 @@ def exchange_token(self, idp_jwt: str) -> dict:
 ```
 
 ### 6.6 MySQL（SQLAlchemyイベントリスナー）
-=======
-### 6.5 MySQL（SQLAlchemyイベントリスナー）
->>>>>>> origin/feature/alert_settings_v2
 
 Service 層での手動ログ出力は行わない。`create_app()` 内で SQLAlchemy イベントリスナーを登録し、全 SQL 実行を自動でログ出力する。
 
@@ -451,11 +411,7 @@ def create_user(email, ...):
     # ← SQLAlchemy イベントリスナーが INSERT ログを自動出力するため手動出力不要
 ```
 
-<<<<<<< HEAD
 ### 6.7 エラーハンドリング（400系・500系）
-=======
-### 6.6 エラーハンドリング（400系・500系）
->>>>>>> origin/feature/alert_settings_v2
 
 `error_handlers.py` がすべての HTTP エラーを一元的にログ出力する。
 
@@ -487,7 +443,6 @@ def handle_4xx(e):
 
 カテゴリ別に必須フィールドを定義する。呼び出し側はこれに従うこと。
 
-<<<<<<< HEAD
 | カテゴリ        | 必須フィールド                         | 例                                                                                                 |
 | --------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | 認証成功        | `email`（マスク自動適用）              | `extra={"email": "yamada@example.com"}`                                                            |
@@ -497,28 +452,11 @@ def handle_4xx(e):
 | DB操作（MySQL） | `query`, `duration_ms`                 | SQLAlchemy イベントリスナーが自動付与                                                              |
 | 400系エラー     | `httpStatus`                           | `extra={"httpStatus": e.code}`                                                                     |
 | 500エラー       | 例外クラス名・スタックトレース（自動） | `exc_info=True` で自動付与。任意で `extra={"error_type": type(e).__name__}`                        |
-=======
-| カテゴリ | 必須フィールド | 例 |
-|---|---|---|
-| 認証成功 | `email`（マスク自動適用） | `extra={"email": "yamada@example.com"}` |
-| 認証失敗 | `raw_email`（マスクなし） | `extra={"raw_email": "unknown@external.com"}` |
-| 外部API呼び出し | `service`, `operation`, `duration_ms` | `extra={"service": "databricks_scim", "operation": "ユーザー作成", "duration_ms": 95}` |
-| 外部API失敗 | 上記 + `status`, `failure_reason` | `extra={..., "status": 400, "failure_reason": "user already exists"}` ※ API ごとに抽出方法が異なる |
-| DB操作（MySQL） | `query`, `duration_ms` | SQLAlchemy イベントリスナーが自動付与 |
-| 500エラー | 例外クラス名・スタックトレース（自動） | `exc_info=True` で自動付与。任意で `extra={"error_type": type(e).__name__}` |
->>>>>>> origin/feature/alert_settings_v2
 
 ---
 
 ## 8. 未決定事項
 
-<<<<<<< HEAD
 | 項目                                                           | 状況   |
 | -------------------------------------------------------------- | ------ |
 | JSON フォーマッターの実装ライブラリ（`python-json-logger` 等） | 要検討 |
-=======
-| 項目 | 状況 |
-|---|---|
-| JSON フォーマッターの実装ライブラリ（`python-json-logger` 等） | 要検討 |
-| 400系エラーのフィールド規則（status 以外に何を出すか） | 400系ハンドリング設計確定後に7章へ追記 |
->>>>>>> origin/feature/alert_settings_v2

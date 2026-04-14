@@ -75,19 +75,15 @@
 
 すべてのFlaskルートで使用する共通HTTPステータスコードを定義します。
 
-| コード | 説明                  | 使用場面                           | Flask実装                            |
-| ------ | --------------------- | ---------------------------------- | ------------------------------------ |
-| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                  |
-| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                         |
-| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error       |
-| 401    | Unauthorized          | 認証エラー                         | ログインページへリダイレクト         |
-| 403    | Forbidden             | 権限不足                           | `render_template('errors/403.html')` |
-| 404    | Not Found             | リソース未検出                     | `render_template('errors/404.html')` |
-| 409    | Conflict              | 競合エラー（重複登録など）         | `render_template()` with error       |
-| 422    | Unprocessable Entity  | バリデーションエラー               | `render_template()` with form errors |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')` |
-| 502    | Bad Gateway           | 外部API連携エラー                  | `render_template('errors/502.html')` |
-| 503    | Service Unavailable   | メンテナンス中                     | `render_template('errors/503.html')` |
+| コード | 説明                  | 使用場面                           | Flask実装                              |
+| ------ | --------------------- | ---------------------------------- | -------------------------------------- |
+| 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                    |
+| 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                           |
+| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error modal   |
+| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
+| 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
+| 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
+| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')`   |
 
 **注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
 
@@ -97,17 +93,15 @@
 
 アプリケーション内部で使用するエラーコードを定義します。
 
-| コード             | 説明                 | HTTPステータス | 表示方法                          |
-| ------------------ | -------------------- | -------------- | --------------------------------- |
-| AUTH_FAILED        | 認証失敗             | 401            | ログインページへリダイレクト      |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーページまたはFlashメッセージ |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーページ                      |
-| DUPLICATE_ENTRY    | 重複エラー           | 409            | フォームエラーメッセージ          |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | フォームエラーメッセージ          |
-| VALIDATION_ERROR   | バリデーションエラー | 422            | フォームエラーメッセージ          |
-| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ                      |
-| EXTERNAL_API_ERROR | 外部API連携エラー    | 502            | エラーページ                      |
-| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ                      |
+| コード             | 説明                 | HTTPステータス | 表示方法                             |
+| ------------------ | -------------------- | -------------- | ------------------------------------ |
+| AUTH_FAILED        | 認証失敗             | 401            | ログイン画面へリダイレクト |
+| PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
+| INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ表示（errors/500.html）                  |
+| EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーページ表示（errors/500.html）                  |
+| DATABASE_ERROR     | データベースエラー   | 500            | エラーページ表示（errors/500.html）                  |
 
 **Flask実装例:**
 
@@ -162,14 +156,12 @@ except Exception as e:
 
 | エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
 | -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
-| バリデーションエラー | 入力パラメータの形式・値が不正 | フォームにエラー表示         | 400, 422       | 開始前                 |
-| 認証エラー           | 認証失敗                       | ログインページへリダイレクト | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーページまたはFlash      | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーページまたはFlash      | 404            | 読み取りのみ           |
-| 競合エラー           | データの重複・競合             | フォームにエラー表示         | 409            | 開始後（ロールバック） |
-| データベースエラー   | DB接続失敗、SQL実行失敗        | ロールバック後エラーページ   | 500            | 開始後（ロールバック） |
-| 外部API連携エラー    | 外部サービスとの連携失敗       | ロールバック後エラーページ   | 502            | 開始後（ロールバック） |
-| タイムアウト         | 処理時間超過                   | ロールバック後エラーページ   | 504            | 開始後（ロールバック） |
+| パラメータ不正       | 入力パラメータの形式・値が不正 | エラーメッセージモーダル表示 | 400            | 開始前                 |
+| 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
+| データベースエラー   | DB接続失敗、SQL実行失敗        | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
+| 外部API連携エラー    | 外部サービスとの連携失敗       | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
 
 **注:** トランザクション管理の詳細は[トランザクション管理](#トランザクション管理)セクションを参照してください。
 
@@ -1566,10 +1558,95 @@ db.session.commit()
 
 ### ログ保存先
 
-| 環境     | 保存先                              | 備考                               |
-| -------- | ----------------------------------- | ---------------------------------- |
-| 開発環境 | stdout（JSON）+ `app.log`（テキスト） | ローカル開発時の可読性確保 |
-| stg / 本番環境 | stdout（JSON）→ Azure Log Analytics | フィールド単位のクエリ・アラート設定 |
+| 環境     | 保存先                                        | 備考                               |
+| -------- | --------------------------------------------- | ---------------------------------- |
+| 開発環境 | Databricks Apps標準ログ                       | Databricks Apps環境                |
+| 本番環境 | Databricks Apps標準ログ + Azure Log Analytics | クエリ・分析可能、アラート設定済み |
+
+**注:** Databricks Appsの標準ログ出力先は、Databricksの仕様に従ってください。
+
+---
+
+## 識別子（ID）設計方針
+
+画面上で登録内容を管理するテーブルに関しては、主キーとAPI識別子を使い分けて設計します。
+
+### 主キー（Primary Key）
+
+**データ型:** 数値型の連番（INT）
+
+**使用目的:**
+- データベース内部での結合処理
+- インデックス効率の最適化
+- 内部的なリレーションシップ管理
+
+### API識別子（UUID）
+
+**データ型:** UUID
+
+**使用目的:**
+- APIのパスパラメータ
+- フォーム送信値
+- 外部システムとの連携
+- URL内での識別子
+
+---
+
+## 設定ファイル管理項目
+
+### 概要
+
+データベースのマスタテーブルではなく、**設定ファイル（constants.py）で管理する項目**を定義します。
+
+**設定ファイル管理の利点:**
+- Pythonコードとして直接参照でき、型安全性が高い
+- バージョン管理が容易
+- 環境ごとの設定差分管理が簡単
+- データベースマイグレーション不要
+- 外部ライブラリ（PyYAML等）への依存が不要
+
+**設定ファイル格納場所:**
+```
+common/
+└── src/iot_app/common/constants.py    # アプリケーション設定（全項目統合）
+```
+
+### 設定ファイル全体構造
+
+`src/iot_app/common/constants.py` には、以下の全設定項目を統合して管理します。
+
+```python
+# アラート比較演算子
+ALERT_OPERATORS = [
+    {"operator_id": "gt", "operator_symbol": ">"},
+    {"operator_id": "lt", "operator_symbol": "<"},
+    {"operator_id": "gte", "operator_symbol": ">="},
+    {"operator_id": "lte", "operator_symbol": "<="},
+    {"operator_id": "eq", "operator_symbol": "=="},
+]
+
+# 判定時間（分）
+JUDGMENT_TIMES = [1, 5, 10, 15, 30, 60]
+
+# ページネーション設定
+PAGINATION = {
+    "default_items_per_page": 25,
+}
+
+# マスタデフォルト値
+MASTER_DEFAULTS = {
+    "user_status": {
+        "active": 1,
+        "locked": 0,
+    },
+}
+```
+
+**Flaskでの読み込み実装例:**
+
+```python
+from iot_app.common.constants import ALERT_OPERATORS, JUDGMENT_TIMES, PAGINATION, MASTER_DEFAULTS
+```
 
 ---
 

@@ -1,0 +1,21 @@
+/* ===== メインスタイルシート（全CSSをインポート） ===== */
+
+@import url('./variables.css');
+@import url('./reset.css');
+@import url('./base.css');
+
+/* コンポーネント */
+@import url('./components/button.css');
+@import url('./components/alert.css');
+@import url('./components/form.css');
+@import url('./components/table.css');
+@import url('./components/pagination.css');
+@import url('./components/modal.css');
+@import url('./components/sort.css');
+@import url('./components/spinner.css');
+@import url('./components/toast.css');
+@import url('./components/sidebar.css');
+@import url('./components/industry-dashboard.css');
+@import url('./components/chat.css');
+@import url('./components/customer_dashboard/common.css');
+@import url('./components/error.css');
