@@ -413,7 +413,7 @@
 | 6   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                      |
 | 7   | device_inventory_id         | デバイス在庫ID         | INT          | NULL     | -   | -   | -                 | デバイス在庫ID（device_inventory_master参照） |
 | 8   | sim_id                      | SIMID                  | VARCHAR(20) | NULL     | -   | -   | -                 | デバイスのSIM ID                              |
-| 9   | mac_address                 | MACアドレス            | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのMACアドレス                         |
+| 9   | mac_address                 | MACアドレス            | VARCHAR(17)  | NULL     | -   | -   | -                 | デバイスのMACアドレス                         |
 | 10  | software_version            | ソフトウェアバージョン | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスのファームウェアバージョン            |
 | 11  | device_location             | 設置場所               | VARCHAR(100) | NULL     | -   | -   | -                 | デバイスの設置場所                            |
 | 12  | certificate_expiration_date | 証明書期限             | DATETIME     | NULL     | -   | -   | -                 | SSL証明書期限                                 |
@@ -1527,6 +1527,7 @@ SELECT
     u.user_name,
     u.organization_id AS user_organization_id,
     d.device_id,
+    d.device_uuid,
     d.organization_id AS device_organization_id,
     d.device_type_id,
     d.device_name,
@@ -1560,14 +1561,15 @@ WHERE
 | user_id                     | ユーザーID             | INT          | ログインユーザーのID                         |
 | user_name                   | ユーザー名             | VARCHAR(20)  | ログインユーザーの名前                       |
 | user_organization_id        | ユーザー組織ID         | INT          | ログインユーザーの所属組織ID                 |
-| device_id                   | デバイスID             | VARCHAR(100) | デバイスの一意識別子                         |
+| device_id                   | デバイスID             | INT          | デバイスの一意識別子                         |
+| device_uuid                 | デバイスUUID           | VARCHAR(128) | Azure IoT HubsのデバイスID、AWS IoT CoreのクライアントIDと同じID |
 | device_organization_id      | デバイス組織ID         | INT          | デバイスが所属する組織ID                     |
 | device_type_id              | デバイス種別ID         | INT          | デバイス種別ID                               |
 | device_name                 | デバイス名             | VARCHAR(100) | デバイスの表示名                             |
 | device_model                | モデル情報             | VARCHAR(100) | デバイスのモデル名・型番                     |
 | device_inventory_id         | デバイス在庫ID         | INT          | デバイス在庫ID                               |
 | sim_id                      | SIMID                  | VARCHAR(20) | デバイスのSIM ID                             |
-| mac_address                 | MACアドレス            | VARCHAR(100) | デバイスのMACアドレス                        |
+| mac_address                 | MACアドレス            | VARCHAR(17)  | デバイスのMACアドレス                        |
 | software_version            | ソフトウェアバージョン | VARCHAR(100) | デバイスのファームウェアバージョン           |
 | device_location             | 設置場所               | VARCHAR(100) | デバイスの設置場所                           |
 | certificate_expiration_date | 証明書期限             | DATETIME     | SSL証明書期限                                |

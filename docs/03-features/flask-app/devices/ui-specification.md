@@ -257,13 +257,13 @@
 | (6.9)  | 操作ボタン            | action_buttons              | Button         | I   | -    | -      | -      | 固定値: 「参照」「更新」、権限制御あり                      |                                      |
 | (6.10) | ページネーション      | pagination                  | Pagination     | I/O | -    | -      | 1      | -                                             | 中央揃え                             |
 | (7.1)  | 機能説明            | explanation                   | Label           | O | -    | -     | -      | 固定値：<br>登録時：デバイス情報を登録します。以下のフォームを入力してください。<br>更新時：デバイス情報を更新します。以下のフォームを更新してください。                                             | -                 |
-| (7.2)  | デバイスID            | device_id                   | Text           | I/O | ○    | 50     | -      | -                                             | 英数字とハイフンのみ                 |
+| (7.2)  | デバイスID            | device_id                   | Text           | I/O | ○    | 128    | -      | -                                             | 英数字とハイフンのみ                 |
 | (7.3)  | デバイス名            | device_name                 | Text           | I/O | ○    | 100    | -      | -                                             |                                      |
 | (7.4)  | デバイス種別          | device_type                 | Select         | I/O | ○    | -      | -      | -                                             |                                      |
 | (7.5)  | モデル情報            | model_info                  | Text           | I/O | ○    | 100    | -      | -                                             |                                      |
-| (7.6)  | SIMID                 | sim_id                      | Text           | I/O | -    | 50     | -      | -                                             |                                      |
+| (7.6)  | SIMID                 | sim_id                      | Text           | I/O | -    | 20     | -      | -                                             |                                      |
 | (7.7)  | MACアドレス           | mac_address                 | Text           | I/O | -    | 17     | -      | -                                             | XX:XX:XX:XX:XX:XX形式                |
-| (7.8)  | 設置場所              | device_location             | Text           | I/O | -    | 200    | -      | -                                             |                                      |
+| (7.8)  | 設置場所              | device_location             | Text           | I/O | -    | 100    | -      | -                                             |                                      |
 | (7.9)  | 所属組織              | organization_name           | Select         | I/O | ○    | -      | -      | DB: organization_master.organization_name     |                                      |
 | (7.10)  | 証明書期限            | certificate_expiration_date | DateTimePicker | I/O | -    | -      | -      | DB: device_master.certificate_expiration_date |
 | (7.11) | 登録ボタン            | submit_button               | Button         | I   | -    | -      | -      | 固定値: 「登録」/「更新」                     | プライマリボタン                     |
@@ -676,6 +676,7 @@
 | 7-3 デバイス名   | 必須                   | 「デバイス名を入力してください」                                 |
 | 7-3 デバイス名   | 最大100文字            | 「デバイス名は100文字以内で入力してください」                    |
 | 7-4 デバイス種別 | 必須                   | 「デバイス種別を選択してください」                               |
+| 7-5 モデル情報   | 必須                   | 「モデル情報を入力してください」                                |
 | 7-5 モデル情報   | 最大100文字            | 「モデル情報は100文字以内で入力してください」                    |
 | 7-6 SIMID        | 最大20文字             | 「SIMIDは20文字以内で入力してください」                          |
 | 7-7 MACアドレス  | MACアドレス形式        | 「MACアドレスの形式が正しくありません（例: AA:BB:CC:DD:EE:FF）」 |
