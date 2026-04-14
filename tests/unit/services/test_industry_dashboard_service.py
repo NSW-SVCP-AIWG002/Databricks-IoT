@@ -229,7 +229,7 @@ class TestGetDefaultDateRange:
     仕様:
         - 開始: 現在日時 - 24時間
         - 終了: 現在日時
-        - フォーマット: YYYY/MM/DDTHH:MM
+        - フォーマット: YYYY-MM-DDTHH:MM
     """
 
     def test_returns_dict_with_required_keys(self):
@@ -258,7 +258,7 @@ class TestGetDefaultDateRange:
         assert end_dt - start_dt == timedelta(hours=24)
 
     def test_datetime_format_matches_specification(self):
-        """2.1.3: 日時フォーマットが YYYY/MM/DDTHH:MM 形式（UI仕様書 10-1, 10-2 準拠）"""
+        """2.1.3: 日時フォーマットが YYYY-MM-DDTHH:MM 形式（UI仕様書 10-1, 10-2 準拠）"""
         result = get_default_date_range()
         pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"
         assert re.match(pattern, result["search_start_datetime"]), \
@@ -879,14 +879,14 @@ class TestGetDeviceAlertsWithCount:
 
 @pytest.mark.unit
 class TestGetLatestSensorData:
-    """最新センサーデータ取得（Unity Catalog / sensor_data_view）
+    """最新センサーデータ取得（MySQL / silver_sensor_data）
 
     観点: 2.1 正常系処理, 3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - センサー情報表示 > ② 最新センサーデータ取得
         - get_latest_sensor_data(device_id)
     仕様:
-        - sensor_data_view から device_id で絞り込み
+        - silver_sensor_data から device_id で絞り込み
         - event_timestamp DESC LIMIT 1 で最新1件を取得
         - 戻り値: センサーデータ行オブジェクト または None
     """
@@ -942,14 +942,14 @@ class TestGetLatestSensorData:
 
 @pytest.mark.unit
 class TestGetGraphData:
-    """グラフ用センサーデータ取得（Unity Catalog / sensor_data_view）
+    """グラフ用センサーデータ取得（MySQL / silver_sensor_data）
 
     観点: 2.1 正常系処理, 3.1.1 検索条件指定, 3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - ② グラフ用データ取得
         - get_graph_data(device_id, search_params)
     仕様:
-        - sensor_data_view から表示期間（BETWEEN）でフィルタした全データを取得
+        - silver_sensor_data から表示期間（BETWEEN）でフィルタした全データを取得
         - event_timestamp ASC でソート
         - 戻り値: センサーデータ行のリスト
     """

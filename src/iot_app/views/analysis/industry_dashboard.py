@@ -316,7 +316,7 @@ def device_details(device_uuid):
 
         if is_initial:
             response.delete_cookie(_DEVICE_DETAILS_COOKIE)
-            _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
+        _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
         logger.info("デバイス詳細表示成功: device_uuid=%s", device_uuid)
         return response
 
@@ -345,9 +345,9 @@ def device_details_search(device_uuid):
         start_str = request.form.get("search_start_datetime", "")
         end_str = request.form.get("search_end_datetime", "")
 
+        current_params = _get_device_details_search_params()
         errors = validate_date_range(start_str, end_str)
         if errors:
-            current_params = _get_device_details_search_params()
             alerts, alerts_total = get_device_alerts_with_count(device.device_id, current_params)
             graph_data = get_graph_data(device.device_id, current_params)
             return render_template(
@@ -365,7 +365,7 @@ def device_details_search(device_uuid):
         search_params = {
             "search_start_datetime": start_str,
             "search_end_datetime": end_str,
-            "page": 1,
+            "page": current_params.get("page", 1),
         }
 
         logger.info("デバイス詳細検索 アラート一覧取得開始: device_uuid=%s", device_uuid)

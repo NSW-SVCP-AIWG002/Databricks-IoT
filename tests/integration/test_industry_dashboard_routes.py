@@ -171,7 +171,7 @@ class TestStoreMonitoringGet:
         pageパラメータありの場合でも _set_cookie が呼ばれ、Set-Cookieヘッダが付く。
         """
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}?page=2")
+        response = client.get(f"{STORE_MONITORING_URL}?device_page=2")
 
         # Assert
         assert response.status_code == 200
@@ -188,13 +188,13 @@ class TestStoreMonitoringGet:
         cookie_params = {
             "organization_name": industry_test_data["org_accessible_name"],
             "device_name": "",
-            "page": 1,
+            "device_page": 1,
             "alert_page": 1,
         }
         client.set_cookie("store_monitoring_search_params", json.dumps(cookie_params))
 
         # Act
-        response = client.get(f"{STORE_MONITORING_URL}?page=2")
+        response = client.get(f"{STORE_MONITORING_URL}?device_page=2")
 
         # Assert: 検索条件（org_accessible_name）に合致するデバイスが表示されること
         assert response.status_code == 200
@@ -541,7 +541,7 @@ class TestShowSensorInfo:
         cookie_params = {
             "organization_name": industry_test_data["org_accessible_name"],
             "device_name": "",
-            "page": 1,
+            "device_page": 1,
             "alert_page": 1,
         }
         client.set_cookie("store_monitoring_search_params", json.dumps(cookie_params))
@@ -586,11 +586,11 @@ class TestDeviceDetailsGet:
         assert response.status_code == 200
         assert "device_details_search_params" in response.headers.get("Set-Cookie", "")
 
-    def test_paging_does_not_set_cookie(self, industry_test_data, client):
-        """5.3.2: ページング時にはCookieが書き込まれないこと
+    def test_paging_sets_cookie(self, industry_test_data, client):
+        """5.3.2: ページング時もCookieが書き込まれること
 
-        ワークフロー仕様書「処理フロー: 初期表示時のみCookie格納（if save_cookie:）」に対応。
-        pageパラメータありの場合は _set_cookie が呼ばれず、Set-Cookieヘッダが付かない。
+        ワークフロー仕様書「検索条件の保持方法: 初期表示・ページング問わず常時更新」に対応。
+        pageパラメータありの場合でも Set-Cookieヘッダが付く。
         """
         # Act
         response = client.get(
@@ -599,7 +599,7 @@ class TestDeviceDetailsGet:
 
         # Assert
         assert response.status_code == 200
-        assert "device_details_search_params" not in response.headers.get("Set-Cookie", "")
+        assert "device_details_search_params" in response.headers.get("Set-Cookie", "")
 
     def test_paging_uses_cookie_search_params(self, industry_test_data, client):
         """5.3.2: ページング時にCookieの表示期間がグラフデータ取得に使用されること

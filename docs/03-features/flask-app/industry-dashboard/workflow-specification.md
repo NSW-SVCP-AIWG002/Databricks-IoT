@@ -109,6 +109,7 @@
 | 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
 | 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
 | 6 | CSVエクスポート | `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
+| 7 | 店舗名オートコンプリート | `/analysis/industry-dashboard/store-monitoring/organizations` | GET | 店舗名候補リスト取得 | JSON | qパラメータで部分一致検索。DBエラー時は空リストと500を返す |
 
 **注:**
 - **レスポンス形式**:
@@ -126,6 +127,7 @@
 | 検索ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/store-monitoring` | `organization_name, organization_id, device_name` | HTML（検索結果画面） | エラーメッセージ表示 |
 | ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/store-monitoring` | `device_page` | HTML（検索結果画面） | エラーモーダル表示 |
 | センサー情報表示ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring/<device_uuid>` | `device_uuid` | HTML（店舗モニタリング画面） | エラーメッセージ表示 |
+| 店舗名入力 | 入力イベント | `GET /analysis/industry-dashboard/store-monitoring/organizations` | `q`（部分一致文字列） | JSON（組織候補リスト） | 空リスト表示 |
 | デバイス詳細ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
 
 ### デバイス詳細画面
@@ -347,7 +349,6 @@ def store_monitoring():
             'device_page': 1,
             'alert_page': 1,
         }
-        save_cookie = True
     else:
         # ページング: Cookieから取得
         cookie_data = request.cookies.get('store_monitoring_search_params')
@@ -357,7 +358,6 @@ def store_monitoring():
             search_params = get_default_search_params()
         search_params['device_page'] = request.args.get('device_page', search_params.get('device_page', 1), type=int)
         search_params['alert_page'] = request.args.get('alert_page', search_params.get('alert_page', 1), type=int)
-        save_cookie = False
 
     device_page = search_params.get('device_page', 1)
     alert_page = search_params.get('alert_page', 1)
@@ -381,16 +381,14 @@ def store_monitoring():
         search_params=search_params
     ))
 
-    # 初期表示時のみCookieをクリア・格納（ページング時はCookieに触れない）
-    if save_cookie:
-        response.delete_cookie('store_monitoring_search_params')
-        response.set_cookie(
-            'store_monitoring_search_params',
-            json.dumps(search_params),
-            max_age=86400,
-            httponly=True,
-            samesite='Lax'
-        )
+    # 初期表示・ページング問わず常時Cookieを更新
+    response.set_cookie(
+        'store_monitoring_search_params',
+        json.dumps(search_params),
+        max_age=86400,
+        httponly=True,
+        samesite='Lax'
+    )
 
     return response
 ```
@@ -819,11 +817,8 @@ flowchart TD
     GraphQuery --> CheckGraphQuery{DBクエリ結果}
     CheckGraphQuery -->|失敗| Error500
 
-    CheckGraphQuery -->|成功| CheckInitial{初期表示?}
-    CheckInitial -->|Yes| SaveCookie[Cookieに検索条件を格納]
-    CheckInitial -->|No| Template[Jinja2テンプレートレンダリング]
-
-    SaveCookie --> Template
+    CheckGraphQuery -->|成功| SaveCookie[Cookieに検索条件を格納<br>response.set_cookie<br>max_age=86400]
+    SaveCookie --> Template[Jinja2テンプレートレンダリング]
     Template --> Response[HTMLレスポンス返却]
 
     LoginRedirect --> End([処理完了])
@@ -939,7 +934,6 @@ def device_details(device_uuid):
     if 'page' not in request.args:
         search_params = get_default_date_range()
         search_params['page'] = 1
-        save_cookie = True
     else:
         cookie_data = request.cookies.get('device_details_search_params')
         if cookie_data:
@@ -947,7 +941,6 @@ def device_details(device_uuid):
         else:
             search_params = get_default_date_range()
         search_params['page'] = request.args.get('page', 1, type=int)
-        save_cookie = False
 
     page = search_params['page']
     per_page = ITEM_PER_PAGE
@@ -975,15 +968,14 @@ def device_details(device_uuid):
         search_params=search_params
     ))
 
-    # 初期表示時のみCookie格納
-    if save_cookie:
-        response.set_cookie(
-            'device_details_search_params',
-            json.dumps(search_params),
-            max_age=86400,
-            httponly=True,
-            samesite='Lax'
-        )
+    # 初期表示・ページング問わず常時Cookieを更新
+    response.set_cookie(
+        'device_details_search_params',
+        json.dumps(search_params),
+        max_age=86400,
+        httponly=True,
+        samesite='Lax'
+    )
 
     return response
 ```
@@ -1011,7 +1003,7 @@ def device_details(device_uuid):
 
 #### 検索条件の保持方法
 
-Cookieに検索条件を保持する
+Cookieに検索条件を保持する（初期表示・ページング問わず常時更新）
 
 #### UI状態
 
