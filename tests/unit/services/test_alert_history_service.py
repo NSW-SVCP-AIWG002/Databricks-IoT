@@ -175,6 +175,34 @@ class TestGetDefaultSearchParams:
         result = get_default_search_params()
         assert result["alert_status_id"] is None
 
+    def test_per_page_default_is_25(self):
+        """2.1.1: per_page のデフォルトが 25（ITEM_PER_PAGE）であること
+        ワークフロー仕様書「実装例」: 'per_page': ITEM_PER_PAGE（25固定）
+        UI仕様書 (5): 1ページあたりの表示件数は25件（固定）
+        """
+        from iot_app.services.alert_history_service import get_default_search_params
+        result = get_default_search_params()
+        assert result["per_page"] == 25
+
+    def test_page_default_is_1(self):
+        """2.1.1: page のデフォルトが 1 であること
+        ワークフロー仕様書「実装例」: 'page': 1
+        """
+        from iot_app.services.alert_history_service import get_default_search_params
+        result = get_default_search_params()
+        assert result["page"] == 1
+
+    def test_text_search_fields_default_is_empty_string(self):
+        """2.1.1: device_name / device_location / alert_name のデフォルトが空文字（''）であること
+        ワークフロー仕様書「実装例」: 'device_name': '', 'device_location': '', 'alert_name': ''
+        None ではなく空文字が仕様のため、初期表示時にフォームへ空文字がセットされる
+        """
+        from iot_app.services.alert_history_service import get_default_search_params
+        result = get_default_search_params()
+        assert result["device_name"] == ""
+        assert result["device_location"] == ""
+        assert result["alert_name"] == ""
+
 
 # =============================================================================
 # 2.1 / 3.1.1 search_alert_histories — データスコープ制御
@@ -517,6 +545,34 @@ class TestSearchAlertHistoriesWithConditions:
 
         # Act & Assert
         assert _run(1) > _run(None)
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_empty_string_text_field_no_filter_applied(self, mock_db, _mock_model):
+        """3.1.1.1: テキスト検索項目が空文字（''）の場合、None と同様にフィルタが追加されないこと
+        get_default_search_params() は device_name / device_location / alert_name を '' で返す。
+        実装は if value: （真偽値チェック）を使用するため、'' も None もフィルタを追加しない。
+        SQL の CASE WHEN IS NULL パターンと合わせて、空文字は「すべて」扱いとなる。
+        """
+        # Arrange
+        user_id = 10
+
+        def _run(device_name):
+            mock_query = _setup_mock_query(mock_db)
+            search_params = _make_default_search_params(device_name=device_name)
+            from iot_app.services.alert_history_service import search_alert_histories
+            search_alert_histories(search_params=search_params, user_id=user_id)
+            return mock_query.filter.call_count
+
+        # Act
+        count_empty_string = _run("")
+        count_none = _run(None)
+        count_with_value = _run("センサー")
+
+        # Assert: 空文字と None はフィルタ呼び出し回数が同じ（フィルタ非適用）
+        assert count_empty_string == count_none
+        # Assert: 具体値指定の場合はフィルタが追加される
+        assert count_with_value > count_none
 
 
 # =============================================================================
@@ -980,6 +1036,28 @@ class TestGetAlertHistoryDetail:
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
+    def test_returns_none_when_logically_deleted(self, mock_db, _mock_model):
+        """2.2.3: 論理削除済み（delete_flag=True）のデータは取得されないこと
+        観点表 2.2.3: 論理削除済みデータ → NotFoundError（呼び出し元が404ハンドリング）
+        delete_flag=False フィルタにより、VIEWまたはクエリが該当レコードを除外し None を返す
+        """
+        # Arrange
+        alert_history_uuid = "uuid-deleted"
+        user_id = 10
+        # delete_flag=True のレコードはフィルタで除外されるため first() は None を返す
+        _setup_mock_query(mock_db, results=[])
+
+        # Act
+        from iot_app.services.alert_history_service import get_alert_history_detail
+        result = get_alert_history_detail(
+            alert_history_uuid=alert_history_uuid, user_id=user_id
+        )
+
+        # Assert: 論理削除済みデータは返されない
+        assert result is None
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
     def test_uuid_filter_applied(self, mock_db, _mock_model):
         """1.3.5: alert_history_uuid でフィルタされること"""
         # Arrange
@@ -1114,3 +1192,53 @@ class TestLogging:
                     alert_history_uuid=alert_history_uuid, user_id=user_id
                 )
         assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_get_detail_logs_info_on_success(self, mock_db, _mock_model, caplog):
+        """1.4.1.3: get_alert_history_detail が正常完了した場合、INFOレベルでログが出力される
+        ワークフロー仕様書「詳細表示 ログ出力タイミング」:
+          DBクエリ実行の直前、直後に操作ログを出力する
+        """
+        import logging
+
+        # Arrange
+        alert_history_uuid = "uuid-001"
+        user_id = 10
+        mock_history = _make_mock_alert_history(alert_history_uuid=alert_history_uuid)
+        _setup_mock_query(mock_db, results=[mock_history])
+
+        # Act
+        from iot_app.services.alert_history_service import get_alert_history_detail
+        with caplog.at_level(logging.INFO, logger=MODULE):
+            get_alert_history_detail(
+                alert_history_uuid=alert_history_uuid, user_id=user_id
+            )
+
+        # Assert
+        assert any(r.levelno == logging.INFO for r in caplog.records)
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_get_detail_logs_debug_with_result(self, mock_db, _mock_model, caplog):
+        """1.4.1.4: get_alert_history_detail が正常完了した場合、DEBUGレベルで取得結果情報がログ出力される
+        ワークフロー仕様書「詳細表示 ログ出力タイミング」:
+          DBクエリ実行の直前、直後に操作ログを出力する
+        """
+        import logging
+
+        # Arrange
+        alert_history_uuid = "uuid-001"
+        user_id = 10
+        mock_history = _make_mock_alert_history(alert_history_uuid=alert_history_uuid)
+        _setup_mock_query(mock_db, results=[mock_history])
+
+        # Act
+        from iot_app.services.alert_history_service import get_alert_history_detail
+        with caplog.at_level(logging.DEBUG, logger=MODULE):
+            get_alert_history_detail(
+                alert_history_uuid=alert_history_uuid, user_id=user_id
+            )
+
+        # Assert
+        assert any(r.levelno == logging.DEBUG for r in caplog.records)
