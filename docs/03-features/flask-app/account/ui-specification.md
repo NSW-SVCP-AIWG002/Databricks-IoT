@@ -234,7 +234,6 @@ form.language_code.choices = get_language_choices()
 │ ┌──────────────────────────────────────────────────────────────┐ │
 │ │ ユーザー情報カード                                           │ │
 │ ├──────────────────────────────────────────────────────────────┤ │
-│ │ ユーザーID:        user-12345                                │ │
 │ │ ユーザー名:        山田 太郎                                 │ │
 │ │ メールアドレス:    yamada@example.com                        │ │
 │ │ 所属組織:          株式会社サンプル                          │ │
@@ -260,11 +259,10 @@ form.language_code.choices = get_language_choices()
 | 要素ID | 要素名 | 種別 | I/O | 必須 | 説明 |
 |--------|--------|------|-----|------|------|
 | E-101 | 画面タイトル | テキスト | O | - | 「ユーザー情報」を表示 |
-| E-102 | ユーザーID | テキスト | O | - | ログインユーザーのユーザーID |
-| E-103 | ユーザー名 | テキスト | O | - | ログインユーザーのユーザー名 |
-| E-104 | メールアドレス | テキスト | O | - | ログインユーザーのメールアドレス |
-| E-105 | 所属組織 | テキスト | O | - | ログインユーザーの所属組織名 |
-| E-106 | ロール | テキスト | O | - | ログインユーザーのロール |
+| E-102 | ユーザー名 | テキスト | O | - | ログインユーザーのユーザー名 |
+| E-103 | メールアドレス | テキスト | O | - | ログインユーザーのメールアドレス |
+| E-104 | 所属組織 | テキスト | O | - | ログインユーザーの所属組織名 |
+| E-105 | ロール | テキスト | O | - | ログインユーザーのロール |
 
 ### UI要素詳細
 
@@ -283,7 +281,7 @@ form.language_code.choices = get_language_choices()
 
 ---
 
-#### E-102 〜 E-106: ユーザー情報カード
+#### E-102 〜 E-105: ユーザー情報カード
 
 **概要**: ログインユーザー自身の情報を読み取り専用で表示
 
@@ -295,9 +293,6 @@ form.language_code.choices = get_language_choices()
   </div>
   <div class="info-card__body">
     <dl class="info-list">
-      <dt class="info-list__term">ユーザーID</dt>
-      <dd class="info-list__desc">{{ user.user_id }}</dd>
-
       <dt class="info-list__term">ユーザー名</dt>
       <dd class="info-list__desc">{{ user.user_name }}</dd>
 
@@ -321,7 +316,6 @@ form.language_code.choices = get_language_choices()
 - `organization_master` テーブル（所属組織名）
 
 **表示項目**:
-- ユーザーID: `user.user_id`
 - ユーザー名: `user.user_name`
 - メールアドレス: `user.email_address`
 - 所属組織: `user.organization_name`（organization_masterと結合）
