@@ -101,7 +101,7 @@
 
 ```mermaid
 flowchart TD
-    Start([URL直接アクセス]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
+    Start([GETリクエスト<br>URL直接アクセス / ページングボタンクリック]) --> Auth[認証チェック<br>Databricksリバースプロキシヘッダ確認]
     Auth --> CheckAuth{認証済み?}
     CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
 
@@ -109,9 +109,16 @@ flowchart TD
     Permission --> CheckPerm{権限OK?}
     CheckPerm -->|権限なし| Error403[403エラーページ表示]
 
-    CheckPerm -->|権限OK| Init[検索条件を初期化<br>page=1, sort_id=3, order=desc<br>sent_at_start=現在日時から7日前の00:00<br>sent_at_end=現在日時の23:59]
+    CheckPerm -->|権限OK| CheckPage{pageパラメータ<br>あり?}
+
+    CheckPage -->|あり（ページング）| GetCookie[Cookieから検索条件を取得]
+    GetCookie --> Query
+
+    CheckPage -->|なし（初期表示）| ClearCookie[Cookieをクリア]
+    ClearCookie --> Init[検索条件を初期化<br>page=1, sort_id=3, order=desc<br>sent_at_start=現在日時から7日前の00:00<br>sent_at_end=現在日時の23:59]
     Init --> SetParams[Cookieに検索条件を格納]
     SetParams --> Query[DBクエリ実行<br>SELECT FROM mail_history<br>WHERE organization_id=現在の組織ID<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
+
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
@@ -364,7 +371,8 @@ Cookieに検索条件を保持する
 
 ```mermaid
 flowchart TD
-    Start([検索ボタンクリック<br>フォーム送信<br>POST]) --> Validate[サーバーサイドバリデーション<br>WTForms検証]
+    Start([検索ボタンクリック<br>フォーム送信<br>POST]) --> ClearCookie[Cookieをクリア]
+    ClearCookie --> Validate[サーバーサイドバリデーション<br>WTForms検証]
     Validate --> ValidCheck{バリデーション<br>結果}
 
     ValidCheck -->|エラー| ValidError[フォーム再表示<br>エラーメッセージ付き]
@@ -775,25 +783,25 @@ def mail_history_list():
 - 複数ページのデータが存在する
 
 **処理概要:**
-- Cookieから検索条件とソート条件を取得
-- **ページ番号押下の度に検索処理を実行**
-- GETメソッド（初期表示メソッド）でページをリロード
+- ページングは `GET /notice/mail-history?page=N` として初期表示と同一エンドポイントで処理される
+- 初期表示フローの「pageパラメータあり（ページング）」分岐で処理が行われる
+- Cookieから検索条件・ソート条件を取得し、指定ページのデータを表示する
+- **Cookieはクリアせず、保存済みの検索条件を維持したままページ遷移する**
 
-**注:** ページング処理は初期表示のGETメソッドを利用し、Cookieから検索条件を取得して表示します。
+**注:** ページング処理の詳細フローは [初期表示](#初期表示) セクションの「pageパラメータあり（ページング）」分岐を参照してください。
 
 #### 処理フロー
 
-```mermaid
-flowchart TD
-    Start([ページ番号ボタンクリック]) --> GetParams[クエリパラメータ取得<br>page]
-    GetParams --> GetCookie[Cookieから検索条件・ソート条件を取得]
-    GetCookie --> Query[DBクエリ実行<br>Cookieの検索条件とソート条件とページ番号で検索]
-    Query --> CheckDB{DBクエリ結果}
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
-    Template --> Response[HTMLレスポンス返却]
-    CheckDB -->|失敗| Error500[500エラーページ表示]
-    Response --> End([処理完了])
-    Error500 --> End
+ページング処理は初期表示フロー（`GET /notice/mail-history`）内の「pageパラメータあり」分岐で処理されます。
+
+```
+ページ番号ボタンクリック
+  → GET /notice/mail-history?page=N
+  → 初期表示フロー「pageパラメータあり（ページング）」分岐
+  → Cookieから検索条件・ソート条件を取得
+  → DBクエリ実行（指定ページ）
+  → Jinja2テンプレートレンダリング
+  → HTMLレスポンス返却
 ```
 
 ページング処理は、Cookieに保存された検索条件とソート条件を保持したまま、ページ番号を変更して検索処理を実行します。
