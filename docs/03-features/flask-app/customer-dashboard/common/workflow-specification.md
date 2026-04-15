@@ -164,25 +164,25 @@
 | 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML | - |
 | 2 | ダッシュボード管理画面 | `/analysis/customer-dashboard/dashboards` | GET | ダッシュボード管理モーダル表示 | HTML（モーダル） | - |
 | 3 | ダッシュボード登録画面 | `/analysis/customer-dashboard/dashboards/create` | GET | ダッシュボード登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | JSON (AJAX) | - |
 | 5 | ダッシュボードタイトル更新画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | JSON (AJAX) | - |
 | 7 | ダッシュボード削除確認画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認モーダル表示 | HTML（モーダル） | - |
-| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | JSON (AJAX) | - |
 | 9 | ダッシュボード表示切替 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
 | 10 | ダッシュボードグループ登録画面 | `/analysis/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録モーダル表示 | HTML（モーダル） | - |
-| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | JSON (AJAX) | - |
 | 12 | ダッシュボードグループタイトル更新画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | JSON (AJAX) | - |
 | 14 | ダッシュボードグループ削除確認画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認モーダル表示 | HTML（モーダル） | - |
-| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | JSON (AJAX) | - |
 | 16 | ガジェット追加画面 | `/analysis/customer-dashboard/gadgets/add` | GET | ガジェット追加モーダル表示 | HTML（モーダル） | - |
-| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | `{gadget_type}` はガジェット種別名（文字列）。`common.py` の共通ルートがガジェット種別ごとのハンドラーにディスパッチする（例: `timeline`, `bar-chart`） |
-| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard`。`{gadget_type}` はガジェット種別名（文字列）。`common.py` の共通ルートがディスパッチする |
+| 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録モーダル表示 | HTML（モーダル） | `{gadget_type}` は `_GADGET_REGISTRY` の `slug` 値（`bar-chart`, `timeline`, `circle-chart`, `belt-chart`）。`common.py` の共通ルートがガジェット種別ごとのハンドラーにディスパッチする |
+| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理 | JSON (AJAX) | `{gadget_type}` は `_GADGET_REGISTRY` の `slug` 値。`common.py` の共通ルートがディスパッチする |
 | 19 | ガジェットタイトル更新画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新モーダル表示 | HTML（モーダル） | - |
-| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | JSON (AJAX) | - |
 | 21 | ガジェット削除確認画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認モーダル表示 | HTML（モーダル） | - |
-| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | JSON (AJAX) | - |
 | 23 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
 | 24 | レイアウト保存 | `/analysis/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) | 非同期通信 |
 | 25 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
@@ -231,27 +231,27 @@
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 登録画面ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示（`{gadget_type}` には `gadget_type_name` 文字列を使用。`gadget_add.html` の `data-create-url` 属性に `url_for('customer_dashboard.gadget_create', gadget_type=gadget_type.gadget_type_name)` で設定） |
+| 登録画面ボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/{gadget_type}/create` | なし | HTML（モーダル） | エラーモーダル表示（`{gadget_type}` は `_GADGET_REGISTRY` の `slug` 値（`bar-chart`, `timeline`, `circle-chart`, `belt-chart`）を使用。`GADGET_TYPE_SLUG` マッピングで `gadget_type_name` からスラグに変換して URL を生成） |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 登録・更新モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| ダッシュボード登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/register` | `dashboard_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | `dashboard_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードグループ登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/register` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
-| ダッシュボードグループタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | `dashboard_group_name` | リダイレクト | フォーム再表示 |
-| ガジェットタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | `gadget_name` | リダイレクト | フォーム再表示 |
+| ダッシュボード登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/register` | `dashboard_name` | JSON (AJAX) | フォーム再表示 |
+| ダッシュボードタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | `dashboard_name` | JSON (AJAX) | フォーム再表示 |
+| ダッシュボードグループ登録実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/register` | `dashboard_group_name` | JSON (AJAX) | フォーム再表示 |
+| ダッシュボードグループタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | `dashboard_group_name` | JSON (AJAX) | フォーム再表示 |
+| ガジェットタイトル更新実行 | フォーム送信 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | `gadget_name` | JSON (AJAX) | フォーム再表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ### 削除確認モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| ダッシュボード削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | リダイレクト | エラーモーダル表示 |
-| ダッシュボードグループ削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | `dashboard_group_uuid` | リダイレクト | エラーモーダル表示 |
-| ガジェット削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | `gadget_uuid` | リダイレクト | エラーモーダル表示 |
+| ダッシュボード削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | `dashboard_uuid` | JSON (AJAX) | エラーモーダル表示 |
+| ダッシュボードグループ削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | `dashboard_group_uuid` | JSON (AJAX) | エラーモーダル表示 |
+| ガジェット削除実行 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | `gadget_uuid` | JSON (AJAX) | エラーモーダル表示 |
 | キャンセルボタン押下 | ボタンクリック | なし（モーダルを閉じる） | - | - | - |
 
 ---
@@ -298,8 +298,10 @@ flowchart TD
     CheckGroupQuery -->|失敗| Error500[500エラーページ表示]
 
     GadgetQuery --> CheckGadgetQuery{DBクエリ結果}
-    CheckGadgetQuery -->|成功| OrgQuery[組織選択肢取得<br>DB organization_master]
+    CheckGadgetQuery -->|成功| GetGadgetDeviceNames[ガジェット固定デバイス名取得<br>get_fixed_gadget_device_names]
     CheckGadgetQuery -->|失敗| Error500
+
+    GetGadgetDeviceNames --> OrgQuery[組織選択肢取得<br>DB organization_master]
     
     OrgQuery --> CheckOrgQuery{DBクエリ結果}
     CheckOrgQuery -->|成功| CheckSelectOrgId{選択中の組織IDあり？<br>ユーザー設定参照}
@@ -366,16 +368,25 @@ flowchart TD
 
 組織階層に基づいてデータスコープ制限を適用します。
 
-**実装例:**
+**サービス関数実装例:**
 ```python
-def get_accessible_organizations(current_user_organization_id):
-    """アクセス可能な組織IDリストを取得"""
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user_organization_id
-    ).all()
-    return [org_id[0] for org_id in accessible_org_ids]
+def get_organization_id_by_user(user_id):
+    """ユーザーIDから所属組織IDを返す"""
+    return (
+        db.session.query(User.organization_id)
+        .filter(User.user_id == user_id, User.delete_flag == False)
+        .scalar()
+    )
+
+
+def get_accessible_organizations(parent_org_id):
+    """ユーザーがアクセス可能な組織IDリストを返す"""
+    rows = (
+        db.session.query(OrganizationClosure.subsidiary_organization_id)
+        .filter(OrganizationClosure.parent_organization_id == parent_org_id)
+        .all()
+    )
+    return [r[0] for r in rows]
 ```
 
 **③ ダッシュボードユーザー設定取得**
@@ -395,6 +406,20 @@ FROM
 WHERE
   user_id = :current_user_id
   AND delete_flag = FALSE
+```
+
+**サービス関数実装例:**
+```python
+def get_dashboard_user_setting(user_id):
+    """ユーザーのダッシュボード設定を返す。存在しない場合はNone"""
+    return (
+        db.session.query(DashboardUserSetting)
+        .filter(
+            DashboardUserSetting.user_id == user_id,
+            DashboardUserSetting.delete_flag == False,
+        )
+        .first()
+    )
 ```
 
 **④ ダッシュボード情報取得**
@@ -417,6 +442,58 @@ ORDER BY
   dashboard_id ASC
 ```
 
+**サービス関数実装例:**
+```python
+def get_dashboards(accessible_org_ids):
+    """アクセス可能スコープ内のダッシュボード一覧をdashboard_id昇順で返す"""
+    if not accessible_org_ids:
+        return []
+    return (
+        db.session.query(DashboardMaster)
+        .filter(
+            DashboardMaster.organization_id.in_(accessible_org_ids),
+            DashboardMaster.delete_flag == False,
+        )
+        .order_by(DashboardMaster.dashboard_id)
+        .all()
+    )
+
+
+def get_first_dashboard(accessible_org_ids, exclude_id=None):
+    """アクセス可能スコープ内の先頭ダッシュボードを返す。exclude_id指定時は除外する"""
+    query = (
+        db.session.query(DashboardMaster)
+        .filter(
+            DashboardMaster.organization_id.in_(accessible_org_ids),
+            DashboardMaster.delete_flag == False,
+        )
+    )
+    if exclude_id is not None:
+        query = query.filter(DashboardMaster.dashboard_id != exclude_id)
+    return query.order_by(DashboardMaster.dashboard_id).first()
+
+
+def upsert_dashboard_user_setting(user_id, dashboard_id):
+    """ユーザー設定が存在しない場合はINSERT、存在する場合はdashboard_idを更新する"""
+    setting = (
+        db.session.query(DashboardUserSetting)
+        .filter(DashboardUserSetting.user_id == user_id)
+        .first()
+    )
+    if setting is None:
+        new_setting = DashboardUserSetting(
+            user_id=user_id,
+            dashboard_id=dashboard_id,
+            organization_id=None,
+            device_id=None,
+            creator=user_id,
+            modifier=user_id,
+        )
+        db.session.add(new_setting)
+    else:
+        setting.dashboard_id = dashboard_id
+```
+
 **⑤ ダッシュボードグループ一覧取得**
 
 選択中のダッシュボードに紐づくグループ一覧を取得します。
@@ -436,6 +513,21 @@ WHERE
   AND delete_flag = FALSE
 ORDER BY
   display_order ASC
+```
+
+**サービス関数実装例:**
+```python
+def get_dashboard_groups(dashboard_id):
+    """ダッシュボードに紐づくグループをdisplay_order昇順で返す"""
+    return (
+        db.session.query(DashboardGroupMaster)
+        .filter(
+            DashboardGroupMaster.dashboard_id == dashboard_id,
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .order_by(DashboardGroupMaster.display_order)
+        .all()
+    )
 ```
 
 **⑥ ガジェット一覧取得**
@@ -466,6 +558,73 @@ ORDER BY
   display_order ASC
 ```
 
+**サービス関数実装例:**
+```python
+def get_gadgets_by_groups(group_ids):
+    """指定グループIDに紐づくガジェット一覧を返す。group_idsが空の場合はDBアクセスしない"""
+    if not group_ids:
+        return []
+    return (
+        db.session.query(DashboardGadgetMaster)
+        .filter(
+            DashboardGadgetMaster.dashboard_group_id.in_(group_ids),
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .order_by(DashboardGadgetMaster.display_order)
+        .all()
+    )
+```
+
+**⑥-b ガジェット固定デバイス名取得**
+
+固定モード（`data_source_config.device_id` が設定されている）のガジェットに対して、デバイス名を取得します。
+
+**サービス関数実装例:**
+```python
+def get_fixed_gadget_device_names(gadgets):
+    """固定モードガジェットのデバイス名を返す
+
+    Returns:
+        dict: {gadget_uuid: device_name} （固定モードのガジェットのみ）
+    """
+    fixed_device_id_map = {}
+    for gadget in gadgets:
+        if gadget.data_source_config:
+            try:
+                config = json.loads(gadget.data_source_config)
+                device_id = config.get('device_id')
+                if device_id is not None:
+                    fixed_device_id_map[gadget.gadget_uuid] = device_id
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+    if not fixed_device_id_map:
+        return {}
+
+    device_name_map = {
+        d.device_id: d.device_name
+        for d in _get_devices_by_ids(list(set(fixed_device_id_map.values())))
+    }
+    return {
+        gadget_uuid: device_name_map.get(device_id, '--')
+        for gadget_uuid, device_id in fixed_device_id_map.items()
+    }
+
+
+def _get_devices_by_ids(device_ids):
+    """デバイスID一覧に対応するデバイス一覧を返す（内部使用）"""
+    if not device_ids:
+        return []
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.device_id.in_(device_ids),
+            DeviceMaster.delete_flag == False,
+        )
+        .all()
+    )
+```
+
 **⑦ 組織選択肢取得**
 
 データソース選択フォーム用の組織選択肢を取得します。
@@ -484,6 +643,21 @@ WHERE
   AND delete_flag = FALSE
 ORDER BY
   organization_id ASC
+```
+
+**サービス関数実装例:**
+```python
+def get_organizations(accessible_org_ids):
+    """アクセス可能スコープ内の組織一覧をorganization_id昇順で返す"""
+    return (
+        db.session.query(OrganizationMaster)
+        .filter(
+            OrganizationMaster.organization_id.in_(accessible_org_ids),
+            OrganizationMaster.delete_flag == False,
+        )
+        .order_by(OrganizationMaster.organization_id)
+        .all()
+    )
 ```
 
 **⑧ デバイス選択肢取得**
@@ -506,17 +680,31 @@ ORDER BY
   device_id ASC
 ```
 
+**サービス関数実装例:**
+```python
+def get_devices(organization_id):
+    """組織に紐づくデバイス一覧をdevice_id昇順で返す"""
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.organization_id == organization_id,
+            DeviceMaster.delete_flag == False,
+        )
+        .order_by(DeviceMaster.device_id)
+        .all()
+    )
+```
+
 **⑨ HTMLレンダリング**
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard', methods=['GET'])
-@require_auth
+@customer_dashboard_bp.route('', methods=['GET'])
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
 
     # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
 
     # ダッシュボードユーザー設定取得
     user_setting = get_dashboard_user_setting(g.current_user.user_id)
@@ -526,8 +714,8 @@ def customer_dashboard():
         dashboard_id = user_setting.dashboard_id
     else:
         # デフォルト: 先頭ダッシュボード
-        first_dashboard = get_first_dashboard(accessible_org_ids)
-        dashboard_id = first_dashboard.dashboard_id if first_dashboard else None
+        first = get_first_dashboard(accessible_org_ids)
+        dashboard_id = first.dashboard_id if first else None
         # ユーザー設定が未登録かつアクセス可能なダッシュボードがある場合は先頭を自動登録
         if dashboard_id and not user_setting:
             upsert_dashboard_user_setting(g.current_user.user_id, dashboard_id)
@@ -537,15 +725,32 @@ def customer_dashboard():
     # ダッシュボード一覧取得
     dashboards = get_dashboards(accessible_org_ids)
 
+    # 組織選択肢取得
+    organizations = get_organizations(accessible_org_ids)
+    gadget_static_files = list(_GADGET_REGISTRY.values())
+    gadget_id_to_template = {
+        get_gadget_type_id_by_name(name): info['template']
+        for name, info in _GADGET_REGISTRY.items()
+    }
+    gadget_type_ids = {
+        name: get_gadget_type_id_by_name(name)
+        for name in _GADGET_REGISTRY
+    }
+
     if not dashboard_id:
         # ダッシュボードなし: 空の画面表示
         return render_template(
-            'customer_dashboard/index.html',
+            'analysis/customer_dashboard/index.html',
             dashboards=[],
+            dashboard=None,
             groups=[],
             gadgets=[],
-            organizations=get_organizations(accessible_org_ids),
-            dashboard=None
+            gadget_id_to_template=gadget_id_to_template,
+            gadget_type_ids=gadget_type_ids,
+            gadget_static_files=gadget_static_files,
+            organizations=organizations,
+            devices=[],
+            user_setting=user_setting,
         )
 
     # 選択中ダッシュボード取得
@@ -555,27 +760,30 @@ def customer_dashboard():
     groups = get_dashboard_groups(dashboard_id)
 
     # ガジェット一覧取得
-    group_ids = [g.dashboard_group_id for g in groups]
-    gadgets = get_gadgets_by_groups(group_ids) if group_ids else []
+    group_ids = [grp.dashboard_group_id for grp in groups]
+    gadgets = get_gadgets_by_groups(group_ids)
 
-    # 組織選択肢取得
-    organizations = get_organizations(accessible_org_ids)
-
-    # ユーザー設定で選択組織IDが設定されている場合（NULLでない場合）
+    # ユーザー設定で選択組織IDが設定されている場合（NULLでない場合）デバイス選択肢取得
     devices = []
-    if user_setting.organization_id is not None:
-      # デバイス選択肢取得
-      devices = get_devices(user_setting.organization_id)
+    if user_setting and user_setting.organization_id is not None:
+        devices = get_devices(user_setting.organization_id)
+
+    # 固定モードガジェットのデバイス名取得
+    gadget_device_names = get_fixed_gadget_device_names(gadgets)
 
     return render_template(
-        'customer_dashboard/index.html',
+        'analysis/customer_dashboard/index.html',
         dashboards=dashboards,
         dashboard=dashboard,
         groups=groups,
         gadgets=gadgets,
+        gadget_id_to_template=gadget_id_to_template,
+        gadget_type_ids=gadget_type_ids,
+        gadget_static_files=gadget_static_files,
         organizations=organizations,
         devices=devices,
-        user_setting=user_setting
+        user_setting=user_setting,
+        gadget_device_names=gadget_device_names,
     )
 ```
 
@@ -664,15 +872,14 @@ ORDER BY
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards', methods=['GET'])
-@require_auth
+@customer_dashboard_bp.route('/dashboards', methods=['GET'])
 def dashboard_management():
     """ダッシュボード管理モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboards = get_dashboards(accessible_org_ids)
 
     return render_template(
-        'customer_dashboard/modals/dashboard_management.html',
+        'analysis/customer_dashboard/modals/dashboard_management.html',
         dashboards=dashboards
     )
 ```
@@ -782,9 +989,24 @@ INSERT INTO dashboard_master (
 )
 ```
 
+**サービス関数実装例:**
+```python
+def create_dashboard(name, organization_id, user_id):
+    """ダッシュボードを新規作成してsessionに追加する"""
+    dashboard = DashboardMaster(
+        dashboard_uuid=str(uuid.uuid4()),
+        dashboard_name=name,
+        organization_id=organization_id,
+        creator=user_id,
+        modifier=user_id,
+    )
+    db.session.add(dashboard)
+    return dashboard
+```
+
 **② ユーザー設定更新**
 
-新規登録したダッシュボードを選択中ダッシュボードとして設定します。
+新規登録したダッシュボードを選択中ダッシュボードとして設定します。`upsert_dashboard_user_setting` サービス関数を使用します（実装例は「ダッシュボード初期表示 ④」参照）。
 
 **使用テーブル:** dashboard_user_setting
 
@@ -819,46 +1041,34 @@ ON DUPLICATE KEY UPDATE
 
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/dashboards/register', methods=['POST'])
 def dashboard_register():
     """ダッシュボード登録実行"""
     form = DashboardForm()
 
     if not form.validate_on_submit():
         return render_template(
-            'customer_dashboard/modals/dashboard_register.html',
-            form=form
+            'analysis/customer_dashboard/modals/dashboard_register.html',
+            form=form,
         ), 400
 
     try:
-        dashboard = DashboardMaster(
-            dashboard_name=form.dashboard_name.data,
-            organization_id=g.current_user.organization_id,
-            creator=g.current_user.user_id,
-            modifier=g.current_user.user_id
+        logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
+        dashboard = create_dashboard(
+            name=form.dashboard_name.data,
+            organization_id=get_organization_id_by_user(g.current_user.user_id),
+            user_id=g.current_user.user_id,
         )
-        db.session.add(dashboard)
         db.session.flush()
-
-        # ユーザー設定更新
-        upsert_dashboard_user_setting(
-            g.current_user.user_id,
-            dashboard.dashboard_id
-        )
-
+        upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
-        modal('ダッシュボードを登録しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
+        return jsonify({'message': 'ダッシュボードを登録しました'})
 
     except Exception as e:
         db.session.rollback()
         logger.error(f'ダッシュボード登録エラー: {str(e)}')
-        modal('ダッシュボードの登録に失敗しました', 'error')
-        return render_template(
-            'customer_dashboard/modals/dashboard_register.html',
-            form=form
-        ), 500
+        abort(500)
 ```
 
 #### 表示メッセージ
@@ -915,13 +1125,27 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
+**サービス関数実装例:**
+```python
+def check_dashboard_access(dashboard_uuid, accessible_org_ids):
+    """ダッシュボードがアクセス可能スコープ内に存在するか確認する"""
+    return (
+        db.session.query(DashboardMaster)
+        .filter(
+            DashboardMaster.dashboard_uuid == dashboard_uuid,
+            DashboardMaster.organization_id.in_(accessible_org_ids),
+            DashboardMaster.delete_flag == False,
+        )
+        .first()
+    )
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
 def dashboard_switch(dashboard_uuid):
     """ダッシュボード表示切替"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
 
     # ダッシュボードアクセス権限チェック
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
@@ -1033,21 +1257,36 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def get_dashboard_update_date(dashboard_uuid):
+    """楽観ロック用: ダッシュボードの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardMaster.update_date)
+        .filter(
+            DashboardMaster.dashboard_uuid == dashboard_uuid,
+            DashboardMaster.delete_flag == False,
+        )
+        .scalar()
+    )
+
+
+def update_dashboard_title(dashboard, name, modifier):
+    """ダッシュボード名とmodifierを更新する"""
+    dashboard.dashboard_name = name
+    dashboard.modifier = modifier
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/update', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/update', methods=['POST'])
 def dashboard_update(dashboard_uuid):
     """ダッシュボードタイトル更新実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボード更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② バリデーション
@@ -1055,27 +1294,24 @@ def dashboard_update(dashboard_uuid):
     if not form.validate_on_submit():
         dashboard = db.session.query(DashboardMaster).filter(
             DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
+            DashboardMaster.delete_flag == False,
         ).first()
         return render_template(
-            'customer_dashboard/modals/dashboard_edit.html',
-            form=form, dashboard=dashboard
+            'analysis/customer_dashboard/modals/dashboard_edit.html',
+            form=form,
+            dashboard=dashboard,
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
 
     # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボード更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ⑤ 更新日時の比較（楽観ロック）
@@ -1085,16 +1321,12 @@ def dashboard_update(dashboard_uuid):
 
     # ⑥ ダッシュボードタイトル更新
     try:
-        dashboard.dashboard_name = form.dashboard_name.data
-        dashboard.update_date = datetime.now()
-        dashboard.modifier = g.current_user.user_id
+        update_dashboard_title(dashboard, form.dashboard_name.data, g.current_user.user_id)
         db.session.commit()
-        modal('ダッシュボードタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ダッシュボードタイトル更新エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1225,37 +1457,92 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def delete_gadgets_by_dashboard(dashboard_id, modifier):
+    """ダッシュボード配下の全ガジェットを論理削除する"""
+    gadgets = (
+        db.session.query(DashboardGadgetMaster)
+        .join(DashboardGroupMaster)
+        .filter(
+            DashboardGroupMaster.dashboard_id == dashboard_id,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .all()
+    )
+    for gadget in gadgets:
+        gadget.delete_flag = True
+        gadget.modifier = modifier
+    db.session.commit()
+
+
+def delete_groups_by_dashboard(dashboard_id, modifier):
+    """ダッシュボード配下の全グループを論理削除する"""
+    groups = (
+        db.session.query(DashboardGroupMaster)
+        .filter(
+            DashboardGroupMaster.dashboard_id == dashboard_id,
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .all()
+    )
+    for group in groups:
+        group.delete_flag = True
+        group.modifier = modifier
+    db.session.commit()
+
+
+def delete_dashboard_user_setting(user_id, modifier):
+    """ユーザー設定を論理削除する"""
+    setting = (
+        db.session.query(DashboardUserSetting)
+        .filter(DashboardUserSetting.user_id == user_id)
+        .first()
+    )
+    if setting is not None:
+        setting.delete_flag = True
+        setting.modifier = modifier
+
+
+def delete_dashboard_with_cascade(dashboard, accessible_org_ids, user_id):
+    """ダッシュボードをカスケード論理削除する。次のダッシュボードがあればユーザー設定を更新する"""
+    dashboard_id = dashboard.dashboard_id
+
+    delete_gadgets_by_dashboard(dashboard_id=dashboard_id, modifier=user_id)
+    delete_groups_by_dashboard(dashboard_id=dashboard_id, modifier=user_id)
+
+    dashboard.delete_flag = True
+    dashboard.modifier = user_id
+
+    next_dashboard = get_first_dashboard(accessible_org_ids, exclude_id=dashboard_id)
+    if next_dashboard is not None:
+        upsert_dashboard_user_setting(user_id, next_dashboard.dashboard_id)
+    else:
+        delete_dashboard_user_setting(user_id=user_id, modifier=user_id)
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/<string:dashboard_uuid>/delete', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/delete', methods=['POST'])
 def dashboard_delete(dashboard_uuid):
     """ダッシュボード削除実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボード更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
     if not dashboard:
         abort(404)
 
     # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardMaster.update_date).filter(
-            DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_dashboard_update_date(dashboard_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボード更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ④ 更新日時の比較（楽観ロック）
@@ -1263,33 +1550,14 @@ def dashboard_delete(dashboard_uuid):
         logger.warning(f'楽観ロック競合検出: dashboard_uuid={dashboard_uuid}, user_id={g.current_user.user_id}')
         abort(409)
 
-    # ⑤ ダッシュボード削除
+    # ⑤ ダッシュボード削除（カスケード）
     try:
-        # 配下のガジェットを論理削除
-        delete_gadgets_by_dashboard(dashboard_uuid, g.current_user.user_id)
-
-        # 配下のグループを論理削除
-        delete_groups_by_dashboard(dashboard_uuid, g.current_user.user_id)
-
-        # ダッシュボードを論理削除
-        dashboard.delete_flag = True
-        dashboard.update_date = datetime.now()
-        dashboard.modifier = g.current_user.user_id
-
-        # ユーザー設定更新（別のダッシュボードに切替）
-        next_dashboard = get_first_dashboard(accessible_org_ids, exclude_id=dashboard.dashboard_id)
-        if next_dashboard:
-            upsert_dashboard_user_setting(g.current_user.user_id, next_dashboard.dashboard_id)
-        else:
-            delete_dashboard_user_setting(g.current_user.user_id)
-
+        delete_dashboard_with_cascade(dashboard, accessible_org_ids, g.current_user.user_id)
         db.session.commit()
-        modal('ダッシュボードを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードを削除しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ダッシュボード削除エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1391,54 +1659,60 @@ INSERT INTO dashboard_group_master (
 )
 ```
 
+**サービス関数実装例:**
+```python
+def create_dashboard_group(group_name, dashboard_id, user_id):
+    """グループを新規作成する。display_orderは既存最大値+1を設定する"""
+    max_order = (
+        db.session.query(func.max(DashboardGroupMaster.display_order))
+        .filter(DashboardGroupMaster.dashboard_id == dashboard_id)
+        .scalar()
+    )
+    display_order = (max_order or 0) + 1
+
+    group = DashboardGroupMaster(
+        dashboard_group_uuid=str(uuid.uuid4()),
+        dashboard_group_name=group_name,
+        dashboard_id=dashboard_id,
+        display_order=display_order,
+        creator=user_id,
+        modifier=user_id,
+    )
+    db.session.add(group)
+    return group
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/register', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/groups/register', methods=['POST'])
 def group_register():
     """ダッシュボードグループ登録実行"""
     form = DashboardGroupForm()
 
     if not form.validate_on_submit():
         return render_template(
-            'customer_dashboard/modals/group_register.html',
-            form=form
+            'analysis/customer_dashboard/modals/group_register.html',
+            form=form,
         ), 400
 
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
+    dashboard = check_dashboard_access(form.dashboard_uuid.data, accessible_org_ids)
+    if not dashboard:
+        abort(404)
+
     try:
-        accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-        # 対象ダッシュボードのアクセス権限チェック
-        dashboard = check_dashboard_access(form.dashboard_uuid.data, accessible_org_ids)
-        if not dashboard:
-            abort(404)
-
-        # display_orderの最大値+1を取得
-        max_order = db.session.query(
-            func.coalesce(func.max(DashboardGroupMaster.display_order), 0)
-        ).filter(
-            DashboardGroupMaster.dashboard_id == dashboard.dashboard_id,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
-
-        group = DashboardGroupMaster(
-            dashboard_group_uuid=str(uuid.uuid4()),
-            dashboard_group_name=form.dashboard_group_name.data,
+        logger.info(f'グループ登録開始: user_id={g.current_user.user_id}, dashboard_id={dashboard.dashboard_id}')
+        create_dashboard_group(
+            group_name=form.dashboard_group_name.data,
             dashboard_id=dashboard.dashboard_id,
-            display_order=max_order + 1,
-            creator=g.current_user.user_id,
-            modifier=g.current_user.user_id
+            user_id=g.current_user.user_id,
         )
-        db.session.add(group)
         db.session.commit()
-
-        modal('ダッシュボードグループを登録しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        logger.info(f'グループ登録成功: dashboard_id={dashboard.dashboard_id}')
+        return jsonify({'message': 'ダッシュボードグループを登録しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ダッシュボードグループ登録エラー: {str(e)}')
-        modal('ダッシュボードグループの登録に失敗しました', 'error')
         abort(500)
 ```
 
@@ -1499,21 +1773,50 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def check_group_access(dashboard_group_uuid, accessible_org_ids):
+    """グループがアクセス可能スコープ内に存在するか確認する（JOINでダッシュボード経由）"""
+    return (
+        db.session.query(DashboardGroupMaster)
+        .join(DashboardMaster)
+        .filter(
+            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
+            DashboardMaster.organization_id.in_(accessible_org_ids),
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .first()
+    )
+
+
+def get_group_update_date(dashboard_group_uuid):
+    """楽観ロック用: グループの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardGroupMaster.update_date)
+        .filter(
+            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
+            DashboardGroupMaster.delete_flag == False,
+        )
+        .scalar()
+    )
+
+
+def update_group_title(group, name, modifier):
+    """グループ名とmodifierを更新する"""
+    group.dashboard_group_name = name
+    group.modifier = modifier
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/<string:dashboard_group_uuid>/update', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/update', methods=['POST'])
 def group_update(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② バリデーション
@@ -1521,27 +1824,24 @@ def group_update(dashboard_group_uuid):
     if not form.validate_on_submit():
         group = db.session.query(DashboardGroupMaster).filter(
             DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
+            DashboardGroupMaster.delete_flag == False,
         ).first()
         return render_template(
-            'customer_dashboard/modals/group_edit.html',
-            form=form, group=group
+            'analysis/customer_dashboard/modals/group_edit.html',
+            form=form,
+            group=group,
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
 
     # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ⑤ 更新日時の比較（楽観ロック）
@@ -1551,16 +1851,12 @@ def group_update(dashboard_group_uuid):
 
     # ⑥ ダッシュボードグループタイトル更新
     try:
-        group.dashboard_group_name = form.dashboard_group_name.data
-        group.update_date = datetime.now()
-        group.modifier = g.current_user.user_id
+        update_group_title(group, form.dashboard_group_name.data, g.current_user.user_id)
         db.session.commit()
-        modal('ダッシュボードグループタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードグループタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ダッシュボードグループタイトル更新エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1668,37 +1964,53 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def delete_gadgets_by_group(group_id, modifier):
+    """グループ配下の全ガジェットを論理削除する"""
+    gadgets = (
+        db.session.query(DashboardGadgetMaster)
+        .filter(
+            DashboardGadgetMaster.dashboard_group_id == group_id,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .all()
+    )
+    for gadget in gadgets:
+        gadget.delete_flag = True
+        gadget.modifier = modifier
+    db.session.commit()
+
+
+def delete_group_with_cascade(group, user_id):
+    """グループをカスケード論理削除する"""
+    delete_gadgets_by_group(group_id=group.dashboard_group_id, modifier=user_id)
+    group.delete_flag = True
+    group.modifier = user_id
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/groups/<string:dashboard_group_uuid>/delete', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/delete', methods=['POST'])
 def group_delete(dashboard_group_uuid):
     """ダッシュボードグループ削除実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     group = check_group_access(dashboard_group_uuid, accessible_org_ids)
     if not group:
         abort(404)
 
     # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardGroupMaster.update_date).filter(
-            DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardGroupMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_group_update_date(dashboard_group_uuid)
     except Exception as e:
-        logger.error(f'ダッシュボードグループ更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ④ 更新日時の比較（楽観ロック）
@@ -1706,23 +2018,14 @@ def group_delete(dashboard_group_uuid):
         logger.warning(f'楽観ロック競合検出: dashboard_group_uuid={dashboard_group_uuid}, user_id={g.current_user.user_id}')
         abort(409)
 
-    # ⑤ グループ削除
+    # ⑤ グループ削除（カスケード）
     try:
-        # 配下のガジェットを論理削除
-        delete_gadgets_by_group(dashboard_group_uuid, g.current_user.user_id)
-
-        # グループを論理削除
-        group.delete_flag = True
-        group.update_date = datetime.now()
-        group.modifier = g.current_user.user_id
-
+        delete_group_with_cascade(group, g.current_user.user_id)
         db.session.commit()
-        modal('ダッシュボードグループを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードグループを削除しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ダッシュボードグループ削除エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1794,6 +2097,30 @@ WHERE
 ORDER BY
   data_source_type ASC,
   display_order ASC
+```
+
+**サービス関数実装例:**
+```python
+def get_gadget_types():
+    """全ガジェット種別をdisplay_order昇順で返す"""
+    return (
+        db.session.query(GadgetTypeMaster)
+        .filter(GadgetTypeMaster.delete_flag == False)
+        .order_by(GadgetTypeMaster.display_order)
+        .all()
+    )
+```
+
+**実装例:**
+```python
+@customer_dashboard_bp.route('/gadgets/add', methods=['GET'])
+def gadget_add():
+    """ガジェット追加モーダル表示"""
+    gadget_types = get_gadget_types()
+    return render_template(
+        'analysis/customer_dashboard/modals/gadget_add.html',
+        gadget_types=gadget_types,
+    )
 ```
 
 #### 表示メッセージ
@@ -1881,21 +2208,51 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def check_gadget_access(gadget_uuid, accessible_org_ids):
+    """ガジェットがアクセス可能スコープ内に存在するか確認する（2段JOINでダッシュボード経由）"""
+    return (
+        db.session.query(DashboardGadgetMaster)
+        .join(DashboardGroupMaster)
+        .join(DashboardMaster)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardMaster.organization_id.in_(accessible_org_ids),
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .first()
+    )
+
+
+def get_gadget_update_date(gadget_uuid):
+    """楽観ロック用: ガジェットの update_date を返す。存在しない場合は None"""
+    return (
+        db.session.query(DashboardGadgetMaster.update_date)
+        .filter(
+            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
+            DashboardGadgetMaster.delete_flag == False,
+        )
+        .scalar()
+    )
+
+
+def update_gadget_title(gadget, name, modifier):
+    """ガジェット名とmodifierを更新する"""
+    gadget.gadget_name = name
+    gadget.modifier = modifier
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/update', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/update', methods=['POST'])
 def gadget_update(gadget_uuid):
     """ガジェットタイトル更新実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
-        logger.error(f'ガジェット更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② バリデーション
@@ -1903,27 +2260,24 @@ def gadget_update(gadget_uuid):
     if not form.validate_on_submit():
         gadget = db.session.query(DashboardGadgetMaster).filter(
             DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
+            DashboardGadgetMaster.delete_flag == False,
         ).first()
         return render_template(
-            'customer_dashboard/modals/gadget_edit.html',
-            form=form, gadget=gadget
+            'analysis/customer_dashboard/modals/gadget_edit.html',
+            form=form,
+            gadget=gadget,
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
 
     # ④ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
-        logger.error(f'ガジェット更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ⑤ 更新日時の比較（楽観ロック）
@@ -1933,16 +2287,12 @@ def gadget_update(gadget_uuid):
 
     # ⑥ ガジェットタイトル更新
     try:
-        gadget.gadget_name = form.gadget_name.data
-        gadget.update_date = datetime.now()
-        gadget.modifier = g.current_user.user_id
+        update_gadget_title(gadget, form.gadget_name.data, g.current_user.user_id)
         db.session.commit()
-        modal('ガジェットタイトルを更新しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットタイトルを更新しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ガジェットタイトル更新エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1996,37 +2346,36 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def delete_gadget(gadget, modifier):
+    """ガジェットを論理削除する"""
+    gadget.delete_flag = True
+    gadget.modifier = modifier
+```
+
 **実装例:**
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/delete', methods=['POST'])
-@require_auth
+@customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/delete', methods=['POST'])
 def gadget_delete(gadget_uuid):
     """ガジェット削除実行"""
 
     # ① 更新対象レコードの更新日時を取得（楽観ロック用スナップショット）
     try:
-        snapshot_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
+        snapshot_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
-        logger.error(f'ガジェット更新日時取得エラー: {str(e)}')
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if not gadget:
         abort(404)
 
     # ③ 更新対象レコードの更新日時を再取得（楽観ロック検証）
     try:
-        current_update_date = db.session.query(DashboardGadgetMaster.update_date).filter(
-            DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar()
+        current_update_date = get_gadget_update_date(gadget_uuid)
     except Exception as e:
-        logger.error(f'ガジェット更新日時再取得エラー: {str(e)}')
         abort(500)
 
     # ④ 更新日時の比較（楽観ロック）
@@ -2036,16 +2385,12 @@ def gadget_delete(gadget_uuid):
 
     # ⑤ ガジェット削除
     try:
-        gadget.delete_flag = True
-        gadget.update_date = datetime.now()
-        gadget.modifier = g.current_user.user_id
+        delete_gadget(gadget, g.current_user.user_id)
         db.session.commit()
-        modal('ガジェットを削除しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ガジェットを削除しました'})
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'ガジェット削除エラー: {str(e)}')
         abort(500)
 ```
 
@@ -2132,26 +2477,40 @@ WHERE
   AND delete_flag = FALSE
 ```
 
+**サービス関数実装例:**
+```python
+def save_layout(layout_data, modifier):
+    """レイアウトデータに基づき各ガジェットのposition/display_orderを更新する"""
+    try:
+        for item in layout_data:
+            gadget = (
+                db.session.query(DashboardGadgetMaster)
+                .filter(DashboardGadgetMaster.gadget_uuid == item['gadget_uuid'])
+                .first()
+            )
+            if gadget is None:
+                continue
+            gadget.position_x = item['position_x']
+            gadget.position_y = item['position_y']
+            gadget.display_order = item['display_order']
+            gadget.modifier = modifier
+    except Exception:
+        db.session.rollback()
+        raise
+```
+
 **実装例:**
 ```python
 @customer_dashboard_bp.route('/analysis/customer-dashboard/layout/save', methods=['POST'])
-@require_auth
 def layout_save():
     """レイアウト保存（AJAX）"""
     try:
-        layout_data = request.get_json()
-        gadgets = layout_data.get('gadgets', [])
-
-        for gadget_info in gadgets:
-            update_gadget_layout(
-                gadget_uuid=gadget_info['gadget_uuid'],
-                position_x=gadget_info['position_x'],
-                position_y=gadget_info['position_y'],
-                display_order=gadget_info['display_order'],
-                modifier=g.current_user.user_id
-            )
-
+        data = request.get_json()
+        gadgets = data.get('gadgets', []) if data else []
+        logger.info(f'レイアウト保存開始: user_id={g.current_user.user_id}, gadget_count={len(gadgets)}')
+        save_layout(gadgets, g.current_user.user_id)
         db.session.commit()
+        logger.info(f'レイアウト保存成功: user_id={g.current_user.user_id}')
         return jsonify({'message': 'レイアウトを保存しました'}), 200
 
     except Exception as e:
@@ -2384,17 +2743,17 @@ ORDER BY
 
 ```python
 @customer_dashboard_bp.route('/analysis/customer-dashboard/organizations/<int:org_id>/devices', methods=['GET'])
-@require_auth
-def get_devices(org_id):
+def organization_devices(org_id):
     """デバイス一覧取得（AJAX）"""
     try:
-        devices = get_devices_by_organization(db, org_id)
+        devices = get_devices_by_organization(org_id)
         return jsonify({
             'devices': [
                 {'device_id': d.device_id, 'device_name': d.device_name}
                 for d in devices
             ]
         })
+
     except Exception as e:
         logger.error(f'デバイス一覧取得エラー: {str(e)}')
         return jsonify({'error': 'デバイス一覧の取得に失敗しました'}), 500
@@ -2404,29 +2763,53 @@ def get_devices(org_id):
 
 ```python
 @customer_dashboard_bp.route('/analysis/customer-dashboard/datasource/save', methods=['POST'])
-@require_auth
 def datasource_save():
     """データソース設定保存（AJAX）"""
     try:
         data = request.get_json()
-        organization_id = data.get('organization_id')  # 未選択の場合は None（NULLとして保存）
-        device_id = data.get('device_id')              # 未選択の場合は None（NULLとして保存）
-        current_user_id = session.get('user_id')
-        update_datasource_setting(db, current_user_id, organization_id, device_id, current_user_id)
+        organization_id = data.get('organization_id') if data else None  # 未選択の場合は None（NULLとして保存）
+        device_id = data.get('device_id') if data else None              # 未選択の場合は None（NULLとして保存）
+        update_datasource_setting(
+            user_id=g.current_user.user_id,
+            organization_id=organization_id,
+            device_id=device_id,
+            modifier=g.current_user.user_id,
+        )
         db.session.commit()
         return jsonify({'status': 'ok'})
+
     except Exception as e:
         db.session.rollback()
         logger.error(f'データソース設定保存エラー: {str(e)}')
         return jsonify({'error': 'データソース設定の保存に失敗しました'}), 500
 ```
 
-**`update_datasource_setting` サービス関数（実装時の注意）:**
-
+**サービス関数実装例:**
 ```python
-def update_datasource_setting(db, user_id, organization_id, device_id, modifier):
-    # organization_id / device_id は None のまま渡す（未選択はNULLで保持）
-    # UPDATE処理...
+def get_devices_by_organization(org_id):
+    """組織に紐づくデバイス一覧をdevice_id昇順で返す（AJAXエンドポイント用）"""
+    return (
+        db.session.query(DeviceMaster)
+        .filter(
+            DeviceMaster.organization_id == org_id,
+            DeviceMaster.delete_flag == False,
+        )
+        .order_by(DeviceMaster.device_id)
+        .all()
+    )
+
+
+def update_datasource_setting(user_id, organization_id, device_id, modifier):
+    """ユーザー設定の組織ID・デバイスIDを更新する。未選択はNULLで保持する"""
+    setting = (
+        db.session.query(DashboardUserSetting)
+        .filter(DashboardUserSetting.user_id == user_id)
+        .first()
+    )
+    if setting is not None:
+        setting.organization_id = organization_id
+        setting.device_id = device_id
+        setting.modifier = modifier
 ```
 
 ---
@@ -2569,7 +2952,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 @customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
-@require_auth
 def dashboard_register():
     logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
 
