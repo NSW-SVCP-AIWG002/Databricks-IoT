@@ -301,14 +301,14 @@ flowchart TD
     CheckGadgetQuery -->|成功| GetGadgetDeviceNames[ガジェット固定デバイス名取得<br>get_fixed_gadget_device_names]
     CheckGadgetQuery -->|失敗| Error500
 
-    GetGadgetDeviceNames --> OrgQuery[組織選択肢取得<br>DB organization_master]
+    GetGadgetDeviceNames --> OrgQuery[組織選択肢取得（スコープ制限適用）<br>DB v_organization_master_by_user]
     
     OrgQuery --> CheckOrgQuery{DBクエリ結果}
     CheckOrgQuery -->|成功| CheckSelectOrgId{選択中の組織IDあり？<br>ユーザー設定参照}
     CheckOrgQuery -->|失敗| Error500
 
     CheckSelectOrgId -->|なし| Template[Jinja2テンプレートレンダリング<br>render_template<br>customer_dashboard/index.html]
-    CheckSelectOrgId -->|あり| DeviceQuery[デバイス選択肢取得<br>DB device_master]
+    CheckSelectOrgId -->|あり| DeviceQuery[デバイス選択肢取得（スコープ制限適用）<br>DB v_device_master_by_user]
     
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
     CheckDeviceQuery -->|成功| SetOrgId[組織選択に組織IDを設定]
@@ -340,13 +340,9 @@ flowchart TD
 **実行タイミング:** なし
 
 **データスコープ制限:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
-  - **ロールによる条件分岐は一切行わない**
-
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
+- **フィルタリングロジックは全ユーザーで共通、実質的なアクセス可能範囲に差分あり**
+- システム保守者・管理者: すべてのユーザーにアクセス可能
+- 販社ユーザ・サービス利用者: ログインユーザーの `organization_id` に紐づく全子組織でフィルタリング
 
 #### 処理詳細（サーバーサイド）
 
@@ -355,39 +351,19 @@ flowchart TD
 リバースプロキシヘッダから認証情報を取得し、権限を確認します。
 
 **処理内容:**
-- ヘッダ `X-Forwarded-User` からユーザーIDを取得
-- データベースから現在ユーザー情報を取得（ユーザー種別、組織ID）
-- 組織に応じてデータスコープを決定
+- ヘッダ `X-Forwarded-User` からメールアドレスを取得
+- データベースから現在ユーザー情報を取得（ユーザーID、ユーザー種別ID）
 
 **変数・パラメータ:**
-- `current_user_id`: string - リバースプロキシヘッダから取得したユーザーID
-- `current_user`: User - データベースから取得したユーザーオブジェクト
-- `organization_id`: int - データスコープ制限用の組織ID
+- `email`: string - リバースプロキシヘッダから取得したメールアドレス
+- `user_id`: int - データベースから取得したユーザーID
+- `user_type_id`: int - データベースから取得したユーザー種別ID
 
 **② データスコープ制限の適用**
 
-組織階層に基づいてデータスコープ制限を適用します。
+`v_organization_master_by_user` と `v_device_master_by_user` にログインユーザーの `user_id` を渡すことで、アクセス可能な組織配下のデータに自動的に絞り込まれます。
 
-**サービス関数実装例:**
-```python
-def get_organization_id_by_user(user_id):
-    """ユーザーIDから所属組織IDを返す"""
-    return (
-        db.session.query(User.organization_id)
-        .filter(User.user_id == user_id, User.delete_flag == False)
-        .scalar()
-    )
-
-
-def get_accessible_organizations(parent_org_id):
-    """ユーザーがアクセス可能な組織IDリストを返す"""
-    rows = (
-        db.session.query(OrganizationClosure.subsidiary_organization_id)
-        .filter(OrganizationClosure.parent_organization_id == parent_org_id)
-        .all()
-    )
-    return [r[0] for r in rows]
-```
+詳細な実装仕様は[認証・認可実装](#認証認可実装)を参照してください。
 
 **③ ダッシュボードユーザー設定取得**
 
@@ -431,27 +407,31 @@ def get_dashboard_user_setting(user_id):
 **SQL詳細:**
 ```sql
 SELECT
-  dashboard_id,
-  dashboard_name
+  d.dashboard_id,
+  d.dashboard_name
 FROM
-  dashboard_master
+  dashboard_master d
+INNER JOIN
+  user_master u
+  ON u.organization_id = d.organization_id
 WHERE
-  organization_id IN (:accessible_org_ids)
-  AND delete_flag = FALSE
+  u.user_id = :current_user_id
+  AND u.delete_flag = FALSE
+  AND d.delete_flag = FALSE
 ORDER BY
-  dashboard_id ASC
+  d.dashboard_id ASC
 ```
 
 **サービス関数実装例:**
 ```python
-def get_dashboards(accessible_org_ids):
-    """アクセス可能スコープ内のダッシュボード一覧をdashboard_id昇順で返す"""
-    if not accessible_org_ids:
-        return []
+def get_dashboards(user_id):
+    """ログインユーザーの組織に属するダッシュボード一覧をdashboard_id昇順で返す"""
     return (
         db.session.query(DashboardMaster)
+        .join(UserMaster, UserMaster.organization_id == DashboardMaster.organization_id)
         .filter(
-            DashboardMaster.organization_id.in_(accessible_org_ids),
+            UserMaster.user_id == user_id,
+            UserMaster.delete_flag == False,
             DashboardMaster.delete_flag == False,
         )
         .order_by(DashboardMaster.dashboard_id)
@@ -459,12 +439,14 @@ def get_dashboards(accessible_org_ids):
     )
 
 
-def get_first_dashboard(accessible_org_ids, exclude_id=None):
-    """アクセス可能スコープ内の先頭ダッシュボードを返す。exclude_id指定時は除外する"""
+def get_first_dashboard(user_id, exclude_id=None):
+    """ログインユーザーの組織に属する先頭ダッシュボードを返す。exclude_id指定時は除外する"""
     query = (
         db.session.query(DashboardMaster)
+        .join(UserMaster, UserMaster.organization_id == DashboardMaster.organization_id)
         .filter(
-            DashboardMaster.organization_id.in_(accessible_org_ids),
+            UserMaster.user_id == user_id,
+            UserMaster.delete_flag == False,
             DashboardMaster.delete_flag == False,
         )
     )
@@ -629,7 +611,7 @@ def _get_devices_by_ids(device_ids):
 
 データソース選択フォーム用の組織選択肢を取得します。
 
-**使用テーブル:** organization_master
+**使用テーブル:** v_organization_master_by_user
 
 **SQL詳細:**
 ```sql
@@ -637,9 +619,9 @@ SELECT
   organization_id,
   organization_name
 FROM
-  organization_master
+  v_organization_master_by_user
 WHERE
-  organization_id IN (:accessible_org_ids)
+  user_id = :current_user_id
   AND delete_flag = FALSE
 ORDER BY
   organization_id ASC
@@ -647,15 +629,15 @@ ORDER BY
 
 **サービス関数実装例:**
 ```python
-def get_organizations(accessible_org_ids):
-    """アクセス可能スコープ内の組織一覧をorganization_id昇順で返す"""
+def get_organizations():
+    """ユーザーのアクセス可能スコープ内の組織一覧をorganization_id昇順で返す"""
     return (
-        db.session.query(OrganizationMaster)
+        db.session.query(OrganizationMasterByUser)
         .filter(
-            OrganizationMaster.organization_id.in_(accessible_org_ids),
-            OrganizationMaster.delete_flag == False,
+            OrganizationMasterByUser.user_id == g.current_user.user_id,
+            OrganizationMasterByUser.delete_flag == False,
         )
-        .order_by(OrganizationMaster.organization_id)
+        .order_by(OrganizationMasterByUser.organization_id)
         .all()
     )
 ```
@@ -703,9 +685,6 @@ def get_devices(organization_id):
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
 
-    # データスコープ制限適用
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-
     # ダッシュボードユーザー設定取得
     user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
@@ -714,7 +693,7 @@ def customer_dashboard():
         dashboard_id = user_setting.dashboard_id
     else:
         # デフォルト: 先頭ダッシュボード
-        first = get_first_dashboard(accessible_org_ids)
+        first = get_first_dashboard(g.current_user.user_id)
         dashboard_id = first.dashboard_id if first else None
         # ユーザー設定が未登録かつアクセス可能なダッシュボードがある場合は先頭を自動登録
         if dashboard_id and not user_setting:
@@ -723,10 +702,10 @@ def customer_dashboard():
             user_setting = get_dashboard_user_setting(g.current_user.user_id)
 
     # ダッシュボード一覧取得
-    dashboards = get_dashboards(accessible_org_ids)
+    dashboards = get_dashboards(g.current_user.user_id)
 
     # 組織選択肢取得
-    organizations = get_organizations(accessible_org_ids)
+    organizations = get_organizations()
     gadget_static_files = list(_GADGET_REGISTRY.values())
     gadget_id_to_template = {
         get_gadget_type_id_by_name(name): info['template']
@@ -859,15 +838,19 @@ flowchart TD
 **SQL詳細:**
 ```sql
 SELECT
-  dashboard_id,
-  dashboard_name
+  d.dashboard_id,
+  d.dashboard_name
 FROM
-  dashboard_master
+  dashboard_master d
+INNER JOIN
+  user_master u
+  ON u.organization_id = d.organization_id
 WHERE
-  organization_id IN (:accessible_org_ids)
-  AND delete_flag = FALSE
+  u.user_id = :current_user_id
+  AND u.delete_flag = FALSE
+  AND d.delete_flag = FALSE
 ORDER BY
-  dashboard_id ASC
+  d.dashboard_id ASC
 ```
 
 **実装例:**
@@ -875,8 +858,7 @@ ORDER BY
 @customer_dashboard_bp.route('/dashboards', methods=['GET'])
 def dashboard_management():
     """ダッシュボード管理モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    dashboards = get_dashboards(accessible_org_ids)
+    dashboards = get_dashboards(g.current_user.user_id)
 
     return render_template(
         'analysis/customer_dashboard/modals/dashboard_management.html',
@@ -961,6 +943,21 @@ flowchart TD
 | ダッシュボードタイトル | 最大50文字 | ダッシュボードタイトルは50文字以内で入力してください |
 
 #### 処理詳細（サーバーサイド）
+
+**③ 組織ID取得**
+
+ダッシュボード登録用に user_id から organization_id を取得
+
+**サービス関数実装例:**
+```python
+def get_organization_id_by_user(user_id):
+    """ユーザーIDから所属組織IDを返す。"""
+    return (
+        db.session.query(User.organization_id)
+        .filter(User.user_id == user_id, User.delete_flag == False)
+        .scalar()
+    )
+```
 
 **① ダッシュボード登録**
 
@@ -1127,13 +1124,14 @@ flowchart TD
 
 **サービス関数実装例:**
 ```python
-def check_dashboard_access(dashboard_uuid, accessible_org_ids):
-    """ダッシュボードがアクセス可能スコープ内に存在するか確認する"""
+def check_dashboard_access(dashboard_uuid, user_id):
+    """ダッシュボードがログインユーザーの組織に属するか確認する"""
     return (
         db.session.query(DashboardMaster)
+        .join(UserMaster, UserMaster.organization_id == DashboardMaster.organization_id)
         .filter(
             DashboardMaster.dashboard_uuid == dashboard_uuid,
-            DashboardMaster.organization_id.in_(accessible_org_ids),
+            UserMaster.user_id == user_id,
             DashboardMaster.delete_flag == False,
         )
         .first()
@@ -1145,10 +1143,8 @@ def check_dashboard_access(dashboard_uuid, accessible_org_ids):
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
 def dashboard_switch(dashboard_uuid):
     """ダッシュボード表示切替"""
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-
     # ダッシュボードアクセス権限チェック
-    dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
+    dashboard = check_dashboard_access(dashboard_uuid, g.current_user.user_id)
     if not dashboard:
         abort(404)
 
@@ -1303,8 +1299,7 @@ def dashboard_update(dashboard_uuid):
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
+    dashboard = check_dashboard_access(dashboard_uuid, g.current_user.user_id)
     if not dashboard:
         abort(404)
 
@@ -1504,7 +1499,7 @@ def delete_dashboard_user_setting(user_id, modifier):
         setting.modifier = modifier
 
 
-def delete_dashboard_with_cascade(dashboard, accessible_org_ids, user_id):
+def delete_dashboard_with_cascade(dashboard, user_id):
     """ダッシュボードをカスケード論理削除する。次のダッシュボードがあればユーザー設定を更新する"""
     dashboard_id = dashboard.dashboard_id
 
@@ -1514,7 +1509,7 @@ def delete_dashboard_with_cascade(dashboard, accessible_org_ids, user_id):
     dashboard.delete_flag = True
     dashboard.modifier = user_id
 
-    next_dashboard = get_first_dashboard(accessible_org_ids, exclude_id=dashboard_id)
+    next_dashboard = get_first_dashboard(user_id, exclude_id=dashboard_id)
     if next_dashboard is not None:
         upsert_dashboard_user_setting(user_id, next_dashboard.dashboard_id)
     else:
@@ -1534,8 +1529,7 @@ def dashboard_delete(dashboard_uuid):
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    dashboard = check_dashboard_access(dashboard_uuid, accessible_org_ids)
+    dashboard = check_dashboard_access(dashboard_uuid, g.current_user.user_id)
     if not dashboard:
         abort(404)
 
@@ -1552,7 +1546,7 @@ def dashboard_delete(dashboard_uuid):
 
     # ⑤ ダッシュボード削除（カスケード）
     try:
-        delete_dashboard_with_cascade(dashboard, accessible_org_ids, g.current_user.user_id)
+        delete_dashboard_with_cascade(dashboard, g.current_user.user_id)
         db.session.commit()
         return jsonify({'message': 'ダッシュボードを削除しました'})
 
@@ -1695,8 +1689,7 @@ def group_register():
             form=form,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    dashboard = check_dashboard_access(form.dashboard_uuid.data, accessible_org_ids)
+    dashboard = check_dashboard_access(form.dashboard_uuid.data, g.current_user.user_id)
     if not dashboard:
         abort(404)
 
@@ -1775,14 +1768,15 @@ WHERE
 
 **サービス関数実装例:**
 ```python
-def check_group_access(dashboard_group_uuid, accessible_org_ids):
-    """グループがアクセス可能スコープ内に存在するか確認する（JOINでダッシュボード経由）"""
+def check_group_access(dashboard_group_uuid, user_id):
+    """グループがログインユーザーの組織のダッシュボードに属するか確認する（2段JOINでダッシュボード経由）"""
     return (
         db.session.query(DashboardGroupMaster)
-        .join(DashboardMaster)
+        .join(DashboardMaster, DashboardMaster.dashboard_id == DashboardGroupMaster.dashboard_id)
+        .join(UserMaster, UserMaster.organization_id == DashboardMaster.organization_id)
         .filter(
             DashboardGroupMaster.dashboard_group_uuid == dashboard_group_uuid,
-            DashboardMaster.organization_id.in_(accessible_org_ids),
+            UserMaster.user_id == user_id,
             DashboardGroupMaster.delete_flag == False,
         )
         .first()
@@ -1833,8 +1827,7 @@ def group_update(dashboard_group_uuid):
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    group = check_group_access(dashboard_group_uuid, accessible_org_ids)
+    group = check_group_access(dashboard_group_uuid, g.current_user.user_id)
     if not group:
         abort(404)
 
@@ -2002,8 +1995,7 @@ def group_delete(dashboard_group_uuid):
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    group = check_group_access(dashboard_group_uuid, accessible_org_ids)
+    group = check_group_access(dashboard_group_uuid, g.current_user.user_id)
     if not group:
         abort(404)
 
@@ -2210,15 +2202,16 @@ WHERE
 
 **サービス関数実装例:**
 ```python
-def check_gadget_access(gadget_uuid, accessible_org_ids):
-    """ガジェットがアクセス可能スコープ内に存在するか確認する（2段JOINでダッシュボード経由）"""
+def check_gadget_access(gadget_uuid, user_id):
+    """ガジェットがログインユーザーの組織のダッシュボードに属するか確認する（3段JOINでダッシュボード経由）"""
     return (
         db.session.query(DashboardGadgetMaster)
-        .join(DashboardGroupMaster)
-        .join(DashboardMaster)
+        .join(DashboardGroupMaster, DashboardGroupMaster.dashboard_group_id == DashboardGadgetMaster.dashboard_group_id)
+        .join(DashboardMaster, DashboardMaster.dashboard_id == DashboardGroupMaster.dashboard_id)
+        .join(UserMaster, UserMaster.organization_id == DashboardMaster.organization_id)
         .filter(
             DashboardGadgetMaster.gadget_uuid == gadget_uuid,
-            DashboardMaster.organization_id.in_(accessible_org_ids),
+            UserMaster.user_id == user_id,
             DashboardGadgetMaster.delete_flag == False,
         )
         .first()
@@ -2269,8 +2262,7 @@ def gadget_update(gadget_uuid):
         ), 400
 
     # ③ データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
+    gadget = check_gadget_access(gadget_uuid, g.current_user.user_id)
     if not gadget:
         abort(404)
 
@@ -2367,8 +2359,7 @@ def gadget_delete(gadget_uuid):
         abort(500)
 
     # ② データスコープ制限チェック
-    accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
-    gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
+    gadget = check_gadget_access(gadget_uuid, g.current_user.user_id)
     if not gadget:
         abort(404)
 
@@ -2897,37 +2888,57 @@ def update_datasource_setting(user_id, organization_id, device_id, modifier):
 ### 認証・認可実装
 
 **認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
+Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
 
 **認可ロジック:**
-
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のダッシュボード・ガジェットデータのみアクセス可能
+- **全ユーザー共通**: 各リソース用VIEW（`v_organization_master_by_user` 等）に `user_id` を渡すことでスコープ制限を自動適用
+  - VIEWが内部で `organization_closure` を参照し、アクセス可能な組織配下のデータのみ返す
   - **ロールによる条件分岐は一切行わない**
 
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
+**注**:
+- システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
+- センサーデータ（`silver_sensor_data` 等）にはVIEWが存在しないため、データ取得の度に `organization_closure` を参照する
 
 **実装例:**
 ```python
-def apply_dashboard_data_scope_filter(query, current_user):
-    """組織階層に基づいたダッシュボードデータのスコープ制限を適用"""
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
+# 組織一覧取得
+def get_organizations():
+    # v_organization_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
+    return (
+        db.session.query(OrganizationMasterByUser)
+        .filter(
+            OrganizationMasterByUser.user_id == g.current_user.user_id,
+            OrganizationMasterByUser.delete_flag == False,
+        )
+        .order_by(OrganizationMasterByUser.organization_id)
+        .all()
+    )
 
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        return query.filter(DashboardMaster.organization_id.in_([]))
-
-    return query.filter(DashboardMaster.organization_id.in_(org_ids))
+# シルバー層センサーデータ取得
+def get_silver_sensor_data(start_datetime, end_datetime):
+    # user_master と organization_closure を innerjoin し、user_id を渡してスコープ制限を適用する
+    return (
+        db.session.query(
+            SilverSensorData
+        ).join(
+            OrganizationClosure,
+            SilverSensorData.organization_id == OrganizationClosure.subsidiary_organization_id
+        ).join(
+            UserMaster,
+            OrganizationClosure.parent_organization_id == UserMaster.organization_id
+        )
+        .filter(
+            UserMaster.user_id == g.current_user.user_id,
+            UserMaster.delete_flag == False,
+            SilverSensorData.event_timestamp.between(start_datetime, end_datetime)
+        )
+        .order_by(desc(SilverSensorData.event_timestamp))
+        .limit(100)
+        .all()
+    )
 ```
 
 ### ログ出力ルール
