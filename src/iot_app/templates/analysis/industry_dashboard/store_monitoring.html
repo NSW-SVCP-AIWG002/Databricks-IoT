@@ -110,7 +110,7 @@
       <div class="pagination">
         {% if alert_page > 1 %}
           <a class="pagination__button"
-             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page - 1 }}&page={{ page }}">&lt;</a>
+             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page - 1 }}&device_page={{ page }}">&lt;</a>
         {% endif %}
         {% set ns = namespace(pages=[]) %}
         {% if alert_total_pages <= 5 %}
@@ -129,12 +129,12 @@
             <span class="pagination__ellipsis">...</span>
           {% else %}
             <a class="pagination__button {% if p == alert_page %}pagination__button--active{% endif %}"
-               href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ p }}&page={{ page }}">{{ p }}</a>
+               href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ p }}&device_page={{ page }}">{{ p }}</a>
           {% endif %}
         {% endfor %}
         {% if alert_page < alert_total_pages %}
           <a class="pagination__button"
-             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page + 1 }}&page={{ page }}">&gt;</a>
+             href="{{ url_for('analysis.store_monitoring') }}?alert_page={{ alert_page + 1 }}&device_page={{ page }}">&gt;</a>
         {% endif %}
       </div>
       {% endif %}
@@ -183,7 +183,7 @@
       <div class="pagination">
         {% if page > 1 %}
           <a class="pagination__button"
-             href="{{ url_for('analysis.store_monitoring') }}?page={{ page - 1 }}&alert_page={{ alert_page }}">&lt;</a>
+             href="{{ url_for('analysis.store_monitoring') }}?device_page={{ page - 1 }}&alert_page={{ alert_page }}">&lt;</a>
         {% endif %}
         {% set ns = namespace(pages=[]) %}
         {% if device_total_pages <= 5 %}
@@ -202,12 +202,12 @@
             <span class="pagination__ellipsis">...</span>
           {% else %}
             <a class="pagination__button {% if p == page %}pagination__button--active{% endif %}"
-               href="{{ url_for('analysis.store_monitoring') }}?page={{ p }}&alert_page={{ alert_page }}">{{ p }}</a>
+               href="{{ url_for('analysis.store_monitoring') }}?device_page={{ p }}&alert_page={{ alert_page }}">{{ p }}</a>
           {% endif %}
         {% endfor %}
         {% if page < device_total_pages %}
           <a class="pagination__button"
-             href="{{ url_for('analysis.store_monitoring') }}?page={{ page + 1 }}&alert_page={{ alert_page }}">&gt;</a>
+             href="{{ url_for('analysis.store_monitoring') }}?device_page={{ page + 1 }}&alert_page={{ alert_page }}">&gt;</a>
         {% endif %}
       </div>
       {% endif %}

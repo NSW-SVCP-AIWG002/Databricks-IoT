@@ -1168,9 +1168,23 @@ def device_details_search(device_uuid):
     search_end_datetime = request.form.get('search_end_datetime', '')
 
     # バリデーション
+    current_params = _get_device_details_search_params()
     errors = validate_date_range(search_start_datetime, search_end_datetime)
     if errors:
-        abort(400)
+        # バリデーションエラー: 400ステータスでフォーム内エラーメッセージを表示
+        alerts, alerts_total = get_device_alerts_with_count(device.device_id, current_params, g.current_user.user_id)
+        graph_data = get_graph_data(device.device_id, current_params)
+        return render_template(
+            'analysis/industry_dashboard/device_details.html',
+            device=device,
+            alerts=alerts,
+            alerts_total=alerts_total,
+            graph_data=graph_data,
+            page=current_params.get('page', 1),
+            per_page=ITEM_PER_PAGE,
+            search_params={'search_start_datetime': search_start_datetime, 'search_end_datetime': search_end_datetime},
+            period_error=errors[0],
+        ), 400
 
     search_params = {
         'search_start_datetime': search_start_datetime,
@@ -1179,7 +1193,7 @@ def device_details_search(device_uuid):
     }
 
     # アラート一覧取得（件数・リストを同時取得）
-    alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params)
+    alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params, g.current_user.user_id)
 
     # グラフ用データ取得（MySQLから取得）
     graph_data = get_graph_data(device.device_id, search_params)
@@ -1212,18 +1226,18 @@ def device_details_search(device_uuid):
 
 | メッセージID | 表示内容 | 表示タイミング | 表示場所 |
 |-------------|---------|---------------|---------|
-| VAL_001 | 日時の形式が正しくありません | 日時形式不正時 | エラーモーダル |
-| VAL_002 | 開始日時は終了日時より前である必要があります | 期間不正時 | エラーモーダル |
-| VAL_003 | 表示期間は2ヶ月以内で指定してください | 期間超過時 | エラーモーダル |
+| VAL_001 | 日時の形式が正しくありません | 日時形式不正時 | フォーム内エラーメッセージ（period_error） |
+| VAL_002 | 開始日時は終了日時より前である必要があります | 期間不正時 | フォーム内エラーメッセージ（period_error） |
+| VAL_003 | 表示期間は2ヶ月以内で指定してください | 期間超過時 | フォーム内エラーメッセージ（period_error） |
 | ERR_001 | データの取得に失敗しました | DBクエリ失敗時 | エラーモーダル |
 
 #### エラーハンドリング
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
-| 400 | パラメータ不正 | 400エラーモーダル表示 | 日時の形式が正しくありません |
-| 400 | パラメータ不正 | 400エラーモーダル表示 | 開始日時は終了日時より前である必要があります |
-| 400 | パラメータ不正 | 400エラーモーダル表示 | 表示期間は2ヶ月以内で指定してください |
+| 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 日時の形式が正しくありません |
+| 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 開始日時は終了日時より前である必要があります |
+| 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 表示期間は2ヶ月以内で指定してください |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
 | 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
 | 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |

@@ -3,6 +3,9 @@
 
 店舗モニタリング・デバイス詳細画面のビジネスロジック。
 OLTP DB (MySQL/SQLite) へのアクセスを担当する。
+
+データスコープ制限は v_device_master_by_user / v_alert_history_by_user VIEW に
+user_id を渡すことで自動適用される。ロールによる条件分岐は一切行わない。
 """
 
 import csv
@@ -10,19 +13,11 @@ from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 from flask import Response
+from sqlalchemy import text
 
 from iot_app import db
-from iot_app.models.alert import (
-    AlertHistory,
-    AlertLevelMaster,
-    AlertSettingMaster,
-    AlertStatusMaster,
-)
-from iot_app.models.contract import ContractStatusMaster  # noqa: F401
-from iot_app.models.device import DeviceMaster, DeviceTypeMaster
-from iot_app.models.device_status import DeviceStatusData
+from iot_app.models.device_status import DeviceStatusData  # noqa: F401
 from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData  # noqa: F401
-from iot_app.models.organization import OrganizationClosure, OrganizationMaster
 
 _JST = timezone(timedelta(hours=9))
 _ALERT_RECENT_DAYS = 30
@@ -72,7 +67,7 @@ def get_default_date_range():
 
     Returns:
         dict: search_start_datetime / search_end_datetime を含む辞書
-              フォーマット: YYYY/MM/DDTHH:MM
+              フォーマット: YYYY-MM-DDTHH:MM
     """
     end_dt = datetime.now(_JST).replace(tzinfo=None)
     start_dt = end_dt - timedelta(hours=24)
@@ -83,64 +78,45 @@ def get_default_date_range():
 
 
 # ---------------------------------------------------------------------------
-# タスク2-1: アクセス可能組織ID取得
-# ---------------------------------------------------------------------------
-
-
-def get_accessible_organizations(current_user_organization_id):
-    """ユーザーの組織IDに基づいてアクセス可能な組織IDリストを返す。
-
-    organization_closure テーブルから parent_organization_id で検索し、
-    subsidiary_organization_id のリストを返す。
-
-    Args:
-        current_user_organization_id: ユーザーの組織ID
-
-    Returns:
-        list[int]: アクセス可能な組織IDのリスト
-    """
-    rows = (
-        db.session.query(OrganizationClosure.subsidiary_organization_id)
-        .filter(
-            OrganizationClosure.parent_organization_id == current_user_organization_id
-        )
-        .all()
-    )
-    return [row[0] for row in rows]
-
-
-# ---------------------------------------------------------------------------
 # 店舗名オートコンプリート
 # ---------------------------------------------------------------------------
 
 
-def search_organizations_by_name(name, accessible_org_ids):
+def search_organizations_by_name(name, user_id):
     """部分一致する組織名の一覧を返す（店舗名オートコンプリート用）。
+
+    v_device_master_by_user VIEW に user_id を渡してデータスコープ制限を適用する。
 
     Args:
         name: 検索文字列（部分一致）
-        accessible_org_ids: アクセス可能な組織IDリスト
+        user_id: ログインユーザーID
 
     Returns:
         list[dict]: {organization_id, organization_name} の辞書リスト
     """
-    if not accessible_org_ids:
-        return []
-    q = (
-        db.session.query(
-            OrganizationMaster.organization_id,
-            OrganizationMaster.organization_name,
-        )
-        .filter(
-            OrganizationMaster.delete_flag == False,  # noqa: E712
-            OrganizationMaster.organization_id.in_(accessible_org_ids),
-        )
-    )
+    params = {"user_id": user_id}
+    name_filter = ""
     if name:
-        q = q.filter(OrganizationMaster.organization_name.like(f"%{name}%"))
-    rows = q.order_by(OrganizationMaster.organization_name.asc()).all()
+        params["name"] = f"%{name}%"
+        name_filter = "AND om.organization_name LIKE :name"
+
+    rows = db.session.execute(
+        text(f"""
+            SELECT DISTINCT om.organization_id, om.organization_name
+            FROM v_device_master_by_user v
+            INNER JOIN organization_master om
+              ON v.device_organization_id = om.organization_id
+              AND om.delete_flag = FALSE
+            WHERE v.user_id = :user_id
+              AND v.delete_flag = FALSE
+              {name_filter}
+            ORDER BY om.organization_name ASC
+        """),
+        params,
+    ).fetchall()
+
     return [
-        {"organization_id": row.organization_id, "organization_name": row.organization_name}
+        {"organization_id": row[0], "organization_name": row[1]}
         for row in rows
     ]
 
@@ -150,47 +126,43 @@ def search_organizations_by_name(name, accessible_org_ids):
 # ---------------------------------------------------------------------------
 
 
-def check_device_access(device_uuid, accessible_org_ids):
-    """device_uuid がアクセス可能組織に属するかチェックし、デバイス情報を返す。
+def check_device_access(device_uuid, user_id):
+    """device_uuid がユーザーのアクセス範囲に属するかチェックし、デバイス情報を返す。
+
+    v_device_master_by_user VIEW に user_id を渡してデータスコープ制限を適用する。
 
     Args:
         device_uuid: デバイスUUID
-        accessible_org_ids: アクセス可能な組織IDリスト
+        user_id: ログインユーザーID
 
     Returns:
-        Row | None: アクセス可能な場合はデバイス情報の named tuple、否の場合はNone
+        Row | None: アクセス可能な場合はデバイス情報の Row、否の場合はNone
     """
-    if not accessible_org_ids:
-        return None
-    return (
-        db.session.query(
-            DeviceMaster.device_id,
-            DeviceMaster.device_uuid,
-            DeviceMaster.device_name,
-            DeviceMaster.device_model,
-            DeviceMaster.organization_id,
-            DeviceTypeMaster.device_type_name,
-            OrganizationMaster.organization_name,
-        )
-        .join(
-            DeviceTypeMaster,
-            (DeviceMaster.device_type_id == DeviceTypeMaster.device_type_id)
-            & (DeviceTypeMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            OrganizationMaster,
-            (DeviceMaster.organization_id == OrganizationMaster.organization_id)
-            & (OrganizationMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .filter(
-            DeviceMaster.device_uuid == device_uuid,
-            DeviceMaster.organization_id.in_(accessible_org_ids),
-            DeviceMaster.delete_flag == False,  # noqa: E712
-        )
-        .first()
-    )
+    return db.session.execute(
+        text("""
+            SELECT
+                v.device_id,
+                dm.device_uuid,
+                v.device_name,
+                dm.device_model,
+                v.device_organization_id AS organization_id,
+                dtm.device_type_name,
+                om.organization_name
+            FROM v_device_master_by_user v
+            INNER JOIN device_master dm
+              ON v.device_id = dm.device_id
+            LEFT JOIN device_type_master dtm
+              ON dm.device_type_id = dtm.device_type_id
+              AND dtm.delete_flag = FALSE
+            LEFT JOIN organization_master om
+              ON v.device_organization_id = om.organization_id
+              AND om.delete_flag = FALSE
+            WHERE v.user_id = :user_id
+              AND dm.device_uuid = :device_uuid
+              AND v.delete_flag = FALSE
+        """),
+        {"user_id": user_id, "device_uuid": device_uuid},
+    ).first()
 
 
 # ---------------------------------------------------------------------------
@@ -198,95 +170,91 @@ def check_device_access(device_uuid, accessible_org_ids):
 # ---------------------------------------------------------------------------
 
 
-def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10):
+def get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10):
     """過去30日以内のアラート履歴を取得する（店舗モニタリング用）。
+
+    v_alert_history_by_user VIEW に user_id を渡してデータスコープ制限を適用する。
 
     Args:
         search_params: 検索条件辞書 (organization_id, organization_name, device_name)
-        accessible_org_ids: アクセス可能な組織IDリスト
+        user_id: ログインユーザーID
         page: ページ番号（1始まり）
         per_page: 1ページあたりの件数（デフォルト10）
 
     Returns:
         tuple[list, int]: (アラートリスト, 総件数)
     """
-    if not accessible_org_ids:
-        return [], 0
-
-    cutoff = datetime.now() - timedelta(days=_ALERT_RECENT_DAYS)
-
-    q = (
-        db.session.query(
-            AlertHistory.alert_history_id,
-            AlertHistory.alert_occurrence_datetime,
-            DeviceMaster.device_name,
-            AlertSettingMaster.alert_name,
-            AlertLevelMaster.alert_level_name,
-            AlertStatusMaster.alert_status_name,
-            OrganizationMaster.organization_name,
-        )
-        .join(
-            AlertStatusMaster,
-            (AlertHistory.alert_status_id == AlertStatusMaster.alert_status_id)
-            & (AlertStatusMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            AlertSettingMaster,
-            (AlertHistory.alert_id == AlertSettingMaster.alert_id)
-            & (AlertSettingMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            AlertLevelMaster,
-            (AlertSettingMaster.alert_level_id == AlertLevelMaster.alert_level_id)
-            & (AlertLevelMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            DeviceMaster,
-            (AlertSettingMaster.device_id == DeviceMaster.device_id)
-            & (DeviceMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            OrganizationMaster,
-            (DeviceMaster.organization_id == OrganizationMaster.organization_id)
-            & (OrganizationMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-    )
-
-    q = q.filter(
-        AlertHistory.delete_flag == False,  # noqa: E712
-        DeviceMaster.organization_id.in_(accessible_org_ids),
-        AlertHistory.alert_occurrence_datetime >= cutoff,
-    )
-
     organization_id = search_params.get("organization_id", "")
     organization_name = search_params.get("organization_name", "")
     device_name = search_params.get("device_name", "")
 
-    if organization_id:
-        q = q.filter(DeviceMaster.organization_id == organization_id)
-    elif organization_name:
-        q = q.filter(
-            OrganizationMaster.organization_name.like(f"%{organization_name}%")
-        )
-    if device_name:
-        q = q.filter(DeviceMaster.device_name.like(f"%{device_name}%"))
+    params = {"user_id": user_id, "days": _ALERT_RECENT_DAYS}
+    extra_filters = ""
 
-    total = min(q.count(), _ALERT_MAX_TOTAL)
+    if organization_id:
+        params["organization_id"] = organization_id
+        extra_filters += " AND dm.organization_id = :organization_id"
+    elif organization_name:
+        params["organization_name"] = f"%{organization_name}%"
+        extra_filters += " AND om.organization_name LIKE :organization_name"
+    if device_name:
+        params["device_name"] = f"%{device_name}%"
+        extra_filters += " AND dm.device_name LIKE :device_name"
+
+    base_sql = f"""
+        FROM v_alert_history_by_user v
+        LEFT JOIN alert_status_master asm
+          ON v.alert_status_id = asm.alert_status_id
+          AND asm.delete_flag = FALSE
+        LEFT JOIN alert_setting_master am
+          ON v.alert_id = am.alert_id
+          AND am.delete_flag = FALSE
+        LEFT JOIN alert_level_master al
+          ON am.alert_level_id = al.alert_level_id
+          AND al.delete_flag = FALSE
+        LEFT JOIN device_master dm
+          ON v.device_id = dm.device_id
+          AND dm.delete_flag = FALSE
+        LEFT JOIN organization_master om
+          ON dm.organization_id = om.organization_id
+          AND om.delete_flag = FALSE
+        WHERE v.user_id = :user_id
+          AND v.delete_flag = FALSE
+          AND v.alert_occurrence_datetime >= DATE_SUB(NOW(), INTERVAL :days DAY)
+          {extra_filters}
+    """
+
+    count_row = db.session.execute(
+        text(f"SELECT COUNT(v.alert_history_id) AS cnt {base_sql}"),
+        params,
+    ).first()
+    total = min(count_row[0] if count_row else 0, _ALERT_MAX_TOTAL)
+
     offset = (page - 1) * per_page
     effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
-    results = (
-        q.order_by(AlertLevelMaster.alert_level_id.asc(), AlertHistory.alert_history_id.desc())
-        .limit(effective_limit)
-        .offset(offset)
-        .all()
-    ) if effective_limit > 0 else []
+    if effective_limit <= 0:
+        return [], total
 
-    return results, total
+    params["limit"] = effective_limit
+    params["offset"] = offset
+    rows = db.session.execute(
+        text(f"""
+            SELECT
+                v.alert_history_id,
+                v.alert_occurrence_datetime,
+                dm.device_name,
+                am.alert_name,
+                al.alert_level_name,
+                asm.alert_status_name,
+                om.organization_name
+            {base_sql}
+            ORDER BY al.alert_level_id ASC, v.alert_history_id DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    ).fetchall()
+
+    return rows, total
 
 
 # ---------------------------------------------------------------------------
@@ -294,63 +262,76 @@ def get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_
 # ---------------------------------------------------------------------------
 
 
-def get_device_list_with_count(search_params, accessible_org_ids, page, per_page=10):
+def get_device_list_with_count(search_params, user_id, page, per_page=10):
     """デバイス一覧をページング付きで取得する（店舗モニタリング用）。
+
+    v_device_master_by_user VIEW に user_id を渡してデータスコープ制限を適用する。
 
     Args:
         search_params: 検索条件辞書 (organization_id, organization_name, device_name)
-        accessible_org_ids: アクセス可能な組織IDリスト
+        user_id: ログインユーザーID
         page: ページ番号（1始まり）
         per_page: 1ページあたりの件数（デフォルト10）
 
     Returns:
         tuple[list, int]: (デバイスリスト, 総件数)
     """
-    if not accessible_org_ids:
-        return [], 0
-
-    q = db.session.query(
-        DeviceMaster.device_id,
-        DeviceMaster.device_uuid,
-        DeviceMaster.device_name,
-        DeviceMaster.organization_id,
-        OrganizationMaster.organization_name,
-    ).join(
-        OrganizationMaster,
-        (DeviceMaster.organization_id == OrganizationMaster.organization_id)
-        & (OrganizationMaster.delete_flag == False),  # noqa: E712
-        isouter=True,
-    ).join(
-        DeviceStatusData,
-        DeviceMaster.device_id == DeviceStatusData.device_id,
-        isouter=True,
-    )
-
-    q = q.filter(
-        DeviceMaster.delete_flag == False,  # noqa: E712
-        DeviceMaster.organization_id.in_(accessible_org_ids),
-    )
-
     organization_id = search_params.get("organization_id", "")
     organization_name = search_params.get("organization_name", "")
     device_name = search_params.get("device_name", "")
 
+    params = {"user_id": user_id}
+    extra_filters = ""
+
     if organization_id:
-        q = q.filter(DeviceMaster.organization_id == organization_id)
+        params["organization_id"] = organization_id
+        extra_filters += " AND dm.organization_id = :organization_id"
     elif organization_name:
-        q = q.filter(
-            OrganizationMaster.organization_name.like(f"%{organization_name}%")
-        )
+        params["organization_name"] = f"%{organization_name}%"
+        extra_filters += " AND om.organization_name LIKE :organization_name"
     if device_name:
-        q = q.filter(DeviceMaster.device_name.like(f"%{device_name}%"))
+        params["device_name"] = f"%{device_name}%"
+        extra_filters += " AND v.device_name LIKE :device_name"
 
-    total = q.count()
+    base_sql = f"""
+        FROM v_device_master_by_user v
+        INNER JOIN device_master dm
+          ON v.device_id = dm.device_id
+        LEFT JOIN organization_master om
+          ON v.device_organization_id = om.organization_id
+          AND om.delete_flag = FALSE
+        LEFT JOIN device_status_data ds
+          ON v.device_id = ds.device_id
+        WHERE v.user_id = :user_id
+          AND v.delete_flag = FALSE
+          {extra_filters}
+    """
+
+    count_row = db.session.execute(
+        text(f"SELECT COUNT(v.device_id) AS cnt {base_sql}"),
+        params,
+    ).first()
+    total = count_row[0] if count_row else 0
+
     offset = (page - 1) * per_page
-    results = (
-        q.order_by(DeviceMaster.organization_id.asc(), DeviceMaster.device_id.asc()).limit(per_page).offset(offset).all()
-    )
+    params["limit"] = per_page
+    params["offset"] = offset
+    rows = db.session.execute(
+        text(f"""
+            SELECT
+                v.device_id,
+                dm.device_uuid,
+                v.device_name,
+                v.device_organization_id AS organization_id,
+                om.organization_name
+            {base_sql}
+            ORDER BY v.device_organization_id ASC, v.device_id ASC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    ).fetchall()
 
-    return results, total
+    return rows, total
 
 
 # ---------------------------------------------------------------------------
@@ -358,65 +339,69 @@ def get_device_list_with_count(search_params, accessible_org_ids, page, per_page
 # ---------------------------------------------------------------------------
 
 
-def get_device_alerts_with_count(device_id, search_params):
+def get_device_alerts_with_count(device_id, search_params, user_id):
     """特定デバイスのアラート履歴をページング付きで取得する（デバイス詳細用）。
+
+    v_alert_history_by_user VIEW に user_id を渡してデータスコープ制限を適用する。
 
     Args:
         device_id: デバイスID
         search_params: 検索条件辞書 (page)
+        user_id: ログインユーザーID
 
     Returns:
         tuple[list, int]: (アラートリスト, 総件数)
     """
     page = search_params.get("page", 1)
     per_page = _ITEM_PER_PAGE
-    cutoff = datetime.now() - timedelta(days=_ALERT_RECENT_DAYS)
+    params = {"user_id": user_id, "device_id": device_id, "days": _ALERT_RECENT_DAYS}
 
-    q = (
-        db.session.query(
-            AlertHistory.alert_history_id,
-            AlertHistory.alert_occurrence_datetime,
-            AlertSettingMaster.alert_name,
-            AlertLevelMaster.alert_level_name,
-            AlertStatusMaster.alert_status_name,
-        )
-        .join(
-            AlertStatusMaster,
-            (AlertHistory.alert_status_id == AlertStatusMaster.alert_status_id)
-            & (AlertStatusMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            AlertSettingMaster,
-            (AlertHistory.alert_id == AlertSettingMaster.alert_id)
-            & (AlertSettingMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-        .join(
-            AlertLevelMaster,
-            (AlertSettingMaster.alert_level_id == AlertLevelMaster.alert_level_id)
-            & (AlertLevelMaster.delete_flag == False),  # noqa: E712
-            isouter=True,
-        )
-    )
+    base_sql = """
+        FROM v_alert_history_by_user v
+        LEFT JOIN alert_status_master asm
+          ON v.alert_status_id = asm.alert_status_id
+          AND asm.delete_flag = FALSE
+        LEFT JOIN alert_setting_master am
+          ON v.alert_id = am.alert_id
+          AND am.delete_flag = FALSE
+        LEFT JOIN alert_level_master al
+          ON am.alert_level_id = al.alert_level_id
+          AND al.delete_flag = FALSE
+        WHERE v.user_id = :user_id
+          AND v.device_id = :device_id
+          AND v.delete_flag = FALSE
+          AND v.alert_occurrence_datetime >= DATE_SUB(NOW(), INTERVAL :days DAY)
+    """
 
-    q = q.filter(
-        AlertHistory.delete_flag == False,  # noqa: E712
-        AlertSettingMaster.device_id == device_id,
-        AlertHistory.alert_occurrence_datetime >= cutoff,
-    )
+    count_row = db.session.execute(
+        text(f"SELECT COUNT(v.alert_history_id) AS cnt {base_sql}"),
+        params,
+    ).first()
+    total = min(count_row[0] if count_row else 0, _ALERT_MAX_TOTAL)
 
-    total = min(q.count(), _ALERT_MAX_TOTAL)
     offset = (page - 1) * per_page
     effective_limit = min(per_page, max(0, _ALERT_MAX_TOTAL - offset))
-    results = (
-        q.order_by(AlertLevelMaster.alert_level_id.asc(), AlertHistory.alert_history_id.desc())
-        .limit(effective_limit)
-        .offset(offset)
-        .all()
-    ) if effective_limit > 0 else []
+    if effective_limit <= 0:
+        return [], total
 
-    return results, total
+    params["limit"] = effective_limit
+    params["offset"] = offset
+    rows = db.session.execute(
+        text(f"""
+            SELECT
+                v.alert_history_id,
+                v.alert_occurrence_datetime,
+                am.alert_name,
+                al.alert_level_name,
+                asm.alert_status_name
+            {base_sql}
+            ORDER BY al.alert_level_id ASC, v.alert_history_id DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    ).fetchall()
+
+    return rows, total
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +495,6 @@ def _fetch_graph_data_from_mysql(device_id, start_dt, end_dt):
         .all()
     )
     return [_sensor_row_to_dict(row) for row in rows]
-
 
 
 # ---------------------------------------------------------------------------

@@ -230,15 +230,38 @@
     var inputStart   = document.getElementById('search_start_datetime');
     var inputEnd     = document.getElementById('search_end_datetime');
     var btnPeriod    = document.getElementById('btn-period');
+    var autoUpdateTimer = null;
+
     function setDisabled(disabled) {
       if (inputStart) { inputStart.disabled = disabled; }
       if (inputEnd)   { inputEnd.disabled   = disabled; }
       if (btnPeriod)  { btnPeriod.disabled  = disabled; }
     }
+
+    function startAutoUpdate() {
+      autoUpdateTimer = setInterval(function() {
+        // page=1 付きでリロード: is_initial=false かつ Cookie の表示期間を維持
+        window.location.href = '{{ url_for("analysis.device_details", device_uuid=device.device_uuid) }}?page=1';
+      }, 60000);
+    }
+
+    function stopAutoUpdate() {
+      if (autoUpdateTimer !== null) {
+        clearInterval(autoUpdateTimer);
+        autoUpdateTimer = null;
+      }
+    }
+
     if (autoUpdateCb) {
       setDisabled(autoUpdateCb.checked);
+      if (autoUpdateCb.checked) { startAutoUpdate(); }
       autoUpdateCb.addEventListener('change', function() {
         setDisabled(autoUpdateCb.checked);
+        if (autoUpdateCb.checked) {
+          startAutoUpdate();
+        } else {
+          stopAutoUpdate();
+        }
       });
     }
   })();
