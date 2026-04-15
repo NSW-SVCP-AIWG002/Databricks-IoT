@@ -1,0 +1,395 @@
+/* ===== 業種別ダッシュボード（IDS-001 / IDS-002）固有スタイル ===== */
+
+/* ------------------------------------------------------------------ */
+/* 共通: セクションヘッダー（タイトル + 件数）                         */
+/* ------------------------------------------------------------------ */
+.ids-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3);
+}
+
+.ids-section-header__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+  margin: 0;
+}
+
+.ids-section-header__count {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-001: 店舗モニタリング — ページヘッダー                          */
+/* ------------------------------------------------------------------ */
+.ids-sm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-6);
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-001: 検索フォーム — 2列フィールド配置                           */
+/* ------------------------------------------------------------------ */
+.ids-search-fields {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.ids-search-fields .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.ids-search-center {
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-001: メインコンテンツ — 左右2カラムレイアウト                    */
+/* ------------------------------------------------------------------ */
+.ids-content-layout {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: stretch;
+}
+
+/* 左カラム: アラート一覧 + デバイス一覧 */
+.ids-content-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+/* アラート一覧・デバイス一覧: 固定高さ（FHD基準） */
+.ids-content-main .card {
+  height: 360px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.ids-content-main .card .table-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 右カラム: センサー情報パネル */
+.ids-content-side {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-001: センサー情報パネル                                          */
+/* ------------------------------------------------------------------ */
+.ids-sensor-panel {
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-4);
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.ids-sensor-panel__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.ids-sensor-panel__updated {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+  margin: 0 0 var(--spacing-3) 0;
+  padding-bottom: var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ids-sensor-panel__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-1) var(--spacing-3);
+  margin: 0;
+}
+
+.ids-sensor-panel__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  white-space: nowrap;
+}
+
+.ids-sensor-panel__value {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-900);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: デバイス詳細 — ページ全体ラッパー                          */
+/* ------------------------------------------------------------------ */
+.ids-dd-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 48px); /* main-content padding 上下24px×2=48px分を差し引き */
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: デバイス詳細 — ページヘッダー                              */
+/* ------------------------------------------------------------------ */
+.ids-dd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+}
+
+.ids-dd-header h1 {
+  margin: 0;
+}
+
+.ids-dd-header .button,
+.ids-period-control__csv .button {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: 上段2カラム（デバイス情報 + アラート一覧）                 */
+/* ------------------------------------------------------------------ */
+.ids-top-layout {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: flex-start;
+  margin-bottom: var(--spacing-4);
+}
+
+/* 左: デバイス情報 */
+.ids-device-info {
+  width: 280px;
+  flex-shrink: 0;
+  height: 280px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.ids-device-info__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-2) var(--spacing-3);
+  margin: 0;
+}
+
+.ids-device-info__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+  white-space: nowrap;
+}
+
+.ids-device-info__value {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+  margin: 0;
+}
+
+/* 右: アラート一覧 */
+.ids-alert-section {
+  flex: 1;
+  min-width: 0;
+  height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.ids-alert-section .table-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: 表示期間変更 + CSVエクスポート行                           */
+/* ------------------------------------------------------------------ */
+.ids-period-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-4);
+}
+
+.ids-period-control__form {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.ids-period-control__inputs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.ids-period-control__inputs .form-input {
+  width: 180px;
+}
+
+.ids-period-control__separator {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+.ids-period-control__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.ids-period-control__csv {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: 時系列グラフ + 凡例 2カラムレイアウト                      */
+/* ------------------------------------------------------------------ */
+.ids-graph-layout {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.ids-graph-section {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#time-series-chart {
+  flex: 1;
+  min-height: 150px;
+}
+
+.ids-graph-section__header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-2);
+}
+
+.ids-graph-section__updated {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+}
+
+/* ------------------------------------------------------------------ */
+/* IDS-002: 凡例パネル                                                  */
+/* ------------------------------------------------------------------ */
+.ids-legend {
+  width: 300px;
+  flex-shrink: 0;
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-3);
+  overflow-y: auto;
+}
+
+.ids-legend__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+  margin: 0 0 var(--spacing-2) 0;
+  padding-bottom: var(--spacing-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ids-legend__item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ids-legend__item:first-of-type {
+  font-weight: var(--font-weight-semibold);
+  padding-bottom: var(--spacing-2);
+  margin-bottom: var(--spacing-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ids-legend__checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* デバイス一覧: 選択行ハイライト                                       */
+/* ------------------------------------------------------------------ */
+.table__body tr.ids-row--selected {
+  background-color: var(--color-brand-blue);
+}
+
+/* ------------------------------------------------------------------ */
+/* 店舗名オートコンプリートドロップダウン                               */
+/* ------------------------------------------------------------------ */
+.ids-autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background-color: var(--color-white, #fff);
+  border: var(--border-width) solid var(--color-gray-300, #ccc);
+  border-top: none;
+  border-radius: 0 0 var(--border-radius-sm, 4px) var(--border-radius-sm, 4px);
+  box-shadow: var(--shadow-md);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ids-autocomplete-dropdown__item {
+  padding: var(--spacing-2, 8px) var(--spacing-3, 12px);
+  cursor: pointer;
+  font-size: var(--font-size-base, 14px);
+  color: var(--color-gray-800, #333);
+}
+
+.ids-autocomplete-dropdown__item:hover {
+  background-color: var(--color-gray-100, #f5f5f5);
+}

@@ -1,0 +1,349 @@
+/* ============================================================
+   棒グラフガジェット（共通定義は common.css を参照）
+   ============================================================ */
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bar-chart__canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.bar-chart__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.bar-chart__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-top: var(--border-width) solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart__label {
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.bar-chart__unit-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.bar-chart__unit-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.bar-chart__unit-btn {
+  padding: 2px var(--spacing-2);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  border-radius: 2px;
+}
+
+.bar-chart__unit-btn--active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.bar-chart__interval-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.bar-chart__interval-select {
+  padding: 2px var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart__datetime-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.bar-chart__datetime-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bar-chart__datetime-input {
+  width: 170px;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--spacing-2) 2px 24px;
+}
+
+.bar-chart__calendar-btn {
+  position: absolute;
+  left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+
+.bar-chart__refresh-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  padding: 0;
+  line-height: 1;
+}
+
+/* エラーメッセージ領域 */
+.bar-chart__error:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-size: var(--font-size-sm);
+  margin: 0 var(--spacing-4) var(--spacing-2);
+  background-color: var(--color-danger-light);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--border-radius-base);
+  color: var(--color-danger-dark);
+  padding: var(--spacing-1) var(--spacing-2);
+}
+
+.bar-chart__error:not(:empty)::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background-color: var(--color-danger);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   棒グラフガジェット登録モーダル
+   ============================================================ */
+
+
+.gadget-register__top-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+}
+
+
+.gadget-register__device-name-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  gap: var(--spacing-6);
+  align-items: center;
+  min-height: var(--spacing-6);
+  margin-bottom: var(--spacing-2);
+}
+
+.gadget-register__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-6);
+  margin-top: var(--spacing-4);
+}
+
+.gadget-register__left {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__minmax {
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__minmax .form-input {
+  width: 100%;
+}
+
+.gadget-register__measurement-label {
+  display: block;
+  margin-bottom: var(--spacing-1);
+}
+
+.gadget-register__middle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__middle .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.gadget-register__right {
+  flex: 1;
+  min-width: 0;
+}
+
+#bar-chart-register-form .gadget-register__right {
+  display: block;
+}
+
+/* ガジェットイメージプレビュー */
+.gadget-register__preview {
+  width: 100%;
+  height: 126px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--spacing-2);
+}
+
+.gadget-register__preview-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100%;
+}
+
+.gadget-register__preview-bar {
+  width: 20px;
+  background: var(--color-primary);
+  border-radius: 2px 2px 0 0;
+}
+.gadget-register__preview-bar--1 { height: 40%; }
+.gadget-register__preview-bar--2 { height: 70%; }
+.gadget-register__preview-bar--3 { height: 55%; }
+.gadget-register__preview-bar--4 { height: 85%; }
+
+/* デバイスモードボタン */
+.bar-chart-register__device-mode-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.bar-chart-register__device-mode-btn {
+  padding: var(--spacing-1) var(--spacing-3);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.bar-chart-register__device-mode-btn--active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+/* デバイス名表示 */
+.bar-chart-register__device-name {
+  font-size: var(--font-size-base);
+}
+
+.bar-chart-register__device-name--wide {
+  grid-column: 1 / 3;
+}
+
+/* デバイスモードエリア（ラベル＋ボタン同一行・グリッド列1〜2スパン） */
+.gadget-register__device-mode-area {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* 表示項目選択リスト */
+.bar-chart-register__measurement-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+}
+
+.bar-chart-register__measurement-list table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.bar-chart-register__measurement-list thead {
+  position: sticky;
+  top: 0;
+  background: var(--color-white);
+  z-index: 1;
+}
+
+.bar-chart-register__measurement-list th,
+.bar-chart-register__measurement-list td {
+  border: var(--border-width) solid var(--color-border);
+}
+
+/* 表示デバイス指定セクション見出し */
+.gadget-register__section-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  margin: 0 0 var(--spacing-1) 0;
+}
+
+/* フォーム行レイアウト */
+.form-row {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: flex-start;
+  margin-top: var(--spacing-4);
+}
+
+/* インラインフォームグループ（ラベル＋コントロール同一行） */
+.form-group--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: 0;
+}
+
+.form-group--inline .form-label {
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+.form-group--half {
+  flex: 1;
+}
+
+.form-group--third {
+  flex: 1;
+}
+
+
+/* 2x2 ガジェット: 表示時間単位を1行目、集計時間幅・時間帯を2行目に配置 */
+.gadget--2x2 .bar-chart__unit-selector {
+  width: 100%;
+}
+
+/* 登録フォーム: 横並びグループ内のエラーメッセージを次行に折り返す */
+.form-group--inline .form-error {
+  flex-basis: 100%;
+  margin-top: var(--spacing-1);
+}

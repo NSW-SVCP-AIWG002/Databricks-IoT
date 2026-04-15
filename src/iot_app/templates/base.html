@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}IoT管理システム{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+{%- set uid = g.current_user.user_type_id if g.get('current_user') else none -%}
+
+<nav class="navigation">
+  <ul class="nav__menu">
+
+    <!-- ホーム（直接リンク） -->
+    <li class="nav__item--direct">
+      <a class="nav__link" href="/analysis/industry-dashboard/store-monitoring">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8z"/></svg>
+        </span>
+        <span class="nav__link-text">ホーム</span>
+      </a>
+    </li>
+
+    <!-- 管理機能 -->
+    <li class="nav__item--parent">
+      <div class="nav__link">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6s-1.62 3.6-3.6 3.6z"/></svg>
+        </span>
+        <span class="nav__link-text">管理機能</span>
+        <span class="nav__arrow">▼</span>
+      </div>
+      <div class="nav__submenu">
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.user_') %} nav__item--active{% endif %}"
+           href="/admin/users">ユーザー管理</a>
+        {%- if uid != 4 %}{# 組織管理：サービス利用者(4)は非表示 #}
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.organization_') %} nav__item--active{% endif %}"
+           href="/admin/organizations">組織管理</a>
+        {%- endif %}
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.device_') and not request.endpoint.startswith('admin.device_inventory_') %} nav__item--active{% endif %}"
+           href="/admin/devices">デバイス管理</a>
+        {%- if uid == 1 %}{# デバイス台帳管理：システム保守者(1)のみ #}
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('admin.device_inventory_') %} nav__item--active{% endif %}"
+           href="/admin/device-inventory">デバイス台帳管理</a>
+        {%- endif %}
+      </div>
+    </li>
+
+    <!-- アラート機能 -->
+    <li class="nav__item--parent">
+      <div class="nav__link">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        </span>
+        <span class="nav__link-text">アラート機能</span>
+        <span class="nav__arrow">▼</span>
+      </div>
+      <div class="nav__submenu">
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('alert.alert_history_') %} nav__item--active{% endif %}"
+           href="/alert/alert-history">アラート履歴</a>
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('alert.alert_setting_') %} nav__item--active{% endif %}"
+           href="/alert/alert-settings">アラート設定</a>
+      </div>
+    </li>
+
+    <!-- 通知機能 -->
+    <li class="nav__item--parent">
+      <div class="nav__link">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5l-8-5V6l8 5l8-5v2z"/></svg>
+        </span>
+        <span class="nav__link-text">通知機能</span>
+        <span class="nav__arrow">▼</span>
+      </div>
+      <div class="nav__submenu">
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('notice.mail_history_') %} nav__item--active{% endif %}"
+           href="/notice/mail-history">メール通知履歴</a>
+      </div>
+    </li>
+
+    <!-- 分析機能 -->
+    <li class="nav__item--parent">
+      <div class="nav__link">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M4 9h4v11H4zm12 4h4v7h-4zm-6-9h4v16h-4z"/></svg>
+        </span>
+        <span class="nav__link-text">分析機能</span>
+        <span class="nav__arrow">▼</span>
+      </div>
+      <div class="nav__submenu">
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('analysis.') %} nav__item--active{% endif %}"
+           href="/analysis/industry-dashboard/store-monitoring">店舗モニタリング</a>
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('customer_dashboard.') %} nav__item--active{% endif %}"
+           href="/analysis/customer-dashboard">顧客作成ダッシュボード</a>
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('chat.') %} nav__item--active{% endif %}"
+           href="/analysis/chat">AIチャット</a>
+      </div>
+    </li>
+
+    {%- if uid != 4 %}{# インポート：サービス利用者(4)は非表示 #}
+    <!-- インポート（直接リンク・モーダル） -->
+    <li class="nav__item--direct">
+      <div class="nav__link" onclick="openImportModal()">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7l-7 7z"/></svg>
+        </span>
+        <span class="nav__link-text">インポート</span>
+      </div>
+    </li>
+    {%- endif %}
+
+  </ul>
+
+  <ul class="nav__account">
+
+    <!-- アカウント -->
+    <li class="nav__item--parent">
+      <div class="nav__link">
+        <span class="nav__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-4.43-.82-6.14-2.88a9.947 9.947 0 0 1 12.28 0C16.43 19.18 14.03 20 12 20z"/></svg>
+        </span>
+        <span class="nav__link-text">アカウント</span>
+        <span class="nav__arrow">▼</span>
+      </div>
+      <div class="nav__submenu">
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('account.language') %} nav__item--active{% endif %}"
+           href="/account/language">言語設定</a>
+        <a class="nav__item--child{% if request.endpoint and request.endpoint.startswith('account.profile') %} nav__item--active{% endif %}"
+           href="/account/profile">ユーザー情報参照</a>
+        <a class="nav__item--child{% if request.endpoint == 'account.logout' %} nav__item--active{% endif %}"
+           href="/account/logout">ログアウト</a>
+      </div>
+    </li>
+
+  </ul>
+</nav>
+
+<main class="main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- CSVインポートモーダル -->
+<div id="csv-import-modal" class="modal-overlay">
+  <div class="modal-content" id="csv-import-content">
+    {# CSVインポートのテンプレートがはいる #}
+  </div>
+</div>
+
+<!-- トースト通知コンテナ -->
+<div id="toast-container"></div>
+
+<script src="{{ url_for('static', filename='js/components/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/modal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/sort.js') }}"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+
+</html>

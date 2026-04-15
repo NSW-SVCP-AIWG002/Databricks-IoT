@@ -1,0 +1,197 @@
+<div class="modal-content--lg">
+
+<!-- モーダルヘッダー -->
+<div class="modal__header">
+  <h2 class="modal__title">棒グラフ</h2>
+</div>
+
+<!-- モーダルボディ -->
+<form method="POST"
+      action="{{ url_for('customer_dashboard.gadget_register', gadget_type=gadget_type) }}"
+      id="bar-chart-register-form"
+      class="modal-form"
+      novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="modal__body">
+
+    <!-- (1) タイトル -->
+    <div class="form-group">
+      <label class="form-label" for="title">タイトル<span class="form-label__required">必須</span></label>
+      {{ form.title(class="form-input", id="title", value="棒グラフ", maxlength=20) }}
+      {% if form.title.errors %}
+        <span class="form-error">{{ form.title.errors[0] }}</span>
+      {% endif %}
+    </div>
+
+    <!-- (2) 表示デバイス選択 -->
+    <div class="gadget-register__top-row">
+      <div class="gadget-register__device-mode-area">
+        <label class="form-label">表示デバイス選択</label>
+        <div class="bar-chart-register__device-mode-buttons">
+          <button type="button"
+                  class="button bar-chart-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'fixed' %} bar-chart-register__device-mode-btn--active{% endif %}"
+                  data-mode="fixed">デバイス固定</button>
+          <button type="button"
+                  class="button bar-chart-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'variable' %} bar-chart-register__device-mode-btn--active{% endif %}"
+                  data-mode="variable">デバイス可変</button>
+        </div>
+        <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'variable' }}">
+      </div>
+    </div>
+
+    <!-- (5) デバイス名（デバイス固定モード時のみ） -->
+    <div class="gadget-register__device-name-row" id="device-name-area"
+         style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
+      <span class="bar-chart-register__device-name bar-chart-register__device-name--wide" id="selected-device-name">-</span>
+    </div>
+
+    <!-- メインエリア（3カラム） -->
+    <div class="gadget-register__body">
+
+      <!-- 左カラム：(6) ガジェットイメージ -->
+      <div class="gadget-register__left">
+        <div class="gadget-register__preview">
+          <div class="gadget-register__preview-chart">
+            <div class="gadget-register__preview-bar gadget-register__preview-bar--1"></div>
+            <div class="gadget-register__preview-bar gadget-register__preview-bar--2"></div>
+            <div class="gadget-register__preview-bar gadget-register__preview-bar--3"></div>
+            <div class="gadget-register__preview-bar gadget-register__preview-bar--4"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中央カラム：(4) 表示デバイス指定（デバイス固定モード時のみ） -->
+      <div class="gadget-register__middle" id="device-fixed-area"
+           style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
+        <p class="gadget-register__section-title">表示デバイス指定</p>
+        <div class="form-group">
+          <label class="form-label">組織フィルター</label>
+          <select class="form-select" id="organization-filter">
+            <option value="">選択してください</option>
+            {% for org in organizations %}
+            <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">デバイス選択<span class="form-label__required">必須</span></label>
+          <select class="form-select" name="device_id" id="device-select" disabled>
+            <option value="">選択してください</option>
+            {% for device in devices %}
+            <option value="{{ device.device_id }}"
+                    data-org="{{ device.organization_id }}"
+                    data-name="{{ device.device_name }}">
+              {{ device.device_name }}
+            </option>
+            {% endfor %}
+          </select>
+          {% if form.device_id.errors %}
+            <span class="form-error">{{ form.device_id.errors[0] }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 右カラム：(3) 表示項目選択 -->
+      <div class="gadget-register__right">
+        <label class="form-label">表示項目選択<span class="form-label__required">必須</span></label>
+        <div class="bar-chart-register__measurement-list">
+            <table class="table table--fit">
+              <thead>
+                <tr>
+                  <th>選択</th>
+                  <th>表示名称</th>
+                  <th>単位</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in measurement_items %}
+                <tr>
+                  <td>
+                    <input type="radio"
+                           name="measurement_item_id"
+                           value="{{ item.measurement_item_id }}"
+                           id="measurement-{{ item.measurement_item_id }}">
+                  </td>
+                  <td>
+                    <label for="measurement-{{ item.measurement_item_id }}">
+                      {{ item.display_name }}
+                    </label>
+                  </td>
+                  <td>{{ item.unit_name }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% if form.measurement_item_id.errors %}
+          <span class="form-error">{{ form.measurement_item_id.errors[0] }}</span>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- (7) グループ選択 / (8) 集約方法 -->
+    <div class="form-row">
+      <div class="form-group form-group--half">
+        <label class="form-label" for="group_id">グループ選択<span class="form-label__required">必須</span></label>
+        <select class="form-select" name="group_id" id="group_id">
+          {% for gr in groups %}
+          <option value="{{ gr.dashboard_group_id }}">{{ gr.dashboard_group_name }}</option>
+          {% endfor %}
+        </select>
+        {% if form.group_id.errors %}
+          <span class="form-error">{{ form.group_id.errors[0] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group form-group--half">
+        <label class="form-label" for="summary_method_id">集約方法<span class="form-label__required">必須</span></label>
+        <select class="form-select" name="summary_method_id" id="summary_method_id">
+          {% for sm in summary_methods %}
+          <option value="{{ sm.summary_method_id }}">{{ sm.summary_method_name }}</option>
+          {% endfor %}
+        </select>
+        {% if form.summary_method_id.errors %}
+          <span class="form-error">{{ form.summary_method_id.errors[0] }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- (9) 最小値 / (10) 最大値 / (11) 部品サイズ -->
+    <div class="form-row">
+      <div class="form-group form-group--third">
+        <label class="form-label" for="min_value">最小値</label>
+        {{ form.min_value(class="form-input", id="min_value") }}
+        {% if form.min_value.errors %}
+          <span class="form-error">{{ form.min_value.errors[0] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group form-group--third">
+        <label class="form-label" for="max_value">最大値</label>
+        {{ form.max_value(class="form-input", id="max_value") }}
+        {% if form.max_value.errors %}
+          <span class="form-error">{{ form.max_value.errors[0] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group form-group--third">
+        <label class="form-label" for="gadget_size">部品サイズ<span class="form-label__required">必須</span></label>
+        {{ form.gadget_size(class="form-select", id="gadget_size") }}
+        {% if form.gadget_size.errors %}
+          <span class="form-error">{{ form.gadget_size.errors[0] }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- モーダルフッター -->
+  <div class="modal__footer">
+    <button type="submit" class="button button--primary" id="register-btn">登録</button>
+    <button type="button" class="button button--secondary"
+            id="modal-close-btn">キャンセル</button>
+  </div>
+
+</form>
+
+</div>
+

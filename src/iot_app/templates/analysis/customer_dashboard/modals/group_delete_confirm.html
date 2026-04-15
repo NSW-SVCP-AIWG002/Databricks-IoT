@@ -1,0 +1,21 @@
+<div class="modal__header">
+  <h2 class="modal__title">ダッシュボードグループ削除確認</h2>
+</div>
+
+<form
+  method="POST"
+  action="{{ url_for('customer_dashboard.group_delete', dashboard_group_uuid=group.dashboard_group_uuid) }}"
+  class="modal-form"
+>
+  {{ form.hidden_tag() if form is defined else '' }}
+
+  <div class="modal__body">
+    <p>選択したダッシュボードグループを削除しますか？</p>
+    <p class="modal__warning">グループ内のすべてのガジェットも削除されます。この操作は取り消すことができません。</p>
+  </div>
+
+  <div class="modal__footer">
+    <button type="submit" class="button button--danger">削除</button>
+    <button type="button" class="button button--secondary" id="modal-close-btn">キャンセル</button>
+  </div>
+</form>

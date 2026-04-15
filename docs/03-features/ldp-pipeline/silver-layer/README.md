@@ -20,7 +20,7 @@
 
 | 機能ID   | 機能名                   | 説明                                                   |
 | -------- | ------------------------ | ------------------------------------------------------ |
-| FR-002-2 | データ処理（シルバー層） | Event Hubsからのデータ取込み、構造化、Delta Lake格納   |
+| FR-002-1 | データ処理（シルバー層） | Event Hubsからのデータ取込み、構造化、Delta Lake格納   |
 | FR-003-1 | 異常検出                 | センサー値の閾値比較・継続時間判定によるアラート判定   |
 | FR-003-2 | アラート通知             | 異常検出時のメール送信キュー登録（バッチジョブで送信） |
 | FR-003-3 | 履歴記録                 | デバイスステータス・アラート履歴の更新                 |
@@ -33,15 +33,20 @@
 
 | データソース                      | 形式                  | 説明                                                                                      |
 | --------------------------------- | --------------------- | ----------------------------------------------------------------------------------------- |
-| Azure Event Hubs (Kafka Endpoint) | Binary / JSON (UTF-8) | IoTデバイスから送信されるテレメトリデータをKafka互換APIで取得。Databricksでデコード処理。 |
+| Azure Event Hubs (Kafka Endpoint) | Binary/JSON (UTF-8) | IoTデバイスから送信されるテレメトリデータをKafka互換APIで取得。Databricksでデコード処理。 |
 
 ### 出力テーブル（Unity Catalog）
 
-| テーブル名                      | スキーマ           | 説明                               |
-| ------------------------------- | ------------------ | ---------------------------------- |
-| silver_sensor_data              | iot_catalog.silver | 構造化されたセンサーデータ         |
-| silver_alert_abnormal_state     | iot_catalog.silver | アラート異常状態（継続時間判定用） |
-| silver_email_notification_queue | iot_catalog.silver | メール送信キュー                   |
+| テーブル名         | スキーマ           | 説明                       |
+| ------------------ | ------------------ | -------------------------- |
+| silver_sensor_data | iot_catalog.silver | 構造化されたセンサーデータ |
+
+### 出力テーブル（OLTP DB）
+
+| テーブル名               | 説明                               |
+| ------------------------ | ---------------------------------- |
+| alert_abnormal_state     | アラート異常状態（継続時間判定用） |
+| email_notification_queue | メール送信キュー                   |
 
 ### センサーデータカラム一覧
 
@@ -88,23 +93,20 @@ CLUSTER BY (event_date, device_id)
 
 ### 読み取りテーブル（Unity Catalog）
 
-| テーブル名                  | 用途                                     |
-| --------------------------- | ---------------------------------------- |
-| device_master               | デバイス情報・組織ID取得                 |
-| organization_closure        | 組織階層情報取得                         |
-| organization_master         | アラートメール通知先と紐づく組織IDを取得 |
-| user_master                 | アラートメール通知先取得                 |
-| silver_alert_abnormal_state | アラート継続状態の参照・更新             |
+| テーブル名           | 用途                                     |
+| -------------------- | ---------------------------------------- |
+| device_master        | デバイス情報・組織ID取得                 |
+| organization_closure | 組織階層情報取得                         |
+| organization_master  | アラートメール通知先と紐づく組織IDを取得 |
+| user_master          | アラートメール通知先取得                 |
 
 センサーデータはAzure Event HubsからKafka互換エンドポイント経由で取得する。
 
 ### 書き込みテーブル（Unity Catalog）
 
-| カタログ    | スキーマ | テーブル名                      | 用途                         |
-| ----------- | -------- | ------------------------------- | ---------------------------- |
-| iot_catalog | silver   | silver_sensor_data              | シルバー層センサーデータ格納 |
-| iot_catalog | silver   | silver_alert_abnormal_state     | アラート異常状態管理         |
-| iot_catalog | silver   | silver_email_notification_queue | メール送信キュー             |
+| カタログ    | スキーマ | テーブル名         | 用途                         |
+| ----------- | -------- | ------------------ | ---------------------------- |
+| iot_catalog | silver   | silver_sensor_data | シルバー層センサーデータ格納 |
 
 ### 読み取りテーブル（OLTP DB）
 
@@ -114,14 +116,17 @@ CLUSTER BY (event_date, device_id)
 | measurement_item_master | 測定項目取得           |
 | alert_level_master      | アラートレベル取得     |
 | alert_status_master     | アラートステータス取得 |
+| alert_abnormal_state    | アラート継続状態の参照 |
 
 
 ### 書き込みテーブル（OLTP DB）
 
-| テーブル名         | 用途                       |
-| ------------------ | -------------------------- |
-| device_status_data | デバイス最新ステータス更新 |
-| alert_history      | アラート履歴記録           |
+| テーブル名               | 用途                       |
+| ------------------------ | -------------------------- |
+| device_status_data       | デバイス最新ステータス更新 |
+| alert_history            | アラート履歴記録           |
+| alert_abnormal_state     | アラート継続状態の更新     |
+| email_notification_queue | メール送信待機列の登録     |
 
 ---
 
@@ -153,7 +158,7 @@ flowchart TB
         StateCheck[継続時間判定<br>judgment_time判定]
         StateUpdate[状態テーブル更新<br>MERGE処理]
         Recovery[復旧判定・処理<br>alert_history更新]
-        Write[Delta Lake書込み<br>silver_sensor_data]
+        Write[(Delta Lake書込み<br>silver_sensor_data)]
 
         KafkaSource --> Parse
         Parse --> Enrich
@@ -165,13 +170,13 @@ flowchart TB
     end
 
     subgraph External["外部連携"]
-        StateUpdate -->|アラート発報時| Queue[メールキュー登録<br>silver_email_notification_queue]
+        StateUpdate -->|アラート発報時| OLTP
         StateUpdate -->|ステータス更新| OLTP[(OLTP DB<br>MySQL)]
         Recovery -->|復旧時| OLTP
     end
 
     subgraph Batch["バッチジョブ"]
-        Queue --> EmailJob[メール送信ジョブ<br>1分間隔実行]
+        OLTP --> EmailJob[メール送信ジョブ<br>1分間隔実行]
         EmailJob --> SMTP[SMTPサーバ]
     end
 
@@ -189,19 +194,27 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    A[センサーデータ受信] --> B{閾値超過?}
+    A(センサーデータ受信) --> B{閾値超過?}
     B -->|No| C[正常処理]
     B -->|Yes| D{状態テーブルに<br>レコード存在?}
-    D -->|No| E[新規レコード作成<br>first_firing_time設定]
-    D -->|Yes| F{judgment_time<br>経過?}
+    D -->|Yes| M{異常開始時刻がNULL？}
+    D -->|No| E[新規レコード作成]
+    M --> |Yes| F{judgment_time<br>経過?}
+    M --> |No| N[異常開始時刻設定]
     F -->|No| G[状態更新のみ]
     F -->|Yes| H{既にアラート<br>発報済み?}
     H -->|Yes| G
     H -->|No| I[アラート発報<br>メールキュー登録<br>alert_history登録]
 
-    C --> J{状態テーブルに<br>異常レコード存在?}
-    J -->|No| K[終了]
-    J -->|Yes| L[復旧処理<br>alert_history更新<br>状態レコード削除]
+    C --> J{状態テーブルに<br>異常開始時刻がNULLでないレコード存在?}
+    J -->|Yes| L[復旧処理<br>alert_history更新]
+    J -->|No| K(終了)
+    L --> K
+    E --> K
+    G --> K
+    I --> K
+    N --> K
+
 ```
 
 ---
@@ -225,7 +238,7 @@ flowchart TB
 | 要件         | 値                        | 対応策                                             |
 | ------------ | ------------------------- | -------------------------------------------------- |
 | 処理時間     | Event Hubs受信から1分以内 | ストリーミング処理、foreachBatch（10秒間隔）で実行 |
-| スループット | 10,000デバイス × 1分間隔  | 水平スケーリング、最適クラスタ構成                 |
+| スループット | 70,000デバイス × 10分間隔 | 水平スケーリング、最適クラスタ構成                 |
 | データ量     | 10GB/日                   | Delta Lake圧縮、Liquid Clustering                  |
 
 ---
@@ -267,7 +280,8 @@ flowchart TB
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容           | 担当者       |
-| ---------- | ---- | ------------------ | ------------ |
-| 2026-01-19 | 1.0  | 初版作成           | Kei Sugiyama |
-| 2026-01-26 | 1.1  | AIレビュー指摘修正 | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                 | 担当者       |
+| ---------- | ---- | ------------------------ | ------------ |
+| 2026-01-19 | 1.0  | 初版作成                 | Kei Sugiyama |
+| 2026-01-26 | 1.1  | AIレビュー指摘修正       | Kei Sugiyama |
+| 2026-02-03 | 1.2  | 内部レビュー指摘事項反映 | Kei Sugiyama |
