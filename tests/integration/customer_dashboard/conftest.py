@@ -121,7 +121,7 @@ def auth_user_id(app):
 
 
 @pytest.fixture()
-def gadget_variable(db_session, gadget_type):
+def gadget_variable(db_session, gadget_type, dashboard_group_master):
     """DashboardGadgetMaster テストレコード（デバイス可変モード: device_id=None）"""
     import json as _json
     import uuid as _uuid
@@ -130,7 +130,7 @@ def gadget_variable(db_session, gadget_type):
         gadget_uuid=str(_uuid.uuid4()),
         gadget_name='テスト棒グラフ（可変）',
         gadget_type_id=1,
-        dashboard_group_id=1,
+        dashboard_group_id=dashboard_group_master.dashboard_group_id,
         chart_config=_json.dumps({
             'measurement_item_id': 1,
             'summary_method_id': 1,
@@ -140,7 +140,7 @@ def gadget_variable(db_session, gadget_type):
         data_source_config=_json.dumps({'device_id': None}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -151,7 +151,7 @@ def gadget_variable(db_session, gadget_type):
 
 
 @pytest.fixture()
-def dashboard_master(db_session):
+def dashboard_master(db_session, organization_master_record):
     """DashboardMaster テストレコード"""
     from iot_app.models.customer_dashboard import DashboardMaster
     d = DashboardMaster(
@@ -185,9 +185,16 @@ def dashboard_user_setting(db_session, dashboard_master):
 
 @pytest.fixture()
 def dashboard_group_master(db_session, dashboard_master):
-    """DashboardGroupMaster テストレコード"""
+    """DashboardGroupMaster テストレコード
+
+    dashboard_group_id=1 を明示指定する。
+    clean_db でレコード削除後も AUTO_INCREMENT カウンタは進み続けるため、
+    gadget フィクスチャが dashboard_group_id=1 をハードコードしている場合に
+    FK違反が発生しないよう、常に id=1 で作成する。
+    """
     from iot_app.models.customer_dashboard import DashboardGroupMaster
     gr = DashboardGroupMaster(
+        dashboard_group_id=1,
         dashboard_group_uuid=str(uuid.uuid4()),
         dashboard_group_name='テストグループ',
         dashboard_id=dashboard_master.dashboard_id,
@@ -246,32 +253,38 @@ def gadget_type(db_session):
 
 @pytest.fixture()
 def measurement_item(db_session):
-    """MeasurementItemMaster テストレコード"""
+    """MeasurementItemMaster テストレコード
+
+    seed_measurement_items（セッションスコープ autouse）が既に id=1 を挿入している場合は
+    そのレコードを返し、存在しない場合のみ INSERT する（重複キーエラー回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
-    item = MeasurementItemMaster(
-        measurement_item_id=1,
-        measurement_item_name='外気温度',
-        display_name='外気温度',
-        silver_data_column_name='external_temp',
-        unit_name='℃',
-        creator=1,
-        modifier=1,
-        delete_flag=False,
-    )
-    db_session.add(item)
-    db_session.flush()
+    item = db_session.get(MeasurementItemMaster, 1)
+    if item is None:
+        item = MeasurementItemMaster(
+            measurement_item_id=1,
+            measurement_item_name='外気温度',
+            display_name='外気温度',
+            silver_data_column_name='external_temp',
+            unit_name='℃',
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(item)
+        db_session.flush()
     return item
 
 
 @pytest.fixture()
-def gadget(db_session, gadget_type):
+def gadget(db_session, gadget_type, dashboard_group_master):
     """DashboardGadgetMaster テストレコード（デバイス固定モード, 2x2）"""
     from iot_app.models.customer_dashboard import DashboardGadgetMaster
     g = DashboardGadgetMaster(
         gadget_uuid=str(uuid.uuid4()),
         gadget_name='テスト棒グラフ',
         gadget_type_id=1,
-        dashboard_group_id=1,
+        dashboard_group_id=dashboard_group_master.dashboard_group_id,
         chart_config=json.dumps({
             'measurement_item_id': 1,
             'summary_method_id': 1,
@@ -281,7 +294,7 @@ def gadget(db_session, gadget_type):
         data_source_config=json.dumps({'device_id': 1}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,

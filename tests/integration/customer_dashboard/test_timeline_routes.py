@@ -237,20 +237,26 @@ def gadget_type_timeline(db_session):
 
 @pytest.fixture()
 def measurement_item_left(db_session):
-    """MeasurementItemMaster テストレコード（左表示項目: external_temp）"""
+    """MeasurementItemMaster テストレコード（左表示項目: external_temp）
+
+    seed_measurement_items（セッションスコープ autouse）が既に id=1 を挿入している場合は
+    そのレコードを返し、存在しない場合のみ INSERT する（重複キーエラー回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
-    item = MeasurementItemMaster(
-        measurement_item_id=1,
-        measurement_item_name='外気温度',
-        display_name='外気温度',
-        silver_data_column_name='external_temp',
-        unit_name='℃',
-        creator=1,
-        modifier=1,
-        delete_flag=False,
-    )
-    db_session.add(item)
-    db_session.flush()
+    item = db_session.get(MeasurementItemMaster, 1)
+    if item is None:
+        item = MeasurementItemMaster(
+            measurement_item_id=1,
+            measurement_item_name='外気温度',
+            display_name='外気温度',
+            silver_data_column_name='external_temp',
+            unit_name='℃',
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(item)
+        db_session.flush()
     return item
 
 
@@ -258,18 +264,20 @@ def measurement_item_left(db_session):
 def measurement_item_right(db_session, measurement_item_left):
     """MeasurementItemMaster テストレコード（右表示項目: compressor_freezer_1）"""
     from iot_app.models.measurement import MeasurementItemMaster
-    item = MeasurementItemMaster(
-        measurement_item_id=2,
-        measurement_item_name='第1冷凍 圧縮機',
-        display_name='第1冷凍 圧縮機',
-        silver_data_column_name='compressor_freezer_1',
-        unit_name='W',
-        creator=1,
-        modifier=1,
-        delete_flag=False,
-    )
-    db_session.add(item)
-    db_session.flush()
+    item = db_session.get(MeasurementItemMaster, 2)
+    if item is None:
+        item = MeasurementItemMaster(
+            measurement_item_id=2,
+            measurement_item_name='第1冷凍 圧縮機',
+            display_name='第1冷凍 圧縮機',
+            silver_data_column_name='compressor_freezer_1',
+            unit_name='W',
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(item)
+        db_session.flush()
     return item
 
 
@@ -298,7 +306,7 @@ def timeline_gadget(db_session, dashboard_group_master, gadget_type_timeline, me
         data_source_config=json.dumps({'device_id': 1}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -331,7 +339,7 @@ def timeline_gadget_variable(db_session, dashboard_group_master, gadget_type_tim
         data_source_config=json.dumps({'device_id': None}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -1792,7 +1800,7 @@ class TestGadgetTimelineCsvExport:
                 'right_min_value': None, 'right_max_value': None,
             }),
             data_source_config=json.dumps({'device_id': 1}),
-            position_x=0, position_y=0, gadget_size='2x2', display_order=1,
+            position_x=0, position_y=0, gadget_size=0, display_order=1,
             delete_flag=False, creator=1, modifier=1,
         )
         db_session.add_all([gt, dash, grp, gadget])
@@ -2607,7 +2615,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2650,7 +2658,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2694,7 +2702,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,

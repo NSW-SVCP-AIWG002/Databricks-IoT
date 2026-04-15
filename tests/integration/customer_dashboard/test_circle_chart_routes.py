@@ -167,34 +167,32 @@ def device_master_record(db_session, organization_master_record):
 
 @pytest.fixture()
 def measurement_items_two(db_session):
-    """MeasurementItemMaster テストレコード 2件（外気温度 / 第1冷凍 設定温度）"""
+    """MeasurementItemMaster テストレコード 2件（外気温度 / 第1冷凍 設定温度）
+
+    seed_measurement_items が既に挿入済みの場合は既存レコードを返す（重複キーエラー回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
-    items = [
-        MeasurementItemMaster(
-            measurement_item_id=1,
-            measurement_item_name="external_temp",
-            display_name="外気温度",
-            silver_data_column_name="external_temp",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ),
-        MeasurementItemMaster(
-            measurement_item_id=2,
-            measurement_item_name="set_temp_freezer_1",
-            display_name="第1冷凍 設定温度",
-            silver_data_column_name="set_temp_freezer_1",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ),
-    ]
-    for item in items:
-        db_session.add(item)
+    result = []
+    for item_id, item_name, display, col_name, unit in [
+        (1, "external_temp", "外気温度", "external_temp", "℃"),
+        (2, "set_temp_freezer_1", "第1冷凍 設定温度", "set_temp_freezer_1", "℃"),
+    ]:
+        item = db_session.get(MeasurementItemMaster, item_id)
+        if item is None:
+            item = MeasurementItemMaster(
+                measurement_item_id=item_id,
+                measurement_item_name=item_name,
+                display_name=display,
+                silver_data_column_name=col_name,
+                unit_name=unit,
+                creator=1,
+                modifier=1,
+                delete_flag=False,
+            )
+            db_session.add(item)
+        result.append(item)
     db_session.flush()
-    return items
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1565,16 +1563,17 @@ class TestCircleChartDataScope:
             modifier=1,
             delete_flag=False,
         ))
-        db_session.add(MeasurementItemMaster(
-            measurement_item_id=1,
-            measurement_item_name="external_temp",
-            display_name="外気温度",
-            silver_data_column_name="external_temp",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ))
+        if db_session.get(MeasurementItemMaster, 1) is None:
+            db_session.add(MeasurementItemMaster(
+                measurement_item_id=1,
+                measurement_item_name="external_temp",
+                display_name="外気温度",
+                silver_data_column_name="external_temp",
+                unit_name="℃",
+                creator=1,
+                modifier=1,
+                delete_flag=False,
+            ))
         db_session.flush()
 
     # ── ヘルパーメソッド ────────────────────────────────────────────────────

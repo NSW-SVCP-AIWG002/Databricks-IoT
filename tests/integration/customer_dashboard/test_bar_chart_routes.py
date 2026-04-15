@@ -414,6 +414,12 @@ class TestGadgetBarChartRegister:
         db_session.add(gt)
         db_session.flush()
 
+    @pytest.fixture(autouse=True)
+    def _require_dashboard_group(self, dashboard_group_master):
+        """dashboard_group_id=1 のレコードを事前登録する。
+        register サービスが dashboard_group_id の FK 制約を満たすために必要。
+        """
+
     def _valid_form(self, **overrides):
         """デバイス可変モード・2x2 の最小有効フォームデータ"""
         data = {
@@ -1187,7 +1193,7 @@ class TestSecurity:
             data_source_config=_json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -1767,6 +1773,10 @@ class TestGadgetBarChartRegisterRedirect:
         gt = GadgetTypeMaster(gadget_type_id=1, gadget_type_name='棒グラフ', data_source_type=1, gadget_image_path='images/gadgets/bar_chart.png', gadget_description='棒グラフガジェット', display_order=1, creator=1, modifier=1, delete_flag=False)
         db_session.add(gt)
         db_session.flush()
+
+    @pytest.fixture(autouse=True)
+    def _require_dashboard_group(self, dashboard_group_master):
+        """dashboard_group_id=1 のレコードを事前登録する。"""
 
     def test_register_redirect_url_contains_registered_param(self, client, measurement_item):
         """4: 登録成功後のリダイレクト先 URL に ?registered=1 が含まれる"""

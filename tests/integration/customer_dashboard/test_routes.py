@@ -60,10 +60,36 @@ def inject_current_user(app):
         funcs.remove(_set_user)
 
 
+_TEST_ORG_IDS = (TEST_ORG_ID, CHILD_ORG_ID, PARENT_ORG_ID, 99)
+"""テスト全体で使用する組織ID一覧。
+
+元の設計は SQLite in-memory（FK制約なし）を前提としていたが、MySQL に移行済み。
+dashboard_master.organization_id の FK 制約を満たすため、
+テストで使用する全組織IDのレコードを事前に作成する。
+"""
+
+
 @pytest.fixture()
 def seed_user(app):
     """テスト用ユーザーを DB に挿入してコミット。テスト後に削除する。"""
+    from datetime import date
     with app.app_context():
+        for org_id in _TEST_ORG_IDS:
+            if not _db.session.get(OrganizationMaster, org_id):
+                _db.session.add(OrganizationMaster(
+                    organization_id=org_id,
+                    organization_name=f'テスト組織{org_id}',
+                    organization_type_id=1,
+                    address='テスト住所',
+                    phone_number='000-0000-0000',
+                    contact_person='テスト担当者',
+                    contract_status_id=1,
+                    contract_start_date=date(2024, 1, 1),
+                    databricks_group_id=f'test-group-{org_id}',
+                    creator=1,
+                    modifier=1,
+                ))
+        _db.session.flush()
         user = User(
             user_id=TEST_USER_ID,
             databricks_user_id='test-databricks-uid',
@@ -86,12 +112,9 @@ def seed_user(app):
         _db.session.commit()
 
     yield
-
-    with app.app_context():
-        u = _db.session.get(User, TEST_USER_ID)
-        if u:
-            _db.session.delete(u)
-            _db.session.commit()
+    # teardown は conftest.py の clean_db (autouse) に委ねる。
+    # clean_db は FK 依存順に全テーブルを削除するため、
+    # ここで個別に削除すると FK エラーが発生する。
 
 
 @pytest.fixture()
