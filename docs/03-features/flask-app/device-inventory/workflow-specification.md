@@ -1274,8 +1274,9 @@ flowchart TD
 
 **削除処理の概要:**
 選択された複数のデバイス台帳を論理削除する:
-1. device_inventory_master（台帳マスタ）のdelete_flagをTRUEに更新
-2. device_master（デバイスマスタ）のdelete_flagをTRUEに更新
+1. OLTPのdevice_inventory_master（台帳マスタ）のdelete_flagをTRUEに更新
+2. OLTPのdevice_master（デバイスマスタ）のdelete_flagをTRUEに更新
+3. UnityCatalogのdevice_master（デバイスマスタ）のdelete_flagをTRUEに更新
 
 **注意:** フロー図では、削除ボタン押下後に削除確認モーダル（ADM-019）を表示し、
 そこで削除ボタンが押されたらDB削除処理を実行する流れになっています。
