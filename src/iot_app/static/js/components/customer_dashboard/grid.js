@@ -242,6 +242,22 @@
     });
   }
 
+  function buildPageNumbers(totalPages, page) {
+    var pages = [];
+    if (totalPages <= 5) {
+      for (var i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push('...');
+      var pstart = Math.max(2, page - 1);
+      var pend   = Math.min(totalPages - 1, page + 1);
+      for (var j = pstart; j <= pend; j++) pages.push(j);
+      if (page < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
+  }
+
   function renderPagination(state, data) {
     const container = document.getElementById('pagination-' + state.uuid);
     if (!container) return;
@@ -260,7 +276,7 @@
     // 前へ
     const prevBtn = document.createElement('button');
     prevBtn.className = 'pagination__button';
-    prevBtn.textContent = '«';
+    prevBtn.textContent = '<';
     prevBtn.disabled = (page <= 1);
     prevBtn.addEventListener('click', function () {
       if (state.page > 1) {
@@ -271,22 +287,29 @@
     nav.appendChild(prevBtn);
 
     // ページ番号
-    for (let i = 1; i <= totalPages; i++) {
-      const btn = document.createElement('button');
-      btn.className = 'pagination__button' + (i === page ? ' pagination__button--active' : '');
-      btn.textContent = i;
-      btn.dataset.page = i;
-      btn.addEventListener('click', function () {
-        state.page = parseInt(this.dataset.page, 10);
-        fetchAndRender(state);
-      });
-      nav.appendChild(btn);
-    }
+    buildPageNumbers(totalPages, page).forEach(function (p) {
+      if (p === '...') {
+        const span = document.createElement('span');
+        span.className = 'pagination__ellipsis';
+        span.textContent = '...';
+        nav.appendChild(span);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'pagination__button' + (p === page ? ' pagination__button--active' : '');
+        btn.textContent = p;
+        btn.dataset.page = p;
+        btn.addEventListener('click', function () {
+          state.page = parseInt(this.dataset.page, 10);
+          fetchAndRender(state);
+        });
+        nav.appendChild(btn);
+      }
+    });
 
     // 次へ
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pagination__button';
-    nextBtn.textContent = '»';
+    nextBtn.textContent = '>';
     nextBtn.disabled = (page >= totalPages);
     nextBtn.addEventListener('click', function () {
       if (state.page < totalPages) {
@@ -460,7 +483,7 @@
     const prevBtn = document.createElement('button');
     prevBtn.type = 'button';
     prevBtn.className = 'pagination__button';
-    prevBtn.textContent = '«';
+    prevBtn.textContent = '<';
     prevBtn.disabled = (page <= 1);
     prevBtn.addEventListener('click', function () {
       if (page > 1) onPageChange(page - 1);
@@ -468,23 +491,30 @@
     nav.appendChild(prevBtn);
 
     // ページ番号
-    for (let i = 1; i <= totalPages; i++) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pagination__button' + (i === page ? ' pagination__button--active' : '');
-      btn.textContent = i;
-      btn.dataset.page = i;
-      btn.addEventListener('click', function () {
-        onPageChange(parseInt(this.dataset.page, 10));
-      });
-      nav.appendChild(btn);
-    }
+    buildPageNumbers(totalPages, page).forEach(function (p) {
+      if (p === '...') {
+        const span = document.createElement('span');
+        span.className = 'pagination__ellipsis';
+        span.textContent = '...';
+        nav.appendChild(span);
+      } else {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pagination__button' + (p === page ? ' pagination__button--active' : '');
+        btn.textContent = p;
+        btn.dataset.page = p;
+        btn.addEventListener('click', function () {
+          onPageChange(parseInt(this.dataset.page, 10));
+        });
+        nav.appendChild(btn);
+      }
+    });
 
     // 次へ
     const nextBtn = document.createElement('button');
     nextBtn.type = 'button';
     nextBtn.className = 'pagination__button';
-    nextBtn.textContent = '»';
+    nextBtn.textContent = '>';
     nextBtn.disabled = (page >= totalPages);
     nextBtn.addEventListener('click', function () {
       if (page < totalPages) onPageChange(page + 1);
