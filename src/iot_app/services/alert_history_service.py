@@ -6,6 +6,16 @@ from iot_app.models.alert import AlertHistoryByUser
 ITEM_PER_PAGE = 25
 INIT_START_DATETIME = 7  # days
 
+# sort_item_id → AlertHistoryByUser カラムのマッピング（ALT-005固定）
+_SORT_COLUMN_MAP = {
+    1: AlertHistoryByUser.alert_occurrence_datetime,
+    2: AlertHistoryByUser.device_name,
+    3: AlertHistoryByUser.device_location,
+    4: AlertHistoryByUser.alert_name,
+    5: AlertHistoryByUser.alert_level_id,
+    6: AlertHistoryByUser.alert_status_id,
+}
+
 
 def get_default_search_params() -> dict:
     """アラート履歴一覧検索のデフォルトパラメータを返す"""
@@ -13,8 +23,8 @@ def get_default_search_params() -> dict:
     return {
         'page': 1,
         'per_page': ITEM_PER_PAGE,
-        'sort_by': 'alert_occurrence_datetime',
-        'order': 'desc',
+        'sort_item_id': 1,   # アラート発生日時
+        'sort_order_id': 2,  # 降順
         'start_datetime': (now - timedelta(days=INIT_START_DATETIME)).replace(
             hour=0, minute=0, second=0, microsecond=0
         ).strftime('%Y/%m/%d %H:%M'),
@@ -33,7 +43,7 @@ def search_alert_histories(search_params: dict, user_id: int) -> tuple[list, int
     """アラート履歴一覧をスコープ制限付きで検索する
 
     Args:
-        search_params: 検索条件（page, per_page, sort_by, order, 各検索項目）
+        search_params: 検索条件（page, per_page, sort_item_id, sort_order_id, 各検索項目）
         user_id: ログインユーザーID（v_alert_history_by_user のスコープ制限に使用）
 
     Returns:
@@ -41,8 +51,8 @@ def search_alert_histories(search_params: dict, user_id: int) -> tuple[list, int
     """
     page = search_params['page']
     per_page = search_params['per_page']
-    sort_by = search_params['sort_by']
-    order = search_params['order']
+    sort_item_id = search_params.get('sort_item_id', 1)
+    sort_order_id = search_params.get('sort_order_id', 2)
     offset = (page - 1) * per_page
 
     query = db.session.query(AlertHistoryByUser).filter(
@@ -77,11 +87,19 @@ def search_alert_histories(search_params: dict, user_id: int) -> tuple[list, int
             AlertHistoryByUser.alert_status_id == search_params['alert_status_id']
         )
 
-    sort_col = getattr(AlertHistoryByUser, sort_by)
+    sort_col = _SORT_COLUMN_MAP.get(sort_item_id, AlertHistoryByUser.alert_occurrence_datetime)
     second_sort_col = AlertHistoryByUser.alert_history_id
-    if order == 'asc':
-        query = query.order_by(sort_col.asc(), second_sort_col.asc())
+
+    if sort_order_id == 1:
+        sort_order = 'ASC'
+    elif sort_order_id == 2:
+        sort_order = 'DESC'
     else:
+        sort_order = None
+
+    if sort_order == 'ASC':
+        query = query.order_by(sort_col.asc(), second_sort_col.asc())
+    elif sort_order == 'DESC':
         query = query.order_by(sort_col.desc(), second_sort_col.desc())
 
     total = query.count()

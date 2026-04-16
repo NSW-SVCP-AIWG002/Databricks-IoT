@@ -99,6 +99,8 @@ class AlertHistoryByUser(db.Model):
     alert_recovery_threshold = db.Column(db.Float, nullable=True)
     # 判定時間（仕様 6.9）
     judgment_time = db.Column(db.Integer, nullable=True)
+    # アラート発生時の値の単位（仕様 6.10）measurement_item_master.unit_name をVIEWで結合
+    unit_name = db.Column(db.String(10), nullable=True)
 
 
 class AlertHistory(db.Model):

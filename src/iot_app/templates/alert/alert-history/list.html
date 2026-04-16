@@ -122,21 +122,25 @@
       </div>
       <div class="ah-search-row ah-search-row--sort">
         <div class="form-group">
-          <label class="form-label" for="sort_by">ソート項目</label>
-          <select id="sort_by" name="sort_by" class="form-select">
+          <label class="form-label" for="sort_item_id">ソート項目</label>
+          <select id="sort_item_id" name="sort_item_id" class="form-select">
             {% for item in sort_items %}
-            <option value="{{ item.value }}"
-              {% if search_params.get('sort_by') == item.value %}selected{% endif %}>
-              {{ item.label }}
+            <option value="{{ item.sort_item_id }}"
+              {% if search_params.get('sort_item_id') == item.sort_item_id %}selected{% endif %}>
+              {{ item.sort_item_name }}
             </option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label" for="order">ソート順</label>
-          <select id="order" name="order" class="form-select">
-            <option value="desc" {% if search_params.get('order') == 'desc' %}selected{% endif %}>降順</option>
-            <option value="asc"  {% if search_params.get('order') == 'asc'  %}selected{% endif %}>昇順</option>
+          <label class="form-label" for="sort_order_id">ソート順</label>
+          <select id="sort_order_id" name="sort_order_id" class="form-select">
+            {% for so in sort_orders %}
+            <option value="{{ so.sort_order_id }}"
+              {% if search_params.get('sort_order_id') == so.sort_order_id %}selected{% endif %}>
+              {{ so.sort_order_name }}
+            </option>
+            {% endfor %}
           </select>
         </div>
       </div>
@@ -203,8 +207,8 @@
       <tr>
         <th style="width:10%;">アラート発生日時 <span class="sort-indicator" data-column="alert_occurrence_datetime">↕</span></th>
         <th style="width:25%;">デバイス名 <span class="sort-indicator" data-column="device_name">↕</span></th>
-        <th style="width:20%;">設置場所 <span class="sort-indicator" data-column="device_location">↕</span></th>
-        <th style="width:10%;">アラート名 <span class="sort-indicator" data-column="alert_name">↕</span></th>
+        <th style="width:25%;">設置場所 <span class="sort-indicator" data-column="device_location">↕</span></th>
+        <th style="width:15%;">アラート名 <span class="sort-indicator" data-column="alert_name">↕</span></th>
         <th style="width:10%;">アラートレベル <span class="sort-indicator" data-column="alert_level_id">↕</span></th>
         <th style="width:10%;">ステータス <span class="sort-indicator" data-column="alert_status_id">↕</span></th>
         <th style="width:5%;">操作</th>

@@ -598,4 +598,61 @@ CREATE TABLE IF NOT EXISTS alert_abnomal_state (
         REFERENCES alert_history (alert_history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- ============================================================
+-- VIEW定義
+-- ============================================================
+
+-- v_alert_history_by_user: ユーザーIDに基づくアラート履歴参照ビュー
+-- organization_closure を使ってデータスコープを制限する
+CREATE OR REPLACE VIEW v_alert_history_by_user AS
+SELECT
+    ah.alert_history_id,
+    ah.alert_history_uuid,
+    ah.alert_occurrence_datetime,
+    ah.alert_recovery_datetime,
+    ah.alert_value,
+    ah.alert_status_id,
+    ah.delete_flag,
+    um.user_id,
+    dm.device_name,
+    dm.device_location,
+    asm.alert_name,
+    alm.alert_level_id,
+    alm.alert_level_name,
+    astm.alert_status_name,
+    cond_mim.display_name                        AS alert_conditions_field,
+    asm.alert_conditions_operator,
+    asm.alert_conditions_threshold,
+    rec_mim.display_name                         AS alert_recovery_field,
+    asm.alert_recovery_conditions_operator       AS alert_recovery_operator,
+    asm.alert_recovery_conditions_threshold      AS alert_recovery_threshold,
+    asm.judgment_time,
+    cond_mim.unit_name
+FROM alert_history ah
+INNER JOIN alert_setting_master asm
+    ON ah.alert_id = asm.alert_id
+INNER JOIN device_master dm
+    ON asm.device_id = dm.device_id
+INNER JOIN alert_level_master alm
+    ON asm.alert_level_id = alm.alert_level_id
+INNER JOIN alert_status_master astm
+    ON ah.alert_status_id = astm.alert_status_id
+INNER JOIN measurement_item_master cond_mim
+    ON asm.alert_conditions_measurement_item_id = cond_mim.measurement_item_id
+INNER JOIN measurement_item_master rec_mim
+    ON asm.alert_recovery_conditions_measurement_item_id = rec_mim.measurement_item_id
+INNER JOIN organization_closure oc
+    ON dm.organization_id = oc.subsidiary_organization_id
+INNER JOIN user_master um
+    ON oc.parent_organization_id = um.organization_id
+WHERE
+    ah.delete_flag      = FALSE
+    AND asm.delete_flag = FALSE
+    AND dm.delete_flag  = FALSE
+    AND alm.delete_flag = FALSE
+    AND astm.delete_flag = FALSE
+    AND cond_mim.delete_flag = FALSE
+    AND rec_mim.delete_flag  = FALSE
+    AND um.delete_flag  = FALSE;
+
 SET FOREIGN_KEY_CHECKS = 1;

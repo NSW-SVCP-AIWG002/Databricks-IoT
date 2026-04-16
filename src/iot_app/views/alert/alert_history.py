@@ -1,6 +1,7 @@
 from flask import abort, g, make_response, render_template, request
 
 from iot_app import db
+from iot_app.common.constants import SORT_ORDER
 from iot_app.common.cookie import (
     clear_search_conditions_cookie,
     get_search_conditions_cookie,
@@ -8,22 +9,13 @@ from iot_app.common.cookie import (
 )
 from iot_app.decorators.auth import require_role
 from iot_app.models.alert import AlertLevelMaster, AlertStatusMaster
+from iot_app.models.sort_item import SortItemMaster
 from iot_app.services.alert_history_service import (
     get_alert_history_detail,
     get_default_search_params,
     search_alert_histories,
 )
 from iot_app.views.alert import alert_bp
-
-# sort_item_master が未実装のため静的リストで代替
-_SORT_ITEMS = [
-    {'value': 'alert_occurrence_datetime', 'label': 'アラート発生日時'},
-    {'value': 'device_name',               'label': 'デバイス名'},
-    {'value': 'device_location',           'label': '設置場所'},
-    {'value': 'alert_name',                'label': 'アラート名'},
-    {'value': 'alert_level_id',            'label': 'アラートレベル'},
-    {'value': 'alert_status_id',           'label': 'ステータス'},
-]
 
 _ALL_ROLES = (
     'system_admin',
@@ -32,9 +24,11 @@ _ALL_ROLES = (
     'service_company_user',
 )
 
+_ALERT_HISTORY_VIEW_ID = 5  # ALT-005 アラート履歴一覧
+
 
 def _load_masters():
-    """アラートレベル・ステータスマスタを取得する"""
+    """アラートレベル・ステータス・ソート項目マスタを取得する"""
     alert_levels = (
         db.session.query(AlertLevelMaster)
         .filter_by(delete_flag=False)
@@ -47,7 +41,13 @@ def _load_masters():
         .order_by(AlertStatusMaster.alert_status_id)
         .all()
     )
-    return alert_levels, alert_statuses
+    sort_items = (
+        db.session.query(SortItemMaster)
+        .filter_by(view_id=_ALERT_HISTORY_VIEW_ID, delete_flag=False)
+        .order_by(SortItemMaster.sort_order)
+        .all()
+    )
+    return alert_levels, alert_statuses, sort_items
 
 
 @alert_bp.route('/alert/alert-history', methods=['GET'])
@@ -71,16 +71,17 @@ def alert_history_list():
     except Exception:
         abort(500)
 
-    alert_levels, alert_statuses = _load_masters()
+    alert_levels, alert_statuses, sort_items = _load_masters()
 
     response = make_response(render_template(
-        'analysis/alert_history/index.html',
+        'alert/alert-history/list.html',
         alert_histories=alert_histories,
         total=total,
         search_params=search_params,
         alert_levels=alert_levels,
         alert_statuses=alert_statuses,
-        sort_items=_SORT_ITEMS,
+        sort_items=sort_items,
+        sort_orders=SORT_ORDER,
     ))
 
     if save_cookie:
@@ -96,14 +97,16 @@ def alert_history_search():
     """アラート履歴検索実行"""
     user_id = g.current_user.user_id
 
-    raw_level  = request.form.get('alert_level_id')
-    raw_status = request.form.get('alert_status_id')
+    raw_level      = request.form.get('alert_level_id')
+    raw_status     = request.form.get('alert_status_id')
+    raw_sort_item  = request.form.get('sort_item_id')
+    raw_sort_order = request.form.get('sort_order_id')
 
     search_params = {
         'page':            1,
         'per_page':        25,
-        'sort_by':         request.form.get('sort_by', 'alert_occurrence_datetime'),
-        'order':           request.form.get('order', 'desc'),
+        'sort_item_id':    int(raw_sort_item)  if raw_sort_item  else 1,
+        'sort_order_id':   int(raw_sort_order) if raw_sort_order else 2,
         'start_datetime':  request.form.get('start_datetime', ''),
         'end_datetime':    request.form.get('end_datetime', ''),
         'device_name':     request.form.get('device_name', ''),
@@ -118,16 +121,17 @@ def alert_history_search():
     except Exception:
         abort(500)
 
-    alert_levels, alert_statuses = _load_masters()
+    alert_levels, alert_statuses, sort_items = _load_masters()
 
     response = make_response(render_template(
-        'analysis/alert_history/index.html',
+        'alert/alert-history/list.html',
         alert_histories=alert_histories,
         total=total,
         search_params=search_params,
         alert_levels=alert_levels,
         alert_statuses=alert_statuses,
-        sort_items=_SORT_ITEMS,
+        sort_items=sort_items,
+        sort_orders=SORT_ORDER,
     ))
 
     response = clear_search_conditions_cookie(response, 'alert_history')
@@ -151,6 +155,6 @@ def alert_history_detail(alert_history_uuid):
         abort(404)
 
     return render_template(
-        'analysis/alert_history/modals/alert_history_reference.html',
+        'alert/alert-history/detail_modal.html',
         alert_history=alert_history,
     )
