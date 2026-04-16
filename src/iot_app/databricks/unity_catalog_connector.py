@@ -19,17 +19,18 @@ class UnityCatalogConnector:
         self._server_hostname = re.sub(r'^https?://', '', host).rstrip('/')
         self._http_path = os.environ.get('DATABRICKS_HTTP_PATH', '')
 
-    def _request(self, sql_text, params, operation, fetch_one=False):
+    def _request(self, sql_text, params, operation, fetch_one=False, dml=False):
         """SQL 実行の内部メソッド（ログ出力・タイミング計測を一元管理）
 
         Args:
             sql_text (str): 実行する SQL（named parameter :param_name 形式）
             params (dict): パラメータ辞書
             operation (str): ログ出力用の操作名
-            fetch_one (bool): True の場合は先頭1件のみ取得
+            fetch_one (bool): True の場合は先頭1件のみ取得（dml=False 時のみ有効）
+            dml (bool): True の場合は DML 専用パス（cursor.description / fetchall を呼ばない）
 
         Returns:
-            list[dict] | dict | None: fetch_one=False なら list[dict]、True なら dict または None
+            list[dict] | dict | None: dml=True なら None、fetch_one=False なら list[dict]、True なら dict または None
         """
         logger.info("外部API呼び出し開始", extra={
             "service": "unity_catalog",
@@ -47,12 +48,16 @@ class UnityCatalogConnector:
             ) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(converted_sql, params)
-                    columns = [desc[0] for desc in cursor.description]
-                    if fetch_one:
-                        row = cursor.fetchone()
-                        result = dict(zip(columns, row)) if row is not None else None
+                    if dml:
+                        # DML 後は cursor.description が None になるため参照しない
+                        result = None
                     else:
-                        result = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                        columns = [desc[0] for desc in cursor.description]
+                        if fetch_one:
+                            row = cursor.fetchone()
+                            result = dict(zip(columns, row)) if row is not None else None
+                        else:
+                            result = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
             duration_ms = int((time.time() - start) * 1000)
             logger.info("外部API完了", extra={
@@ -84,6 +89,19 @@ class UnityCatalogConnector:
             list[dict]: クエリ結果行のリスト
         """
         return self._request(sql_text, params, operation)
+
+    def execute_dml(self, sql_text, params, operation="DML実行") -> None:
+        """INSERT / UPDATE / DELETE を実行する（DML専用パス）
+
+        cursor.description が None になる DML に対応するため、
+        cursor.description / fetchall / fetchone を呼ばない専用パスを使用する。
+
+        Args:
+            sql_text (str): 実行する SQL（named parameter :param_name 形式）
+            params (dict): パラメータ辞書
+            operation (str): ログ出力用の操作名
+        """
+        self._request(sql_text, params, operation, dml=True)
 
     def execute_one(self, sql_text, params, operation="SQL実行") -> dict | None:
         """SQL を実行して先頭1件を dict で返す（fetchone 使用）
