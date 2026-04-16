@@ -207,7 +207,7 @@ class TestStoreMonitoringGet:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.get_recent_alerts_with_count",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.get(STORE_MONITORING_URL)
@@ -236,13 +236,12 @@ class TestStoreMonitoringGet:
         """4.1.1: アクセス可能組織が0件の場合は200でデバイス空リストを返すこと
 
         ワークフロー仕様書「UI状態: デバイスリストが空（0件）の場合」に対応。
-        get_accessible_organizations が空リストを返す場合、
-        デバイス取得スキップして200を返すことを確認する。
+        get_device_list_with_count / get_recent_alerts_with_count が空リストを返す場合、
+        200を返すことを確認する。
         """
         # Act
-        with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations", return_value=[]
-        ):
+        with patch(f"{_VIEW_MODULE}.get_recent_alerts_with_count", return_value=([], 0)), \
+             patch(f"{_VIEW_MODULE}.get_device_list_with_count", return_value=([], 0)):
             response = client.get(STORE_MONITORING_URL)
 
         # Assert
@@ -503,7 +502,7 @@ class TestShowSensorInfo:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.check_device_access",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.get(f"{STORE_MONITORING_URL}/{DEVICE_UUID_NOT_FOUND}")
@@ -645,7 +644,7 @@ class TestDeviceDetailsGet:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.check_device_access",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.get(f"{DEVICE_DETAILS_URL}/{DEVICE_UUID_NOT_FOUND}")
@@ -873,7 +872,7 @@ class TestDeviceDetailsPost:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.check_device_access",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.post(
@@ -1002,7 +1001,7 @@ class TestCsvExport:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.check_device_access",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.get(
@@ -1229,7 +1228,7 @@ class TestStoreMonitoringOrganizationAutocomplete:
         """
         # Act
         with patch(
-            f"{_VIEW_MODULE}.get_accessible_organizations",
+            f"{_VIEW_MODULE}.search_organizations_by_name",
             side_effect=Exception("DB接続エラー"),
         ):
             response = client.get(f"{AUTOCOMPLETE_URL}?q=店舗")

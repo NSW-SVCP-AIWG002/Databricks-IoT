@@ -598,3 +598,70 @@ CREATE TABLE IF NOT EXISTS alert_abnomal_state (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- VIEWs
+
+CREATE OR REPLACE VIEW v_device_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    d.device_id,
+    d.organization_id AS device_organization_id,
+    d.device_type_id,
+    d.device_name,
+    d.device_model,
+    d.device_inventory_id,
+    d.sim_id,
+    d.mac_address,
+    d.software_version,
+    d.device_location,
+    d.certificate_expiration_date,
+    d.create_date,
+    d.creator,
+    d.update_date,
+    d.modifier,
+    d.delete_flag,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id
+WHERE
+    u.delete_flag = FALSE;
+
+CREATE OR REPLACE VIEW v_alert_history_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id AS user_organization_id,
+    ah.alert_history_id,
+    ah.alert_history_uuid,
+    ah.alert_id,
+    ah.alert_occurrence_datetime,
+    ah.alert_recovery_datetime,
+    ah.alert_status_id,
+    ah.alert_value,
+    ah.create_date,
+    ah.creator,
+    ah.update_date,
+    ah.modifier,
+    ah.delete_flag,
+    a.device_id,
+    d.organization_id AS device_organization_id,
+    oc.depth
+FROM
+    user_master u
+    INNER JOIN organization_closure oc
+        ON u.organization_id = oc.parent_organization_id
+    INNER JOIN device_master d
+        ON oc.subsidiary_organization_id = d.organization_id
+    INNER JOIN alert_setting_master a
+        ON d.device_id = a.device_id
+    INNER JOIN alert_history ah
+        ON a.alert_id = ah.alert_id
+WHERE
+    d.delete_flag = FALSE
+    AND a.delete_flag = FALSE;

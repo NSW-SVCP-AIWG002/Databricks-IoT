@@ -252,6 +252,18 @@ SELECT
   COUNT(v.alert_history_id) AS data_count
 FROM
   v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
+LEFT JOIN device_master dm
+  ON v.device_id = dm.device_id
+  AND dm.delete_flag = FALSE
 WHERE
   v.user_id = :user_id
   AND v.delete_flag = FALSE
@@ -622,7 +634,7 @@ def check_device_access(device_uuid, user_id):
 
 **② アラート一覧取得**
 
-**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master
+**使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master、device_master
 
 **SQL詳細:**
 - アラート一覧件数取得DBクエリ
@@ -634,6 +646,18 @@ SELECT
   COUNT(v.alert_history_id) AS data_count
 FROM
   v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
+LEFT JOIN device_master dm
+  ON v.device_id = dm.device_id
+  AND dm.delete_flag = FALSE
 WHERE
   v.user_id = :user_id
   AND v.delete_flag = FALSE
@@ -659,6 +683,9 @@ LEFT JOIN alert_setting_master am
 LEFT JOIN alert_level_master al
   ON am.alert_level_id = al.alert_level_id
   AND al.delete_flag = FALSE
+LEFT JOIN device_master dm
+  ON v.device_id = dm.device_id
+  AND dm.delete_flag = FALSE
 WHERE
   v.user_id = :user_id
   AND v.delete_flag = FALSE
@@ -882,6 +909,15 @@ SELECT
   COUNT(v.alert_history_id) AS data_count
 FROM
   v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
 WHERE
   v.user_id = :user_id
   AND v.device_id = :device_id
@@ -1133,6 +1169,15 @@ SELECT
   COUNT(v.alert_history_id) AS data_count
 FROM
   v_alert_history_by_user v
+LEFT JOIN alert_status_master asm
+  ON v.alert_status_id = asm.alert_status_id
+  AND asm.delete_flag = FALSE
+LEFT JOIN alert_setting_master am
+  ON v.alert_id = am.alert_id
+  AND am.delete_flag = FALSE
+LEFT JOIN alert_level_master al
+  ON am.alert_level_id = al.alert_level_id
+  AND al.delete_flag = FALSE
 WHERE
   v.user_id = :user_id
   AND v.device_id = :device_id

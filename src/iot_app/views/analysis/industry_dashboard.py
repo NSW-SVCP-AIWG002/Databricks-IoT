@@ -108,7 +108,7 @@ def store_monitoring():
             search_params["device_page"] = request.args.get("device_page", search_params.get("device_page", 1), type=int)
             search_params["alert_page"] = request.args.get("alert_page", search_params.get("alert_page", 1), type=int)
 
-        page = search_params.get("device_page", 1)
+        device_page = search_params.get("device_page", 1)
         alert_page = search_params.get("alert_page", 1)
 
         logger.info("店舗モニタリング アラート一覧取得開始")
@@ -119,7 +119,7 @@ def store_monitoring():
 
         logger.info("店舗モニタリング デバイス一覧取得開始")
         devices, devices_total = get_device_list_with_count(
-            search_params, g.current_user.user_id, page, _ITEM_PER_PAGE
+            search_params, g.current_user.user_id, device_page, _ITEM_PER_PAGE
         )
         logger.info("店舗モニタリング デバイス一覧取得完了")
 
@@ -138,7 +138,7 @@ def store_monitoring():
                 alerts_total=alerts_total,
                 devices=devices,
                 devices_total=devices_total,
-                page=page,
+                device_page=device_page,
                 alert_page=alert_page,
                 per_page=_ITEM_PER_PAGE,
                 search_params=search_params,
@@ -201,7 +201,7 @@ def show_sensor_info(device_uuid):
             abort(404)
 
         search_params = _get_store_monitoring_search_params()
-        page = search_params.get("device_page", 1)
+        device_page = search_params.get("device_page", 1)
         alert_page = search_params.get("alert_page", 1)
 
         logger.info("センサー情報表示 アラート一覧取得開始: device_uuid=%s", device_uuid)
@@ -212,7 +212,7 @@ def show_sensor_info(device_uuid):
 
         logger.info("センサー情報表示 デバイス一覧取得開始: device_uuid=%s", device_uuid)
         devices, devices_total = get_device_list_with_count(
-            search_params, g.current_user.user_id, page, _ITEM_PER_PAGE
+            search_params, g.current_user.user_id, device_page, _ITEM_PER_PAGE
         )
         logger.info("センサー情報表示 デバイス一覧取得完了: device_uuid=%s", device_uuid)
 
@@ -227,7 +227,7 @@ def show_sensor_info(device_uuid):
             alerts_total=alerts_total,
             devices=devices,
             devices_total=devices_total,
-            page=page,
+            device_page=device_page,
             alert_page=alert_page,
             per_page=_ITEM_PER_PAGE,
             search_params=search_params,
