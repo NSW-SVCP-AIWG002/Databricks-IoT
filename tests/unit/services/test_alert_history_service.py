@@ -267,6 +267,27 @@ class TestSearchAlertHistoriesScope:
         assert result_list == []
         assert total == 0
 
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_only_queries_alert_history_by_user_view(self, mock_db, _mock_model):
+        """使用DB詳細 No.1/No.6: db.session.query() の呼び出し先が AlertHistoryByUser（VIEW）のみであること
+        仕様書「使用テーブル一覧」:
+          - v_alert_history_by_user のみアプリから直接アクセスする
+          - organization_closure / alert_status_master 等には直接アクセスしない（VIEW内部で処理）
+        """
+        # Arrange
+        user_id = 10
+        search_params = _make_default_search_params()
+        _setup_mock_query(mock_db)
+
+        # Act
+        from iot_app.services.alert_history_service import search_alert_histories
+        from iot_app.models.alert import AlertHistoryByUser as _AHBUModel
+        search_alert_histories(search_params=search_params, user_id=user_id)
+
+        # Assert: query() の第一引数が AlertHistoryByUser のみ
+        mock_db.session.query.assert_called_once_with(_AHBUModel)
+
 
 # =============================================================================
 # 3.1.1 search_alert_histories — 検索条件の適用
@@ -1074,6 +1095,30 @@ class TestGetAlertHistoryDetail:
 
         # Assert: filter が呼ばれたこと
         mock_query.filter.assert_called()
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_only_queries_alert_history_by_user_view(self, mock_db, _mock_model):
+        """使用DB詳細 No.1/No.6: db.session.query() の呼び出し先が AlertHistoryByUser（VIEW）のみであること
+        仕様書「使用テーブル一覧」:
+          - v_alert_history_by_user のみアプリから直接アクセスする
+          - organization_closure 等には直接アクセスしない（VIEW内部で処理）
+        """
+        # Arrange
+        alert_history_uuid = "uuid-001"
+        user_id = 10
+        mock_history = _make_mock_alert_history(alert_history_uuid=alert_history_uuid)
+        _setup_mock_query(mock_db, results=[mock_history])
+
+        # Act
+        from iot_app.services.alert_history_service import get_alert_history_detail
+        from iot_app.models.alert import AlertHistoryByUser as _AHBUModel
+        get_alert_history_detail(
+            alert_history_uuid=alert_history_uuid, user_id=user_id
+        )
+
+        # Assert: query() の第一引数が AlertHistoryByUser のみ
+        mock_db.session.query.assert_called_once_with(_AHBUModel)
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
