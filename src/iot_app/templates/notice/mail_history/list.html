@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block title %}メール通知履歴{% endblock %}
+
+{% block extra_css %}
+<style>
+.mh-search-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  align-items: flex-end;
+  margin-bottom: var(--spacing-4);
+}
+.mh-search-fields .form-group {
+  flex: 1;
+  min-width: 160px;
+}
+.mh-search-center {
+  display: flex;
+  gap: var(--spacing-2);
+  justify-content: flex-end;
+}
+.mh-search-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: var(--color-gray-50);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-sm);
+}
+.mh-search-summary__label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
+}
+.mh-search-summary__count {
+  margin-left: auto;
+  color: var(--color-gray-600);
+}
+.mh-search-badge {
+  display: inline-block;
+  background-color: var(--color-search-badge);
+  color: var(--color-gray-800);
+  font-size: var(--font-size-sm);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.sort-header {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+}
+.sort-header:hover {
+  color: var(--color-primary);
+}
+.table__empty {
+  text-align: center;
+  padding: var(--spacing-6);
+  color: var(--color-gray-500);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# (1) 画面タイトル #}
+<h1 class="page-title">メール通知履歴</h1>
+
+{# (2) 検索フォーム #}
+<div class="search-form" id="search-form-container">
+  <div class="search-form__header" id="search-form-toggle">
+    <span class="search-form__title">検索条件</span>
+    <span class="search-form__toggle-icon" id="search-toggle-icon">▼</span>
+  </div>
+  <div class="search-form__body" id="search-form-body">
+    <form id="search-form" method="POST" action="{{ url_for('notice.mail_history_search') }}">
+      {{ form.hidden_tag() }}
+      <div class="mh-search-fields">
+        <div class="form-group">
+          {{ form.mail_type_ids.label(class_='form-label') }}
+          {{ form.mail_type_ids(id='mail_type_ids', class_='form-select', size=4) }}
+        </div>
+        <div class="form-group">
+          {{ form.sent_at_start.label(class_='form-label') }}
+          {{ form.sent_at_start(id='sent_at_start', class_='form-input', type='date') }}
+        </div>
+        <div class="form-group">
+          {{ form.sent_at_end.label(class_='form-label') }}
+          {{ form.sent_at_end(id='sent_at_end', class_='form-input', type='date') }}
+        </div>
+        <div class="form-group">
+          {{ form.keyword.label(class_='form-label') }}
+          {{ form.keyword(id='keyword', class_='form-input', maxlength=255, placeholder='件名または本文') }}
+        </div>
+      </div>
+      {% if form.errors %}
+      <div class="form-error-summary">
+        {% for field, errors in form.errors.items() %}
+          {% for error in errors %}
+            <p class="form-error">{{ error }}</p>
+          {% endfor %}
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="mh-search-center">
+        <button type="submit" class="button button--primary">検索</button>
+        <button type="button" class="button button--secondary" id="clear-btn">クリア</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# (3) 現在の検索条件 #}
+<div class="mh-search-summary">
+  <span class="mh-search-summary__label">検索条件:</span>
+  {% if search_params.get('mail_types') %}
+    {% for mt_id in search_params['mail_types'] %}
+      <span class="mh-search-badge">{{ mail_type_map.get(mt_id, mt_id) }}</span>
+    {% endfor %}
+  {% endif %}
+  {% if search_params.get('sent_at_start') or search_params.get('sent_at_end') %}
+    <span class="mh-search-badge">
+      送信日時: {{ search_params.get('sent_at_start', '') }} ～ {{ search_params.get('sent_at_end', '') }}
+    </span>
+  {% endif %}
+  {% if search_params.get('keyword') %}
+    <span class="mh-search-badge">キーワード: {{ search_params['keyword'] }}</span>
+  {% endif %}
+  <span class="mh-search-summary__count">検索結果: {{ total }}件</span>
+</div>
+
+{# (4) データテーブル #}
+<div class="table-container">
+  <table class="table" style="min-width:1000px;">
+    <colgroup>
+      <col style="width:15%;">
+      <col style="width:30%;">
+      <col style="width:35%;">
+      <col style="width:12%;">
+      <col style="width:8%;">
+    </colgroup>
+    <thead class="table__head">
+      <tr>
+        <th>
+          {% set next_order_1 = 'asc' if (sort_id == 1 and order == 'desc') else 'desc' %}
+          <a class="sort-header"
+             href="{{ url_for('notice.mail_history_list', sort_id=1, order=next_order_1) }}">
+            メール種別
+            {% if sort_id == 1 %}{{ '↑' if order == 'asc' else '↓' }}{% else %}↕{% endif %}
+          </a>
+        </th>
+        <th>
+          {% set next_order_2 = 'asc' if (sort_id == 2 and order == 'desc') else 'desc' %}
+          <a class="sort-header"
+             href="{{ url_for('notice.mail_history_list', sort_id=2, order=next_order_2) }}">
+            件名
+            {% if sort_id == 2 %}{{ '↑' if order == 'asc' else '↓' }}{% else %}↕{% endif %}
+          </a>
+        </th>
+        <th>本文（抜粋）</th>
+        <th>
+          {% set next_order_3 = 'asc' if (sort_id == 3 and order == 'desc') else 'desc' %}
+          <a class="sort-header"
+             href="{{ url_for('notice.mail_history_list', sort_id=3, order=next_order_3) }}">
+            送信日時
+            {% if sort_id == 3 %}{{ '↑' if order == 'asc' else '↓' }}{% else %}↕{% endif %}
+          </a>
+        </th>
+        <th>アクション</th>
+      </tr>
+    </thead>
+    <tbody class="table__body">
+      {% if mail_histories %}
+        {% for history in mail_histories %}
+        <tr>
+          <td>
+            <span class="table__badge table__badge--{{ mail_type_badge.get(history.mail_type, 'info') }}">
+              {{ mail_type_map.get(history.mail_type, history.mail_type) }}
+            </span>
+          </td>
+          <td>
+            <span class="table__truncate" title="{{ history.subject }}">
+              {{ history.subject[:50] }}{% if history.subject | length > 50 %}...{% endif %}
+            </span>
+          </td>
+          <td>
+            <span class="table__truncate" title="{{ history.body }}">
+              {% set body_oneline = history.body | replace('\n', ' ') | replace('\r', '') %}
+              {{ body_oneline[:100] }}{% if body_oneline | length > 100 %}...{% endif %}
+            </span>
+          </td>
+          <td>
+            {% if history.sent_at %}
+              {{ history.sent_at.strftime('%Y/%m/%d %H:%M') }}
+            {% endif %}
+          </td>
+          <td>
+            <div class="table__actions">
+              <button class="table__action-btn"
+                      onclick="openMailHistoryModal('{{ history.mail_history_uuid }}')">詳細</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="5" class="table__empty">メール通知履歴が見つかりませんでした</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{# (4.6) ページネーション #}
+{% if total_pages >= 1 %}
+<div class="pagination">
+  {% if page > 1 %}
+    <a class="pagination__button"
+       href="{{ url_for('notice.mail_history_list', page=page - 1) }}">&lt;</a>
+  {% endif %}
+
+  {% set ns = namespace(pages=[]) %}
+  {% if total_pages <= 5 %}
+    {% for i in range(1, total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+  {% else %}
+    {% set ns.pages = [1] %}
+    {% if page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set pstart = [2, page - 1] | max %}
+    {% set pend = [total_pages - 1, page + 1] | min %}
+    {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+    {% if page < total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set ns.pages = ns.pages + [total_pages] %}
+  {% endif %}
+
+  {% for p in ns.pages %}
+    {% if p == '...' %}
+      <span class="pagination__ellipsis">...</span>
+    {% else %}
+      <a class="pagination__button {% if p == page %}pagination__button--active{% endif %}"
+         href="{{ url_for('notice.mail_history_list', page=p) }}">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page < total_pages %}
+    <a class="pagination__button"
+       href="{{ url_for('notice.mail_history_list', page=page + 1) }}">&gt;</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{# (5) 詳細モーダルオーバーレイ（詳細コンテンツを動的注入） #}
+<div class="modal-overlay" id="mailHistoryModal"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// (5) 詳細モーダルを開く
+async function openMailHistoryModal(uuid) {
+  try {
+    const res = await fetch('/notice/mail-history/' + uuid);
+    if (!res.ok) {
+      console.error('詳細取得エラー: HTTP ' + res.status);
+      return;
+    }
+    const html = await res.text();
+    const overlay = document.getElementById('mailHistoryModal');
+    overlay.innerHTML = html;
+    overlay.classList.add('active');
+  } catch (e) {
+    console.error('詳細取得エラー:', e);
+  }
+}
+
+// モーダルを閉じる（detail_modal.html の閉じるボタンから呼び出される）
+function closeMailHistoryModal() {
+  const overlay = document.getElementById('mailHistoryModal');
+  overlay.classList.remove('active');
+  overlay.innerHTML = '';
+}
+
+// クリアボタン: フォームをリセット（送信はしない）
+document.getElementById('clear-btn').addEventListener('click', function () {
+  const form = document.getElementById('search-form');
+  form.querySelectorAll('input[type="date"]').forEach(function (el) { el.value = ''; });
+  form.querySelectorAll('input[type="text"]').forEach(function (el) { el.value = ''; });
+  const sel = form.querySelector('select[name="mail_type_ids"]');
+  if (sel) {
+    Array.from(sel.options).forEach(function (opt) { opt.selected = false; });
+  }
+});
+
+// 検索フォームの折りたたみ
+document.getElementById('search-form-toggle').addEventListener('click', function () {
+  const body = document.getElementById('search-form-body');
+  const icon = document.getElementById('search-toggle-icon');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    icon.textContent = '▼';
+  } else {
+    body.style.display = 'none';
+    icon.textContent = '▶';
+  }
+});
+</script>
+{% endblock %}

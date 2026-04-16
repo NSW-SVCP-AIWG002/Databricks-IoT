@@ -58,7 +58,7 @@ def create_app():
     app.register_blueprint(chat_bp)
     # db.create_all() が全テーブルを認識できるようモデルを明示インポート
     with app.app_context():
-        from iot_app.models import customer_dashboard, organization, device, measurement  # noqa: F401
+        from iot_app.models import customer_dashboard, organization, device, measurement, notification, sort_item  # noqa: F401
 
     # ログハンドラー設定
     configure_logging(app, config_name)
@@ -138,6 +138,10 @@ def create_app():
     # 分析機能 Blueprint
     from iot_app.views.analysis import customer_dashboard_bp
     app.register_blueprint(customer_dashboard_bp)
+
+    # 通知機能 Blueprint
+    from iot_app.views.notice import notice_bp
+    app.register_blueprint(notice_bp)
 
     # 開発環境専用 Blueprint
     if config_name == "development":
