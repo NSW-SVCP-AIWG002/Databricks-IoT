@@ -189,13 +189,17 @@ def get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10):
     device_name = search_params.get("device_name", "")
 
     params = {"user_id": user_id, "days": _ALERT_RECENT_DAYS}
+    extra_join = ""
     extra_filters = ""
 
     if organization_id:
         params["organization_id"] = organization_id
-        extra_filters += " AND dm.organization_id = :organization_id"
+        extra_filters += " AND v.device_organization_id = :organization_id"
     elif organization_name:
         params["organization_name"] = f"%{organization_name}%"
+        extra_join = """LEFT JOIN organization_master om
+          ON v.device_organization_id = om.organization_id
+          AND om.delete_flag = FALSE"""
         extra_filters += " AND om.organization_name LIKE :organization_name"
     if device_name:
         params["device_name"] = f"%{device_name}%"
@@ -215,9 +219,7 @@ def get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10):
         LEFT JOIN device_master dm
           ON v.device_id = dm.device_id
           AND dm.delete_flag = FALSE
-        LEFT JOIN organization_master om
-          ON dm.organization_id = om.organization_id
-          AND om.delete_flag = FALSE
+        {extra_join}
         WHERE v.user_id = :user_id
           AND v.delete_flag = FALSE
           AND v.alert_occurrence_datetime >= DATE_SUB(NOW(), INTERVAL :days DAY)
@@ -245,8 +247,7 @@ def get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10):
                 dm.device_name,
                 am.alert_name,
                 al.alert_level_name,
-                asm.alert_status_name,
-                om.organization_name
+                asm.alert_status_name
             {base_sql}
             ORDER BY al.alert_level_id ASC, v.alert_history_id DESC
             LIMIT :limit OFFSET :offset
@@ -285,7 +286,7 @@ def get_device_list_with_count(search_params, user_id, page, per_page=10):
 
     if organization_id:
         params["organization_id"] = organization_id
-        extra_filters += " AND dm.organization_id = :organization_id"
+        extra_filters += " AND v.device_organization_id = :organization_id"
     elif organization_name:
         params["organization_name"] = f"%{organization_name}%"
         extra_filters += " AND om.organization_name LIKE :organization_name"

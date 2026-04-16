@@ -4,7 +4,6 @@
 対象: src/iot_app/services/industry_dashboard_service.py
 
 テスト対象関数:
-  - get_accessible_organizations     タスク2-1
   - check_device_access              タスク2-2
   - get_recent_alerts_with_count     タスク2-3
   - get_device_list_with_count       タスク2-4
@@ -24,7 +23,6 @@ from unittest.mock import Mock, MagicMock, patch
 from iot_app.services.industry_dashboard_service import (
     check_device_access,
     export_sensor_data_csv,
-    get_accessible_organizations,
     get_default_date_range,
     get_device_alerts_with_count,
     get_device_list_with_count,
@@ -40,6 +38,26 @@ from iot_app.services.industry_dashboard_service import (
 # テストヘルパー
 # =============================================================================
 
+
+def _mock_execute_one(mock_db, first=None, rows=None):
+    """db.session.execute が1回呼ばれる関数用（check_device_access / search_organizations_by_name）"""
+    result = MagicMock()
+    result.first.return_value = first
+    result.fetchall.return_value = rows if rows is not None else []
+    mock_db.session.execute.return_value = result
+
+
+def _mock_execute_two(mock_db, count=0, rows=None):
+    """db.session.execute が2回呼ばれる関数用（COUNT → SELECT の2クエリ関数）"""
+    count_result = MagicMock()
+    count_result.__getitem__ = MagicMock(return_value=count)
+    count_exec = MagicMock()
+    count_exec.first.return_value = count_result
+    data_exec = MagicMock()
+    data_exec.fetchall.return_value = rows if rows is not None else []
+    mock_db.session.execute.side_effect = [count_exec, data_exec]
+
+
 def _make_mock_device(device_uuid="uuid-001", device_id=1, organization_id=1):
     """テスト用モックデバイスオブジェクトを生成"""
     device = Mock()
@@ -54,7 +72,7 @@ def _make_mock_device(device_uuid="uuid-001", device_id=1, organization_id=1):
 def _make_mock_sensor_row(**kwargs):
     """テスト用モックセンサーデータ行を生成（全カラムデフォルト値あり）"""
     return {
-        "event_timestamp":                      kwargs.get("event_timestamp",                      datetime(2026, 2, 27, 12, 0, 0)),
+        "event_timestamp":                      kwargs.get("event_timestamp",                      "2026-02-27 12:00:00"),
         "external_temp":                        kwargs.get("external_temp",                        25.0),
         "set_temp_freezer_1":                   kwargs.get("set_temp_freezer_1",                   -15.0),
         "internal_sensor_temp_freezer_1":       kwargs.get("internal_sensor_temp_freezer_1",       -12.0),
@@ -240,9 +258,11 @@ class TestGetDefaultDateRange:
 
     def test_end_datetime_is_close_to_now(self):
         """2.1.2: search_end_datetime が現在日時に近い（1分以内）"""
-        before = datetime.now()
+        from datetime import timezone
+        _JST = timezone(timedelta(hours=9))
+        before = datetime.now(_JST).replace(tzinfo=None)
         result = get_default_date_range()
-        after = datetime.now()
+        after = datetime.now(_JST).replace(tzinfo=None)
         end_dt = datetime.strptime(result["search_end_datetime"], "%Y-%m-%dT%H:%M")
         assert (
             before.replace(second=0, microsecond=0) - timedelta(seconds=30)
@@ -268,57 +288,6 @@ class TestGetDefaultDateRange:
 
 
 # =============================================================================
-# 3. アクセス可能組織ID取得 - get_accessible_organizations()
-#    観点: 2.1 正常系処理, 3.1.4 検索結果戻り値ハンドリング
-# =============================================================================
-
-@pytest.mark.unit
-class TestGetAccessibleOrganizations:
-    """アクセス可能組織ID取得
-
-    観点: 2.1 正常系処理, 3.1.4 検索結果戻り値ハンドリング
-    対応ワークフロー仕様書:
-        - ② データスコープ制限の適用
-        - get_accessible_organizations(current_user_organization_id)
-    仕様:
-        - organization_closure テーブルから parent_organization_id で検索
-        - subsidiary_organization_id のリストを返す
-    """
-
-    def test_returns_list_of_subsidiary_org_ids(self, mocker):
-        """3.1.4.1: DBクエリ結果から subsidiary_organization_id のリストが返却される"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [
-            (1,), (2,), (3,),
-        ]
-        result = get_accessible_organizations(10)
-        assert result == [1, 2, 3]
-
-    def test_returns_empty_list_when_no_subsidiaries(self, mocker):
-        """3.1.4.2: 下位組織が存在しない場合、空リストが返却される"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        mock_db.session.query.return_value.filter.return_value.all.return_value = []
-        result = get_accessible_organizations(99)
-        assert result == []
-
-    def test_query_is_executed_with_parent_org_id(self, mocker):
-        """3.1.1.1: parent_organization_id を条件にクエリが実行される"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        mock_db.session.query.return_value.filter.return_value.all.return_value = []
-        get_accessible_organizations(100)
-        mock_db.session.query.assert_called_once()
-        mock_db.session.query.return_value.filter.assert_called_once()
-
-    def test_returns_flat_list_not_tuples(self, mocker):
-        """2.1.1: 戻り値がタプルではなく整数のフラットリスト"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [(1,)]
-        result = get_accessible_organizations(10)
-        assert isinstance(result, list)
-        assert result[0] == 1
-
-
-# =============================================================================
 # 3.5 店舗名オートコンプリート - search_organizations_by_name()
 #     観点: 3.1.1 検索条件指定, 3.1.2 検索条件未指定（全件相当）,
 #           3.1.4 検索結果戻り値ハンドリング
@@ -332,106 +301,62 @@ class TestSearchOrganizationsByName:
           3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - 店舗モニタリング検索 > 検索条件（organization_name 部分一致）
-        - search_organizations_by_name(name, accessible_org_ids)
+        - search_organizations_by_name(name, user_id)
     仕様:
-        - accessible_org_ids に含まれる組織を対象に organization_name で部分一致検索
-        - accessible_org_ids が空の場合は空リストを即返却
-        - name が空文字の場合は全件相当（フィルタなし）で取得
+        - v_device_master_by_user VIEW に user_id を渡してスコープ制限
+        - name が空文字の場合は全件相当（nameフィルタなし）で取得
         - 戻り値: {organization_id, organization_name} の辞書リスト
     """
 
-    def _setup_mock_db(self, mocker, rows=None):
-        """db.session.query チェーンのモックを構築するヘルパー"""
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.filter.return_value = q
-        q.filter.return_value = q
-        q.order_by.return_value.all.return_value = rows or []
-        return mock_db, q
-
     def test_returns_dict_list_with_org_id_and_name(self, mocker):
         """3.1.4.1: 戻り値が organization_id / organization_name を持つ辞書リストである"""
-        # Arrange
-        mock_row = Mock()
-        mock_row.organization_id = 1
-        mock_row.organization_name = "店舗A"
-        self._setup_mock_db(mocker, rows=[mock_row])
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, rows=[(1, "店舗A")])
 
-        # Act
-        result = search_organizations_by_name("店舗", [1])
+        result = search_organizations_by_name("店舗", user_id=10)
 
-        # Assert
         assert len(result) == 1
         assert result[0]["organization_id"] == 1
         assert result[0]["organization_name"] == "店舗A"
 
-    def test_returns_empty_list_when_accessible_org_ids_is_empty(self, mocker):
-        """3.1.2.1: accessible_org_ids が空リストの場合、DBクエリを発行せず空リストを返す"""
-        # Arrange
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-
-        # Act
-        result = search_organizations_by_name("店舗", [])
-
-        # Assert
-        assert result == []
-        mock_db.session.query.assert_not_called()
-
-    def test_name_filter_applied_when_name_provided(self, mocker):
-        """3.1.1.1: name が指定された場合、部分一致フィルタがクエリに追加される"""
-        # Arrange
-        mock_db, q = self._setup_mock_db(mocker, rows=[])
-
-        # Act
-        search_organizations_by_name("店舗A", [1])
-
-        # Assert
-        # name フィルタが追加されること（filter が複数回呼ばれる）
-        assert q.filter.call_count >= 1
-
     def test_no_name_filter_when_name_is_empty(self, mocker):
-        """3.1.2.1: name が空文字の場合、追加フィルタなしで全件相当クエリが実行される"""
-        # Arrange
-        mock_row = Mock()
-        mock_row.organization_id = 2
-        mock_row.organization_name = "店舗B"
-        mock_db, q = self._setup_mock_db(mocker, rows=[mock_row])
+        """3.1.2.1: name が空文字の場合、nameフィルタなしで全件相当クエリが実行される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, rows=[(2, "店舗B")])
 
-        # Act
-        result = search_organizations_by_name("", [1, 2])
+        result = search_organizations_by_name("", user_id=10)
 
-        # Assert
         assert len(result) == 1
         assert result[0]["organization_name"] == "店舗B"
 
     def test_returns_empty_list_when_no_matching_orgs(self, mocker):
         """3.1.4.2: 条件に一致する組織が存在しない場合、空リストが返却される"""
-        # Arrange
-        self._setup_mock_db(mocker, rows=[])
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, rows=[])
 
-        # Act
-        result = search_organizations_by_name("存在しない店舗", [1])
+        result = search_organizations_by_name("存在しない店舗", user_id=10)
 
-        # Assert
         assert result == []
 
     def test_returns_multiple_orgs_as_list(self, mocker):
         """3.1.4.1: 複数の組織が存在する場合、全件がリストで返却される"""
-        # Arrange
-        rows = []
-        for i in range(3):
-            r = Mock()
-            r.organization_id = i + 1
-            r.organization_name = f"店舗{chr(65 + i)}"
-            rows.append(r)
-        self._setup_mock_db(mocker, rows=rows)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, rows=[(1, "店舗A"), (2, "店舗B"), (3, "店舗C")])
 
-        # Act
-        result = search_organizations_by_name("店舗", [1, 2, 3])
+        result = search_organizations_by_name("店舗", user_id=10)
 
-        # Assert
         assert len(result) == 3
         assert all("organization_id" in r and "organization_name" in r for r in result)
+
+    def test_execute_called_with_user_id(self, mocker):
+        """3.1.1.1: user_id が execute の params に渡される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, rows=[])
+
+        search_organizations_by_name("店舗", user_id=42)
+
+        call_params = mock_db.session.execute.call_args[0][1]
+        assert call_params["user_id"] == 42
 
 
 # =============================================================================
@@ -446,52 +371,51 @@ class TestCheckDeviceAccess:
     観点: 2.2 対象データ存在チェック
     対応ワークフロー仕様書:
         - ① データスコープ制限チェック
-        - check_device_access(device_uuid, accessible_org_ids)
+        - check_device_access(device_uuid, user_id)
     仕様:
-        - device_uuid が accessible_org_ids 内の組織に属し、
-          かつ delete_flag == False であれば Device を返す
-        - それ以外は None を返す（→ 呼び出し元が abort(404) する）
+        - v_device_master_by_user VIEW に user_id を渡してスコープ制限
+        - アクセス可能なデバイスは Row を返す、それ以外は None
     """
 
-    def _setup_mock_db(self, mocker, first_return=None):
-        """db.session.query チェーンのモックを構築するヘルパー"""
+    def test_accessible_device_returns_device_row(self, mocker):
+        """2.2.1: アクセス可能なデバイスが存在する場合、Row を返す"""
         mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        mock_q = MagicMock()
-        mock_db.session.query.return_value = mock_q
-        mock_q.join.return_value = mock_q
-        mock_q.filter.return_value = mock_q
-        mock_q.first.return_value = first_return
-        return mock_db, mock_q
+        mock_row = Mock()
+        mock_row.device_uuid = "uuid-001"
+        _mock_execute_one(mock_db, first=mock_row)
 
-    def test_accessible_device_returns_device_object(self, mocker):
-        """2.2.1: アクセス可能なデバイスが存在する場合、Deviceオブジェクトを返す"""
-        mock_device = _make_mock_device(device_uuid="uuid-001")
-        self._setup_mock_db(mocker, first_return=mock_device)
-        result = check_device_access("uuid-001", [1])
-        assert result is mock_device
+        result = check_device_access("uuid-001", user_id=10)
 
-    def test_device_not_in_accessible_orgs_returns_none(self, mocker):
-        """2.2.2: デバイスがアクセス可能組織に属さない場合、Noneを返す"""
-        self._setup_mock_db(mocker, first_return=None)
-        result = check_device_access("uuid-outside", [1])
-        assert result is None
+        assert result is mock_row
 
-    def test_logically_deleted_device_returns_none(self, mocker):
-        """2.2.3: 論理削除済みデバイス（delete_flag=True）はNoneを返す"""
-        self._setup_mock_db(mocker, first_return=None)
-        result = check_device_access("uuid-deleted", [1])
-        assert result is None
+    def test_device_not_accessible_returns_none(self, mocker):
+        """2.2.2: アクセス範囲外のデバイスは None を返す"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, first=None)
 
-    def test_empty_accessible_org_ids_returns_none(self, mocker):
-        """2.2.2: accessible_org_ids が空リストの場合、Noneを返す"""
-        result = check_device_access("uuid-001", [])
+        result = check_device_access("uuid-outside", user_id=10)
+
         assert result is None
 
     def test_nonexistent_device_uuid_returns_none(self, mocker):
-        """2.2.2: 存在しない device_uuid はNoneを返す"""
-        self._setup_mock_db(mocker, first_return=None)
-        result = check_device_access("uuid-nonexistent-9999", [1])
+        """2.2.2: 存在しない device_uuid は None を返す"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, first=None)
+
+        result = check_device_access("uuid-nonexistent-9999", user_id=10)
+
         assert result is None
+
+    def test_execute_called_with_user_id_and_device_uuid(self, mocker):
+        """3.1.1.1: user_id と device_uuid が execute の params に渡される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_one(mock_db, first=None)
+
+        check_device_access("uuid-001", user_id=42)
+
+        call_params = mock_db.session.execute.call_args[0][1]
+        assert call_params["user_id"] == 42
+        assert call_params["device_uuid"] == "uuid-001"
 
 
 # =============================================================================
@@ -507,108 +431,85 @@ class TestGetRecentAlertsWithCount:
           3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - ③ アラート一覧取得
-        - get_recent_alerts_with_count(search_params, accessible_org_ids, page=1, per_page=10)
+        - get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10)
     仕様:
-        - アラート発生日時が過去30日以内のアラート履歴を最大30件取得
+        - v_alert_history_by_user VIEW に user_id を渡してスコープ制限
+        - 過去30日以内のアラート履歴を最大30件取得
         - 検索条件: organization_name（部分一致）, device_name（部分一致）
-        - ソート: alert_history_id DESC（デフォルト）
         - 戻り値: (alerts_list, total_count) のタプル
     """
-
-    def _setup_mock_db(self, mocker, return_list=None, total_count=0):
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = total_count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            return_list if return_list is not None else []
-        )
-        return mock_db, q
-
-    def _make_base_query_mock(self, mock_db, alerts, count):
-        """DBクエリチェーンのモックを構築するヘルパー（join チェーン用）"""
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = alerts
-        return q
 
     def test_returns_alert_list_and_count_tuple(self, mocker):
         """2.1.1 / 3.1.4.1: アラートリストと件数のタプルが返却される"""
         mock_alert = Mock()
         mock_alert.alert_occurrence_datetime = datetime(2026, 2, 1, 18, 45, 0)
-        mock_alert.device_name = "冷蔵庫1"
         mock_alert.alert_name = "温度異常"
-        mock_alert.alert_level_name = "Warning"
-        mock_alert.alert_status_name = "発生中"
-        self._setup_mock_db(mocker, return_list=[mock_alert], total_count=1)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=1, rows=[mock_alert])
+
         alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
         )
+
         assert total == 1
         assert len(alerts) == 1
         assert alerts[0] is mock_alert
 
     def test_returns_empty_list_and_zero_count_when_no_alerts(self, mocker):
         """3.1.4.2: アラートが存在しない場合、空リストと0件が返却される"""
-        self._setup_mock_db(mocker, return_list=[], total_count=0)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
         alerts, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
         )
+
         assert total == 0
         assert alerts == []
 
-    def test_search_params_passed_to_query(self, mocker):
-        """3.1.1.2: 検索条件（店舗名・デバイス名）がクエリに渡される"""
-        mock_db, _ = self._setup_mock_db(mocker, return_list=[], total_count=0)
-        get_recent_alerts_with_count(
-            search_params={"organization_name": "店舗A", "device_name": "冷蔵庫"},
-            accessible_org_ids=[1],
-        )
-        mock_db.session.query.assert_called()
-
     def test_max_total_30_applied(self, mocker):
         """3.1.3.1: DBに100件あっても total が30件に制限される"""
-        self._setup_mock_db(mocker, return_list=[], total_count=100)
-        alerts, total = get_recent_alerts_with_count(
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=100, rows=[])
+
+        _, total = get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
         )
+
         assert total == 30
 
-    def test_organization_name_empty_string_treated_as_no_filter(self, mocker):
-        """3.1.2.1: 店舗名が空文字の場合、フィルタなし相当でクエリが実行される"""
-        self._setup_mock_db(mocker, return_list=[], total_count=0)
-        alerts, total = get_recent_alerts_with_count(
+    def test_execute_called_with_user_id(self, mocker):
+        """3.1.1.1: user_id が execute の params に渡される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_recent_alerts_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=42,
         )
-        assert total == 0
 
-    def test_returns_empty_when_no_org_ids(self):
-        """org_ids が空リストの場合に ([], 0) を返すこと"""
-        result = get_recent_alerts_with_count({}, [])
-        assert result == ([], 0)
+        call_params = mock_db.session.execute.call_args_list[0][0][1]
+        assert call_params["user_id"] == 42
 
-    def test_organization_name_filter_applied(self):
-        """organization_name が指定された場合にフィルタが追加されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
-            get_recent_alerts_with_count({"organization_name": "店舗A"}, [1])
-        assert q.filter.call_count >= 1
+    def test_order_by_alert_level_id_asc_then_alert_history_id_desc(self, mocker):
+        """ソート順: al.alert_level_id ASC, v.alert_history_id DESC の順でSQLが構築される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
 
-    def test_device_name_filter_applied(self):
-        """device_name が指定された場合にフィルタが追加されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
-            get_recent_alerts_with_count({"device_name": "冷蔵庫1"}, [1])
-        assert q.filter.call_count >= 1
+        get_recent_alerts_with_count(
+            search_params={"organization_name": "", "device_name": ""},
+            user_id=10,
+        )
+
+        sql_text = str(mock_db.session.execute.call_args_list[1][0][0])
+        assert "alert_level_id ASC" in sql_text
+        assert "alert_history_id DESC" in sql_text
+        level_pos = sql_text.find("alert_level_id ASC")
+        history_pos = sql_text.find("alert_history_id DESC")
+        assert level_pos < history_pos, "alert_level_id ASC が alert_history_id DESC より前に来る必要があります"
 
 
 # =============================================================================
@@ -624,153 +525,104 @@ class TestGetDeviceListWithCount:
           3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - ④ デバイス一覧取得
-        - get_device_list_with_count(search_params, accessible_org_ids, page, per_page)
+        - get_device_list_with_count(search_params, user_id, page, per_page)
     仕様:
-        - デバイスマスタから組織でフィルタしたデバイス一覧を取得
+        - v_device_master_by_user VIEW に user_id を渡してスコープ制限
         - 検索条件: organization_name（部分一致）, device_name（部分一致）
-        - ソート: organization_id ASC（デフォルト）
         - ページング: LIMIT per_page OFFSET (page-1)*per_page
         - 戻り値: (devices_list, total_count) のタプル
     """
 
-    def _setup_mock_db(self, mocker, return_list=None, total_count=0):
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = total_count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            return_list if return_list is not None else []
-        )
-        return mock_db, q
-
-    def _make_base_query_mock(self, mock_db, devices, count):
-        """DBクエリチェーンのモックを構築するヘルパー（join チェーン用）"""
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = devices
-        return q
-
     def test_returns_device_list_and_count_tuple(self, mocker):
         """2.1.1 / 3.1.4.1: デバイスリストと件数のタプルが返却される"""
         mock_device = _make_mock_device()
-        self._setup_mock_db(mocker, return_list=[mock_device], total_count=1)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=1, rows=[mock_device])
+
         devices, total = get_device_list_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
             page=1,
             per_page=10,
         )
+
         assert total == 1
         assert len(devices) == 1
         assert devices[0] is mock_device
 
     def test_returns_empty_list_when_no_devices(self, mocker):
         """3.1.4.2: デバイスが存在しない場合、空リストと0件が返却される"""
-        self._setup_mock_db(mocker, return_list=[], total_count=0)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
         devices, total = get_device_list_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
             page=1,
             per_page=10,
         )
+
         assert total == 0
         assert devices == []
 
     def test_page_2_offset_is_10_when_per_page_10(self, mocker):
-        """3.1.3.1: page=2, per_page=10 のとき OFFSET=10 が適用される"""
+        """3.1.3.1: page=2, per_page=10 のとき OFFSET=10 が params に含まれる"""
         mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = 20
-        mock_offset = q.order_by.return_value.limit.return_value.offset
-        mock_offset.return_value.all.return_value = []
+        _mock_execute_two(mock_db, count=20, rows=[])
+
         get_device_list_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
             page=2,
             per_page=10,
         )
-        mock_offset.assert_called_with(10)
+
+        call_params = mock_db.session.execute.call_args_list[1][0][1]
+        assert call_params["offset"] == 10
 
     def test_page_1_offset_is_0(self, mocker):
-        """3.1.3.1: page=1, per_page=10 のとき OFFSET=0 が適用される"""
+        """3.1.3.1: page=1, per_page=10 のとき OFFSET=0 が params に含まれる"""
         mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = 5
-        mock_offset = q.order_by.return_value.limit.return_value.offset
-        mock_offset.return_value.all.return_value = []
+        _mock_execute_two(mock_db, count=5, rows=[])
+
         get_device_list_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
             page=1,
             per_page=10,
         )
-        mock_offset.assert_called_with(0)
 
-    def test_search_params_both_conditions_passed_to_query(self, mocker):
-        """3.1.1.2: 複数条件（店舗名・デバイス名）が両方クエリに渡される"""
-        mock_db, _ = self._setup_mock_db(mocker, return_list=[], total_count=0)
-        get_device_list_with_count(
-            search_params={"organization_name": "店舗A", "device_name": "冷蔵庫"},
-            accessible_org_ids=[1],
-            page=1,
-            per_page=10,
-        )
-        mock_db.session.query.assert_called()
+        call_params = mock_db.session.execute.call_args_list[1][0][1]
+        assert call_params["offset"] == 0
 
     def test_per_page_limit_applied_to_query(self, mocker):
-        """3.1.3.1: per_page=10 が LIMIT として適用される"""
+        """3.1.3.1: per_page=10 が params の limit に含まれる"""
         mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = 0
-        mock_limit = q.order_by.return_value.limit
-        mock_limit.return_value.offset.return_value.all.return_value = []
+        _mock_execute_two(mock_db, count=0, rows=[])
+
         get_device_list_with_count(
             search_params={"organization_name": "", "device_name": ""},
-            accessible_org_ids=[1],
+            user_id=10,
             page=1,
             per_page=10,
         )
-        mock_limit.assert_called_with(10)
 
-    def test_returns_empty_when_no_org_ids(self):
-        """org_ids が空リストの場合に ([], 0) を返すこと"""
-        result = get_device_list_with_count({}, [], page=1)
-        assert result == ([], 0)
+        call_params = mock_db.session.execute.call_args_list[1][0][1]
+        assert call_params["limit"] == 10
 
-    def test_page_offset_calculation(self):
-        """ページ番号に応じてオフセットが正しく計算されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 5)
-            get_device_list_with_count({}, [1], page=3, per_page=10)
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(20)
+    def test_execute_called_with_user_id(self, mocker):
+        """3.1.1.1: user_id が execute の params に渡される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
 
-    def test_organization_name_filter_applied(self):
-        """organization_name フィルタが適用されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
-            get_device_list_with_count({"organization_name": "店舗A"}, [1], page=1)
-        assert q.filter.call_count >= 1
+        get_device_list_with_count(
+            search_params={"organization_name": "", "device_name": ""},
+            user_id=42,
+            page=1,
+        )
 
-    def test_device_name_filter_applied(self):
-        """device_name フィルタが適用されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
-            get_device_list_with_count({"device_name": "冷蔵庫"}, [1], page=1)
-        assert q.filter.call_count >= 1
+        call_params = mock_db.session.execute.call_args_list[0][0][1]
+        assert call_params["user_id"] == 42
 
 
 # =============================================================================
@@ -786,90 +638,88 @@ class TestGetDeviceAlertsWithCount:
           3.1.4 検索結果戻り値ハンドリング
     対応ワークフロー仕様書:
         - デバイス詳細初期表示 > アラート一覧取得
-        - get_device_alerts_with_count(device_id, search_params)
+        - get_device_alerts_with_count(device_id, search_params, user_id)
     仕様:
+        - v_alert_history_by_user VIEW に user_id を渡してスコープ制限
         - 特定デバイスのアラート履歴（過去30日以内）を最大30件取得
-        - ソート: alert_history_id DESC
         - 戻り値: (alerts_list, total_count) のタプル
     """
-
-    def _setup_mock_db(self, mocker, return_list=None, total_count=0):
-        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = total_count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            return_list if return_list is not None else []
-        )
-        return mock_db, q
-
-    def _make_base_query_mock(self, mock_db, alerts, count):
-        """DBクエリチェーンのモックを構築するヘルパー（join チェーン用）"""
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = alerts
-        return q
 
     def test_returns_alert_list_and_count_for_specific_device(self, mocker):
         """2.1.1 / 3.1.1.1: 特定デバイスのアラートリストと件数が返却される"""
         mock_alert = Mock()
         mock_alert.alert_occurrence_datetime = datetime(2026, 2, 1, 18, 45, 0)
         mock_alert.alert_name = "温度異常"
-        mock_alert.alert_level_name = "Warning"
-        mock_alert.alert_status_name = "発生中"
-        self._setup_mock_db(mocker, return_list=[mock_alert], total_count=1)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=1, rows=[mock_alert])
+
         alerts, total = get_device_alerts_with_count(
             device_id=1,
             search_params={"page": 1},
+            user_id=10,
         )
+
         assert total == 1
         assert len(alerts) == 1
 
     def test_returns_empty_list_when_no_alerts_for_device(self, mocker):
         """3.1.4.2: 対象デバイスにアラートが存在しない場合、空リストが返却される"""
-        self._setup_mock_db(mocker, return_list=[], total_count=0)
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
         alerts, total = get_device_alerts_with_count(
             device_id=1,
             search_params={"page": 1},
+            user_id=10,
         )
+
         assert total == 0
         assert alerts == []
 
-    def test_device_id_passed_to_query_filter(self, mocker):
-        """3.1.1.1: device_id がクエリフィルタに渡される"""
-        mock_db, _ = self._setup_mock_db(mocker, return_list=[], total_count=0)
-        get_device_alerts_with_count(device_id=42, search_params={"page": 1})
-        mock_db.session.query.assert_called()
+    def test_page_3_offset_is_20(self, mocker):
+        """3.1.3.1: page=3, per_page=10 のとき OFFSET=20 が params に含まれる"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=5, rows=[])
 
-    def test_returns_alerts_and_count(self):
-        """アラートリストと件数のタプルを返すこと"""
-        mock_alert = MagicMock()
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            self._make_base_query_mock(mock_db, [mock_alert], 1)
-            alerts, total = get_device_alerts_with_count(
-                device_id=1, search_params={"page": 1}
-            )
-        assert total == 1
-        assert alerts == [mock_alert]
+        get_device_alerts_with_count(device_id=1, search_params={"page": 3}, user_id=10)
 
-    def test_page_offset_calculation(self):
-        """ページ番号に応じてオフセットが正しく計算されること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 5)
-            get_device_alerts_with_count(device_id=1, search_params={"page": 3})
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(20)
+        call_params = mock_db.session.execute.call_args_list[1][0][1]
+        assert call_params["offset"] == 20
 
-    def test_default_page_is_1(self):
-        """page パラメータがない場合に page=1 として動作すること"""
-        with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
-            get_device_alerts_with_count(device_id=1, search_params={})
-        q.order_by.return_value.limit.return_value.offset.assert_called_with(0)
+    def test_default_page_is_1(self, mocker):
+        """page パラメータがない場合に page=1（OFFSET=0）として動作すること"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_alerts_with_count(device_id=1, search_params={}, user_id=10)
+
+        call_params = mock_db.session.execute.call_args_list[1][0][1]
+        assert call_params["offset"] == 0
+
+    def test_execute_called_with_device_id_and_user_id(self, mocker):
+        """3.1.1.1: device_id と user_id が execute の params に渡される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_alerts_with_count(device_id=42, search_params={"page": 1}, user_id=99)
+
+        call_params = mock_db.session.execute.call_args_list[0][0][1]
+        assert call_params["device_id"] == 42
+        assert call_params["user_id"] == 99
+
+    def test_order_by_alert_level_id_asc_then_alert_history_id_desc(self, mocker):
+        """ソート順: al.alert_level_id ASC, v.alert_history_id DESC の順でSQLが構築される"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_alerts_with_count(device_id=1, search_params={"page": 1}, user_id=10)
+
+        sql_text = str(mock_db.session.execute.call_args_list[1][0][0])
+        assert "alert_level_id ASC" in sql_text
+        assert "alert_history_id DESC" in sql_text
+        level_pos = sql_text.find("alert_level_id ASC")
+        history_pos = sql_text.find("alert_history_id DESC")
+        assert level_pos < history_pos, "alert_level_id ASC が alert_history_id DESC より前に来る必要があります"
 
 
 # =============================================================================
@@ -1132,7 +982,7 @@ class TestExportSensorDataCsv:
 
     def test_event_timestamp_formatted_as_yyyy_mm_dd_hh_mm_ss(self, mocker):
         """3.5.1.4: event_timestamp が YYYY-MM-DD HH:MM:SS 形式で出力される"""
-        row = _make_mock_sensor_row(event_timestamp=datetime(2026, 2, 27, 12, 30, 0))
+        row = _make_mock_sensor_row(event_timestamp="2026-02-27 12:30:00")
         response = self._call_export(mocker, sensor_rows=[row])
         csv_text = response.data.decode("utf-8-sig")
         data_line = csv_text.split("\n")[1]
@@ -1288,44 +1138,32 @@ class TestGetRecentAlertsOrganizationIdPriority:
         - organization_id が空 かつ organization_name が非空 → organization_name で部分一致
     """
 
-    def _make_base_query_mock(self, mock_db, alerts=None, count=0):
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            alerts if alerts is not None else []
-        )
-        return q
-
     def test_organization_id_takes_priority_over_organization_name(self):
         """3.1.1.4: organization_id と organization_name が両方指定された場合、
         organization_id フィルタのみが適用される（OR条件にならない）"""
-        # Arrange
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
+            _mock_execute_two(mock_db, count=0, rows=[])
 
-            # Act
             get_recent_alerts_with_count(
                 search_params={"organization_id": "1", "organization_name": "店舗A"},
-                accessible_org_ids=[1],
+                user_id=10,
             )
 
-        # Assert: filter が呼ばれていること（organization_id フィルタが追加される）
-        assert q.filter.call_count >= 1
+        sql_text = str(mock_db.session.execute.call_args_list[0][0][0])
+        assert "organization_id" in sql_text
 
     def test_organization_name_used_when_organization_id_is_empty(self):
         """3.1.1.3: organization_id が空文字のとき organization_name フィルタが使われる"""
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
+            _mock_execute_two(mock_db, count=0, rows=[])
 
             get_recent_alerts_with_count(
                 search_params={"organization_id": "", "organization_name": "店舗A"},
-                accessible_org_ids=[1],
+                user_id=10,
             )
 
-        assert q.filter.call_count >= 1
+        call_params = mock_db.session.execute.call_args_list[0][0][1]
+        assert "organization_name" in call_params
 
 
 # =============================================================================
@@ -1342,43 +1180,34 @@ class TestGetDeviceListOrganizationIdPriority:
         - organization_id が指定された場合は organization_name フィルタは使用しない
     """
 
-    def _make_base_query_mock(self, mock_db, devices=None, count=0):
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            devices if devices is not None else []
-        )
-        return q
-
     def test_organization_id_takes_priority_over_organization_name(self):
         """3.1.1.4: organization_id と organization_name が両方指定された場合、
         organization_id フィルタのみが適用される（OR条件にならない）"""
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
+            _mock_execute_two(mock_db, count=0, rows=[])
 
             get_device_list_with_count(
                 search_params={"organization_id": "1", "organization_name": "店舗A"},
-                accessible_org_ids=[1],
+                user_id=10,
                 page=1,
             )
 
-        assert q.filter.call_count >= 1
+        sql_text = str(mock_db.session.execute.call_args_list[0][0][0])
+        assert "organization_id" in sql_text
 
     def test_organization_name_used_when_organization_id_is_empty(self):
         """3.1.1.3: organization_id が空文字のとき organization_name フィルタが使われる"""
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            q = self._make_base_query_mock(mock_db, [], 0)
+            _mock_execute_two(mock_db, count=0, rows=[])
 
             get_device_list_with_count(
                 search_params={"organization_id": "", "organization_name": "店舗A"},
-                accessible_org_ids=[1],
+                user_id=10,
                 page=1,
             )
 
-        assert q.filter.call_count >= 1
+        call_params = mock_db.session.execute.call_args_list[0][0][1]
+        assert "organization_name" in call_params
 
 
 # =============================================================================
@@ -1399,8 +1228,8 @@ class TestGetGraphDataAdditional:
         """2.1.1: MySQLから取得したデータが event_timestamp ASC でソートされている
         （_fetch_graph_data_from_mysql が ASC ORDER BY で取得するため）"""
         # Arrange: 複数行を昇順でモック
-        row_old = _make_mock_sensor_row(event_timestamp=datetime(2026, 2, 10,  6, 0, 0))
-        row_new = _make_mock_sensor_row(event_timestamp=datetime(2026, 2, 20, 12, 0, 0))
+        row_old = _make_mock_sensor_row(event_timestamp="2026-02-10 06:00:00")
+        row_new = _make_mock_sensor_row(event_timestamp="2026-02-20 12:00:00")
         mocker.patch(
             "iot_app.services.industry_dashboard_service._fetch_graph_data_from_mysql",
             return_value=[row_old, row_new],
@@ -1440,29 +1269,15 @@ class TestGetDeviceAlertsEffectiveLimit:
         - offset >= 30 → effective_limit = 0 → DBクエリを発行せず [] を返す
     """
 
-    def _make_base_query_mock(self, mock_db, alerts=None, count=30):
-        q = MagicMock()
-        mock_db.session.query.return_value.join.return_value = q
-        q.join.return_value = q
-        q.filter.return_value = q
-        q.count.return_value = count
-        q.order_by.return_value.limit.return_value.offset.return_value.all.return_value = (
-            alerts if alerts is not None else []
-        )
-        return q
-
     def test_page_4_with_per_page_10_returns_empty_list(self):
         """3.1.3.1: page=4, per_page=10 のとき offset=30 で effective_limit=0 → 空リスト"""
-        # Arrange: DBには30件ある
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            self._make_base_query_mock(mock_db, [], 30)
+            _mock_execute_two(mock_db, count=30, rows=[])
 
-            # Act
             alerts, total = get_device_alerts_with_count(
-                device_id=1, search_params={"page": 4}
+                device_id=1, search_params={"page": 4}, user_id=10
             )
 
-        # Assert: offset=30 → effective_limit=0 → DBへのクエリなしで空リスト
         assert alerts == []
         assert total == 30
 
@@ -1470,10 +1285,10 @@ class TestGetDeviceAlertsEffectiveLimit:
         """3.1.3.1: page=3, per_page=10 のとき offset=20 → effective_limit=10 → データ取得"""
         mock_alert = MagicMock()
         with patch("iot_app.services.industry_dashboard_service.db") as mock_db:
-            self._make_base_query_mock(mock_db, [mock_alert], 30)
+            _mock_execute_two(mock_db, count=30, rows=[mock_alert])
 
             alerts, total = get_device_alerts_with_count(
-                device_id=1, search_params={"page": 3}
+                device_id=1, search_params={"page": 3}, user_id=10
             )
 
         assert total == 30

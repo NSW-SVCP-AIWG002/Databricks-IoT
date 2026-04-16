@@ -285,7 +285,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  v.alert_history_id DESC
+  al.alert_level_id ASC
+  , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
 
@@ -586,16 +587,30 @@ flowchart TD
 
 **① データスコープ制限チェック＆デバイス情報取得**
 
-**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、device_master
+**使用テーブル:** v_device_master_by_user（デバイス一覧用VIEW）、device_master、device_type_master、organization_master
 
 ```python
 def check_device_access(device_uuid, user_id):
     """デバイスへのアクセス権限をチェック（v_device_master_by_userを使用）"""
     result = db.session.execute(
         text("""
-            SELECT dm.device_id, dm.device_uuid, dm.device_name, dm.organization_id
+            SELECT
+                v.device_id,
+                dm.device_uuid,
+                v.device_name,
+                dm.device_model,
+                v.device_organization_id AS organization_id,
+                dtm.device_type_name,
+                om.organization_name
             FROM v_device_master_by_user v
-            INNER JOIN device_master dm ON v.device_id = dm.device_id
+            INNER JOIN device_master dm
+              ON v.device_id = dm.device_id
+            LEFT JOIN device_type_master dtm
+              ON dm.device_type_id = dtm.device_type_id
+              AND dtm.delete_flag = FALSE
+            LEFT JOIN organization_master om
+              ON v.device_organization_id = om.organization_id
+              AND om.delete_flag = FALSE
             WHERE v.user_id = :user_id
               AND dm.device_uuid = :device_uuid
               AND v.delete_flag = FALSE
@@ -649,7 +664,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  v.alert_history_id DESC
+  al.alert_level_id ASC
+  , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
 
@@ -897,7 +913,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  v.alert_history_id DESC
+  al.alert_level_id ASC
+  , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
 
@@ -1041,7 +1058,7 @@ flowchart TD
 
     CheckValidate -->|OK| ClearCookie[Cookieの検索条件をクリア]
     ClearCookie --> GetParams[フォームから検索条件を取得<br>search_start_datetime, search_end_datetime]
-    GetParams --> Convert[検索条件設定<br>page: 1（リセット）]
+    GetParams --> Convert[検索条件設定<br>page: 現在のページを引き継ぐ（current_params.get('page', 1)）]
 
     Convert --> DeviceQuery2[デバイス情報取得]
     DeviceQuery2 --> AlertCount[アラート一覧件数取得]
@@ -1147,7 +1164,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  v.alert_history_id DESC
+  al.alert_level_id ASC
+  , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
 
@@ -1189,7 +1207,7 @@ def device_details_search(device_uuid):
     search_params = {
         'search_start_datetime': search_start_datetime,
         'search_end_datetime': search_end_datetime,
-        'page': 1
+        'page': current_params.get('page', 1)
     }
 
     # アラート一覧取得（件数・リストを同時取得）
