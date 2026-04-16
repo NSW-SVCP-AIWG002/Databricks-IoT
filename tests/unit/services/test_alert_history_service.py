@@ -39,8 +39,8 @@ def _make_default_search_params(**overrides):
     params = {
         "page": 1,
         "per_page": 25,
-        "sort_by": "alert_occurrence_datetime",
-        "order": "desc",
+        "sort_item_id": 1,   # アラート発生日時
+        "sort_order_id": 2,  # 降順
         "start_datetime": (now - timedelta(days=7)).strftime("%Y/%m/%d 00:00"),
         "end_datetime": now.strftime("%Y/%m/%d 23:59"),
         "device_name": None,
@@ -116,7 +116,7 @@ class TestGetDefaultSearchParams:
         from iot_app.services.alert_history_service import get_default_search_params
         result = get_default_search_params()
         required_keys = {
-            "page", "per_page", "sort_by", "order",
+            "page", "per_page", "sort_item_id", "sort_order_id",
             "start_datetime", "end_datetime",
             "device_name", "device_location", "alert_name",
             "alert_level_id", "alert_status_id",
@@ -143,21 +143,22 @@ class TestGetDefaultSearchParams:
         assert result["end_datetime"].startswith(expected_date)
         assert "23:59" in result["end_datetime"]
 
-    def test_sort_by_default_is_alert_occurrence_datetime(self):
-        """2.1.1: sort_by のデフォルトが alert_occurrence_datetime であること
-        UI仕様書 (2-8): ソート項目デフォルトは発生日時
+    def test_sort_item_id_default_is_1(self):
+        """2.1.1: sort_item_id のデフォルトが 1（アラート発生日時）であること
+        UI仕様書 (2-8): ソート項目デフォルトは発生日時（sort_item_id=1）
         """
         from iot_app.services.alert_history_service import get_default_search_params
         result = get_default_search_params()
-        assert result["sort_by"] == "alert_occurrence_datetime"
+        assert result["sort_item_id"] == 1
 
-    def test_order_default_is_desc(self):
-        """2.1.1: order のデフォルトが 'desc' であること
+    def test_sort_order_id_default_is_desc(self):
+        """2.1.1: sort_order_id のデフォルトが 2（降順）であること
         UI仕様書 (2-9): ソート順デフォルトは降順（最新が上）
+        sort_order_id: -1=指定なし, 1=昇順(ASC), 2=降順(DESC)
         """
         from iot_app.services.alert_history_service import get_default_search_params
         result = get_default_search_params()
-        assert result["order"] == "desc"
+        assert result["sort_order_id"] == 2
 
     def test_alert_level_id_default_is_none(self):
         """2.1.1: alert_level_id のデフォルトが None（すべて）であること
@@ -568,6 +569,45 @@ class TestSearchAlertHistoriesWithConditions:
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
+    def test_all_conditions_none_applies_only_base_filters(self, mock_db, _mock_model):
+        """3.1.2.1: 全検索条件が None の場合、user_id と delete_flag のみでフィルタされること
+        条件未指定 = 全件相当（スコープ内の全アラート履歴を返す）
+        条件指定ありより filter() 呼び出し回数が少ない（基底フィルタのみ）
+        """
+        # Arrange
+        user_id = 10
+
+        def _run(params):
+            mock_query = _setup_mock_query(mock_db)
+            from iot_app.services.alert_history_service import search_alert_histories
+            search_alert_histories(search_params=params, user_id=user_id)
+            return mock_query.filter.call_count
+
+        params_all_none = _make_default_search_params(
+            start_datetime=None,
+            end_datetime=None,
+            device_name=None,
+            device_location=None,
+            alert_name=None,
+            alert_level_id=None,
+            alert_status_id=None,
+        )
+        params_with_conditions = _make_default_search_params(
+            start_datetime="2026/01/01 00:00",
+            end_datetime="2026/01/07 23:59",
+            device_name="センサー",
+            alert_level_id=2,
+        )
+
+        # Act
+        count_none = _run(params_all_none)
+        count_with = _run(params_with_conditions)
+
+        # Assert: 全条件 None の場合は条件指定ありより filter() 呼び出し回数が少ない
+        assert count_none < count_with
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
     def test_empty_string_text_field_no_filter_applied(self, mock_db, _mock_model):
         """3.1.1.1: テキスト検索項目が空文字（''）の場合、None と同様にフィルタが追加されないこと
         get_default_search_params() は device_name / device_location / alert_name を '' で返す。
@@ -604,19 +644,20 @@ class TestSearchAlertHistoriesSorting:
     """3.1.1.1 ソート機能
 
     ワークフロー仕様書「全体ソート」:
-      sort_by, order パラメータを使ってサーバーサイドで全体ソートを行う。
-      デフォルトは alert_occurrence_datetime 降順（最新が上）。
+      sort_item_id, sort_order_id パラメータを使ってサーバーサイドで全体ソートを行う。
+      デフォルトは sort_item_id=1（アラート発生日時）, sort_order_id=2（降順、最新が上）。
       第二ソートキー: alert_history_id（主ソートと同方向）
+      sort_order_id: -1=指定なし, 1=昇順(ASC), 2=降順(DESC)
     """
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
     def test_desc_order_applies_descending_sort(self, mock_db, _mock_model):
-        """3.1.1.1: order='desc' の場合、order_by が呼ばれる（降順）"""
+        """3.1.1.1: sort_order_id=2（降順）の場合、order_by が呼ばれる"""
         # Arrange
         user_id = 10
         search_params = _make_default_search_params(
-            sort_by="alert_occurrence_datetime", order="desc"
+            sort_item_id=1, sort_order_id=2
         )
         mock_query = _setup_mock_query(mock_db)
 
@@ -630,11 +671,11 @@ class TestSearchAlertHistoriesSorting:
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
     def test_asc_order_applies_ascending_sort(self, mock_db, _mock_model):
-        """3.1.1.1: order='asc' の場合、order_by が呼ばれる（昇順）"""
+        """3.1.1.1: sort_order_id=1（昇順）の場合、order_by が呼ばれる"""
         # Arrange
         user_id = 10
         search_params = _make_default_search_params(
-            sort_by="alert_occurrence_datetime", order="asc"
+            sort_item_id=1, sort_order_id=1
         )
         mock_query = _setup_mock_query(mock_db)
 
@@ -645,24 +686,25 @@ class TestSearchAlertHistoriesSorting:
         # Assert
         mock_query.order_by.assert_called()
 
-    @pytest.mark.parametrize("sort_by", [
-        "device_name",
-        "device_location",
-        "alert_name",
-        "alert_level_id",
-        "alert_status_id",
+    @pytest.mark.parametrize("sort_item_id", [
+        2,  # device_name
+        3,  # device_location
+        4,  # alert_name
+        5,  # alert_level_id
+        6,  # alert_status_id
     ])
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
-    def test_non_default_sort_by_applies_dynamic_sort(self, mock_db, _mock_model, sort_by):
-        """3.1.1.1: sort_by にデフォルト以外のカラムを指定した場合も order_by が呼ばれる
+    def test_non_default_sort_item_applies_dynamic_sort(self, mock_db, _mock_model, sort_item_id):
+        """3.1.1.1: sort_item_id にデフォルト以外の値を指定した場合も order_by が呼ばれる
         UI仕様書 (2-8) ソート項目: sort_item_master から動的取得。
-        UI仕様書 (5) データテーブル ソート可カラム:
-          device_name, device_location, alert_name, alert_level, alert_status
+        sort_item_id マッピング:
+          2=device_name, 3=device_location, 4=alert_name,
+          5=alert_level_id, 6=alert_status_id
         """
         # Arrange
         user_id = 10
-        search_params = _make_default_search_params(sort_by=sort_by, order="desc")
+        search_params = _make_default_search_params(sort_item_id=sort_item_id, sort_order_id=2)
         mock_query = _setup_mock_query(mock_db)
 
         # Act
@@ -672,24 +714,24 @@ class TestSearchAlertHistoriesSorting:
         # Assert
         mock_query.order_by.assert_called()
 
-    @pytest.mark.parametrize("sort_by,order", [
-        ("device_name",               "asc"),
-        ("device_name",               "desc"),
-        ("device_location",           "asc"),
-        ("device_location",           "desc"),
-        ("alert_name",                "asc"),
-        ("alert_occurrence_datetime", "asc"),
-        ("alert_occurrence_datetime", "desc"),
+    @pytest.mark.parametrize("sort_item_id,sort_order_id", [
+        (2, 1),  # device_name, 昇順
+        (2, 2),  # device_name, 降順
+        (3, 1),  # device_location, 昇順
+        (3, 2),  # device_location, 降順
+        (4, 1),  # alert_name, 昇順
+        (1, 1),  # alert_occurrence_datetime, 昇順
+        (1, 2),  # alert_occurrence_datetime, 降順
     ])
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
-    def test_sort_by_and_order_combination_applies_sort(self, mock_db, _mock_model, sort_by, order):
-        """3.1.1.1: sort_by と order の組み合わせが変わっても order_by が正しく呼ばれる
+    def test_sort_item_and_order_combination_applies_sort(self, mock_db, _mock_model, sort_item_id, sort_order_id):
+        """3.1.1.1: sort_item_id と sort_order_id の組み合わせが変わっても order_by が正しく呼ばれる
         UI仕様書 (2-8)(2-9): ソート項目（動的）× ソート順（昇順/降順）の全組み合わせ。
         """
         # Arrange
         user_id = 10
-        search_params = _make_default_search_params(sort_by=sort_by, order=order)
+        search_params = _make_default_search_params(sort_item_id=sort_item_id, sort_order_id=sort_order_id)
         mock_query = _setup_mock_query(mock_db)
 
         # Act
@@ -706,12 +748,12 @@ class TestSearchAlertHistoriesSorting:
     def test_second_sort_key_applied(self, mock_db, _mock_model):
         """3.1.1.1: 第二ソートキー（alert_history_id）が主ソートと同方向で適用されること
         ワークフロー仕様書 SQL:
-          ORDER BY {sort_by} {order}, ah.alert_history_id {order} -- 第二ソートキー
+          ORDER BY {sort_col} {sort_order}, ah.alert_history_id {sort_order} -- 第二ソートキー
         """
         # Arrange
         user_id = 10
         search_params = _make_default_search_params(
-            sort_by="alert_occurrence_datetime", order="desc"
+            sort_item_id=1, sort_order_id=2
         )
         mock_query = _setup_mock_query(mock_db)
 
@@ -898,6 +940,51 @@ class TestSearchAlertHistoriesReturnValue:
         assert len(result_list) == 1
         assert result_list[0] is mock_history
         assert total == 1
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_minimum_input_completes_normally(self, mock_db, _mock_model):
+        """2.1.2: 全検索条件を None/空文字にした最小構成の入力で正常終了すること"""
+        # Arrange
+        user_id = 10
+        search_params = _make_default_search_params(
+            start_datetime=None,
+            end_datetime=None,
+            device_name=None,
+            device_location=None,
+            alert_name=None,
+            alert_level_id=None,
+            alert_status_id=None,
+        )
+        _setup_mock_query(mock_db, count=0, results=[])
+
+        # Act
+        from iot_app.services.alert_history_service import search_alert_histories
+        result_list, total = search_alert_histories(search_params=search_params, user_id=user_id)
+
+        # Assert
+        assert isinstance(result_list, list)
+        assert isinstance(total, int)
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_max_per_page_returns_correct_count(self, mock_db, _mock_model):
+        """2.1.3: per_page=25（最大件数）で25件返却され正常終了すること
+        ITEM_PER_PAGE=25 が上限。25件ちょうどのデータをページ内に収める。
+        """
+        # Arrange
+        user_id = 10
+        search_params = _make_default_search_params(page=1, per_page=25)
+        mock_results = [_make_mock_alert_history(alert_history_id=i) for i in range(1, 26)]
+        _setup_mock_query(mock_db, count=25, results=mock_results)
+
+        # Act
+        from iot_app.services.alert_history_service import search_alert_histories
+        result_list, total = search_alert_histories(search_params=search_params, user_id=user_id)
+
+        # Assert
+        assert total == 25
+        assert len(result_list) == 25
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
