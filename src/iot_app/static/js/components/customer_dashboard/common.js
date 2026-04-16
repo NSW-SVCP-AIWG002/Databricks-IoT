@@ -54,7 +54,7 @@ const CustomerDashboard = (function () {
       if (!res.ok) {
         const data = await res.json();
         _closeModal();
-        Toast.show(data.error || 'エラーが発生しました', 'error');
+        Toast.show(data.error, 'error');
         return;
       }
       content.innerHTML = await res.text();
@@ -443,9 +443,9 @@ const CustomerDashboard = (function () {
         });
         const data = await res.json();
         if (res.ok) {
-          Toast.show(data.message || 'レイアウトを保存しました', 'success');
+          Toast.show(data.message, 'success');
         } else {
-          Toast.show(data.error || 'レイアウトの保存に失敗しました', 'error');
+          Toast.show(data.error, 'error');
         }
       } catch (e) {
         Toast.show(MESSAGES.ERR_NETWORK, 'error');

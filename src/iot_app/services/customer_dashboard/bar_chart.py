@@ -14,6 +14,7 @@ from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeM
 from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
 from iot_app.common.messages import (
     ERR_MIN_MAX_COMBINED,
+    ERR_DATETIME_FORMAT,
     err_invalid,
     err_numeric,
     err_required,
@@ -54,12 +55,12 @@ def validate_chart_params(display_unit, interval, base_datetime_str):
         return err_invalid('集計間隔')
 
     if not base_datetime_str:
-        return err_invalid('日付形式')
+        return ERR_DATETIME_FORMAT
 
     try:
         datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        return err_invalid('日付形式')
+        return ERR_DATETIME_FORMAT
 
     return None
 
@@ -536,12 +537,12 @@ def export_bar_chart_csv(gadget_uuid, device_id, display_unit, interval,
 
     # base_datetime バリデーション
     if not base_datetime_str:
-        raise ValidationError(err_invalid("日付形式"))
+        raise ValidationError(ERR_DATETIME_FORMAT)
     try:
         if isinstance(base_datetime, str):
             base_datetime = datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        raise ValidationError(err_invalid("日付形式"))
+        raise ValidationError(ERR_DATETIME_FORMAT)
 
     try:
         rows = fetch_bar_chart_data(

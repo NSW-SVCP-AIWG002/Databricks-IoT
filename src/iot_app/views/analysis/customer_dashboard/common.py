@@ -392,7 +392,7 @@ def dashboard_switch(dashboard_uuid):
     try:
         upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードの表示を切り替えました'})
 
     except Exception as e:
         db.session.rollback()

@@ -276,25 +276,25 @@ def validate_chart_params(start_datetime_str, end_datetime_str):
         str | None: エラーメッセージ（正常時は None）
     """
     if not start_datetime_str or not end_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     try:
         start = datetime.strptime(start_datetime_str, _DATETIME_FORMAT)
         end   = datetime.strptime(end_datetime_str,   _DATETIME_FORMAT)
     except ValueError:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     # 1桁月などの曖昧な表記を排除（strftime で再フォーマットして一致確認）
     if start.strftime(_DATETIME_FORMAT) != start_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
     if end.strftime(_DATETIME_FORMAT) != end_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     if start >= end:
-        return '終了日時は開始日時以降の日時を入力してください'
+        return ERR_END_BEFORE_START
 
     if (end - start) > timedelta(hours=24):
-        return '取得期間は24時間以内で指定してください'
+        return ERR_DATETIME_RANGE_24H
 
     return None
 

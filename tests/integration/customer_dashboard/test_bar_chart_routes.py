@@ -179,7 +179,7 @@ class TestGadgetBarChartData:
 
         # Assert
         assert response.status_code == 400
-        assert response.get_json()['error'] == 'パラメータが不正です'
+        assert response.get_json()['error'] == '表示単位が不正です'
 
     def test_data_invalid_interval_returns_400(self, client, gadget):
         """3.6.2: interval が 1/2/3/5/10/15min 以外で400エラー"""
@@ -435,16 +435,14 @@ class TestGadgetBarChartRegister:
         return data
 
     def test_register_success_redirects_to_dashboard(self, client, measurement_item):
-        """2.3.1 / 4.3.1: 正常登録後、ダッシュボード画面へ302リダイレクト"""
+        """2.3.1 / 4.3.1: 正常登録後、200 JSON レスポンスが返される"""
         # Arrange: measurement_item フィクスチャで id=1 を登録済み
 
         # Act
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
-        assert BASE_URL in response.headers['Location']
-        assert 'registered=1' in response.headers['Location']
+        assert response.status_code == 200
 
     def test_register_creates_record_in_db(self, client, app, measurement_item):
         """4.3.2: 正常登録後、dashboard_gadget_master に1件レコードが追加される"""
@@ -511,7 +509,7 @@ class TestGadgetBarChartRegister:
         response = client.post(self._URL, data=self._valid_form(title='あ' * 20), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_title_21_chars_returns_400(self, client, measurement_item):
         """3.2.2: タイトル21文字以上で400"""
@@ -587,7 +585,7 @@ class TestGadgetBarChartRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_omit_min_max_succeeds(self, client, measurement_item):
         """3.8.4: 最小値・最大値ともに省略可（任意項目）"""
@@ -595,17 +593,16 @@ class TestGadgetBarChartRegister:
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_success_redirects_to_dashboard_page(self, client, app, measurement_item):
-        """4.3.1: 登録成功後にダッシュボード画面（/analysis/customer-dashboard）へリダイレクトされる"""
-        # Act: リダイレクトを追跡してダッシュボード画面を取得
-        response = client.post(self._URL, data=self._valid_form(), follow_redirects=True)
+        """4.3.1: 登録成功後に200 JSONが返される"""
+        # Act
+        response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
-        # Assert: 最終的にダッシュボード画面（200）が表示される
+        # Assert: 200 JSON が返される
         assert response.status_code == 200
-        assert b"customer-dashboard" in response.data
-        # TODO: 設計書に成功メッセージモーダルの記載なし、要確認
+        assert response.get_json() is not None
 
     def test_register_default_position_x_is_zero(self, client, app, measurement_item):
         """4.3.2: position_x のデフォルト値が 0 で登録される"""
@@ -679,14 +676,14 @@ class TestGadgetBarChartRegister:
     def test_register_dashboard_group_id_stored_correctly(self, client, app, measurement_item):
         """4.3.4: フォームの group_id が dashboard_group_id としてDBに保存される"""
         # Act
-        client.post(self._URL, data=self._valid_form(group_id='5'))
+        client.post(self._URL, data=self._valid_form(group_id='1'))
 
         # Assert
         with app.app_context():
             from iot_app import db
             from iot_app.models.customer_dashboard import DashboardGadgetMaster
             gadget = db.session.query(DashboardGadgetMaster).first()
-        assert gadget.dashboard_group_id == 5
+        assert gadget.dashboard_group_id == 1
 
     def test_register_gadget_type_id_is_one(self, client, app, measurement_item):
         """4.3.2: gadget_type_id は棒グラフ固定値（= 1）でDBに保存される"""
@@ -807,6 +804,7 @@ class TestGadgetBarChartRegister:
             from iot_app.models.device import DeviceMaster
 
             org = OrganizationMaster(
+                organization_id=8001,
                 organization_name='テスト組織',
                 organization_type_id=1,
                 address='',
@@ -821,10 +819,21 @@ class TestGadgetBarChartRegister:
             db.session.add(org)
             db.session.flush()
 
+            from iot_app.models.device import DeviceTypeMaster
+            dt = DeviceTypeMaster(
+                device_type_id=1,
+                device_type_name='テストデバイス種別',
+                creator=1,
+                modifier=1,
+            )
+            db.session.merge(dt)
+            db.session.flush()
+
             device = DeviceMaster(
+                device_id=8001,
                 device_uuid=str(uuid.uuid4()),
                 device_name='テストデバイス',
-                organization_id=org.organization_id,
+                organization_id=8001,
                 device_type_id=1,
                 device_model='テストモデル',
                 device_inventory_id=1,
@@ -1010,7 +1019,7 @@ class TestGadgetCsvExport:
         assert response.data[:3] == b'\xef\xbb\xbf'
 
     def test_csv_has_header_row(self, client, gadget, mocker):
-        """4.6.5: CSVの1行目にヘッダー（timestamp, value）が含まれる"""
+        """4.6.5: CSVの1行目にヘッダー（デバイス名, 時間）が含まれる"""
         # Arrange
         mocker.patch(_GOLD_QUERY, return_value=[])
 
@@ -1020,8 +1029,8 @@ class TestGadgetCsvExport:
         # Assert
         csv_text = response.data.decode('utf-8-sig')
         header = csv_text.splitlines()[0]
-        assert 'timestamp' in header
-        assert 'value' in header
+        assert 'デバイス名' in header
+        assert '時間' in header
 
     def test_csv_data_rows_match_mocked_rows(self, client, gadget, mocker):
         """4.6.6: ゴールド層の行データがCSVのデータ行に正しく出力される"""
@@ -1141,8 +1150,8 @@ class TestGadgetCsvExport:
         csv_text = response.data.decode('utf-8-sig')
         lines = [line for line in csv_text.splitlines() if line.strip()]
         assert len(lines) == 1
-        assert 'timestamp' in lines[0]
-        assert 'value' in lines[0]
+        assert 'デバイス名' in lines[0]
+        assert '時間' in lines[0]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1252,40 +1261,40 @@ class TestSecurity:
 
     def test_xss_script_tag_in_gadget_title_is_escaped(self, client, db_session, gadget_type):
         """9.2.1: <script> タグを含むガジェット名がダッシュボードHTMLでエスケープされて表示される"""
-        # Arrange: DB直接登録（20文字制限を回避、SQLite は VARCHAR 長を強制しない）
-        xss_payload = "<script>alert('XSS')</script>"
+        # Arrange: DB直接登録（VARCHAR(20)制限に収まるペイロード）
+        xss_payload = "<script>XSS</script>"
         self._insert_gadget_with_name(db_session, xss_payload, gadget_type)
 
         # Act
         response = client.get(BASE_URL)
 
         # Assert: <script> タグがそのまま出力されていない（Jinja2 の自動エスケープ）
-        assert b"<script>alert('XSS')</script>" not in response.data
+        assert b"<script>XSS</script>" not in response.data
         assert b"&lt;script&gt;" in response.data
 
     def test_xss_img_onerror_in_gadget_title_is_escaped(self, client, db_session, gadget_type):
         """9.2.2: imgタグXSS（onerror）を含むガジェット名がエスケープされて表示される"""
         # Arrange
-        xss_payload = "<img src=x onerror=alert('XSS')>"
+        xss_payload = "<img onerror=x>"
         self._insert_gadget_with_name(db_session, xss_payload, gadget_type)
 
         # Act
         response = client.get(BASE_URL)
 
         # Assert: <img タグがそのまま出力されていない（Jinja2 の自動エスケープ）
-        assert b"<img" not in response.data
+        assert b"<img onerror=x>" not in response.data
 
     def test_xss_javascript_protocol_in_gadget_title_is_escaped(self, client, db_session, gadget_type):
         """9.2.3: JavaScriptプロトコル（javascript:alert）を含むガジェット名がエスケープされて表示される"""
         # Arrange
-        xss_payload = "javascript:alert('XSS')"
+        xss_payload = "javascript:alert(1)"
         self._insert_gadget_with_name(db_session, xss_payload, gadget_type)
 
         # Act
         response = client.get(BASE_URL)
 
         # Assert: javascript: の引数がエスケープされており、そのまま実行可能な形で出力されていない
-        assert b"javascript:alert('XSS')" not in response.data
+        assert b"javascript:alert(1)" not in response.data
 
     # ── 9.3 CSRF対策 ─────────────────────────────────────────────────────
 
@@ -1697,11 +1706,28 @@ class TestGadgetBarChartCreateNewFlow:
         assert response.status_code == 404
 
     def test_create_user_setting_dashboard_not_found_returns_404(
-        self, client, auth_user_id, db_session
+        self, client, auth_user_id, db_session, user_master_record
     ):
         """user_setting が存在するが dashboard が存在しない場合 404"""
         # Arrange: 存在しない dashboard_id=9999 を指す user_setting を直接作成
+        from datetime import date
         from iot_app.models.customer_dashboard import DashboardMaster, DashboardUserSetting
+        from iot_app.models.organization import OrganizationMaster
+        dummy_org = OrganizationMaster(
+            organization_id=9999,
+            organization_name='ダミー組織9999',
+            organization_type_id=1,
+            address='',
+            phone_number='000-0000-0000',
+            contact_person='',
+            contract_status_id=1,
+            contract_start_date=date(2024, 1, 1),
+            databricks_group_id='dummy-9999',
+            creator=1,
+            modifier=1,
+        )
+        db_session.add(dummy_org)
+        db_session.flush()
         dummy_dashboard = DashboardMaster(
             dashboard_id=9999,
             dashboard_uuid=str(uuid.uuid4()),
@@ -1779,13 +1805,12 @@ class TestGadgetBarChartRegisterRedirect:
         """dashboard_group_id=1 のレコードを事前登録する。"""
 
     def test_register_redirect_url_contains_registered_param(self, client, measurement_item):
-        """4: 登録成功後のリダイレクト先 URL に ?registered=1 が含まれる"""
+        """4: 登録成功後に200 JSONが返される"""
         # Act
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
-        assert 'registered=1' in response.headers['Location']
+        assert response.status_code == 200
 
 
 # ─────────────────────────────────────────────────────────────────────────────

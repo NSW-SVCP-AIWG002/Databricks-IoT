@@ -69,7 +69,7 @@ def clean_db(app):
             DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster,
             DashboardUserSetting, GadgetTypeMaster, GoldSummaryMethodMaster,
         )
-        from iot_app.models.device import DeviceMaster
+        from iot_app.models.device import DeviceMaster, DeviceTypeMaster
         from iot_app.models.measurement import MeasurementItemMaster
         from iot_app.models.organization import OrganizationClosure, OrganizationMaster
         from iot_app.models.user import User
@@ -78,6 +78,7 @@ def clean_db(app):
         _db.session.query(DashboardGroupMaster).delete()
         _db.session.query(DashboardMaster).delete()
         _db.session.query(DeviceMaster).delete()
+        _db.session.query(DeviceTypeMaster).delete()
         _db.session.query(OrganizationClosure).delete()
         _db.session.query(GadgetTypeMaster).delete()
         _db.session.query(GoldSummaryMethodMaster).delete()
@@ -168,7 +169,7 @@ def dashboard_master(db_session, organization_master_record):
 
 
 @pytest.fixture()
-def dashboard_user_setting(db_session, dashboard_master):
+def dashboard_user_setting(db_session, dashboard_master, user_master_record):
     """DashboardUserSetting テストレコード（user_id=1, device_id=1）"""
     from iot_app.models.customer_dashboard import DashboardUserSetting
     s = DashboardUserSetting(
