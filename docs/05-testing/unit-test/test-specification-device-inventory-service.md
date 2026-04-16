@@ -78,19 +78,17 @@
 
 ## 5. delete_device_inventories
 
-| No.  | テストメソッド名                                       | 観点番号        | テスト概要                                 | 実行内容                                                          | 想定結果                                                                                                       |
-| ---- | ------------------------------------------------------ | --------------- | ------------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 5-1  | test_delete_success_sets_delete_flag_true_on_inventory | 2.1.1 / 3.4.1.1 | device_inventory の delete_flag 更新確認   | 有効な UUID リストで削除を実行する                                | `mock_inventory.delete_flag is True` であること                                                                |
-| 5-2  | test_delete_success_sets_delete_flag_true_on_device    | 2.1.1 / 3.4.1.1 | device_master の delete_flag 更新確認      | 有効な UUID リストで削除を実行する                                | `mock_device.delete_flag is True` であること                                                                   |
-| 5-3  | test_delete_sets_modifier_id_on_records                | 3.4.1.1         | modifier_id の設定確認                     | `modifier_id=99` で削除を実行する                                 | `mock_inventory.modifier == 99` かつ `mock_device.modifier == 99` であること                                   |
-| 5-4  | test_delete_calls_unity_catalog_soft_delete            | 3.4.1.1         | Unity Catalog 論理削除 UPDATE 呼び出し確認 | 有効な UUID リストで削除を実行する                                | `execute_dml()` が1回呼ばれ、SQL に `UPDATE iot_catalog.oltp_db.device_master` と `delete_flag` が含まれること |
-| 5-5  | test_delete_success_commits                            | 3.4.2.1         | 削除成功時のコミット確認                   | 有効な UUID リストで削除を実行する                                | `db.session.commit()` が1回呼ばれること                                                                        |
-| 5-6  | test_delete_no_matching_records_raises_value_error     | 2.2.2           | 存在しない UUID 指定時のエラー確認         | 存在しない UUID で削除を実行する（DBモックは空リストを返す）      | `ValueError('削除対象が見つかりません')` がスローされること                                                    |
-| 5-7  | test_delete_empty_uuids_list_raises_value_error        | 2.2.2           | 空の UUID リスト指定時のエラー確認         | 空リスト `[]` で削除を実行する                                    | `ValueError` がスローされること                                                                                |
-| 5-8  | test_delete_db_flush_exception_calls_rollback          | 2.3.2           | flush 例外時のロールバック確認             | `db.session.flush()` が例外をスローするよう設定して削除を実行する | `db.session.rollback()` が呼ばれること                                                                         |
-| 5-9  | test_delete_uc_exception_triggers_uc_rollback          | 1.3.1           | UC 論理削除失敗時の UC ロールバック確認    | UC の `execute_dml()` が1回目で例外をスローするよう設定する       | `execute_dml()` が2回呼ばれ、2回目の SQL に `delete_flag = false` が含まれること                               |
-| 5-10 | test_delete_uc_exception_calls_oltp_rollback           | 2.3.2           | UC 論理削除失敗時の OLTP ロールバック確認  | UC の `execute_dml()` が1回目で例外をスローするよう設定する       | `db.session.rollback()` が呼ばれること                                                                         |
-| 5-11 | test_delete_multiple_inventories                       | 2.1.3           | 複数 UUID 指定時の全件論理削除確認         | `['uuid-001', 'uuid-002']` の2件で削除を実行する                  | `inv1.delete_flag is True` かつ `inv2.delete_flag is True` であること                                          |
+> **変更履歴:** 削除対象は `device_inventory_master` のみ（device_master/UC の論理削除は廃止）
+
+| No. | テストメソッド名                                       | 観点番号        | テスト概要                               | 実行内容                                                          | 想定結果                                                           |
+| --- | ------------------------------------------------------ | --------------- | ---------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 5-1 | test_delete_success_sets_delete_flag_true_on_inventory | 2.1.1 / 3.4.1.1 | device_inventory の delete_flag 更新確認 | 有効な UUID リストで削除を実行する                                | `mock_inventory.delete_flag is True` であること                    |
+| 5-2 | test_delete_sets_modifier_id_on_inventory              | 3.4.1.1         | modifier_id の設定確認                   | `modifier_id=99` で削除を実行する                                 | `mock_inventory.modifier == 99` であること                         |
+| 5-3 | test_delete_success_commits                            | 3.4.2.1         | 削除成功時のコミット確認                 | 有効な UUID リストで削除を実行する                                | `db.session.commit()` が1回呼ばれること                            |
+| 5-4 | test_delete_no_matching_records_raises_value_error     | 2.2.2           | 存在しない UUID 指定時のエラー確認       | 存在しない UUID で削除を実行する（DBモックは空リストを返す）      | `ValueError('削除対象が見つかりません')` がスローされること         |
+| 5-5 | test_delete_empty_uuids_list_raises_value_error        | 2.2.2           | 空の UUID リスト指定時のエラー確認       | 空リスト `[]` で削除を実行する                                    | `ValueError` がスローされること                                    |
+| 5-6 | test_delete_db_flush_exception_calls_rollback          | 2.3.2           | flush 例外時のロールバック確認           | `db.session.flush()` が例外をスローするよう設定して削除を実行する | `db.session.rollback()` が呼ばれること                             |
+| 5-7 | test_delete_multiple_inventories                       | 2.1.3           | 複数 UUID 指定時の全件論理削除確認       | `['uuid-001', 'uuid-002']` の2件で削除を実行する                  | `inv1.delete_flag is True` かつ `inv2.delete_flag is True` であること |
 
 ---
 
@@ -110,14 +108,43 @@
 
 ---
 
-**合計: 59 テストケース**
+## 7. get_device_inventory_form_options
 
-| セクション | 関数名                        | 件数     |
-| ---------- | ----------------------------- | -------- |
-| 1          | get_default_search_params     | 11件     |
-| 2          | search_device_inventories     | 14件     |
-| 3          | create_device_inventory       | 9件      |
-| 4          | update_device_inventory       | 8件      |
-| 5          | delete_device_inventories     | 11件     |
-| 6          | export_device_inventories_csv | 9件      |
-| **合計**   |                               | **62件** |
+| No. | テストメソッド名                                          | 観点番号 | テスト概要                                              | 実行内容                                                                | 想定結果                                                                           |
+| --- | --------------------------------------------------------- | -------- | ------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 7-1 | test_returns_tuple_of_three_elements                      | 3.1.4.1  | 戻り値が3要素タプルであることを確認                     | `get_device_inventory_form_options()` を呼び出す                        | `tuple` 型かつ長さ3であること                                                      |
+| 7-2 | test_device_types_queries_with_delete_flag_false          | 2.1.1    | DeviceTypeMaster の delete_flag=False フィルタ確認      | `get_device_inventory_form_options()` を呼び出す                        | `DeviceTypeMaster.query.filter_by(delete_flag=False)` が呼ばれること               |
+| 7-3 | test_inventory_statuses_queries_with_delete_flag_false    | 2.1.1    | InventoryStatusMaster の delete_flag=False フィルタ確認 | `get_device_inventory_form_options()` を呼び出す                        | `InventoryStatusMaster.query.filter_by(delete_flag=False)` が呼ばれること          |
+| 7-4 | test_sort_items_queries_with_view_id_filter               | 2.1.1    | SortItemMaster の view_id/delete_flag フィルタ確認      | `get_device_inventory_form_options()` を呼び出す                        | `SortItemMaster.query.filter()` が呼ばれること                                     |
+| 7-5 | test_sort_items_ordered_by_sort_order                     | 2.1.1    | SortItemMaster の sort_order 昇順取得確認               | `get_device_inventory_form_options()` を呼び出す                        | `filter()` の後に `order_by()` が呼ばれること                                      |
+| 7-6 | test_returns_master_data_as_fetched                       | 3.1.4.1  | DBから取得したデータがそのまま返却されることを確認      | 各マスタに複数件モックを設定して `get_device_inventory_form_options()` を呼び出す | `device_types`, `inventory_statuses`, `sort_items` がモックデータと一致すること   |
+| 7-7 | test_returns_empty_lists_when_masters_are_empty           | 3.1.4.2  | 各マスタ0件時の空リスト返却を確認                       | 各マスタが0件のモックで `get_device_inventory_form_options()` を呼び出す | `device_types == []`, `inventory_statuses == []`, `sort_items == []` であること   |
+
+> **NOTE:** 本クラスのテストは `get_device_inventory_form_options()` の実装完了後に実行可能。
+
+---
+
+## 8. get_organization_options
+
+| No. | テストメソッド名                              | 観点番号 | テスト概要                                 | 実行内容                                                             | 想定結果                                                                 |
+| --- | --------------------------------------------- | -------- | ------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 8-1 | test_queries_with_delete_flag_false           | 2.1.1    | OrganizationMaster の delete_flag=False フィルタ確認 | `get_organization_options()` を呼び出す                    | `OrganizationMaster.query.filter_by(delete_flag=False)` が呼ばれること  |
+| 8-2 | test_ordered_by_organization_name             | 2.1.1    | organization_name 昇順取得確認             | `get_organization_options()` を呼び出す                              | `filter_by()` の後に `order_by()` が呼ばれること                        |
+| 8-3 | test_returns_master_data_as_fetched           | 3.1.4.1  | DBから取得したデータがそのまま返却されることを確認 | 組織マスタに2件モックを設定して `get_organization_options()` を呼び出す | 戻り値がモックデータと一致すること                                    |
+| 8-4 | test_returns_empty_list_when_no_organizations | 3.1.4.2  | 組織マスタ0件時の空リスト返却確認          | 組織マスタが0件のモックで `get_organization_options()` を呼び出す    | 空リストが返却されること                                                 |
+
+---
+
+**合計: 65 テストケース**
+
+| セクション | 関数名                             | 件数     |
+| ---------- | ---------------------------------- | -------- |
+| 1          | get_default_search_params          | 11件     |
+| 2          | search_device_inventories          | 14件     |
+| 3          | create_device_inventory            | 9件      |
+| 4          | update_device_inventory            | 8件      |
+| 5          | delete_device_inventories          | 7件      |
+| 6          | export_device_inventories_csv      | 9件      |
+| 7          | get_device_inventory_form_options  | 7件      |
+| 8          | get_organization_options           | 4件      |
+| **合計**   |                                    | **69件** |

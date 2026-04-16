@@ -112,7 +112,7 @@ flowchart TD
     CheckMaster -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
+    CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
 
     CheckPage -->|ある<br>ページング（初期表示後・検索後）| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie<br>※POST検索またはGET初期表示でセット済み]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
@@ -122,7 +122,7 @@ flowchart TD
 
     CheckCountResult -->|失敗| Error500
 
-    CheckCountResult -->|成功| Query[検索結果取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>LIMIT per_page OFFSET offset]
+    CheckCountResult -->|成功| Query[検索結果取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>LIMIT per_page OFFSET offset]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500
@@ -240,8 +240,8 @@ def search_device_inventories(search_params: dict) -> tuple[list, int]:
 
     query = (
         DeviceInventoryMaster.query
-        .join(DeviceMaster, DeviceInventoryMaster.device_inventory_id == DeviceMaster.device_inventory_id)
-        .filter(DeviceMaster.delete_flag == False)
+        .outerjoin(DeviceMaster, DeviceInventoryMaster.device_inventory_id == DeviceMaster.device_inventory_id)
+        .filter(or_(DeviceMaster.delete_flag == False, DeviceMaster.device_id.is_(None)))
         .join(DeviceTypeMaster, DeviceMaster.device_type_id == DeviceTypeMaster.device_type_id)
         .filter(DeviceTypeMaster.delete_flag == False)
         .join(InventoryStatusMaster, DeviceInventoryMaster.inventory_status_id == InventoryStatusMaster.inventory_status_id)
@@ -373,13 +373,13 @@ flowchart TD
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
     Convert --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master<br>SELECT * FROM sort_item_master<br>WHERE view_id=7 AND delete_flag=FALSE]
-    LoadMaster --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
+    LoadMaster --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Query --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|失敗| Error500
@@ -876,7 +876,7 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
+    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
@@ -1233,14 +1233,14 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| OpenModal{削除確認モーダル表示}
+    CheckPerm -->|権限OK| CheckDeviceMaster[デバイスマスタに削除対象データと紐づくデータが存在するか確認]
+    CheckDeviceMaster --> OpenModal{削除確認モーダル表示<br>デバイスマスタに削除対象データと紐づくものがある場合、「デバイスマスタに削除対象のデータと紐づく出たが残っています。本当に削除しますか？」と追加で表示する}
     OpenModal -->|キャンセルボタン押下| CloseModal[確認モーダルを閉じる]
     CloseModal --> End
 
     OpenModal -->|削除ボタン押下| StartTx[トランザクション開始]
     StartTx --> DeleteInventory[UPDATE<br>device_inventory_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_uuid IN :uuids]
-    DeleteInventory --> DeleteDevice["UPDATE<br>device_master<br>SET delete_flag = TRUE<br>WHERE device_inventory_id IN<br>(SELECT device_inventory_id<br>FROM device_inventory_master<br>WHERE device_inventory_uuid IN :uuids)"]
-    DeleteDevice --> Query{DBクエリ結果}
+    DeleteInventory --> Query{DBクエリ結果}
 
     Query -->|0件削除| Error404[404エラーモーダル表示]
     Error404 --> End
@@ -1249,17 +1249,10 @@ flowchart TD
     Rollback --> Error500[500エラーモーダル表示]
     Error500 --> End
 
-    Query -->|成功| DeleteUC[UnityCatalogの<br>device_masterの<br>デバイス論理削除<br>UPDATE iot_catalog.oltp_db.device_master]
-
-    DeleteUC --> UCDeleteResult{UnityCatalog<br>操作結果}
-    UCDeleteResult --> |成功|Commit[トランザクションコミット]
-    UCDeleteResult --> |失敗|UCRollback[UnityCatalog.device_master<br>ロールバック]
-    UCRollback --> Rollback
+    Query -->|成功|Commit[トランザクションコミット]
 
     Commit --> ShowModal[完了モーダル表示]
-    ShowModal --> ClickOK[OKボタン押下]
-    ClickOK --> Redirect[一覧画面へリダイレクト]
-    Redirect --> End
+    ShowModal --> End
 ```
 
 #### Flaskルート
@@ -1275,8 +1268,9 @@ flowchart TD
 **削除処理の概要:**
 選択された複数のデバイス台帳を論理削除する:
 1. OLTPのdevice_inventory_master（台帳マスタ）のdelete_flagをTRUEに更新
-2. OLTPのdevice_master（デバイスマスタ）のdelete_flagをTRUEに更新
-3. UnityCatalogのdevice_master（デバイスマスタ）のdelete_flagをTRUEに更新
+
+> 削除対象のデバイス台帳データと紐づくデバイスマスタデータの削除は本機能の対象外とする。
+> デバイスマスタデータの削除はデバイス管理画面で閉じているものとする。
 
 **注意:** フロー図では、削除ボタン押下後に削除確認モーダル（ADM-019）を表示し、
 そこで削除ボタンが押されたらDB削除処理を実行する流れになっています。
@@ -1285,7 +1279,7 @@ flowchart TD
 # services/device_inventory_service.py
 
 def delete_device_inventories(inventory_uuids: list[str], modifier_id: int) -> None:
-    """デバイス台帳を論理削除する（device_inventory_master + device_master + Unity Catalog の同時論理削除）
+    """デバイス台帳を論理削除する（device_inventory_master のみ）
 
     Args:
         inventory_uuids: 削除対象のデバイス在庫UUIDリスト
@@ -1303,62 +1297,15 @@ def delete_device_inventories(inventory_uuids: list[str], modifier_id: int) -> N
     if not inventories:
         raise ValueError('削除対象が見つかりません')
 
-    # UC ロールバック用に削除対象の device_inventory_id を退避
-    target_inventory_ids = [inv.device_inventory_id for inv in inventories]
-
     try:
         for inventory in inventories:
-            # 1. device_inventory_master の論理削除
+            # device_inventory_master の論理削除
             inventory.delete_flag = True
             inventory.modifier    = modifier_id
-
-            # 2. device_master の論理削除
-            devices = DeviceMaster.query.filter_by(
-                device_inventory_id=inventory.device_inventory_id, delete_flag=False
-            ).all()
-            for device in devices:
-                device.delete_flag = True
-                device.modifier    = modifier_id
 
         db.session.flush()
 
     except Exception:
-        db.session.rollback()
-        raise
-
-    # 3. Unity Catalog の device_master を論理削除
-    uc = UnityCatalogConnector()
-    try:
-        uc.execute_dml(
-            """
-            UPDATE iot_catalog.oltp_db.device_master
-            SET delete_flag = true, modifier = :modifier
-            WHERE device_inventory_id IN :device_inventory_ids
-              AND delete_flag = false
-            """,
-            {
-                'modifier':             modifier_id,
-                'device_inventory_ids': tuple(target_inventory_ids),
-            },
-            operation='UC device_master 論理削除',
-        )
-    except Exception:
-        # UC 論理削除失敗 → UC を元の状態（delete_flag=false）に戻してから OLTP もロールバック
-        try:
-            uc.execute_dml(
-                """
-                UPDATE iot_catalog.oltp_db.device_master
-                SET delete_flag = false, modifier = :modifier
-                WHERE device_inventory_id IN :device_inventory_ids
-                """,
-                {
-                    'modifier':             modifier_id,
-                    'device_inventory_ids': tuple(target_inventory_ids),
-                },
-                operation='UC device_master 論理削除ロールバック',
-            )
-        except Exception:
-            pass  # UC ロールバックも失敗した場合は無視して OLTP ロールバックへ進む
         db.session.rollback()
         raise
 
@@ -1407,7 +1354,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>JOIN device_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid]
+    CheckPerm -->|権限OK| Query[デバイスの記録を取得<br>SELECT * FROM<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|データなし| Error404[404エラーモーダル表示]
@@ -1437,8 +1384,8 @@ def show_device_inventory(device_inventory_uuid):
     try:
         inventory = (
             DeviceInventoryMaster.query
-            .join(DeviceMaster, DeviceInventoryMaster.device_inventory_id == DeviceMaster.device_inventory_id)
-            .filter(DeviceMaster.delete_flag == False)
+            .outerjoin(DeviceMaster, DeviceInventoryMaster.device_inventory_id == DeviceMaster.device_inventory_id)
+            .filter(or_(DeviceMaster.delete_flag == False, DeviceMaster.device_id.is_(None)))
             .join(InventoryStatusMaster, DeviceInventoryMaster.inventory_status_id == InventoryStatusMaster.inventory_status_id)
             .filter(InventoryStatusMaster.delete_flag == False)
             .filter(DeviceInventoryMaster.device_inventory_uuid == device_inventory_uuid)
@@ -1471,7 +1418,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_inventory_master<br>JOIN inventory_status_master<br>JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
+    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_inventory_master<br>JOIN inventory_status_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
     GetParams --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
@@ -1491,6 +1438,7 @@ flowchart TD
 #### 処理詳細（サーバーサイド）
 
 - `search_device_inventories()` は初期表示と共用（`device_inventory_service.py`）
+- CSV出力されるカラムのうち、`操作列`カラムは空文字で出力する
 
 ```python
 # services/device_inventory_service.py
@@ -1511,6 +1459,7 @@ def export_device_inventories_csv(search_params: dict) -> str:
         'per_page': -1,
     })
     df = pd.DataFrame([{
+        '操作列':            '',
         'デバイス名':         d.device.device_name,
         'デバイス種別':       d.device.device_type.device_type_name,
         'モデル情報':         d.device.device_model or '',
@@ -1570,7 +1519,7 @@ def export_device_inventory():
 
 ```
 device_inventory_master (dim)
-    ├── INNER JOIN device_master (dm)
+    ├── LEFT JOIN device_master (dm)
     │       ON dim.device_inventory_id = dm.device_inventory_id
     │       └── INNER JOIN device_type_master (dtm)
     │               ON dm.device_type_id = dtm.device_type_id
@@ -1648,7 +1597,7 @@ device_inventory_master (dim)
 device_uuidは接続するクラウドサービスによりバリデーション方法が異なる。環境変数`AUTH_TYPE`に基づき、適切なバリデータを取得する。
 
 ```python
-# validators/device_uuid_validator.py
+# services/device_inventory_service.py
 import os
 import re
 
