@@ -725,75 +725,75 @@ class TestValidateChartParams:
     # ── 正常系 ──────────────────────────────────────────────
 
     def test_valid_with_all_valid_params_hour(self):
-        """2.1.1 正常処理: 全パラメータ正常（display_unit=hour）→ True を返す"""
+        """2.1.1 正常処理: 全パラメータ正常（display_unit=hour）→ None を返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is True
+        assert result is None
 
     def test_valid_with_all_valid_params_day(self):
-        """2.1.1 正常処理: 全パラメータ正常（display_unit=day）→ True を返す"""
+        """2.1.1 正常処理: 全パラメータ正常（display_unit=day）→ None を返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('day', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is True
+        assert result is None
 
     def test_valid_with_all_valid_params_week(self):
-        """2.1.1 正常処理: 全パラメータ正常（display_unit=week）→ True を返す"""
+        """2.1.1 正常処理: 全パラメータ正常（display_unit=week）→ None を返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('week', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is True
+        assert result is None
 
     def test_valid_with_all_valid_params_month(self):
-        """2.1.1 正常処理: 全パラメータ正常（display_unit=month）→ True を返す"""
+        """2.1.1 正常処理: 全パラメータ正常（display_unit=month）→ None を返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('month', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is True
+        assert result is None
 
     # ── display_unit バリデーション ─────────────────────────
 
     def test_invalid_when_display_unit_is_unknown(self):
-        """1.1.6.2 未定義値: display_unit が 'hour/day/week/month' 以外の場合 → False"""
+        """1.1.6.2 未定義値: display_unit が 'hour/day/week/month' 以外の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('minute', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_display_unit_empty(self):
-        """1.1.6.3 空文字: display_unit が空文字の場合 → False"""
+        """1.1.6.3 空文字: display_unit が空文字の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('', '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_display_unit_none(self):
-        """1.1.6.4 None: display_unit が None の場合 → False"""
+        """1.1.6.4 None: display_unit が None の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params(None, '10min', '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     # ── interval バリデーション ──────────────────────────────
 
     @pytest.mark.parametrize('interval', ['1min', '2min', '3min', '5min', '10min', '15min'])
     def test_valid_for_all_allowed_intervals(self, interval):
-        """1.1.6.1 許容値: 許容された集計間隔（1/2/3/5/10/15min）は True
+        """1.1.6.1 許容値: 許容された集計間隔（1/2/3/5/10/15min）は None
         ワークフロー仕様書 § バリデーション: 集計間隔 許容値リスト
         """
         # Arrange
@@ -801,39 +801,39 @@ class TestValidateChartParams:
         # Act
         result = validate_chart_params('hour', interval, '2026/03/05 12:00:00')
         # Assert
-        assert result is True
+        assert result is None
 
     def test_invalid_when_interval_is_unknown(self):
-        """1.1.6.2 未定義値: interval が許容値以外の場合 → False"""
+        """1.1.6.2 未定義値: interval が許容値以外の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '7min', '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_interval_empty(self):
-        """1.1.6.3 空文字: interval が空文字の場合 → False"""
+        """1.1.6.3 空文字: interval が空文字の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '', '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_interval_none(self):
-        """1.1.6.4 None: interval が None の場合 → False"""
+        """1.1.6.4 None: interval が None の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', None, '2026/03/05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     # ── base_datetime バリデーション ─────────────────────────
 
     def test_invalid_when_base_datetime_wrong_format(self):
-        """1.1.4.3 形式不正: base_datetime がスラッシュ区切り以外の形式 → False
+        """1.1.4.3 形式不正: base_datetime がスラッシュ区切り以外の形式 → エラーメッセージを返す
         ワークフロー仕様書 § バリデーション: 基準日時 形式（YYYY/MM/DD HH:mm:ss）
         """
         # Arrange
@@ -841,43 +841,43 @@ class TestValidateChartParams:
         # Act
         result = validate_chart_params('hour', '10min', '2026-03-05 12:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_base_datetime_date_only(self):
-        """1.1.4 形式不正: 時刻部分が省略されている場合 → False"""
+        """1.1.4 形式不正: 時刻部分が省略されている場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '10min', '2026/03/05')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_base_datetime_empty(self):
-        """1.1.4 空文字: base_datetime が空文字の場合 → False"""
+        """1.1.4 空文字: base_datetime が空文字の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '10min', '')
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_base_datetime_none(self):
-        """1.1.4 None: base_datetime が None の場合 → False"""
+        """1.1.4 None: base_datetime が None の場合 → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '10min', None)
         # Assert
-        assert result is False
+        assert result is not None
 
     def test_invalid_when_base_datetime_invalid_date(self):
-        """1.1.4.5 存在しない日付: 2026/02/30 は存在しないため → False"""
+        """1.1.4.5 存在しない日付: 2026/02/30 は存在しないため → エラーメッセージを返す"""
         # Arrange
         from iot_app.services.customer_dashboard.belt_chart import validate_chart_params
         # Act
         result = validate_chart_params('hour', '10min', '2026/02/30 00:00:00')
         # Assert
-        assert result is False
+        assert result is not None
 
 
 # ===========================================================================

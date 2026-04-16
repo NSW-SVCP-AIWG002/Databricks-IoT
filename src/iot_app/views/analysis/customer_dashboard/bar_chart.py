@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import Response, abort, g, jsonify, redirect, render_template, request, url_for
 
-from iot_app.common.exceptions import NotFoundError
+from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
 from iot_app.forms.customer_dashboard.bar_chart import BarChartGadgetForm
 from iot_app.services.customer_dashboard.bar_chart import (
@@ -91,8 +91,7 @@ def handle_gadget_data(gadget_uuid):
         })
 
     except Exception as e:
-        g.last_exception_type = type(e).__name__
-        logger.error(f'棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}', exc_info=True, extra={"error_type": type(e).__name__})
         return jsonify({'error': err_fetch_failed('データ')}), 500
 
 
@@ -192,6 +191,8 @@ def handle_gadget_register(gadget_type):
         )
         return jsonify({'message': msg_created('ガジェット')})
 
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
     except NotFoundError:
         abort(404)
     except Exception as e:
@@ -216,8 +217,9 @@ def handle_gadget_csv_export(gadget_uuid):
     interval = request.args.get('interval', '10min')
     base_datetime_str = request.args.get('base_datetime')
 
-    if validate_chart_params(display_unit, interval, base_datetime_str):
-        abort(400)
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         data_source_config = json.loads(gadget.data_source_config or '{}')

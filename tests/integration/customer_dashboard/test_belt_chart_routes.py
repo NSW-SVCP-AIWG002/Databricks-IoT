@@ -391,7 +391,7 @@ class TestGadgetBeltChartData:
 
         # Assert
         assert response.status_code == 400
-        assert response.get_json()['error'] == 'パラメータが不正です'
+        assert response.get_json()['error'] == '表示単位が不正です'
 
     def test_data_invalid_interval_returns_400(
         self, client, belt_chart_gadget_fixed

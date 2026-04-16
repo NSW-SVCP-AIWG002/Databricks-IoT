@@ -823,9 +823,6 @@ class TestCustomerDashboardIndex:
             d = _db.session.get(DeviceMaster, device_id)
             if d:
                 _db.session.delete(d)
-            o = _db.session.get(OrganizationMaster, TEST_ORG_ID)
-            if o:
-                _db.session.delete(o)
             _db.session.commit()
 
     @pytest.mark.integration

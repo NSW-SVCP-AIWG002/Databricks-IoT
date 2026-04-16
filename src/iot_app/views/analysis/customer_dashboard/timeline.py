@@ -239,8 +239,9 @@ def handle_gadget_csv_export(gadget_uuid):
     start_datetime_str = request.args.get('start_datetime')
     end_datetime_str   = request.args.get('end_datetime')
 
-    if validate_chart_params(start_datetime_str, end_datetime_str):
-        abort(400)
+    error = validate_chart_params(start_datetime_str, end_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         csv_content = export_timeline_csv(

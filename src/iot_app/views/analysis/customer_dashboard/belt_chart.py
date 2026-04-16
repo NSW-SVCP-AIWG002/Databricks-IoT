@@ -35,7 +35,7 @@ from iot_app.services.customer_dashboard.common import (
     get_organization_id_by_user,
     get_organizations,
 )
-from iot_app.common.messages import ERR_INVALID_PARAMETER, err_fetch_failed, err_not_found, msg_created
+from iot_app.common.messages import err_fetch_failed, err_not_found, msg_created
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # noqa: E402
 
 logger = get_logger(__name__)
@@ -72,8 +72,9 @@ def handle_gadget_data(gadget_uuid):
     interval = params.get('interval', '10min')
     base_datetime_str = params.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
-        return jsonify({'error': ERR_INVALID_PARAMETER}), 400
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
@@ -236,8 +237,9 @@ def handle_gadget_csv_export(gadget_uuid):
     interval = request.args.get('interval', '10min')
     base_datetime_str = request.args.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
-        abort(400)
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         data_source_config = json.loads(gadget.data_source_config or '{}')

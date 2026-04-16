@@ -71,19 +71,13 @@ def err_max_greater_than_min(subject: str) -> str:
 # ============================================================
 
 ERR_ACCESS_DENIED       = 'アクセス権限がありません'
-ERR_INVALID_PARAMETER   = 'パラメータが不正です'
 ERR_GADGET_NOT_AVAILABLE = '追加予定のガジェットです'
 ERR_MEASUREMENT_NOT_FOUND = '測定項目が見つかりません'
 ERR_GADGET_ITEM_COUNT   = '表示項目を1つ以上5つ以下で選択してください'
 ERR_MIN_VALUE_LESS_THAN_MAX    = '最小値は最大値より小さい値を入力してください'
 ERR_MAX_VALUE_GREATER_THAN_MIN = '最大値は最小値より大きい値を入力してください'
-ERR_MIN_MAX_COMBINED = (
-    '最小値は最大値より小さい値を入力してください。'
-    '最大値は最小値より大きい値を入力してください。'
-)
-
 # 日時バリデーション（timeline サービス）
-ERR_DATETIME_FORMAT   = '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+ERR_DATETIME_FORMAT   = '正しい日付形式で入力してください'
 ERR_END_BEFORE_START  = '終了日時は開始日時以降の日時を入力してください'
 ERR_DATETIME_RANGE_24H = '取得期間は24時間以内で指定してください'
 

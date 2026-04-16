@@ -553,7 +553,7 @@ class TestGadgetTimelineData:
 
         # Assert
         assert response.status_code == 400
-        assert response.get_json()['error'] == '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        assert response.get_json()['error'] == '正しい日付形式で入力してください'
 
     def test_data_missing_end_datetime_returns_400(self, client, timeline_gadget):
         """3.1.2: end_datetime 未指定で400エラー"""

@@ -13,7 +13,6 @@ from iot_app.common.logger import get_logger
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster, GoldSummaryMethodMaster
 from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
 from iot_app.common.messages import (
-    ERR_MIN_MAX_COMBINED,
     ERR_DATETIME_FORMAT,
     err_invalid,
     err_numeric,
@@ -109,9 +108,6 @@ def validate_gadget_registration(params):
             max_value = float(max_value)
         except (TypeError, ValueError):
             raise ValidationError(err_numeric("最大値"))
-    if min_value is not None and max_value is not None and min_value >= max_value:
-        raise ValidationError(ERR_MIN_MAX_COMBINED)
-
     gadget_size = params.get("gadget_size")
     if gadget_size is None:
         raise ValidationError(err_select_required("部品サイズ"))
@@ -490,8 +486,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
 
         return []
 
-    except Exception as e:
-        logger.error(f"棒グラフデータ取得エラー: device_id={device_id}, error={str(e)}")
+    except Exception:
         raise
 
 
