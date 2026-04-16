@@ -1,7 +1,9 @@
 # テスト項目書 - デバイス台帳管理 Service層
 
 **対象ファイル:** `tests/unit/services/test_device_inventory_service.py`
-**対象サービス:** `iot_app.services.device_inventory_service`
+**対象モジュール:**
+- `iot_app.services.device_inventory_service`（セクション 1〜10）
+
 **作成日:** 2026-04-14
 
 ---
@@ -135,7 +137,38 @@
 
 ---
 
-**合計: 65 テストケース**
+## 9. get_device_uuid_validator
+
+観点: `1.1.6 不整値チェック`、`2.1 正常系処理`
+
+| No. | テストメソッド名                                          | 観点番号 | テスト概要                              | 実行内容                                                             | 想定結果                                                              |
+| --- | --------------------------------------------------------- | -------- | --------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 9-1 | test_returns_azure_validator_when_auth_type_is_azure      | 2.1.1    | AUTH_TYPE=azure 時のバリデータ返却確認  | AUTH_TYPE=azure で `get_device_uuid_validator()` を呼ぶ              | max_length=128、pattern・description キーを持つ辞書が返る             |
+| 9-2 | test_returns_aws_validator_when_auth_type_is_aws          | 2.1.1    | AUTH_TYPE=aws 時のバリデータ返却確認    | AUTH_TYPE=aws で `get_device_uuid_validator()` を呼ぶ                | aws 用パターン（英数字・ハイフン・アンダースコアのみ）の辞書が返る    |
+| 9-3 | test_returns_same_as_azure_when_auth_type_is_local        | 2.1.1    | AUTH_TYPE=local 時のバリデータ返却確認  | AUTH_TYPE=local で `get_device_uuid_validator()` を呼ぶ              | azure バリデータと同じ pattern・max_length が返る                     |
+| 9-4 | test_defaults_to_azure_when_auth_type_not_set             | 2.1.1    | AUTH_TYPE 未設定時のデフォルト値確認    | AUTH_TYPE 未設定で `get_device_uuid_validator()` を呼ぶ              | デフォルト値 'azure' が使われ max_length=128 が返る                   |
+| 9-5 | test_raises_value_error_when_auth_type_is_unknown         | 1.1.6.1  | 未知の AUTH_TYPE 指定時のエラー確認     | AUTH_TYPE=unknown_provider で `get_device_uuid_validator()` を呼ぶ   | `ValueError: Unknown AUTH_TYPE: unknown_provider` が送出される        |
+
+---
+
+## 10. validate_device_uuid
+
+観点: `1.1.2 最大文字列長チェック`、`1.1.6 不整値チェック`、`2.1 正常系処理`
+
+| No.  | テストメソッド名                                           | 観点番号 | テスト概要                                   | 実行内容                                                        | 想定結果                                                                              |
+| ---- | ---------------------------------------------------------- | -------- | -------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 10-1 | test_valid_azure_uuid_returns_true_and_empty_message       | 2.1.1    | 有効な Azure UUID の正常系確認               | AUTH_TYPE=azure で有効な UUID を渡す                            | `(True, '')` が返る                                                                   |
+| 10-2 | test_valid_aws_uuid_returns_true_and_empty_message         | 2.1.1    | 有効な AWS UUID の正常系確認                 | AUTH_TYPE=aws で有効な UUID を渡す                              | `(True, '')` が返る                                                                   |
+| 10-3 | test_uuid_at_max_length_returns_true                       | 1.1.2.1  | 最大文字数ちょうどの境界値確認（有効）       | ちょうど 128 文字の UUID を渡す                                 | `(True, '')` が返る（境界値: 有効）                                                   |
+| 10-4 | test_uuid_over_max_length_returns_false_with_message       | 1.1.2.2  | 最大文字数超過の境界値確認（無効）           | 129 文字の UUID を渡す                                          | `(False, 'device_uuidは128文字以内で入力してください')` が返る（境界値: 無効）        |
+| 10-5 | test_invalid_chars_for_azure_returns_false_with_message    | 1.1.6.1  | Azure パターン不一致の確認                   | AUTH_TYPE=azure でスペースを含む UUID を渡す                    | `(False, 'device_uuidの形式が不正です...')` が返る                                    |
+| 10-6 | test_invalid_chars_for_aws_returns_false_with_message      | 1.1.6.1  | AWS パターン不一致の確認                     | AUTH_TYPE=aws でドットを含む UUID を渡す                        | `(False, 'device_uuidの形式が不正です...')` が返る                                    |
+| 10-7 | test_length_error_message_includes_max_length              | 1.1.2.2  | エラーメッセージへの最大文字数埋め込み確認   | 200 文字の UUID を渡す                                          | エラーメッセージに '128' が含まれる                                                   |
+| 10-8 | test_pattern_error_message_includes_description            | 1.1.6.1  | エラーメッセージへの説明文埋め込み確認       | AUTH_TYPE=azure でパターン不一致の UUID を渡す                  | エラーメッセージに azure の description 文言が含まれる                                |
+
+---
+
+**合計: 82 テストケース**
 
 | セクション | 関数名                             | 件数     |
 | ---------- | ---------------------------------- | -------- |
@@ -147,4 +180,6 @@
 | 6          | export_device_inventories_csv      | 9件      |
 | 7          | get_device_inventory_form_options  | 7件      |
 | 8          | get_organization_options           | 4件      |
-| **合計**   |                                    | **69件** |
+| 9          | get_device_uuid_validator          | 5件      |
+| 10         | validate_device_uuid               | 8件      |
+| **合計**   |                                    | **82件** |
