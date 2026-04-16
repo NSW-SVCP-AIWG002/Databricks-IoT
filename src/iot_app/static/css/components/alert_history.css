@@ -1,0 +1,254 @@
+/* ===== アラート履歴 ===== */
+
+/* ─────────────────────────────────────────────────────────
+   テーブルコンテナ（縦スクロール）
+   ───────────────────────────────────────────────────────── */
+
+#alert-history-table-container {
+  overflow-y: auto;
+}
+
+/* ─────────────────────────────────────────────────────────
+   モーダルコンテナ
+   ───────────────────────────────────────────────────────── */
+
+.modal-content {
+  background: var(--color-white);
+  border-radius: var(--border-radius-base);
+  min-width: 400px;
+  max-width: 680px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-content--large {
+  max-width: 800px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   検索フォームヘッダー（開閉トグル）
+   ───────────────────────────────────────────────────────── */
+
+.search-form__header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-form__toggle-icon {
+  transition: transform var(--transition-base);
+}
+
+/* ─────────────────────────────────────────────────────────
+   日時入力（flatpickr ラッパー）
+   ───────────────────────────────────────────────────────── */
+
+.ah-datetime-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ah-calendar-icon {
+  position: absolute;
+  left: var(--spacing-2);
+  font-size: var(--font-size-base);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ah-datetime-input {
+  padding-left: 2rem;
+  cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────
+   検索フォーム行レイアウト
+   ───────────────────────────────────────────────────────── */
+
+.ah-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.ah-search-row .form-group {
+  flex: 1;
+  min-width: 200px;
+  max-width: calc(25% - 12px);
+}
+
+.ah-search-row--sort .form-group {
+  flex: 1;
+  max-width: calc(25% - 12px);
+}
+
+.ah-search-center {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   検索条件表示 + 検索結果件数
+   ───────────────────────────────────────────────────────── */
+
+.ah-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-base);
+}
+
+.ah-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.ah-conditions__label {
+  color: var(--color-gray-700);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.ah-badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-search-badge);
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
+}
+
+.ah-result-count {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  white-space: nowrap;
+}
+
+.ah-result-count__label {
+  color: var(--color-gray-700);
+  font-weight: var(--font-weight-medium);
+}
+
+.ah-result-count__value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+}
+
+/* ─────────────────────────────────────────────────────────
+   アラートレベルバッジ
+   ───────────────────────────────────────────────────────── */
+
+.ah-level-badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ah-level-badge--critical {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger-dark);
+}
+
+.ah-level-badge--warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning-dark);
+}
+
+.ah-level-badge--info {
+  background-color: var(--color-info-light);
+  color: var(--color-info-dark);
+}
+
+/* ─────────────────────────────────────────────────────────
+   ステータスバッジ
+   ───────────────────────────────────────────────────────── */
+
+.ah-status-badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ah-status-badge--発生中 {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger-dark);
+}
+
+.ah-status-badge--復旧済み {
+  background-color: var(--color-success-light);
+  color: var(--color-success-dark);
+}
+
+/* ─────────────────────────────────────────────────────────
+   参照モーダル詳細レイアウト
+   ───────────────────────────────────────────────────────── */
+
+.ah-modal-desc {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-4);
+}
+
+.ah-detail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.ah-detail__row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ah-detail__row:last-child {
+  border-bottom: none;
+}
+
+.ah-detail__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-700);
+  font-size: var(--font-size-base);
+}
+
+.ah-detail__value {
+  color: var(--color-gray-900);
+  font-size: var(--font-size-base);
+  word-break: break-all;
+}
+
+/* ─────────────────────────────────────────────────────────
+   モーダル読み込み / エラー表示
+   ───────────────────────────────────────────────────────── */
+
+.ah-modal-loading,
+.ah-modal-error {
+  padding: var(--spacing-8);
+  text-align: center;
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+.ah-modal-error {
+  color: var(--color-danger);
+}

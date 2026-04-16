@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+
+{% block title %}アラート履歴{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/alert_history.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+
+{# (1) 画面タイトル #}
+<h1 class="page-title">
+  <span class="page-title__icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true">
+      <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+    </svg>
+  </span>
+  アラート履歴
+</h1>
+
+{# (2) 検索フォーム #}
+<div class="search-form" id="search-form-container">
+  <div class="search-form__header" id="search-form-toggle">
+    <span class="search-form__title">検索条件</span>
+    <span class="search-form__toggle-icon" id="search-toggle-icon">▼</span>
+  </div>
+  <div class="search-form__body" id="search-form-body">
+    <form method="POST" action="{{ url_for('alert.alert_history_search') }}" id="search-form">
+      <div class="ah-search-row">
+        <div class="form-group">
+          <label class="form-label" for="start_datetime">期間（開始）</label>
+          <div class="ah-datetime-wrap">
+            <span class="ah-calendar-icon">📅</span>
+            <input
+              type="text"
+              id="start_datetime"
+              name="start_datetime"
+              class="form-input ah-datetime-input"
+              placeholder="YYYY/MM/DD HH:mm"
+              value="{{ search_params.get('start_datetime', '') }}"
+              autocomplete="off"
+              readonly
+            >
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="end_datetime">期間（終了）</label>
+          <div class="ah-datetime-wrap">
+            <span class="ah-calendar-icon">📅</span>
+            <input
+              type="text"
+              id="end_datetime"
+              name="end_datetime"
+              class="form-input ah-datetime-input"
+              placeholder="YYYY/MM/DD HH:mm"
+              value="{{ search_params.get('end_datetime', '') }}"
+              autocomplete="off"
+              readonly
+            >
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="device_name">デバイス名</label>
+          <input
+            type="text"
+            id="device_name"
+            name="device_name"
+            class="form-input"
+            maxlength="100"
+            value="{{ search_params.get('device_name', '') }}"
+          >
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="device_location">設置場所</label>
+          <input
+            type="text"
+            id="device_location"
+            name="device_location"
+            class="form-input"
+            maxlength="100"
+            value="{{ search_params.get('device_location', '') }}"
+          >
+        </div>
+      </div>
+      <div class="ah-search-row">
+        <div class="form-group">
+          <label class="form-label" for="alert_name">アラート名</label>
+          <input
+            type="text"
+            id="alert_name"
+            name="alert_name"
+            class="form-input"
+            maxlength="100"
+            value="{{ search_params.get('alert_name', '') }}"
+          >
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="alert_level_id">アラートレベル</label>
+          <select id="alert_level_id" name="alert_level_id" class="form-select">
+            <option value="">すべて</option>
+            {% for level in alert_levels %}
+            <option value="{{ level.alert_level_id }}"
+              {% if search_params.get('alert_level_id') == level.alert_level_id %}selected{% endif %}>
+              {{ level.alert_level_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="alert_status_id">ステータス</label>
+          <select id="alert_status_id" name="alert_status_id" class="form-select">
+            <option value="">すべて</option>
+            {% for status in alert_statuses %}
+            <option value="{{ status.alert_status_id }}"
+              {% if search_params.get('alert_status_id') == status.alert_status_id %}selected{% endif %}>
+              {{ status.alert_status_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="ah-search-row ah-search-row--sort">
+        <div class="form-group">
+          <label class="form-label" for="sort_by">ソート項目</label>
+          <select id="sort_by" name="sort_by" class="form-select">
+            {% for item in sort_items %}
+            <option value="{{ item.value }}"
+              {% if search_params.get('sort_by') == item.value %}selected{% endif %}>
+              {{ item.label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="order">ソート順</label>
+          <select id="order" name="order" class="form-select">
+            <option value="desc" {% if search_params.get('order') == 'desc' %}selected{% endif %}>降順</option>
+            <option value="asc"  {% if search_params.get('order') == 'asc'  %}selected{% endif %}>昇順</option>
+          </select>
+        </div>
+      </div>
+      <div class="ah-search-center">
+        <button type="submit" class="button button--primary">検索</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# (3) 検索条件表示 + (4) 検索結果件数 #}
+<div class="ah-result-header">
+  <div class="ah-conditions">
+    <span class="ah-conditions__label">現在の検索条件：</span>
+    {% set has_condition = namespace(value=false) %}
+    {% if search_params.get('start_datetime') or search_params.get('end_datetime') %}
+      {% set has_condition.value = true %}
+      <span class="ah-badge">
+        期間：{{ search_params.get('start_datetime', '') }} ～ {{ search_params.get('end_datetime', '') }}
+      </span>
+    {% endif %}
+    {% if search_params.get('device_name') %}
+      {% set has_condition.value = true %}
+      <span class="ah-badge">デバイス名：{{ search_params.get('device_name') }}</span>
+    {% endif %}
+    {% if search_params.get('device_location') %}
+      {% set has_condition.value = true %}
+      <span class="ah-badge">設置場所：{{ search_params.get('device_location') }}</span>
+    {% endif %}
+    {% if search_params.get('alert_name') %}
+      {% set has_condition.value = true %}
+      <span class="ah-badge">アラート名：{{ search_params.get('alert_name') }}</span>
+    {% endif %}
+    {% if search_params.get('alert_level_id') is not none %}
+      {% set has_condition.value = true %}
+      {% for level in alert_levels %}
+        {% if level.alert_level_id == search_params.get('alert_level_id') %}
+          <span class="ah-badge">アラートレベル：{{ level.alert_level_name }}</span>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if search_params.get('alert_status_id') is not none %}
+      {% set has_condition.value = true %}
+      {% for status in alert_statuses %}
+        {% if status.alert_status_id == search_params.get('alert_status_id') %}
+          <span class="ah-badge">ステータス：{{ status.alert_status_name }}</span>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if not has_condition.value %}
+      <span>なし</span>
+    {% endif %}
+  </div>
+  <div class="ah-result-count">
+    <span class="ah-result-count__label">検索結果：</span>
+    <span class="ah-result-count__value">{{ total }}件</span>
+  </div>
+</div>
+
+{# (5) データテーブル #}
+<div class="table-container" id="alert-history-table-container">
+  <table class="table ah-table" id="alert-history-table">
+    <thead class="table__head">
+      <tr>
+        <th style="width:30%;">アラート発生日時 <span class="sort-indicator" data-column="alert_occurrence_datetime">↕</span></th>
+        <th style="width:15%;">デバイス名 <span class="sort-indicator" data-column="device_name">↕</span></th>
+        <th style="width:15%;">設置場所 <span class="sort-indicator" data-column="device_location">↕</span></th>
+        <th style="width:10%;">アラート名 <span class="sort-indicator" data-column="alert_name">↕</span></th>
+        <th style="width:15%;">アラートレベル <span class="sort-indicator" data-column="alert_level_id">↕</span></th>
+        <th style="width:10%;">ステータス <span class="sort-indicator" data-column="alert_status_id">↕</span></th>
+        <th style="width:5%;">操作</th>
+      </tr>
+    </thead>
+    <tbody class="table__body">
+      {% for ah in alert_histories %}
+      <tr>
+        <td>
+          {% if ah.alert_occurrence_datetime %}
+            {{ ah.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ ah.device_name or '-' }}</td>
+        <td>{{ ah.device_location or '-' }}</td>
+        <td>{{ ah.alert_name or '-' }}</td>
+        <td>
+          {% if ah.alert_level_name %}
+            <span class="ah-level-badge ah-level-badge--{{ ah.alert_level_name | lower }}">
+              {{ ah.alert_level_name }}
+            </span>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          {% if ah.alert_status_name %}
+            <span class="ah-status-badge ah-status-badge--{{ '発生中' if ah.alert_status_name == '発生中' else '復旧済み' }}">
+              {{ ah.alert_status_name }}
+            </span>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          <button
+            type="button"
+            class="button button--primary button--sm"
+            onclick="openAlertHistoryModal('{{ ah.alert_history_uuid }}')"
+          >参照</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="table__empty">データがありません</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# (5.8) ページネーション #}
+{% set per_page = search_params.get('per_page', 25) %}
+{% set current_page = search_params.get('page', 1) %}
+{% set total_pages = ((total + per_page - 1) // per_page) if per_page > 0 else 1 %}
+
+{% if total_pages >= 1 %}
+<div class="pagination">
+  {% if current_page > 1 %}
+    <a class="pagination__button" href="{{ url_for('alert.alert_history_list', page=current_page - 1) }}">&lt;</a>
+  {% endif %}
+  {% set ns = namespace(pages=[]) %}
+  {% if total_pages <= 5 %}
+    {% for i in range(1, total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+  {% else %}
+    {% set ns.pages = [1] %}
+    {% if current_page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set pstart = [2, current_page - 1] | max %}
+    {% set pend = [total_pages - 1, current_page + 1] | min %}
+    {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+    {% if current_page < total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set ns.pages = ns.pages + [total_pages] %}
+  {% endif %}
+  {% for p in ns.pages %}
+    {% if p == '...' %}
+      <span class="pagination__ellipsis">...</span>
+    {% else %}
+      <a class="pagination__button {% if p == current_page %}pagination__button--active{% endif %}"
+         href="{{ url_for('alert.alert_history_list', page=p) }}">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if current_page < total_pages %}
+    <a class="pagination__button" href="{{ url_for('alert.alert_history_list', page=current_page + 1) }}">&gt;</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{# アラート履歴参照モーダル オーバーレイ #}
+<div id="ah-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-content modal-content--large" id="ah-modal-content" onclick="event.stopPropagation()">
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script src="{{ url_for('static', filename='js/components/alert_history.js') }}"></script>
+{% endblock %}

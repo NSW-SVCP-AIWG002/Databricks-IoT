@@ -1,0 +1,94 @@
+<div class="modal__header">
+  <h2 class="modal__title">アラート履歴参照</h2>
+</div>
+
+<div class="modal__body">
+  <p class="ah-modal-desc">登録されているアラート履歴情報を表示します。</p>
+
+  <dl class="ah-detail">
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート発生日時</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.alert_occurrence_datetime %}
+          {{ alert_history.alert_occurrence_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">デバイス名</dt>
+      <dd class="ah-detail__value">{{ alert_history.device_name or '-' }}</dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">設置場所</dt>
+      <dd class="ah-detail__value">{{ alert_history.device_location or '-' }}</dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート名</dt>
+      <dd class="ah-detail__value">{{ alert_history.alert_name or '-' }}</dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラートレベル</dt>
+      <dd class="ah-detail__value">{{ alert_history.alert_level_name or '-' }}</dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">ステータス</dt>
+      <dd class="ah-detail__value">{{ alert_history.alert_status_name or '-' }}</dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート発生条件</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.alert_conditions_field and alert_history.alert_conditions_operator and alert_history.alert_conditions_threshold is not none %}
+          {{ alert_history.alert_conditions_field }} {{ alert_history.alert_conditions_operator }} {{ alert_history.alert_conditions_threshold }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート復旧条件</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.alert_recovery_field and alert_history.alert_recovery_operator and alert_history.alert_recovery_threshold is not none %}
+          {{ alert_history.alert_recovery_field }} {{ alert_history.alert_recovery_operator }} {{ alert_history.alert_recovery_threshold }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">判定時間</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.judgment_time is not none %}
+          {{ alert_history.judgment_time }}分
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート発生時の値</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.alert_value is not none %}
+          {{ alert_history.alert_value }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+    <div class="ah-detail__row">
+      <dt class="ah-detail__label">アラート復旧日時</dt>
+      <dd class="ah-detail__value">
+        {% if alert_history.alert_recovery_datetime %}
+          {{ alert_history.alert_recovery_datetime.strftime('%Y/%m/%d %H:%M:%S') }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+</div>
+
+<div class="modal__footer">
+  <button type="button" class="button button--secondary" onclick="closeAlertHistoryModal()">閉じる</button>
+</div>
