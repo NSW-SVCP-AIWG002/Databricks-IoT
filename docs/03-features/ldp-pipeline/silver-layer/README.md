@@ -8,11 +8,12 @@
 
 1. **データ取込み**: Kafka互換エンドポイントからテレメトリデータをストリーミング取得
 2. **データ構造化**: JSON形式のセンサーデータをパースし、構造化スキーマに変換
-3. **異常検出**: アラート設定マスタの閾値に基づく異常値検出（継続時間判定含む）
-4. **状態管理**: 異常状態テーブル（`silver_alert_abnormal_state`）によるアラート状態追跡
-5. **メールキュー登録**: 異常検出時のメール送信キューへの登録（実送信は別バッチ）
-6. **外部DB更新**: デバイスステータス・アラート履歴のOLTP DB更新
-7. **障害通知**: OLTP接続エラー、キュー書込みエラー、Delta Lake書込みエラー発生時のTeams通知
+3. **組織フィルタリング**: 組織マスタとの結合により、未登録組織のレコードを除外（STEP 3.5）
+4. **異常検出**: アラート設定マスタの閾値に基づく異常値検出（継続時間判定含む）
+5. **状態管理**: 異常状態テーブル（`alert_abnormal_state`）によるアラート状態追跡
+6. **メールキュー登録**: 異常検出時のメール送信キューへの登録（実送信は別バッチ）
+7. **外部DB更新**: センサーデータ・デバイスステータス・アラート履歴のOLTP DB更新（STEP 5a-2）
+8. **障害通知**: OLTP接続エラー、キュー書込みエラー、Delta Lake書込みエラー発生時のTeams通知
 
 ---
 
@@ -45,6 +46,7 @@
 
 | テーブル名               | 説明                               |
 | ------------------------ | ---------------------------------- |
+| silver_sensor_data       | センサーデータ（MySQL側レプリカ）  |
 | alert_abnormal_state     | アラート異常状態（継続時間判定用） |
 | email_notification_queue | メール送信キュー                   |
 
@@ -95,10 +97,8 @@ CLUSTER BY (event_date, device_id)
 
 | テーブル名           | 用途                                     |
 | -------------------- | ---------------------------------------- |
-| device_master        | デバイス情報・組織ID取得                 |
-| organization_closure | 組織階層情報取得                         |
-| organization_master  | アラートメール通知先と紐づく組織IDを取得 |
-| user_master          | アラートメール通知先取得                 |
+| device_master        | デバイス情報・組織ID取得                                     |
+| organization_master  | 組織マスタ存在チェック（未登録組織のレコードを除外、STEP 3.5） |
 
 センサーデータはAzure Event HubsからKafka互換エンドポイント経由で取得する。
 
@@ -112,21 +112,22 @@ CLUSTER BY (event_date, device_id)
 
 | テーブル名              | 用途                   |
 | ----------------------- | ---------------------- |
-| alert_setting_master    | アラート閾値設定取得   |
-| measurement_item_master | 測定項目取得           |
-| alert_level_master      | アラートレベル取得     |
-| alert_status_master     | アラートステータス取得 |
-| alert_abnormal_state    | アラート継続状態の参照 |
+| alert_setting_master    | アラート閾値設定取得                         |
+| measurement_item_master | 測定項目取得                                 |
+| alert_level_master      | アラートレベル名取得（通知JSON生成に使用）   |
+| alert_abnormal_state    | アラート継続状態の参照                       |
+| user_master             | メール通知先取得（JDBC経由）                 |
 
 
 ### 書き込みテーブル（OLTP DB）
 
-| テーブル名               | 用途                       |
-| ------------------------ | -------------------------- |
-| device_status_data       | デバイス最新ステータス更新 |
-| alert_history            | アラート履歴記録           |
-| alert_abnormal_state     | アラート継続状態の更新     |
-| email_notification_queue | メール送信待機列の登録     |
+| テーブル名               | 用途                                          |
+| ------------------------ | --------------------------------------------- |
+| silver_sensor_data       | センサーデータ書き込み（Delta Lake と並行、STEP 5a-2） |
+| device_status_data       | デバイス最新ステータス更新                    |
+| alert_history            | アラート履歴記録                              |
+| alert_abnormal_state     | アラート継続状態の更新                        |
+| email_notification_queue | メール送信待機列の登録                        |
 
 ---
 
@@ -152,32 +153,41 @@ flowchart TB
 
     subgraph Pipeline["シルバー層パイプライン（foreachBatch処理）"]
         KafkaSource["Kafka Source<br>readStream.format('kafka')"]
+        Decode["UTF-8デコード<br>CAST(value AS STRING)"]
+        JsonFilter["JSON形式フィルタ<br>.rlike(r'^\\{.*\\}')"]
         Parse[JSONパース<br>value列抽出]
         Enrich[データエンリッチ<br>デバイスマスタ結合]
+        OrgFilter[組織フィルタリング<br>organization_master inner join]
         ThresholdCheck[閾値判定<br>アラート設定比較]
         StateCheck[継続時間判定<br>judgment_time判定]
         StateUpdate[状態テーブル更新<br>MERGE処理]
         Recovery[復旧判定・処理<br>alert_history更新]
         Write[(Delta Lake書込み<br>silver_sensor_data)]
+        MySQLWrite[(MySQL書込み<br>silver_sensor_data)]
 
-        KafkaSource --> Parse
+        KafkaSource --> Decode
+        Decode --> JsonFilter
+        JsonFilter --> Parse
         Parse --> Enrich
-        Enrich --> ThresholdCheck
+        Enrich --> OrgFilter
+        OrgFilter --> ThresholdCheck
         ThresholdCheck --> StateCheck
         StateCheck --> StateUpdate
         StateUpdate --> Recovery
         Recovery --> Write
+        Recovery --> MySQLWrite
     end
 
     subgraph External["外部連携"]
         StateUpdate -->|アラート発報時| OLTP
         StateUpdate -->|ステータス更新| OLTP[(OLTP DB<br>MySQL)]
         Recovery -->|復旧時| OLTP
+        MySQLWrite -->|センサーデータ| OLTP
     end
 
     subgraph Batch["バッチジョブ"]
         OLTP --> EmailJob[メール送信ジョブ<br>1分間隔実行]
-        EmailJob --> SMTP[SMTPサーバ]
+        EmailJob --> SMTP[Azure SendGrid]
     end
 
     Device1 --> IoTHub
@@ -282,6 +292,7 @@ flowchart TB
 
 | 日付       | 版数 | 変更内容                 | 担当者       |
 | ---------- | ---- | ------------------------ | ------------ |
-| 2026-01-19 | 1.0  | 初版作成                 | Kei Sugiyama |
-| 2026-01-26 | 1.1  | AIレビュー指摘修正       | Kei Sugiyama |
-| 2026-02-03 | 1.2  | 内部レビュー指摘事項反映 | Kei Sugiyama |
+| 2026-01-19 | 1.0  | 初版作成                                                                                                              | Kei Sugiyama |
+| 2026-01-26 | 1.1  | AIレビュー指摘修正                                                                                                    | Kei Sugiyama |
+| 2026-02-03 | 1.2  | 内部レビュー指摘事項反映                                                                                              | Kei Sugiyama |
+| 2026-04-17 | 1.3  | 実装との齟齬を反映：STEP 3.5（organization_master inner join）追加、STEP 5a-2（MySQL センサーデータ書き込み）追加、organization_master用途修正、silver_sensor_dataをOLTP書き込みテーブルに追加 | Kei Sugiyama |

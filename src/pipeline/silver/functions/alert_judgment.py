@@ -346,13 +346,13 @@ def enqueue_email_notification(batch_df, batch_id, spark):
     if alert_records.isEmpty():
         return
 
-    mail_settings = spark.read.format("jdbc").options(
+    user_mail_settings = spark.read.format("jdbc").options(
         url=_oltp_jdbc_url(),
         # driver="com.mysql.cj.jdbc.Driver",
-        dbtable="mail_setting",
+        dbtable="user_master",
         user=_builtins.dbutils.secrets.get("my_sql_secrets", "username"),
         password=_builtins.dbutils.secrets.get("my_sql_secrets", "password"),
-    ).load().filter("is_active = TRUE")
+    ).load().filter("delete_flag = FALSE AND alert_notification_flag = TRUE")
 
     measurement_items = spark.read.format("jdbc").options(
         url=_oltp_jdbc_url(),
@@ -362,45 +362,59 @@ def enqueue_email_notification(batch_df, batch_id, spark):
         password=_builtins.dbutils.secrets.get("my_sql_secrets", "password"),
     ).load()
 
+    alert_levels = spark.read.format("jdbc").options(
+        url=_oltp_jdbc_url(),
+        # driver="com.mysql.cj.jdbc.Driver",
+        dbtable="alert_level_master",
+        user=_builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+        password=_builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+    ).load()
+
     current_time = F.current_timestamp()
 
     queue_records = (
         alert_records
-        .join(F.broadcast(mail_settings), "organization_id", "inner")
+        .join(F.broadcast(user_mail_settings), "organization_id", "inner")
         .join(
             F.broadcast(measurement_items),
             alert_records.alert_conditions_measurement_item_id == measurement_items.measurement_item_id,
             "left"
         )
+        .join(
+            F.broadcast(alert_levels),
+            alert_records.alert_level_id == alert_levels.alert_level_id,
+            "left"
+        )
         .select(
-            F.col("device_id"),
-            F.col("organization_id"),
-            F.col("alert_id"),
+            alert_records.device_id,
+            alert_records.organization_id,
+            alert_records.alert_id,
             F.col("email_address").alias("recipient_email"),
             F.concat(
                 F.lit("[アラート] "),
                 F.col("alert_name"),
                 F.lit(" - デバイスID: "),
-                F.col("device_id").cast("string")
+                alert_records.device_id.cast("string")
             ).alias("subject"),
             F.concat(
                 F.lit("アラートが発生しました。\n\n"),
-                F.lit("デバイスID: "), F.col("device_id").cast("string"), F.lit("\n"),
+                F.lit("デバイスID: "), alert_records.device_id.cast("string"), F.lit("\n"),
                 F.lit("アラート名: "), F.col("alert_name"), F.lit("\n"),
                 F.lit("測定項目: "), F.col("measurement_item_name"), F.lit("\n"),
                 F.lit("検出日時: "), F.col("event_timestamp").cast("string"), F.lit("\n")
             ).alias("body"),
             F.to_json(F.struct(
-                F.col("alert_id"),
+                alert_records.alert_id,
                 F.col("alert_name"),
                 F.col("alert_conditions_measurement_item_id").alias("measurement_item_id"),
                 F.col("measurement_item_name"),
                 F.col("alert_conditions_operator").alias("operator"),
                 F.col("alert_conditions_threshold").alias("threshold"),
-                F.col("alert_level_id"),
+                alert_records.alert_level_id,
+                F.col("alert_level_name"),
                 F.col("event_timestamp").alias("detected_at"),
-                F.col("device_id"),
-                F.col("organization_id")
+                alert_records.device_id,
+                alert_records.organization_id
             )).alias("alert_detail_json"),
             F.lit("PENDING").alias("status"),
             F.lit(0).alias("retry_count"),
@@ -488,8 +502,6 @@ def insert_alert_history(batch_df, batch_id):
                     "alert_id": record["alert_id"],
                     "alert_history_id": alert_history_id,
                 })
-
-            conn.commit()
 
             for update in alert_history_updates:
                 cursor.execute("""

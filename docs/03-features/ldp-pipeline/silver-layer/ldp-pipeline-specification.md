@@ -50,6 +50,7 @@
     - [メール送信キュー登録処理](#メール送信キュー登録処理)
     - [キュー登録の設計方針](#キュー登録の設計方針)
     - [メール送信バッチジョブ](#メール送信バッチジョブ)
+    - [MySQL センサーデータ書き込み（STEP 5a-2）](#mysql-センサーデータ書き込みstep-5a-2)
     - [デバイスステータス更新](#デバイスステータス更新)
     - [アラート履歴登録処理（アラート発報時）](#アラート履歴登録処理アラート発報時)
     - [アラート履歴更新処理（復旧時）](#アラート履歴更新処理復旧時)
@@ -88,7 +89,6 @@
     - [定期メンテナンス](#定期メンテナンス)
   - [関連ドキュメント](#関連ドキュメント)
     - [機能概要](#機能概要)
-    - [バッチジョブ](#バッチジョブ)
     - [要件定義](#要件定義)
     - [データベース設計](#データベース設計)
     - [共通仕様](#共通仕様)
@@ -212,6 +212,10 @@ flowchart TB
             Enrich --> Meta[メタデータ付与]
         end
 
+        subgraph Step3_5["STEP 3.5: 組織フィルタリング"]
+            OrgFilter[organization_master inner join<br>未登録組織レコードを除外]
+        end
+
         subgraph Step4["STEP 4: アラート判定"]
             Threshold[閾値判定] --> StateCheck[異常状態テーブル参照]
             StateCheck --> Duration[継続時間判定]
@@ -249,7 +253,8 @@ flowchart TB
     DeviceId --> FormatCheck
     RawJson --> Extract
     Flatten --> AddDeviceId
-    Meta --> Threshold
+    Meta --> OrgFilter
+    OrgFilter --> Threshold
     Flag --> Write
     Flag --> StateUpdate
     Flag -->|アラート発報時| Queue
@@ -283,9 +288,9 @@ from pyspark.sql.types import (
 # =============================================================================
 # 接続設定
 # =============================================================================
-EVENTHUBS_NAMESPACE = dbutils.secrets.get("iot-secrets", "eventhubs-namespace")
-EVENTHUBS_CONNECTION_STRING = dbutils.secrets.get("iot-secrets", "eventhubs-connection-string")
-TOPIC_NAME = "telemetry-hub"
+EVENTHUBS_NAMESPACE = dbutils.secrets.get("eventhubs_secrets", "eventhubs-namespace")
+EVENTHUBS_CONNECTION_STRING = dbutils.secrets.get("eventhubs_secrets", "eventhubs-connection-string")
+TOPIC_NAME = "eh-telemetry"
 
 kafka_options = {
     "kafka.bootstrap.servers": f"{EVENTHUBS_NAMESPACE}.servicebus.windows.net:9093",
@@ -297,8 +302,14 @@ kafka_options = {
         f'username="$ConnectionString" '
         f'password="{EVENTHUBS_CONNECTION_STRING}";'
     ),
-    "startingOffsets": "latest",
-    "failOnDataLoss": "false"
+    # チェックポイントなし初回起動時は earliest から開始（チェックポイントがあれば自動でそこから再開）
+    "startingOffsets": "earliest",
+    # "startingOffsets": "latest",
+    "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",       # 30秒（デフォルト600秒を短縮）
+    "kafka.heartbeat.interval.ms": "10000",    # 10秒（session.timeout の1/3以下）
+    "kafka.request.timeout.ms": "60000",       # 60秒
+    "kafka.max.poll.interval.ms": "600000",    # 10分（foreachBatch の処理時間上限）
 }
 
 # ----------------------------------
@@ -321,25 +332,25 @@ spark.readStream
 
 ### 入力データスキーマ（Kafka互換エンドポイントの基本スキーマ）
 
-| カラム名      | データ型  | 説明                                                                                         |
-| ------------- | --------- | -------------------------------------------------------------------------------------------- |
-| key           | BINARY    | メッセージのキー。EventHub経由の場合、デバイスIDが格納される（デバイスID抽出に使用）         |
-| value         | BINARY    | メッセージの本体（ペイロード）。テレメトリデータなどはここに格納される                       |
-| topic         | STRING    | Event Hubs（Kafkaトピック）の名前。MQTT経由の場合、TopicからデバイスIDを抽出する             |
-| partition     | INT       | データが格納されているパーティション番号                                                     |
-| offset        | long      | パーティション内のデータの位置                                                               |
-| timestamp     | TIMESTAMP | メッセージのタイムスタンプ                                                                   |
-| timestampType | INT       | タイムスタンプの種類（0: CreateTime, 1: LogAppendTime）                                      |
+| カラム名      | データ型  | 説明                                                                                 |
+| ------------- | --------- | ------------------------------------------------------------------------------------ |
+| key           | BINARY    | メッセージのキー。EventHub経由の場合、デバイスIDが格納される（デバイスID抽出に使用） |
+| value         | BINARY    | メッセージの本体（ペイロード）。テレメトリデータなどはここに格納される               |
+| topic         | STRING    | Event Hubs（Kafkaトピック）の名前。MQTT経由の場合、TopicからデバイスIDを抽出する     |
+| partition     | INT       | データが格納されているパーティション番号                                             |
+| offset        | long      | パーティション内のデータの位置                                                       |
+| timestamp     | TIMESTAMP | メッセージのタイムスタンプ                                                           |
+| timestampType | INT       | タイムスタンプの種類（0: CreateTime, 1: LogAppendTime）                              |
 
 #### デバイスID取得元の優先順位
 
 テレメトリデータに格納するデバイスIDは、以下の優先順位で取得する：
 
-| 優先度 | 取得元              | 形式                                | 説明                                                     |
-| ------ | ------------------- | ----------------------------------- | -------------------------------------------------------- |
-| 1      | MQTT Topic          | `/<機器ID>/data/refrigerator`       | MQTT経由の場合、Topicパスから機器IDを抽出                |
-| 2      | EventHub key        | デバイスID文字列                    | EventHub直接接続の場合、keyカラムにデバイスIDが格納される |
-| 3      | ペイロード内device_id | JSON/バイナリ内のdevice_idフィールド | Topic/keyから取得できない場合のフォールバック            |
+| 優先度 | 取得元                | 形式                                 | 説明                                                      |
+| ------ | --------------------- | ------------------------------------ | --------------------------------------------------------- |
+| 1      | MQTT Topic            | `/<機器ID>/data/refrigerator`        | MQTT経由の場合、Topicパスから機器IDを抽出                 |
+| 2      | EventHub key          | デバイスID文字列                     | EventHub直接接続の場合、keyカラムにデバイスIDが格納される |
+| 3      | ペイロード内device_id | JSON/バイナリ内のdevice_idフィールド | Topic/keyから取得できない場合のフォールバック             |
 
 **MQTT Topic形式:**
 ```
@@ -724,9 +735,9 @@ def update_json_device_id(json_str: str, override_device_id: str) -> str:
 
     try:
         data = json.loads(json_str)
-        data["device_id"] = override_device_id
+        data["device_id"] = int(override_device_id)  # int型に変換してdevice_idを上書き
         return json.dumps(data)
-    except (json.JSONDecodeError, TypeError):
+    except (json.JSONDecodeError, TypeError, ValueError):
         return json_str
 
 # UDF登録
@@ -788,19 +799,19 @@ convert_to_json_with_device_id_udf = F.udf(convert_to_json_with_device_id, Strin
         F.col("extracted_device_id")
     )
 )
-.filter(F.col("raw_json").isNotNull())  # 変換失敗レコードを除外
+.filter(F.col("raw_json").isNotNull() & F.col("raw_json").rlike(r'^\{.*\}'))  # 変換失敗・JSON非オブジェクトレコードを除外
 ```
 
 #### 変換エラー時の処理
 
 バイナリ/JSON変換に失敗したレコードは以下の条件で発生する：
 
-| エラー条件                             | 原因                       | 処理         |
-| -------------------------------------- | -------------------------- | ------------ |
-| バイナリデータが188バイトでない        | 不正なデータサイズ         | レコード破棄 |
-| UTF-8デコード失敗かつバイナリパース失敗 | 不正なデータ形式           | レコード破棄 |
-| structアンパックエラー                 | バイナリフォーマット不整合 | レコード破棄 |
-| デバイスID抽出失敗                     | Topic/key/ペイロードすべて無効 | レコード破棄 |
+| エラー条件                              | 原因                           | 処理         |
+| --------------------------------------- | ------------------------------ | ------------ |
+| バイナリデータが188バイトでない         | 不正なデータサイズ             | レコード破棄 |
+| UTF-8デコード失敗かつバイナリパース失敗 | 不正なデータ形式               | レコード破棄 |
+| structアンパックエラー                  | バイナリフォーマット不整合     | レコード破棄 |
+| デバイスID抽出失敗                      | Topic/key/ペイロードすべて無効 | レコード破棄 |
 
 変換失敗レコードはfilter条件で除外され、後続のJSONパース処理には渡されない。これはエラーレコード処理方針（本仕様書「エラーレコード処理方針」参照）に準拠する。
 
@@ -870,18 +881,24 @@ sensor_schema = StructType([
     F.col("parsed.fan_motor_5").alias("fan_motor_5"),
     F.col("parsed.defrost_heater_output_1").alias("defrost_heater_output_1"),
     F.col("parsed.defrost_heater_output_2").alias("defrost_heater_output_2"),
-    F.col("raw_json"),
-    F.col("parsed")  # データ品質チェック用
+    F.col("raw_json")
 )
 ```
 
 ### データエンリッチ処理
 
-データエンリッチ処理はデバイスマスタからデバイスID、組織IDを結合することで達成する。
+データエンリッチ処理はデバイスマスタからデバイスID・組織IDを結合し、さらに組織マスタとの内部結合で未登録組織のレコードを除外することで達成する。
 
 ```python
 # STEP 3: デバイスマスタ結合（organization_id付与）
-.join(F.broadcast(device_master), "device_id", "left")
+.join(F.broadcast(get_device_master()), "device_id", "left")
+
+# STEP 3.5: 組織マスタ存在チェック（organization_idが存在しないレコードは除外）
+.join(
+    F.broadcast(get_organization_master().select("organization_id")),
+    "organization_id",
+    "inner",
+)
 ```
 
 ### データ型変換ルール
@@ -889,7 +906,7 @@ sensor_schema = StructType([
 | 入力                   | 出力カラム        | 変換ロジック                                               |
 | ---------------------- | ----------------- | ---------------------------------------------------------- |
 | parsed.event_timestamp | event_timestamp   | to_timestamp()でTIMESTAMP型に変換                          |
-| parsed.device_id       | device_id         | そのまま文字列型として抽出。データエンリッチ時に数値型なる |
+| parsed.device_id       | device_id         | IntegerType()で整数型として抽出                            |
 | -                      | raw_json          | そのまま文字列型として抽出                                 |
 | 上記以外の項目         | external_tempなど | DOUBLE型として抽出                                         |
 
@@ -949,34 +966,59 @@ flowchart TD
 
 ```python
 def get_alert_settings():
-    """OLTP DBからアラート設定を取得"""
-    return spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",　# host, databaseはOLTPDBの設定情報で置換する
-        driver="com.mysql.cj.jdbc.Driver",
-        dbtable="alert_setting_master",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password")
-    ).load().filter("delete_flag = FALSE")
+    """OLTP DBからアラート設定を取得（Spark JDBC経由）"""
+    return (
+        builtins.spark.read.format("jdbc").options(
+            url=OLTP_JDBC_URL,
+            # driver="com.mysql.cj.jdbc.Driver",
+            dbtable="alert_setting_master",
+            user=builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+            password=builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+        ).load()
+        .filter("delete_flag = FALSE")
+    )
 
-def get_measurement_items():
-    """測定項目マスタを取得"""
-    return spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
-        driver="com.mysql.cj.jdbc.Driver",
-        dbtable="measurement_item_master",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password")
-    ).load()
+# get_measurement_items() は独立関数として存在しない。
+# enqueue_email_notification() 内でインライン JDBC クエリとして実装されている。
+
+_ALERT_ABNORMAL_STATE_SCHEMA = StructType([
+    StructField("device_id",           IntegerType(),   True),
+    StructField("alert_id",            IntegerType(),   True),
+    StructField("abnormal_start_time", TimestampType(), True),
+    StructField("last_event_time",     TimestampType(), True),
+    StructField("last_sensor_value",   DoubleType(),    True),
+    StructField("alert_fired_time",    TimestampType(), True),
+    StructField("alert_history_id",    IntegerType(),   True),
+    # 派生カラム（DBには存在しない。ロード後に付与）
+    StructField("is_abnormal",         BooleanType(),   True),
+    StructField("alert_fired",         BooleanType(),   True),
+])
 
 def get_alert_abnormal_state():
-    """異常状態テーブルをOLTP DBから取得"""
-    return spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
-        driver="com.mysql.cj.jdbc.Driver",
-        dbtable="alert_abnormal_state",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password")
-    ).load()
+    """
+    異常状態テーブルを OLTP DB から取得する。
+
+    DBテーブル上に is_abnormal / alert_fired カラムは存在しないため、
+    ロード後に派生カラムとして追加する:
+        is_abnormal = abnormal_start_time IS NOT NULL
+        alert_fired  = alert_fired_time  IS NOT NULL
+    """
+    try:
+        df = builtins.spark.read.format("jdbc").options(
+            url=OLTP_JDBC_URL,
+            # driver="com.mysql.cj.jdbc.Driver",
+            dbtable="alert_abnormal_state",
+            user=builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+            password=builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+        ).load()
+        return (
+            df
+            .withColumn("is_abnormal", F.col("abnormal_start_time").isNotNull())
+            .withColumn("alert_fired",  F.col("alert_fired_time").isNotNull())
+        )
+    except Exception as e:
+        print(f"[WARN] alert_abnormal_state 取得失敗（空DataFrameで代替）: {str(e).splitlines()[0]}")
+        return builtins.spark.createDataFrame([], schema=_ALERT_ABNORMAL_STATE_SCHEMA)
 
 # 測定項目IDとセンサーカラム名のマッピング
 MEASUREMENT_COLUMN_MAP = {
@@ -1310,18 +1352,26 @@ import random
 
 # =============================================================================
 # MySQL接続設定
+# Databricks Secrets スコープ: "my_sql_secrets"
+# キー: host / username / password
 # =============================================================================
-MYSQL_CONFIG = {
-    "host": dbutils.secrets.get("scope", "mysql-host"),
-    "port": 3306,
-    "user": dbutils.secrets.get("scope", "mysql-user"),
-    "password": dbutils.secrets.get("scope", "mysql-password"),
-    "database": "iot_app",
-    "charset": "utf8mb4",
-    "connect_timeout": 10,
-    "read_timeout": 30,
-    "write_timeout": 30
-}
+def get_mysql_config():
+    """MySQL接続設定を返す（Spark Connect ワーカー対応のため遅延解決）"""
+    _dbutils = builtins.dbutils
+    return {
+        "host": _dbutils.secrets.get("my_sql_secrets", "host"),
+        "port": 3306,
+        "user": _dbutils.secrets.get("my_sql_secrets", "username"),
+        "password": _dbutils.secrets.get("my_sql_secrets", "password"),
+        "database": "iot_app_db",
+        "charset": "utf8mb4",
+        "connect_timeout": 10,
+        "read_timeout": 30,
+        "write_timeout": 30,
+        "ssl_ca": certifi.where(),     # certifi CA証明書でSSL有効化（Azure MySQL対応）
+        "ssl_verify_cert": True,
+        "ssl_verify_identity": False,  # ホスト名検証はスキップ
+    }
 
 # =============================================================================
 # OLTPリトライ設定
@@ -1353,7 +1403,7 @@ def get_mysql_connection():
 
     for attempt in range(OLTP_MAX_RETRIES + 1):
         try:
-            conn = pymysql.connect(**MYSQL_CONFIG)
+            conn = pymysql.connect(**get_mysql_config())
             yield conn
             return  # 正常終了
 
@@ -1378,7 +1428,7 @@ def get_mysql_connection():
 
 | 項目             | 値                                                   | 説明                                                                |
 | ---------------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
-| 最大リトライ回数 | 3回                                                  | 4回失敗で例外送出、処理継続（Delta Lake書込みはロールバックしない） |
+| 最大リトライ回数 | 3回                                                  | 3回失敗で例外送出、処理継続（Delta Lake書込みはロールバックしない） |
 | リトライ間隔     | ジッター付き指数バックオフ（1～2秒、2～4秒、4～8秒） | 一時的なネットワーク障害からの復旧を待機                            |
 | 接続タイムアウト | 10秒                                                 | MySQL接続確立のタイムアウト                                         |
 | 読取タイムアウト | 30秒                                                 | クエリ実行のタイムアウト                                            |
@@ -1432,10 +1482,9 @@ def is_retryable_error(error: Exception) -> bool:
 **リトライ動作シーケンス:**
 
 ```
-試行1: 接続失敗 → 1~2秒待機
-試行2: 接続失敗 → 2~4秒待機
-試行3: 接続失敗 → 4~8秒待機
-試行4: 例外送出（エラーログ記録、処理継続）
+試行1（attempt=0）: 実行 → 失敗 → 1〜2秒待機
+試行2（attempt=1）: 実行 → 失敗 → 2〜4秒待機
+試行3（attempt=2）: 実行 → 失敗 → 例外送出（リトライ上限）
 ```
 
 ### メール送信キュー登録処理
@@ -1444,8 +1493,11 @@ def is_retryable_error(error: Exception) -> bool:
 実際のメール送信は別途Databricks Workflowで定期実行されるバッチジョブが担当する。
 
 ```python
-def enqueue_email_notification(batch_df, batch_id):
-    """メール送信キューへの登録（foreachBatchで呼び出し）"""
+def enqueue_email_notification(batch_df, batch_id, spark):
+    """メール送信キューへの登録（foreachBatchで呼び出し）
+    
+    spark: foreachBatch ワーカーから受け取った SparkSession
+    """
 
     # アラート発生レコードを抽出
     alert_records = batch_df.filter(
@@ -1456,56 +1508,77 @@ def enqueue_email_notification(batch_df, batch_id):
     if alert_records.isEmpty():
         return
 
-    # メール設定マスタを取得（送信先アドレス）
-    mail_settings = spark.read.format("jdbc").options(
-        url="jdbc:mysql://{host}:3306/{database}",
-        driver="com.mysql.cj.jdbc.Driver",
-        dbtable="mail_setting",
-        user=dbutils.secrets.get("scope", "mysql-user"),
-        password=dbutils.secrets.get("scope", "mysql-password")
-    ).load().filter("is_active = TRUE")
+    # ユーザマスタを取得（送信先アドレス）
+    user_mail_settings = spark.read.format("jdbc").options(
+        url=OLTP_JDBC_URL,
+        # driver="com.mysql.cj.jdbc.Driver",
+        dbtable="user_master",
+        user=builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+        password=builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+    ).load().filter("delete_flag = FALSE AND alert_notification_flag = TRUE")
 
-    # 測定項目マスタを取得（測定項目名）
-    measurement_items = get_measurement_items()
+    # 測定項目マスタを取得（測定項目名）— 独立関数なし、インラインで取得
+    measurement_items = spark.read.format("jdbc").options(
+        url=OLTP_JDBC_URL,
+        # driver="com.mysql.cj.jdbc.Driver",
+        dbtable="measurement_item_master",
+        user=builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+        password=builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+    ).load()
+
+    # アラートレベルマスタを取得（アラートレベル名）
+    alert_levels = spark.read.format("jdbc").options(
+        url=OLTP_JDBC_URL,
+        # driver="com.mysql.cj.jdbc.Driver",
+        dbtable="alert_level_master",
+        user=builtins.dbutils.secrets.get("my_sql_secrets", "username"),
+        password=builtins.dbutils.secrets.get("my_sql_secrets", "password"),
+    ).load()
 
     # キューレコードを生成
     current_time = F.current_timestamp()
 
     queue_records = (
         alert_records
-        .join(F.broadcast(mail_settings), "organization_id", "inner")
+        .join(F.broadcast(user_mail_settings), "organization_id", "inner")
         .join(F.broadcast(measurement_items),
               alert_records.alert_conditions_measurement_item_id == measurement_items.measurement_item_id,
               "left")
+        .join(
+            F.broadcast(alert_levels),
+            alert_records.alert_level_id == alert_levels.alert_level_id,
+            "left"
+        )
         .select(
-            F.col("device_id"),
-            F.col("organization_id"),
-            F.col("alert_id"),
+            alert_records.device_id,
+            alert_records.organization_id,
+            alert_records.alert_id,
             F.col("email_address").alias("recipient_email"),
             F.concat(
                 F.lit("[アラート] "),
                 F.col("alert_name"),
                 F.lit(" - デバイスID: "),
-                F.col("device_id").cast("string")
+                alert_records.device_id.cast("string")
             ).alias("subject"),
             F.concat(
                 F.lit("アラートが発生しました。\n\n"),
-                F.lit("デバイスID: "), F.col("device_id").cast("string"), F.lit("\n"),
+                F.lit("デバイスID: "), alert_records.device_id.cast("string"), F.lit("\n"),
                 F.lit("アラート名: "), F.col("alert_name"), F.lit("\n"),
                 F.lit("測定項目: "), F.col("measurement_item_name"), F.lit("\n"),
                 F.lit("検出日時: "), F.col("event_timestamp").cast("string"), F.lit("\n")
             ).alias("body"),
             F.to_json(F.struct(
-                F.col("alert_id"),
+                alert_records.alert_id,
                 F.col("alert_name"),
                 F.col("alert_conditions_measurement_item_id").alias("measurement_item_id"),
                 F.col("measurement_item_name"),
                 F.col("alert_conditions_operator").alias("operator"),
                 F.col("alert_conditions_threshold").alias("threshold"),
-                F.col("alert_level_id"),
+                alert_records.alert_level_id,
+                F.col("alert_level_name"),
                 F.col("event_timestamp").alias("detected_at"),
-                F.col("device_id"),
-                F.col("organization_id")
+                alert_records.device_id,
+                alert_records.organization_id
             )).alias("alert_detail_json"),
             F.lit("PENDING").alias("status"),
             F.lit(0).alias("retry_count"),
@@ -1569,6 +1642,75 @@ def enqueue_email_notification(batch_df, batch_id):
 本バッチジョブはDatabricks Workflowで1分間隔で実行される。
 
 詳細は[バッチジョブ仕様書](./batch-job-specification.md)を参照。
+
+### MySQL センサーデータ書き込み（STEP 5a-2）
+
+Delta Lake 書き込み（STEP 5a）と並行して、OLTP DB（MySQL）の `silver_sensor_data` テーブルにもセンサーデータを書き込む。
+
+```python
+# STEP 5a-2: MySQL書込み（センサーデータ）
+mysql_df = batch_df.select(
+    F.col("device_id"),
+    F.col("organization_id"),
+    F.col("event_timestamp"),
+    F.to_date(F.col("event_timestamp")).alias("event_date"),
+    *[F.col(f) for f in [
+        "external_temp", "set_temp_freezer_1",
+        "internal_sensor_temp_freezer_1", "internal_temp_freezer_1",
+        "df_temp_freezer_1", "condensing_temp_freezer_1",
+        "adjusted_internal_temp_freezer_1", "set_temp_freezer_2",
+        "internal_sensor_temp_freezer_2", "internal_temp_freezer_2",
+        "df_temp_freezer_2", "condensing_temp_freezer_2",
+        "adjusted_internal_temp_freezer_2", "compressor_freezer_1",
+        "compressor_freezer_2", "fan_motor_1", "fan_motor_2",
+        "fan_motor_3", "fan_motor_4", "fan_motor_5",
+        "defrost_heater_output_1", "defrost_heater_output_2",
+    ]],
+)
+
+mysql_records = mysql_df.collect()
+if mysql_records:
+    with get_mysql_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.executemany("""
+                INSERT INTO silver_sensor_data (
+                    device_id, organization_id, event_timestamp, event_date,
+                    external_temp, set_temp_freezer_1,
+                    internal_sensor_temp_freezer_1, internal_temp_freezer_1,
+                    df_temp_freezer_1, condensing_temp_freezer_1,
+                    adjusted_internal_temp_freezer_1, set_temp_freezer_2,
+                    internal_sensor_temp_freezer_2, internal_temp_freezer_2,
+                    df_temp_freezer_2, condensing_temp_freezer_2,
+                    adjusted_internal_temp_freezer_2, compressor_freezer_1,
+                    compressor_freezer_2, fan_motor_1, fan_motor_2,
+                    fan_motor_3, fan_motor_4, fan_motor_5,
+                    defrost_heater_output_1, defrost_heater_output_2,
+                    create_time
+                ) VALUES (
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, NOW(6)
+                )
+            """, [(
+                r["device_id"], r["organization_id"],
+                r["event_timestamp"], r["event_date"],
+                r["external_temp"], r["set_temp_freezer_1"],
+                r["internal_sensor_temp_freezer_1"], r["internal_temp_freezer_1"],
+                r["df_temp_freezer_1"], r["condensing_temp_freezer_1"],
+                r["adjusted_internal_temp_freezer_1"], r["set_temp_freezer_2"],
+                r["internal_sensor_temp_freezer_2"], r["internal_temp_freezer_2"],
+                r["df_temp_freezer_2"], r["condensing_temp_freezer_2"],
+                r["adjusted_internal_temp_freezer_2"], r["compressor_freezer_1"],
+                r["compressor_freezer_2"], r["fan_motor_1"], r["fan_motor_2"],
+                r["fan_motor_3"], r["fan_motor_4"], r["fan_motor_5"],
+                r["defrost_heater_output_1"], r["defrost_heater_output_2"],
+            ) for r in mysql_records])
+        conn.commit()
+```
+
+**エラーハンドリング:** STEP 5a-2 の例外は `print([SILVER_ERR_007] ...)` でログ出力し、後続の OLTP 更新処理（STEP 5b）は継続する。
 
 ### デバイスステータス更新
 
@@ -1659,8 +1801,6 @@ def insert_alert_history(batch_df, batch_id):
                     "alert_id": record["alert_id"],
                     "alert_history_id": alert_history_id
                 })
-
-            conn.commit()
 
             # 異常状態テーブル（OLTP DB）にalert_history_idを更新
             for update in alert_history_updates:
@@ -1926,11 +2066,11 @@ TBLPROPERTIES (
 
 ### チェックポイント設定
 
-| 項目                   | 設定値                                                                      |
-| ---------------------- | --------------------------------------------------------------------------- |
-| チェックポイント保存先 | abfss://checkpoints@{storage_account}.dfs.core.windows.net/silver_pipeline/ |
-| 保持期間               | 7日間                                                                       |
-| 保存間隔               | マイクロバッチ完了ごと                                                      |
+| 項目                   | 設定値                                                           |
+| ---------------------- | ---------------------------------------------------------------- |
+| チェックポイント保存先 | abfss://checkpoints@bronze.dfs.core.windows.net/silver_pipeline/ |
+| 保持期間               | 7日間                                                            |
+| 保存間隔               | マイクロバッチ完了ごと                                           |
 
 ### 再処理手順
 
@@ -2027,9 +2167,12 @@ TBLPROPERTIES (
 
 ```python
 # シークレット取得例
-mysql_host = dbutils.secrets.get("iot-pipeline-scope", "mysql-host")
-mysql_user = dbutils.secrets.get("iot-pipeline-scope", "mysql-user")
-mysql_password = dbutils.secrets.get("iot-pipeline-scope", "mysql-password")
+# Secretsスコープ: "eventhubs_secrets"（EventHubs）、"my_sql_secrets"（MySQL）、"storage_secrets"（Storage）
+mysql_host = dbutils.secrets.get("my_sql_secrets", "host")
+mysql_user = dbutils.secrets.get("my_sql_secrets", "username")
+mysql_password = dbutils.secrets.get("my_sql_secrets", "password")
+eventhubs_namespace = dbutils.secrets.get("eventhubs_secrets", "eventhubs-namespace")
+eventhubs_connection_string = dbutils.secrets.get("eventhubs_secrets", "eventhubs-connection-string")
 ```
 
 ### データアクセス制御
@@ -2082,23 +2225,12 @@ mysql_password = dbutils.secrets.get("iot-pipeline-scope", "mysql-password")
 | OPTIMIZE実行                   | 日次     | ファイル最適化           |
 | チェックポイントクリーンアップ | 週次     | 古いチェックポイント削除 |
 
-```sql
--- 週次VACUUMジョブ
-VACUUM iot_catalog.silver.silver_sensor_data RETAIN 168 HOURS;
-
--- 日次OPTIMIZEジョブ
-OPTIMIZE iot_catalog.silver.silver_sensor_data;
-```
-
 ---
 
 ## 関連ドキュメント
 
 ### 機能概要
 - [README.md](./README.md) - シルバー層パイプライン概要
-
-### バッチジョブ
-- [バッチジョブ仕様書](./batch-job-specification.md) - メール送信バッチジョブ、キュークリーンアップジョブ
 
 ### 要件定義
 - [機能要件定義書](../../02-requirements/functional-requirements.md) - FR-002, FR-003
@@ -2120,3 +2252,4 @@ OPTIMIZE iot_catalog.silver.silver_sensor_data;
 | ---------- | ---- | ----------------------------------------------------------- | ------------ |
 | 2026-01-19 | 1.0  | 初版作成                                                    | Kei Sugiyama |
 | 2026-02-02 | 1.1  | 異常状態テーブル・メール送信キューをOLTP DBに移設に伴う修正 | Kei Sugiyama |
+| 2026-04-17 | 1.2  | 実装の内容を設計書に反映                                    | Kei Sugiyama |
