@@ -349,6 +349,37 @@ class TestSearchAlertHistoriesWithConditions:
 
     @patch(f"{MODULE}.AlertHistoryByUser")
     @patch(f"{MODULE}.db")
+    def test_partial_datetime_no_between_filter(self, mock_db, _mock_model):
+        """3.1.1.1: start_datetime のみ、または end_datetime のみ指定の場合、BETWEEN フィルタが追加されないこと
+        ワークフロー仕様書SQL: CASE WHEN :start_datetime IS NULL OR :end_datetime IS NULL THEN TRUE
+        実装: if search_params.get('start_datetime') and search_params.get('end_datetime'):
+        両方揃って初めて BETWEEN が適用される。片方だけでは適用されない。
+        """
+        # Arrange
+        user_id = 10
+
+        def _run(start, end):
+            mock_query = _setup_mock_query(mock_db)
+            search_params = _make_default_search_params(start_datetime=start, end_datetime=end)
+            from iot_app.services.alert_history_service import search_alert_histories
+            search_alert_histories(search_params=search_params, user_id=user_id)
+            return mock_query.filter.call_count
+
+        # Act
+        count_start_only = _run("2026/01/01 00:00", None)
+        count_end_only = _run(None, "2026/01/07 23:59")
+        count_both = _run("2026/01/01 00:00", "2026/01/07 23:59")
+        count_none = _run(None, None)
+
+        # Assert: 片方だけ指定の場合は両方指定より BETWEEN フィルタが少ない
+        assert count_start_only < count_both
+        assert count_end_only < count_both
+        # Assert: 片方だけ指定の場合は両方 None と同じ（BETWEEN が追加されない）
+        assert count_start_only == count_none
+        assert count_end_only == count_none
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
     def test_device_name_partial_match(self, mock_db, _mock_model):
         """3.1.1.1: device_name を指定した場合、部分一致フィルタが適用される
         UI仕様書 (2-3): デバイス名（前方・後方・中間一致、max100文字）
@@ -685,6 +716,25 @@ class TestSearchAlertHistoriesSorting:
 
         # Assert
         mock_query.order_by.assert_called()
+
+    @patch(f"{MODULE}.AlertHistoryByUser")
+    @patch(f"{MODULE}.db")
+    def test_no_sort_when_sort_order_id_is_minus_one(self, mock_db, _mock_model):
+        """3.1.1.1: sort_order_id=-1（指定なし）の場合、order_by() が呼ばれないこと
+        SORT_ORDER の sort_order_id=-1 は「指定なし」を意味し、ORDER BY が適用されない。
+        sort_order_id=1（昇順）や sort_order_id=2（降順）と異なり、ソートが一切行われない。
+        """
+        # Arrange
+        user_id = 10
+        search_params = _make_default_search_params(sort_item_id=1, sort_order_id=-1)
+        mock_query = _setup_mock_query(mock_db)
+
+        # Act
+        from iot_app.services.alert_history_service import search_alert_histories
+        search_alert_histories(search_params=search_params, user_id=user_id)
+
+        # Assert
+        mock_query.order_by.assert_not_called()
 
     @pytest.mark.parametrize("sort_item_id", [
         2,  # device_name
