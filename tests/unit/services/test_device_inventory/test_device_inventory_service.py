@@ -61,8 +61,8 @@ def make_default_search_params(**overrides):
         'sort_order': -1,
         'device_uuid': '',
         'device_name': '',
-        'device_type': -1,
-        'inventory_status': -1,
+        'device_type_id': -1,
+        'inventory_status_id': -1,
         'inventory_location': '',
         'purchase_date_from': None,
         'purchase_date_to': None,
@@ -90,12 +90,14 @@ def make_inventory_mock(**kwargs):
     m.device = Mock()
     m.device.device_name = kwargs.get('device_name', 'センサーA')
     m.device.device_type = Mock()
-    m.device.device_type.device_type_name = kwargs.get('device_type_name', 'センサー')
+    m.device.device_type.device_type_name = kwargs.get(
+        'device_type_name', 'センサー')
     m.device.device_model = kwargs.get('device_model', 'MODEL-X100')
     m.device.sim_id = kwargs.get('sim_id', 'SIM001')
     m.device.mac_address = kwargs.get('mac_address', 'AA:BB:CC:DD:EE:FF')
     m.inventory_status = Mock()
-    m.inventory_status.inventory_status_name = kwargs.get('inventory_status_name', '在庫中')
+    m.inventory_status.inventory_status_name = kwargs.get(
+        'inventory_status_name', '在庫中')
     m.purchase_date = kwargs.get('purchase_date', date(2025, 1, 15))
     m.estimated_ship_date = kwargs.get('estimated_ship_date', None)
     m.ship_date = kwargs.get('ship_date', None)
@@ -122,99 +124,110 @@ class TestGetDefaultSearchParams:
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()            # get_default_search_params関数実行
-        assert result['page'] == 1                      # Assert: result内のkey『page』が持つvalueが1であること
+        # Assert: result内のkey『page』が持つvalueが1であること
+        assert result['page'] == 1
 
     def test_returns_per_page_25(self):
         """2.1.1: per_page のデフォルト値は 25 である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['per_page'] == 25             # Assert: result内のkey『per_page』が持つvalueが25であること
+        # Assert: result内のkey『per_page』が持つvalueが25であること
+        assert result['per_page'] == 25
 
     def test_returns_empty_string_for_device_uuid(self):
         """2.1.1: device_uuid のデフォルト値は空文字である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['device_uuid'] == ''          # Assert: result内のkey『device_uuid』が持つvalueが''(空文字)であること
+        # Assert: result内のkey『device_uuid』が持つvalueが''(空文字)であること
+        assert result['device_uuid'] == ''
 
     def test_returns_empty_string_for_device_name(self):
         """2.1.1: device_name のデフォルト値は空文字である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['device_name'] == ''          # Assert: result内のkey『device_name』が持つvalueが''(空文字)であること
+        # Assert: result内のkey『device_name』が持つvalueが''(空文字)であること
+        assert result['device_name'] == ''
 
     def test_returns_all_for_device_type(self):
         """2.1.1: device_type のデフォルト値は -1 である（すべて選択）"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['device_type'] == -1          # Assert: result内のkey『device_type』が持つvalueが-1であること
+        # Assert: result内のkey『device_type』が持つvalueが-1であること
+        assert result['device_type_id'] == -1
 
     def test_returns_all_for_inventory_status(self):
         """2.1.1: inventory_status のデフォルト値は -1 である（すべて選択）"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['inventory_status'] == -1     # Assert: result内のkey『inventory_status』が持つvalueが-1であること
+        # Assert: result内のkey『inventory_status』が持つvalueが-1であること
+        assert result['inventory_status_id'] == -1
 
     def test_returns_empty_string_for_inventory_location(self):
         """2.1.1: inventory_location のデフォルト値は空文字である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['inventory_location'] == ''   # Assert: result内のkey『inventory_location』が持つvalueが''(空文字)であること
+        # Assert: result内のkey『inventory_location』が持つvalueが''(空文字)であること
+        assert result['inventory_location'] == ''
 
     def test_returns_none_for_purchase_date_from(self):
         """2.1.1: purchase_date_from のデフォルト値は None である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['purchase_date_from'] is None # Assert: result内のkey『purchase_date_from』が持つvalueがNoneであること
+        # Assert: result内のkey『purchase_date_from』が持つvalueがNoneであること
+        assert result['purchase_date_from'] is None
 
     def test_returns_none_for_purchase_date_to(self):
         """2.1.1: purchase_date_to のデフォルト値は None である"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['purchase_date_to'] is None   # Assert: result内のkey『purchase_date_to』が持つvalueがNoneであること
+        # Assert: result内のkey『purchase_date_to』が持つvalueがNoneであること
+        assert result['purchase_date_to'] is None
 
     def test_returns_minus1_for_sort_item_id(self):
         """2.1.1: sort_item_id のデフォルト値は -1 である（未選択）"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['sort_item_id'] == -1         # Assert: result内のkey『sort_item_id』が持つvalueが-1であること
+        # Assert: result内のkey『sort_item_id』が持つvalueが-1であること
+        assert result['sort_item_id'] == -1
 
     def test_returns_minus1_for_sort_order(self):
         """2.1.1: sort_order のデフォルト値は -1 である（未選択）"""
         # Arrange / Act
         from iot_app.services.device_inventory_service \
             import get_default_search_params
-        
+
         result = get_default_search_params()        # get_default_search_params関数実行
-        assert result['sort_order'] == -1           # Assert: result内のkey『sort_order』が持つvalueが-1であること
+        # Assert: result内のkey『sort_order』が持つvalueが-1であること
+        assert result['sort_order'] == -1
 
 
 # ============================================================
@@ -241,17 +254,24 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-            
-        q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
-        params = make_default_search_params(device_uuid='DEV-001')      # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
-        call_args = q.filter.call_args_list                             # フィルタ条件取得
-        filter_args_str = str(call_args)                                # 文字列にキャスト
 
-        assert q.filter.call_count > 0                                  # Assert: filter が1回以上呼ばれていること（like フィルタ含む）
-        assert 'DEV-001%' in filter_args_str                            # Assert: 文字列パラメータによる検索が前方一致検索であること
+        q = make_mock_query()
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            device_uuid='DEV-001')      # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        call_args = q.filter.call_args_list                             # フィルタ条件取得
+        # 文字列にキャスト
+        filter_args_str = str(call_args)
+
+        # Assert: filter が1回以上呼ばれていること（like フィルタ含む）
+        assert q.filter.call_count > 0
+        # Assert: 文字列パラメータによる検索が前方一致検索であること
+        assert 'DEV-001%' in filter_args_str
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -265,17 +285,24 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-            
-        q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
-        params = make_default_search_params(device_name='センサー')      # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
-        call_args = q.filter.call_args_list                             # フィルタ条件取得
-        filter_args_str = str(call_args)                                # 文字列にキャスト
 
-        assert q.filter.call_count > 0                                  # Assert: filterメソッドが1回以上実行されること
-        assert 'センサー%' in filter_args_str                            # Assert: 文字列パラメータによる検索が前方一致検索であること
+        q = make_mock_query()
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            device_name='センサー')      # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        call_args = q.filter.call_args_list                             # フィルタ条件取得
+        # 文字列にキャスト
+        filter_args_str = str(call_args)
+
+        # Assert: filterメソッドが1回以上実行されること
+        assert q.filter.call_count > 0
+        # Assert: 文字列パラメータによる検索が前方一致検索であること
+        assert 'センサー%' in filter_args_str
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -289,18 +316,22 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
         params = make_default_search_params(                            # ヘルパーの値を書き換えてパラメータ生成
             device_type=1,
             sort_item_id=1,
             sort_order=1
-            )
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
+        )
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
 
-        assert q.filter.call_count > 0                                  # Assert: filterメソッドが1回以上実行されること
+        # Assert: filterメソッドが1回以上実行されること
+        assert q.filter.call_count > 0
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -314,17 +345,21 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
         params = make_default_search_params(                            # ヘルパーの値を書き換えてパラメータ生成
             purchase_date_from=date(2025, 1, 1),
             purchase_date_to=date(2025, 12, 31),
         )
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
 
-        assert q.filter.call_count > 0                                  # Assert: filterメソッドが1回以上実行されること
+        # Assert: filterメソッドが1回以上実行されること
+        assert q.filter.call_count > 0
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -338,17 +373,25 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
-        q = make_mock_query()
-        q.count.return_value = 0                                        # Mockの.count()の返り値を0に設定
-        q.offset.return_value.all.return_value = []                     # Mockの.offset(...).all()の返り値を空リストに設定
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
-        params = make_default_search_params()                           # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
 
-        assert isinstance(inventories, list)                            # Assert: デバイス台帳一覧がリスト型で返却されること
-        assert isinstance(total, int)                                   # Assert: 検索結果件数が数値型で返却されること
+        q = make_mock_query()
+        # Mockの.count()の返り値を0に設定
+        q.count.return_value = 0
+        # Mockの.offset(...).all()の返り値を空リストに設定
+        q.offset.return_value.all.return_value = []
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        # ヘルパーの値を書き換えてパラメータ生成
+        params = make_default_search_params()
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+
+        # Assert: デバイス台帳一覧がリスト型で返却されること
+        assert isinstance(inventories, list)
+        # Assert: 検索結果件数が数値型で返却されること
+        assert isinstance(total, int)
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -362,18 +405,24 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         mock_records = [Mock(), Mock()]
         q = make_mock_query()
         q.all.return_value = mock_records
         q.count.return_value = 2
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.filter_by(...).first()の返り値をNoneに設定
-        params = make_default_search_params(per_page=-1)                # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.filter_by(...).first()の返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            per_page=-1)                # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
 
-        q.limit.assert_not_called()                                     # Assert: limit が呼ばれていないこと
-        assert inventories == mock_records                              # Assert: 出力される結果がMockデータと一致すること（全件取得）
+        # Assert: limit が呼ばれていないこと
+        q.limit.assert_not_called()
+        # Assert: 出力される結果がMockデータと一致すること（全件取得）
+        assert inventories == mock_records
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -387,18 +436,26 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         mock_records = [Mock()]
         q = make_mock_query()                                           # Mockデータ生成
-        q.count.return_value = 1                                        # .count()の返り値を1に設定
-        q.offset.return_value.all.return_value = mock_records           # .offset(...).all()の返り値をmock_recordsで上書き
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.filter_by(...).first()の返り値をNoneに設定
-        params = make_default_search_params(page=2, per_page=25)        # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
+        # .count()の返り値を1に設定
+        q.count.return_value = 1
+        # .offset(...).all()の返り値をmock_recordsで上書き
+        q.offset.return_value.all.return_value = mock_records
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.filter_by(...).first()の返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            page=2, per_page=25)        # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
 
-        q.limit.assert_called()                                         # Assert: limitが呼ばれること
-        q.offset.assert_called()                                        # Assert: offsetが呼ばれること
+        # Assert: limitが呼ばれること
+        q.limit.assert_called()
+        # Assert: offsetが呼ばれること
+        q.offset.assert_called()
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -412,20 +469,29 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
-        mock_records = [Mock(), Mock(), Mock()]                         # mock_recordsとして、Mockデータを3つ生成
-        q = make_mock_query()                                           # Mockデータ生成
-        q.count.return_value = 3                                        # .count()の返却値を3に設定
-        q.offset.return_value.all.return_value = mock_records
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
-        params = make_default_search_params()                           # ヘルパーの値をそのままパラメータとして設定
-        result = search_device_inventories(params)                      # Act: SELECT実行
 
-        assert isinstance(result, tuple)                                # Assert: (list, int)タプルの形式で返却されていること
-        assert len(result) == 2                                         # Assert: タプルのサイズが2（list, int）であること
+        # mock_recordsとして、Mockデータを3つ生成
+        mock_records = [Mock(), Mock(), Mock()]
+        q = make_mock_query()                                           # Mockデータ生成
+        # .count()の返却値を3に設定
+        q.count.return_value = 3
+        q.offset.return_value.all.return_value = mock_records
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        # ヘルパーの値をそのままパラメータとして設定
+        params = make_default_search_params()
+        result = search_device_inventories(
+            params)                      # Act: SELECT実行
+
+        # Assert: (list, int)タプルの形式で返却されていること
+        assert isinstance(result, tuple)
+        # Assert: タプルのサイズが2（list, int）であること
+        assert len(result) == 2
         _, total = result
-        assert total == 3                                               # Assert: 返却される検索結果件数が3であること
+        # Assert: 返却される検索結果件数が3であること
+        assert total == 3
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -439,17 +505,23 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
         q.count.return_value = 0
         q.offset.return_value.all.return_value = []
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
-        params = make_default_search_params()                           # ヘルパーの値をそのままパラメータとして設定
-        inventories, total = search_device_inventories(params)          # Act: SELECT実行
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        # ヘルパーの値をそのままパラメータとして設定
+        params = make_default_search_params()
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
 
-        assert total == 0                                               # Assert: 検索結果一覧の件数が0件であること
-        assert inventories == []                                        # Assert: 検索結果一覧が空であること
+        # Assert: 検索結果一覧の件数が0件であること
+        assert total == 0
+        # Assert: 検索結果一覧が空であること
+        assert inventories == []
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -465,14 +537,19 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
-        params = make_default_search_params(device_type=-1)             # ヘルパーの値を書き換えてパラメータ生成
-        search_device_inventories(params)                               # Act: SELECT実行
-        
-        mock_sim.query.filter_by.assert_not_called()                    # Assert: SortItemMaster.query.filter_by は sort_item_id=-1 のため呼ばれないこと
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            device_type_id=-1)          # ヘルパーの値を書き換えてパラメータ生成
+        # Act: SELECT実行
+        search_device_inventories(params)
+
+        # Assert: SortItemMaster.query.filter_by は sort_item_id=-1 のため呼ばれないこと
+        mock_sim.query.filter_by.assert_not_called()
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -486,14 +563,19 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
-        q = make_mock_query()
-        mock_dim.query = q                                              # デバイス台帳マスタMock化
-        mock_sim.query.filter_by.return_value.first.return_value = None # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
-        params = make_default_search_params(inventory_status=-1)        # device_type と inventory_status をともに -1 にしてフィルタなし状態を作る
-        search_device_inventories(params)                               # Act: SELECT実行
 
-        mock_sim.query.filter_by.assert_not_called()                    # Assert: sort_item_id=-1 のため SortItemMaster.query.filter_by は呼ばれないこと
+        q = make_mock_query()
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        # device_type_id と inventory_status_id をともに -1 にしてフィルタなし状態を作る
+        params = make_default_search_params(inventory_status_id=-1)
+        # Act: SELECT実行
+        search_device_inventories(params)
+
+        # Assert: sort_item_id=-1 のため SortItemMaster.query.filter_by は呼ばれないこと
+        mock_sim.query.filter_by.assert_not_called()
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -508,14 +590,19 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
-        q = make_mock_query()
-        mock_dim.query = q                                                  # デバイス台帳マスタMock化
-        params = make_default_search_params(sort_item_id=-1, sort_order=-1) # ヘルパーの値を書き換えてパラメータ生成
-        search_device_inventories(params)                                   # Act: SELECT実行
 
-        mock_sim.query.filter_by.assert_not_called()                        # Assert: sort_item_id=-1 のため SortItemMaster.query.filter_by は呼ばれないこと
-        q.order_by.assert_called()                                          # Assert: order_by は呼ばれる（デフォルトソート）こと
+        q = make_mock_query()
+        # デバイス台帳マスタMock化
+        mock_dim.query = q
+        params = make_default_search_params(
+            sort_item_id=-1, sort_order=-1)  # ヘルパーの値を書き換えてパラメータ生成
+        # Act: SELECT実行
+        search_device_inventories(params)
+
+        # Assert: sort_item_id=-1 のため SortItemMaster.query.filter_by は呼ばれないこと
+        mock_sim.query.filter_by.assert_not_called()
+        # Assert: order_by は呼ばれる（デフォルトソート）こと
+        q.order_by.assert_called()
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -529,21 +616,29 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
-        mock_dim.query = q                                                          # デバイス台帳マスタの.queryの返り値をMock化
-        mock_inventory_attr = Mock()                                                # デバイス台帳マスタの登録内容生成
-        mock_inventory_attr.asc.return_value = 'asc_col'                            # mock_inventory_attrに対する.ascの返り値を『asc_col』に設定
-        mock_dim.device_inventory_id = mock_inventory_attr                          # mock_dim.device_inventory_idの値をmock_inventory_attrに設定
+        # デバイス台帳マスタの.queryの返り値をMock化
+        mock_dim.query = q
+        # デバイス台帳マスタの登録内容生成
+        mock_inventory_attr = Mock()
+        # mock_inventory_attrに対する.ascの返り値を『asc_col』に設定
+        mock_inventory_attr.asc.return_value = 'asc_col'
+        # mock_dim.device_inventory_idの値をmock_inventory_attrに設定
+        mock_dim.device_inventory_id = mock_inventory_attr
 
         sort_item_mock = Mock()
         sort_item_mock.sort_item_name = 'inventory_location'
         mock_sim.query.filter_by.return_value.first.return_value = sort_item_mock
-        params = make_default_search_params(sort_item_id=9, sort_order=1)           # ヘルパーの値を書き換えてパラメータ生成
-        search_device_inventories(params)                                           # Act: SELECT実行
+        params = make_default_search_params(
+            sort_item_id=9, sort_order=1)           # ヘルパーの値を書き換えてパラメータ生成
+        # Act: SELECT実行
+        search_device_inventories(params)
 
-        mock_sim.query.filter_by.assert_called()                                    # Assert: SortItemMaster の検索が呼ばれること
-        mock_inventory_attr.asc.assert_called()                                     # Assert: asc() が使われること
+        # Assert: SortItemMaster の検索が呼ばれること
+        mock_sim.query.filter_by.assert_called()
+        # Assert: asc() が使われること
+        mock_inventory_attr.asc.assert_called()
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -557,7 +652,7 @@ class TestSearchDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
-        
+
         q = make_mock_query()
         mock_dim.query = q
         mock_inventory_attr = Mock()
@@ -568,11 +663,15 @@ class TestSearchDeviceInventories:
         sort_item_mock.sort_item_name = 'inventory_location'
         mock_sim.query.filter_by.return_value.first.return_value = sort_item_mock
 
-        params = make_default_search_params(sort_item_id=9, sort_order=2)           # ヘルパーの値を書き換えてパラメータ生成
-        search_device_inventories(params)                                           # Act: SELECT実行
+        params = make_default_search_params(
+            sort_item_id=9, sort_order=2)           # ヘルパーの値を書き換えてパラメータ生成
+        # Act: SELECT実行
+        search_device_inventories(params)
 
-        mock_sim.query.filter_by.assert_called()                                    # Assert: SortItemMaster の検索が呼ばれること
-        mock_inventory_attr.desc.assert_called()                                    # Assert: desc() が使われること
+        # Assert: SortItemMaster の検索が呼ばれること
+        mock_sim.query.filter_by.assert_called()
+        # Assert: desc() が使われること
+        mock_inventory_attr.desc.assert_called()
 
 
 # ============================================================
@@ -597,7 +696,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_dim_cls.return_value = mock_inventory
@@ -611,8 +710,9 @@ class TestCreateDeviceInventory:
 
         form_data = make_valid_form_data()                  # ヘルパーから登録に必要な最小データ構成を取得
         create_device_inventory(form_data, creator_id=1)    # Act: INSERT実施
-        
-        assert mock_db.session.add.call_count >= 2          # Assert: db.session.add()が2回（デバイス台帳マスタ、デバイスマスタへの登録の2回）呼ばれること
+
+        # Assert: db.session.add()が2回（デバイス台帳マスタ、デバイスマスタへの登録の2回）呼ばれること
+        assert mock_db.session.add.call_count >= 2
         mock_db.session.flush.assert_called()               # Assert: db.flush()が呼ばれること
 
     @patch(f'{MODULE}.UnityCatalogConnector')
@@ -626,7 +726,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_dim_cls.return_value = mock_inventory
@@ -641,7 +741,8 @@ class TestCreateDeviceInventory:
         form_data = make_valid_form_data()                  # ヘルパーから登録に必要な最小データ構成を取得
         create_device_inventory(form_data, creator_id=1)    # Act: INSERT実施
 
-        mock_db.session.commit.assert_called_once()         # Assert: 登録成功時、db.session.commit()が1回だけ呼ばれていること
+        # Assert: 登録成功時、db.session.commit()が1回だけ呼ばれていること
+        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -654,7 +755,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_dim_cls.return_value = mock_inventory
@@ -666,12 +767,16 @@ class TestCreateDeviceInventory:
         mock_uc = Mock()
         mock_uc_cls.return_value = mock_uc
 
-        form_data = make_valid_form_data()                                  # ヘルパーから登録に必要な最小データ構成を取得
-        create_device_inventory(form_data, creator_id=1)                    # Act: INSERT実施
+        # ヘルパーから登録に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
+        # Act: INSERT実施
+        create_device_inventory(form_data, creator_id=1)
 
-        mock_uc.execute_dml.assert_called_once()                            # Assert: UCへのクエリ実行が1回呼び出されること
+        # Assert: UCへのクエリ実行が1回呼び出されること
+        mock_uc.execute_dml.assert_called_once()
         sql_arg = mock_uc.execute_dml.call_args[0][0]
-        assert 'INSERT INTO iot_catalog.oltp_db.device_master' in sql_arg   # Assert: UCへのINSERTクエリ実行が渡されること
+        # Assert: UCへのINSERTクエリ実行が渡されること
+        assert 'INSERT INTO iot_catalog.oltp_db.device_master' in sql_arg
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -684,16 +789,21 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_dim_cls.return_value = mock_inventory
-        mock_db.session.flush.side_effect = Exception('DB Flush Error')     # db.session.flush()の代わりに強制的にExceptionが発生するように設定
-        form_data = make_valid_form_data()                                  # ヘルパーから登録に必要な最小データ構成を取得
+        # db.session.flush()の代わりに強制的にExceptionが発生するように設定
+        mock_db.session.flush.side_effect = Exception('DB Flush Error')
+        # ヘルパーから登録に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                      # Act: create_device_inventoryはdb.session.flush()時にExceptionが発生するはず
-            create_device_inventory(form_data, creator_id=1)                # INSERT実施
+        # Act: create_device_inventoryはdb.session.flush()時にExceptionが発生するはず
+        with pytest.raises(Exception):
+            create_device_inventory(
+                form_data, creator_id=1)                # INSERT実施
 
-        mock_db.session.rollback.assert_called()                            # Assert: db.session.rollback()が呼び出されること
+        # Assert: db.session.rollback()が呼び出されること
+        mock_db.session.rollback.assert_called()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -706,14 +816,18 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_dim_cls.return_value = mock_inventory
-        mock_db.session.flush.side_effect = RuntimeError('DB Connection Error')     # db.session.flush()の代わりに強制的にRuntimeErrorが発生するように設定
-        form_data = make_valid_form_data()                                          # ヘルパーから登録に必要な最小データ構成を取得
+        # db.session.flush()の代わりに強制的にRuntimeErrorが発生するように設定
+        mock_db.session.flush.side_effect = RuntimeError('DB Connection Error')
+        # ヘルパーから登録に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(RuntimeError):                                           # Act: create_device_inventoryはdb.session.flush()時にRuntimeErrorが発生するはず
-            create_device_inventory(form_data, creator_id=1)                        # INSERT実施
+        # Act: create_device_inventoryはdb.session.flush()時にRuntimeErrorが発生するはず
+        with pytest.raises(RuntimeError):
+            # INSERT実施
+            create_device_inventory(form_data, creator_id=1)
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -726,7 +840,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_dim_cls.return_value = mock_inventory
@@ -736,16 +850,22 @@ class TestCreateDeviceInventory:
         mock_dm_cls.return_value = mock_device
 
         mock_uc = Mock()
-        mock_uc.execute_dml.side_effect = [Exception('UC Insert Error'), None]      # INSERT（1回目）失敗し、Exception発報したのち、補償DELETE（2回目）に成功するように設定
+        # INSERT（1回目）失敗し、Exception発報したのち、補償DELETE（2回目）に成功するように設定
+        mock_uc.execute_dml.side_effect = [Exception('UC Insert Error'), None]
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                                          # ヘルパーから登録に必要な最小データ構成を取得
+        # ヘルパーから登録に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                              # Act: execute_dml実行時、Exceptionが発生するはず。発生しなければNG
-            create_device_inventory(form_data, creator_id=1)                        # INSERT実施
+        # Act: execute_dml実行時、Exceptionが発生するはず。発生しなければNG
+        with pytest.raises(Exception):
+            # INSERT実施
+            create_device_inventory(form_data, creator_id=1)
 
-        assert mock_uc.execute_dml.call_count == 2                                  # Assert: UCへのクエリ実行が2回実行されること
+        # Assert: UCへのクエリ実行が2回実行されること
+        assert mock_uc.execute_dml.call_count == 2
         compensating_sql = mock_uc.execute_dml.call_args_list[1][0][0]
-        assert 'DELETE FROM iot_catalog.oltp_db.device_master' in compensating_sql  # Assert: UCへのDELETEクエリ実行が2回のうちに実行されること
+        # Assert: UCへのDELETEクエリ実行が2回のうちに実行されること
+        assert 'DELETE FROM iot_catalog.oltp_db.device_master' in compensating_sql
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -758,7 +878,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_dim_cls.return_value = mock_inventory
@@ -768,15 +888,20 @@ class TestCreateDeviceInventory:
         mock_dm_cls.return_value = mock_device
 
         mock_uc = Mock()
-        
-        mock_uc.execute_dml.side_effect = [Exception('UC Error'), None]     # INSERT（1回目）に失敗しException発報→有償DELETE（2回目）に成功するように設定
+
+        # INSERT（1回目）に失敗しException発報→有償DELETE（2回目）に成功するように設定
+        mock_uc.execute_dml.side_effect = [Exception('UC Error'), None]
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                                  # ヘルパーから登録に必要な最小データ構成を取得
+        # ヘルパーから登録に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                      # Act: execute_dml実行時、Exceptionが発生するはず。発生しなければNG
-            create_device_inventory(form_data, creator_id=1)                # INSERT実施
+        # Act: execute_dml実行時、Exceptionが発生するはず。発生しなければNG
+        with pytest.raises(Exception):
+            create_device_inventory(
+                form_data, creator_id=1)                # INSERT実施
 
-        mock_db.session.rollback.assert_called()                            # Assert: UCへのINSERTクエリ実行失敗時、OLTPに対するロールバックが実行されること
+        # Assert: UCへのINSERTクエリ実行失敗時、OLTPに対するロールバックが実行されること
+        mock_db.session.rollback.assert_called()
 
     @patch(f'{MODULE}.uuid')
     @patch(f'{MODULE}.UnityCatalogConnector')
@@ -790,8 +915,9 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
-        mock_uuid_mod.uuid4.return_value = Mock(__str__=lambda self: 'generated-uuid')
+
+        mock_uuid_mod.uuid4.return_value = Mock(
+            __str__=lambda self: 'generated-uuid')
 
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
@@ -806,7 +932,8 @@ class TestCreateDeviceInventory:
         form_data = make_valid_form_data()                  # ヘルパーから登録に必要な最小データ構成を取得
         create_device_inventory(form_data, creator_id=1)    # Act: INSERT実施
 
-        mock_uuid_mod.uuid4.assert_called()                 # Assert: データ登録時、uuid生成メソッドが呼び出されること
+        # Assert: データ登録時、uuid生成メソッドが呼び出されること
+        mock_uuid_mod.uuid4.assert_called()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -819,7 +946,7 @@ class TestCreateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import create_device_inventory
-            
+
         created_kwargs = {}
 
         def capture_dim(**kwargs):
@@ -828,7 +955,8 @@ class TestCreateDeviceInventory:
             m.device_inventory_id = 100
             return m
 
-        mock_dim_cls.side_effect = capture_dim              # mock_dim_clsに設定された値をcapture_dim関数を使ってcreated_kwargsに保持
+        # mock_dim_clsに設定された値をcapture_dim関数を使ってcreated_kwargsに保持
+        mock_dim_cls.side_effect = capture_dim
 
         mock_device = Mock()
         mock_device.device_id = 200
@@ -839,8 +967,10 @@ class TestCreateDeviceInventory:
         form_data = make_valid_form_data()                  # ヘルパーから登録に必要な最小データ構成を取得
         create_device_inventory(form_data, creator_id=42)   # Act: INSERT実施
 
-        assert created_kwargs.get('creator') == 42          # Assert: device_inventory の creator に 42 が渡されること
-        assert created_kwargs.get('modifier') == 42         # Assert: device_inventory の modifier に 42 が渡されること
+        # Assert: device_inventory の creator に 42 が渡されること
+        assert created_kwargs.get('creator') == 42
+        # Assert: device_inventory の modifier に 42 が渡されること
+        assert created_kwargs.get('modifier') == 42
 
 
 # ============================================================
@@ -889,7 +1019,7 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
@@ -899,10 +1029,13 @@ class TestUpdateDeviceInventory:
             inventory_location='新倉庫B',
             purchase_date=date(2025, 6, 1),
         )
-        update_device_inventory('test-uuid', form_data, modifier_id=1)  # Act: UPDATE実施
+        update_device_inventory('test-uuid', form_data,
+                                modifier_id=1)  # Act: UPDATE実施
 
-        assert mock_inventory.inventory_location == '新倉庫B'            # Assert: 在庫場所が「新倉庫B」に更新されること
-        assert mock_inventory.purchase_date == date(2025, 6, 1)         # Assert: 購入日が「2025/06/01」に更新されること
+        # Assert: 在庫場所が「新倉庫B」に更新されること
+        assert mock_inventory.inventory_location == '新倉庫B'
+        assert mock_inventory.purchase_date == date(
+            2025, 6, 1)         # Assert: 購入日が「2025/06/01」に更新されること
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -915,7 +1048,7 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
@@ -925,10 +1058,13 @@ class TestUpdateDeviceInventory:
             device_name='新センサーX',
             device_type_id=2,
         )
-        update_device_inventory('test-uuid', form_data, modifier_id=1)  # Act: UPDATE実施
+        update_device_inventory('test-uuid', form_data,
+                                modifier_id=1)  # Act: UPDATE実施
 
-        assert mock_device.device_name == '新センサーX'                  # Assert: 更新後のデバイス名が「新センサーX」であること
-        assert mock_device.device_type_id == 2                          # Assert: 更新後のデバイスデバイス種別IDが2であること
+        # Assert: 更新後のデバイス名が「新センサーX」であること
+        assert mock_device.device_name == '新センサーX'
+        # Assert: 更新後のデバイスデバイス種別IDが2であること
+        assert mock_device.device_type_id == 2
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -941,17 +1077,21 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
         mock_uc = Mock()
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                              # ヘルパーから更新に必要な最小データ構成を取得
-        update_device_inventory('test-uuid', form_data, modifier_id=99) # Act: UPDATE実施
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
+        update_device_inventory('test-uuid', form_data,
+                                modifier_id=99)  # Act: UPDATE実施
 
-        assert mock_inventory.modifier == 99                            # Assert: デバイス台帳マスタのレコード更新者IDが99であること
-        assert mock_device.modifier == 99                               # Assert: デバイスマスタのレコード更新者IDが99であること
+        # Assert: デバイス台帳マスタのレコード更新者IDが99であること
+        assert mock_inventory.modifier == 99
+        # Assert: デバイスマスタのレコード更新者IDが99であること
+        assert mock_device.modifier == 99
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -964,18 +1104,22 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
         mock_uc = Mock()
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                              # ヘルパーから更新に必要な最小データ構成を取得
-        update_device_inventory('test-uuid', form_data, modifier_id=1)  # Act: UPDATE実施
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
+        update_device_inventory('test-uuid', form_data,
+                                modifier_id=1)  # Act: UPDATE実施
 
-        mock_uc.execute_dml.assert_called_once()                        # Assert: UCへのクエリ実行が1回呼び出されること
+        # Assert: UCへのクエリ実行が1回呼び出されること
+        mock_uc.execute_dml.assert_called_once()
         sql_arg = mock_uc.execute_dml.call_args[0][0]
-        assert 'UPDATE iot_catalog.oltp_db.device_master' in sql_arg    # Assert: UCへのUPDATEクエリ実行が呼び出されること
+        # Assert: UCへのUPDATEクエリ実行が呼び出されること
+        assert 'UPDATE iot_catalog.oltp_db.device_master' in sql_arg
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -988,16 +1132,19 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
         mock_uc = Mock()
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                              # ヘルパーから更新に必要な最小データ構成を取得
-        update_device_inventory('test-uuid', form_data, modifier_id=1)  # Act: UPDATE実施
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
+        update_device_inventory('test-uuid', form_data,
+                                modifier_id=1)  # Act: UPDATE実施
 
-        mock_db.session.commit.assert_called_once()                     # Assert: 更新成功時、db.session.commit()が1回呼び出されること
+        # Assert: 更新成功時、db.session.commit()が1回呼び出されること
+        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -1010,17 +1157,22 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
-        mock_db.session.flush.side_effect = Exception('DB Flush Error')     # db.session.flush()の代わりに、強制的Exceptionを発生させるように設定
-        form_data = make_valid_form_data()                                  # ヘルパーから更新に必要な最小データ構成を取得
+        # db.session.flush()の代わりに、強制的Exceptionを発生させるように設定
+        mock_db.session.flush.side_effect = Exception('DB Flush Error')
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                      # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
-            update_device_inventory('test-uuid', form_data, modifier_id=1)  # UPDATE実施
+        # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
+        with pytest.raises(Exception):
+            update_device_inventory(
+                'test-uuid', form_data, modifier_id=1)  # UPDATE実施
 
-        mock_db.session.rollback.assert_called()                            # Assert: db.session.flush()失敗時、db.session.rollback()が呼び出されること
+        # Assert: db.session.flush()失敗時、db.session.rollback()が呼び出されること
+        mock_db.session.rollback.assert_called()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -1033,20 +1185,25 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
         mock_uc = Mock()
-        
-        mock_uc.execute_dml.side_effect = [Exception('UC Update Error'), None]  # UPDATE失敗し、Exception発報 → UC ロールバック成功と設定
+
+        # UPDATE失敗し、Exception発報 → UC ロールバック成功と設定
+        mock_uc.execute_dml.side_effect = [Exception('UC Update Error'), None]
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                                      # ヘルパーから更新に必要な最小データ構成を取得
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                          # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
-            update_device_inventory('test-uuid', form_data, modifier_id=1)      # UPDATE実施
+        # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
+        with pytest.raises(Exception):
+            update_device_inventory(
+                'test-uuid', form_data, modifier_id=1)      # UPDATE実施
 
-        assert mock_uc.execute_dml.call_count == 2                              # Assert: execute_dmlがUPDATE、UCロールバックのちょうど2度呼ばれること
+        # Assert: execute_dmlがUPDATE、UCロールバックのちょうど2度呼ばれること
+        assert mock_uc.execute_dml.call_count == 2
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
@@ -1059,20 +1216,25 @@ class TestUpdateDeviceInventory:
         # Arrange
         from iot_app.services.device_inventory_service \
             import update_device_inventory
-            
+
         mock_inventory, mock_device = self._setup_mock_inventory_and_device(
             mock_dim_cls, mock_dm_cls
         )
         mock_uc = Mock()
-        
-        mock_uc.execute_dml.side_effect = [Exception('UC Error'), None]     # UPDATE失敗し、Exception発報 → UC ロールバック成功と設定
+
+        # UPDATE失敗し、Exception発報 → UC ロールバック成功と設定
+        mock_uc.execute_dml.side_effect = [Exception('UC Error'), None]
         mock_uc_cls.return_value = mock_uc
-        form_data = make_valid_form_data()                                  # ヘルパーから更新に必要な最小データ構成を取得
+        # ヘルパーから更新に必要な最小データ構成を取得
+        form_data = make_valid_form_data()
 
-        with pytest.raises(Exception):                                      # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
-            update_device_inventory('test-uuid', form_data, modifier_id=1)  # UPDATE実施
+        # Act & Assert: 前の設定から、必ずExceptionが発生するはず。発生しなければNG
+        with pytest.raises(Exception):
+            update_device_inventory(
+                'test-uuid', form_data, modifier_id=1)  # UPDATE実施
 
-        mock_db.session.rollback.assert_called()                            # Assert: OLTPロールバックが呼ばれていること
+        # Assert: OLTPロールバックが呼ばれていること
+        mock_db.session.rollback.assert_called()
 
 
 # ============================================================
@@ -1096,14 +1258,17 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
         mock_inventory.delete_flag = False
-        mock_dim_cls.query.filter.return_value.all.return_value = [mock_inventory]
-        delete_device_inventories(['uuid-001'], modifier_id=1)                      # Act: UPDATE（論理削除）実行
+        mock_dim_cls.query.filter.return_value.all.return_value = [
+            mock_inventory]
+        # Act: UPDATE（論理削除）実行
+        delete_device_inventories(['uuid-001'], modifier_id=1)
 
-        assert mock_inventory.delete_flag is True                                   # Assert: デバイス台帳の対象となるデータのdelete_flagがTrueに更新されていること（論理削除扱いであること）
+        # Assert: デバイス台帳の対象となるデータのdelete_flagがTrueに更新されていること（論理削除扱いであること）
+        assert mock_inventory.delete_flag is True
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceInventoryMaster')
@@ -1114,13 +1279,16 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
-        mock_dim_cls.query.filter.return_value.all.return_value = [mock_inventory]
-        delete_device_inventories(['uuid-001'], modifier_id=99)                     # Act: UPDATE（論理削除）実行
+        mock_dim_cls.query.filter.return_value.all.return_value = [
+            mock_inventory]
+        # Act: UPDATE（論理削除）実行
+        delete_device_inventories(['uuid-001'], modifier_id=99)
 
-        assert mock_inventory.modifier == 99                                        # Assert: 更新者IDが99と設定されること
+        # Assert: 更新者IDが99と設定されること
+        assert mock_inventory.modifier == 99
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceInventoryMaster')
@@ -1131,13 +1299,16 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
-        mock_dim_cls.query.filter.return_value.all.return_value = [mock_inventory]
-        delete_device_inventories(['uuid-001'], modifier_id=1)                      # Act: UPDATE（論理削除）実行
+        mock_dim_cls.query.filter.return_value.all.return_value = [
+            mock_inventory]
+        # Act: UPDATE（論理削除）実行
+        delete_device_inventories(['uuid-001'], modifier_id=1)
 
-        mock_db.session.commit.assert_called_once()                                 # Assert: 削除成功時、db.session.commit()が1回呼び出されること
+        # Assert: 削除成功時、db.session.commit()が1回呼び出されること
+        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.DeviceInventoryMaster')
     def test_delete_no_matching_records_raises_value_error(
@@ -1147,11 +1318,14 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
-        mock_dim_cls.query.filter.return_value.all.return_value = []          # デバイス台帳マスタにレコードは存在しないように設定
 
-        with pytest.raises(ValueError, match='削除対象が見つかりません'):       # Act & Assert: レコードが存在しないため、ValueError発生、エラーメッセージとして『削除対象が見つかりません』と返却されること
-            delete_device_inventories(['nonexistent-uuid'], modifier_id=1)    # UPDATE（論理削除）実行
+        # デバイス台帳マスタにレコードは存在しないように設定
+        mock_dim_cls.query.filter.return_value.all.return_value = []
+
+        # Act & Assert: レコードが存在しないため、ValueError発生、エラーメッセージとして『削除対象が見つかりません』と返却されること
+        with pytest.raises(ValueError, match='削除対象が見つかりません'):
+            delete_device_inventories(
+                ['nonexistent-uuid'], modifier_id=1)    # UPDATE（論理削除）実行
 
     @patch(f'{MODULE}.DeviceInventoryMaster')
     def test_delete_empty_uuids_list_raises_value_error(
@@ -1161,11 +1335,14 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
-        mock_dim_cls.query.filter.return_value.all.return_value = []        # デバイス台帳マスタにレコードは存在しないように設定
 
-        with pytest.raises(ValueError):                                     # Act & Assert: 削除対象を指定せずに論理削除実行時、ValueError発生（View側でバリデーションが走るため、本稼働時は発生し得ない）
-            delete_device_inventories([], modifier_id=1)                    # UPDATE（論理削除）実行
+        # デバイス台帳マスタにレコードは存在しないように設定
+        mock_dim_cls.query.filter.return_value.all.return_value = []
+
+        # Act & Assert: 削除対象を指定せずに論理削除実行時、ValueError発生（View側でバリデーションが走るため、本稼働時は発生し得ない）
+        with pytest.raises(ValueError):
+            # UPDATE（論理削除）実行
+            delete_device_inventories([], modifier_id=1)
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceInventoryMaster')
@@ -1176,16 +1353,21 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
+
         mock_inventory = Mock()
         mock_inventory.device_inventory_id = 100
-        mock_dim_cls.query.filter.return_value.all.return_value = [mock_inventory]
-        mock_db.session.flush.side_effect = Exception('DB Flush Error')             # db.session.flush()実行時、強制的にExceptionが発生するように設定
-        
-        with pytest.raises(Exception):                                              # Act: 上の設定の効果で必ずExceptionが発生するはず。発生しなかったらNG
-            delete_device_inventories(['uuid-001'], modifier_id=1)                  # UPDATE（論理削除）実行
+        mock_dim_cls.query.filter.return_value.all.return_value = [
+            mock_inventory]
+        # db.session.flush()実行時、強制的にExceptionが発生するように設定
+        mock_db.session.flush.side_effect = Exception('DB Flush Error')
 
-        mock_db.session.rollback.assert_called()                                    # Assert: 論理削除失敗時、db.session.rollback()が呼び出されること
+        # Act: 上の設定の効果で必ずExceptionが発生するはず。発生しなかったらNG
+        with pytest.raises(Exception):
+            # UPDATE（論理削除）実行
+            delete_device_inventories(['uuid-001'], modifier_id=1)
+
+        # Assert: 論理削除失敗時、db.session.rollback()が呼び出されること
+        mock_db.session.rollback.assert_called()
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceInventoryMaster')
@@ -1196,18 +1378,24 @@ class TestDeleteDeviceInventories:
         # Arrange
         from iot_app.services.device_inventory_service \
             import delete_device_inventories
-        
-        inv1 = Mock()                                                           # 削除対象1生成
+
+        # 削除対象1生成
+        inv1 = Mock()
         inv1.device_inventory_id = 100
         inv1.delete_flag = False
-        inv2 = Mock()                                                           # 削除対象2生成
+        # 削除対象2生成
+        inv2 = Mock()
         inv2.device_inventory_id = 200
         inv2.delete_flag = False
-        mock_dim_cls.query.filter.return_value.all.return_value = [inv1, inv2]  # デバイス台帳マスタのデータとして、削除対象1、削除対象2を設定
-        delete_device_inventories(['uuid-001', 'uuid-002'], modifier_id=1)      # Act: UPDATE（論理削除）実行（2件を対象とする）
+        mock_dim_cls.query.filter.return_value.all.return_value = [
+            inv1, inv2]  # デバイス台帳マスタのデータとして、削除対象1、削除対象2を設定
+        # Act: UPDATE（論理削除）実行（2件を対象とする）
+        delete_device_inventories(['uuid-001', 'uuid-002'], modifier_id=1)
 
-        assert inv1.delete_flag is True                                         # Assert: 指定した2件のレコードのdelete_flagがTrueに変更されていること
-        assert inv2.delete_flag is True                                         # Assert: 指定した2件のレコードのdelete_flagがTrueに変更されていること
+        # Assert: 指定した2件のレコードのdelete_flagがTrueに変更されていること
+        assert inv1.delete_flag is True
+        # Assert: 指定した2件のレコードのdelete_flagがTrueに変更されていること
+        assert inv2.delete_flag is True
 
 
 # ============================================================
@@ -1227,13 +1415,15 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)          # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
         params = make_default_search_params()       # ヘルパーから検索条件の最小データ構成を取得
         export_device_inventories_csv(params)       # Act: CSVエクスポート実施
 
         call_params = mock_search.call_args[0][0]
-        assert call_params['per_page'] == -1        # Assert: CSVエクスポート実施時に指定されたper_pageが-1であること
+        # Assert: CSVエクスポート実施時に指定されたper_pageが-1であること
+        assert call_params['per_page'] == -1
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_calls_search_with_page_1(self, mock_search):
@@ -1241,13 +1431,15 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)          # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
-        params = make_default_search_params(page=3) # ヘルパーから検索条件の最小データ構成を取得
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
+        params = make_default_search_params(page=3)  # ヘルパーから検索条件の最小データ構成を取得
         export_device_inventories_csv(params)       # Act: CSVエクスポート実施
 
         call_params = mock_search.call_args[0][0]
-        assert call_params['page'] == 1             # Assert: CSVエクスポート実施時に指定されたpageが1であること
+        # Assert: CSVエクスポート実施時に指定されたpageが1であること
+        assert call_params['page'] == 1
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_csv_contains_required_headers(self, mock_search):
@@ -1255,20 +1447,22 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)              # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')         # Assert: UTF-8 BOM 付きまたは通常の文字列で decode
-        
+            else result.decode('utf-8-sig')         # Assert: UTF-8 BOM 付きまたは通常の文字列で decode
+
         assert '操作列' in decoded                      # Assert: ヘッダ内に『操作列』の文字列が含まれていること
         assert '在庫状況' in decoded                    # Assert: ヘッダ内に『在庫状況』の文字列が含まれていること
         assert 'モデル情報' in decoded                  # Assert: ヘッダ内に『モデル情報』の文字列が含まれていること
         assert 'デバイス名' in decoded                  # Assert: ヘッダ内に『デバイス名』の文字列が含まれていること
         assert 'デバイス種別' in decoded                # Assert: ヘッダ内に『デバイス種別』の文字列が含まれていること
-        assert 'SIMID' in decoded                      # Assert: ヘッダ内に『SIMID』の文字列が含まれていること
+        # Assert: ヘッダ内に『SIMID』の文字列が含まれていること
+        assert 'SIMID' in decoded
         assert 'MACアドレス' in decoded                 # Assert: ヘッダ内に『MACアドレス』の文字列が含まれていること
         assert '購入日' in decoded                      # Assert: ヘッダ内に『購入日』の文字列が含まれていること
         assert '出荷予定日' in decoded                  # Assert: ヘッダ内に『出荷予定日』の文字列が含まれていること
@@ -1282,20 +1476,22 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)              # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')
-        data_lines = [\
-            line \
-                for line in decoded.strip().split('\n') \
-                    if line.strip()\
-                        ]
-        
-        assert len(data_lines) == 1                     # Assert: 出力行が1行（ヘッダ行）のみであること
+            else result.decode('utf-8-sig')
+        data_lines = [
+            line
+            for line in decoded.strip().split('\n')
+            if line.strip()
+        ]
+
+        # Assert: 出力行が1行（ヘッダ行）のみであること
+        assert len(data_lines) == 1
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_multiple_records_all_output(self, mock_search):
@@ -1303,29 +1499,29 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
+
         inv1 = make_inventory_mock(                     # デバイス台帳のレコードを2件設定
-            device_name='センサーA'
-            , purchase_date=date(2025, 1, 15)
-            )
+            device_name='センサーA', purchase_date=date(2025, 1, 15)
+        )
         inv2 = make_inventory_mock(
-            device_name='センサーB'
-            , purchase_date=date(2025, 2, 20)
-            )
-        mock_search.return_value = ([inv1, inv2], 2)    # 検索結果をデバイス台帳のレコード（2件）、検索結果件数を2に設定
+            device_name='センサーB', purchase_date=date(2025, 2, 20)
+        )
+        # 検索結果をデバイス台帳のレコード（2件）、検索結果件数を2に設定
+        mock_search.return_value = ([inv1, inv2], 2)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
 
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')
+            else result.decode('utf-8-sig')
         data_lines = [
-            line \
-                for line in decoded.strip().split('\n') \
-                    if line.strip()
-                    ]
-        
-        assert len(data_lines) == 3                     # Assert: 出力行が3行（ヘッダ行 + 2件分）のみであること
+            line
+            for line in decoded.strip().split('\n')
+            if line.strip()
+        ]
+
+        # Assert: 出力行が3行（ヘッダ行 + 2件分）のみであること
+        assert len(data_lines) == 3
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_csv_column_order(self, mock_search):
@@ -1333,36 +1529,27 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)              # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
 
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')
+            else result.decode('utf-8-sig')
         header_line = decoded.strip().split('\n')[0]
         columns = [                                     # CSV ヘッダーからカラム名を取得（ダブルクォートを除去）
-            c.strip().strip('"') \
-                for c in header_line.split(',')
-                ]
+            c.strip().strip('"')
+            for c in header_line.split(',')
+        ]
 
         expected_order = [                              # 想定されるカラム名の順序
-            '操作列'
-            , 'デバイス名'
-            , 'デバイス種別'
-            , 'モデル情報'
-            , 'SIMID'
-            , 'MACアドレス'
-            , '在庫状況'
-            , '購入日'
-            , '出荷予定日'
-            , '出荷日'
-            , 'メーカー保証終了日'
-            , '在庫場所'
+            '操作列', 'デバイス名', 'デバイス種別', 'モデル情報', 'SIMID', 'MACアドレス', '在庫状況', '購入日', '出荷予定日', '出荷日', 'メーカー保証終了日', '在庫場所'
         ]
-        
-        assert columns == expected_order                # Assert: 出力されるCSVヘッダの内容が、順序も含めて予想結果と完全一致すること
+
+        # Assert: 出力されるCSVヘッダの内容が、順序も含めて予想結果と完全一致すること
+        assert columns == expected_order
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_csv_encodes_with_utf8_bom(self, mock_search):
@@ -1370,15 +1557,18 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
-        mock_search.return_value = ([], 0)              # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+
+        # デバイス台帳の検索結果レコードを空、検索結果件数を0に設定
+        mock_search.return_value = ([], 0)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
 
-        if isinstance(result, bytes):                   # Assert: 戻り値がバイト列の場合は BOM バイト列を確認、文字列の場合は BOM 文字を確認
+        # Assert: 戻り値がバイト列の場合は BOM バイト列を確認、文字列の場合は BOM 文字を確認
+        if isinstance(result, bytes):
             assert result[:3] == b'\xef\xbb\xbf'        # UTF-8 BOM
         else:                                           # TODO: 実装によって戻り値の型が変わる可能性あり。実装完了後に要確認
-            assert isinstance(result, str)              # pandas の to_csv(encoding='utf-8-sig') は BOM 付き文字列を返す場合がある
+            # pandas の to_csv(encoding='utf-8-sig') は BOM 付き文字列を返す場合がある
+            assert isinstance(result, str)
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_date_formatted_as_slash_separated(self, mock_search):
@@ -1386,18 +1576,20 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
+
         inv = make_inventory_mock(                      # デバイス台帳のレコードを1件設定
             purchase_date=date(2025, 3, 15)
-            )
-        mock_search.return_value = ([inv], 1)           # 検索結果をデバイス台帳のレコード（1件）、検索結果件数を1に設定
+        )
+        # 検索結果をデバイス台帳のレコード（1件）、検索結果件数を1に設定
+        mock_search.return_value = ([inv], 1)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')
-        
-        assert '2025/03/15' in decoded                  # Assert: 購入日が2025/03/15と出力されること。形式も含めて完全一致すること。
+            else result.decode('utf-8-sig')
+
+        # Assert: 購入日が2025/03/15と出力されること。形式も含めて完全一致すること。
+        assert '2025/03/15' in decoded
 
     @patch(f'{MODULE}.search_device_inventories')
     def test_export_optional_date_none_outputs_empty_string(self, mock_search):
@@ -1405,22 +1597,22 @@ class TestExportDeviceInventoriesCsv:
         # Arrange
         from iot_app.services.device_inventory_service \
             import export_device_inventories_csv
-        
+
         inv = make_inventory_mock(                      # デバイス台帳のレコードを1件設定
-            estimated_ship_date=None
-            , ship_date=None
-            )
-        mock_search.return_value = ([inv], 1)           # 検索結果をデバイス台帳のレコード（1件）、検索結果件数を1に設定
+            estimated_ship_date=None, ship_date=None
+        )
+        # 検索結果をデバイス台帳のレコード（1件）、検索結果件数を1に設定
+        mock_search.return_value = ([inv], 1)
         params = make_default_search_params()           # ヘルパーから検索条件の最小データ構成を取得
         result = export_device_inventories_csv(params)  # Act: CSVエクスポート実施
         decoded = result \
             if isinstance(result, str) \
-                else result.decode('utf-8-sig')
+            else result.decode('utf-8-sig')
         data_line = decoded.strip().split('\n')[1]
 
         assert ',,' in data_line \
             or ',"","",' in data_line \
-                or ',' in data_line                     # Assert: 出荷予定日・出荷日が空 → データ行に空フィールドが存在すること（連続カンマで確認）
+            or ',' in data_line                     # Assert: 出荷予定日・出荷日が空 → データ行に空フィールドが存在すること（連続カンマで確認）
 
 
 # ============================================================
@@ -1442,16 +1634,19 @@ class TestGetDeviceInventoryFormOptions:
         # Arrange
         from iot_app.services.device_inventory_service \
             import get_device_inventory_form_options
-        
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         result = get_device_inventory_form_options()
 
-        # Assert
+        # Assert: 取得結果がタプルであること
         assert isinstance(result, tuple)
+        # Assert: タプルの長さが3であること
         assert len(result) == 3
 
     @patch(f'{MODULE}.SortItemMaster')
@@ -1460,15 +1655,19 @@ class TestGetDeviceInventoryFormOptions:
     def test_device_types_queries_with_delete_flag_false(self, mock_dtm, mock_ism, mock_sim):
         """2.1.1: DeviceTypeMaster を delete_flag=False でフィルタして取得する"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         get_device_inventory_form_options()
 
-        # Assert: delete_flag=False で filter_by が呼ばれること
+        # Assert: デバイス種別マスタに対する.filter_by(delete_flag=False)が呼ばれること
         mock_dtm.query.filter_by.assert_called_with(delete_flag=False)
 
     @patch(f'{MODULE}.SortItemMaster')
@@ -1477,15 +1676,19 @@ class TestGetDeviceInventoryFormOptions:
     def test_inventory_statuses_queries_with_delete_flag_false(self, mock_dtm, mock_ism, mock_sim):
         """2.1.1: InventoryStatusMaster を delete_flag=False でフィルタして取得する"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         get_device_inventory_form_options()
 
-        # Assert: delete_flag=False で filter_by が呼ばれること
+        # Assert: デバイス在庫ステータスマスタに対する.filter_by(delete_flag=False)が呼ばれること
         mock_ism.query.filter_by.assert_called_with(delete_flag=False)
 
     @patch(f'{MODULE}.SortItemMaster')
@@ -1494,15 +1697,19 @@ class TestGetDeviceInventoryFormOptions:
     def test_sort_items_queries_with_view_id_filter(self, mock_dtm, mock_ism, mock_sim):
         """2.1.1: SortItemMaster を view_id=DEVICE_INVENTORY_VIEW_ID かつ delete_flag=False で filter() して取得する"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         get_device_inventory_form_options()
 
-        # Assert: filter() が呼ばれること（filter_by ではなく filter を使う仕様）
+        # Assert: ソート項目マスタに対する.filter(delete_flag=False)が呼ばれること
         mock_sim.query.filter.assert_called()
 
     @patch(f'{MODULE}.SortItemMaster')
@@ -1511,15 +1718,19 @@ class TestGetDeviceInventoryFormOptions:
     def test_sort_items_ordered_by_sort_order(self, mock_dtm, mock_ism, mock_sim):
         """2.1.1: SortItemMaster は sort_order 昇順で取得する（order_by が呼ばれること）"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         get_device_inventory_form_options()
 
-        # Assert: filter() の後に order_by() が呼ばれること
+        # Assert: ソート項目マスタに対する.filter().order_by()が呼ばれること
         mock_sim.query.filter.return_value.order_by.assert_called()
 
     @patch(f'{MODULE}.SortItemMaster')
@@ -1528,21 +1739,30 @@ class TestGetDeviceInventoryFormOptions:
     def test_returns_master_data_as_fetched(self, mock_dtm, mock_ism, mock_sim):
         """3.1.4.1: DBから取得したデータがそのまま返却される"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_types    = [Mock(), Mock()]
-        mock_statuses = [Mock()]
-        mock_sorts    = [Mock(), Mock(), Mock()]
-        mock_dtm.query.filter_by.return_value.all.return_value = mock_types
-        mock_ism.query.filter_by.return_value.all.return_value = mock_statuses
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = mock_sorts
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに設定するデータを2個用意
+        mock_types = [Mock(), Mock()]
+        # デバイス在庫ステータスマスタに設定するデータを1個用意
+        mock_statuses = [Mock()]
+        # ソート項目マスタに設定するデータを3個用意
+        mock_sorts = [Mock(), Mock(), Mock()]
+        # デバイス種別マスタに対する.filter_by().all()の結果をテストデータに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = mock_types
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果をテストデータに設定
+        mock_ism.query.filter_by.return_value.all.return_value = mock_statuses
+        # ソート項目マスタに対する.filter().order_by().all()の結果をテストデータに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = mock_sorts
+        # Act: 検索画面で使用するリストを取得
         device_types, inventory_statuses, sort_items = get_device_inventory_form_options()
 
-        # Assert
-        assert device_types       == mock_types
+        # Assert: 取得したデバイス種別マスタの結果がテストデータと完全一致すること
+        assert device_types == mock_types
+        # Assert: 取得したデバイス在庫ステータスマスタの結果がテストデータと完全一致すること
         assert inventory_statuses == mock_statuses
-        assert sort_items         == mock_sorts
+        # Assert: 取得したソート項目マスタの結果がテストデータと完全一致すること
+        assert sort_items == mock_sorts
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -1550,18 +1770,24 @@ class TestGetDeviceInventoryFormOptions:
     def test_returns_empty_lists_when_masters_are_empty(self, mock_dtm, mock_ism, mock_sim):
         """3.1.4.2: 各マスタが0件のとき、空リストが返却される"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_inventory_form_options
-        mock_dtm.query.filter_by.return_value.all.return_value = []
-        mock_ism.query.filter_by.return_value.all.return_value = []
-        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_device_inventory_form_options
 
-        # Act
+        # デバイス種別マスタに対する.filter_by().all()の結果を空リストに設定
+        mock_dtm.query.filter_by.return_value.all.return_value = []
+        # デバイス在庫ステータスマスタに対する.filter_by().all()の結果を空リストに設定
+        mock_ism.query.filter_by.return_value.all.return_value = []
+        # ソート項目マスタに対する.filter().order_by().all()の結果を空リストに設定
+        mock_sim.query.filter.return_value.order_by.return_value.all.return_value = []
+        # Act: 検索画面で使用するリストを取得
         device_types, inventory_statuses, sort_items = get_device_inventory_form_options()
 
-        # Assert
-        assert device_types       == []
+        # Assert: 取得したデバイス種別マスタの結果が空リストであること
+        assert device_types == []
+        # Assert: 取得したデバイス在庫ステータスマスタの結果が空リストであること
         assert inventory_statuses == []
-        assert sort_items         == []
+        # Assert: 取得したソート項目マスタの結果が空リストであること
+        assert sort_items == []
 
 
 # ============================================================
@@ -1579,53 +1805,62 @@ class TestGetOrganizationOptions:
     def test_queries_with_delete_flag_false(self, mock_om):
         """2.1.1: OrganizationMaster を delete_flag=False でフィルタして取得する"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_organization_options
-        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_organization_options
 
-        # Act
+        # 組織マスタに対する.filter_by().order_by().all()の結果を空リストに設定
+        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        # Act: 画面に表示する組織リストを取得
         get_organization_options()
 
-        # Assert: delete_flag=False で filter_by が呼ばれること
+        # Assert: 組織マスタに対する.filter_by(delete_flag=False)が呼ばれること
         mock_om.query.filter_by.assert_called_with(delete_flag=False)
 
     @patch(f'{MODULE}.OrganizationMaster')
     def test_ordered_by_organization_name(self, mock_om):
         """2.1.1: organization_name 昇順で取得する（order_by が呼ばれること）"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_organization_options
-        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_organization_options
 
-        # Act
+        # 組織マスタに対する.filter_by().order_by().all()の結果を空リストに設定
+        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        # Act: 画面に表示する組織リストを取得
         get_organization_options()
 
-        # Assert: filter_by の後に order_by が呼ばれること
+        # Assert: 組織マスタに対する.filter_by(delete_flag=False).order_by()が呼ばれること
         mock_om.query.filter_by.return_value.order_by.assert_called()
 
     @patch(f'{MODULE}.OrganizationMaster')
     def test_returns_master_data_as_fetched(self, mock_om):
         """3.1.4.1: DBから取得したデータがそのまま返却される"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_organization_options
-        mock_orgs = [Mock(), Mock()]
-        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = mock_orgs
+        from iot_app.services.device_inventory_service \
+            import get_organization_options
 
-        # Act
+        # 組織マスタに設定するデータを2個用意
+        mock_orgs = [Mock(), Mock()]
+        # 組織マスタに対する.filter_by().order_by().all()の結果をテストデータに設定
+        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = mock_orgs
+        # Act: 画面に表示する組織リストを取得
         result = get_organization_options()
 
-        # Assert: 取得したデータがそのまま返却されること
+        # Assert: 取得した組織マスタの結果がテストデータと完全一致すること
         assert result == mock_orgs
 
     @patch(f'{MODULE}.OrganizationMaster')
     def test_returns_empty_list_when_no_organizations(self, mock_om):
         """3.1.4.2: 組織マスタが0件のとき、空リストが返却される"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_organization_options
-        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.device_inventory_service \
+            import get_organization_options
 
-        # Act
+        # 組織マスタに対する.filter_by().order_by().all()の結果を空リストに設定
+        mock_om.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        # Act: 画面に表示する組織リストを取得
         result = get_organization_options()
 
-        # Assert: 空リストが返却されること
+        # Assert: 取得した組織マスタの結果が空リストであること
         assert result == []
 
 
@@ -1648,24 +1883,33 @@ class TestGetDeviceUuidValidator:
     def test_returns_azure_validator_when_auth_type_is_azure(self):
         """2.1.1: AUTH_TYPE=azure のとき azure バリデータが返る"""
         # Arrange / Act
-        from iot_app.services.device_inventory_service import get_device_uuid_validator
+        from iot_app.services.device_inventory_service \
+            import get_device_uuid_validator
+        import re
+
         result = get_device_uuid_validator()
 
         # Assert
         assert result['max_length'] == 128
         assert 'pattern' in result
         assert 'description' in result
+        # azure パターン: 英数字・ハイフン・ドット・パーセント・シャープ・アンダースコア・アスタリスク・クエスチョンマーク・カンマ・コロン・シングルクオートのみ使用可
+        assert re.match(result['pattern'], 'valid_device_-.%#*?,:')
+        assert not re.match(result['pattern'], 'invalid_device_@')
 
     @patch.dict(os.environ, {'AUTH_TYPE': 'aws'})
     def test_returns_aws_validator_when_auth_type_is_aws(self):
         """2.1.1: AUTH_TYPE=aws のとき aws バリデータが返る"""
         # Arrange / Act
-        from iot_app.services.device_inventory_service import get_device_uuid_validator
+        from iot_app.services.device_inventory_service \
+            import get_device_uuid_validator
         import re
         result = get_device_uuid_validator()
 
         # Assert
         assert result['max_length'] == 128
+        assert 'pattern' in result
+        assert 'description' in result
         # aws パターン: 英数字・ハイフン・アンダースコアのみ
         assert re.match(result['pattern'], 'valid-device_123')
         assert not re.match(result['pattern'], 'invalid.device')
@@ -1673,7 +1917,8 @@ class TestGetDeviceUuidValidator:
     def test_returns_same_as_azure_when_auth_type_is_local(self):
         """2.1.1: AUTH_TYPE=local のとき azure と同じバリデータが返る"""
         # Arrange
-        from iot_app.services.device_inventory_service import get_device_uuid_validator
+        from iot_app.services.device_inventory_service \
+            import get_device_uuid_validator
 
         # Act
         with patch.dict(os.environ, {'AUTH_TYPE': 'azure'}):
@@ -1688,19 +1933,27 @@ class TestGetDeviceUuidValidator:
     def test_defaults_to_azure_when_auth_type_not_set(self):
         """2.1.1: AUTH_TYPE 未設定のとき azure バリデータが返る（デフォルト値 'azure'）"""
         # AUTH_TYPE を環境変数から除去した状態でテスト
-        env_without_auth = {k: v for k, v in os.environ.items() if k != 'AUTH_TYPE'}
+        env_without_auth = {k: v for k,
+                            v in os.environ.items() if k != 'AUTH_TYPE'}
+        import re
         with patch.dict(os.environ, env_without_auth, clear=True):
-            from iot_app.services.device_inventory_service import get_device_uuid_validator
+            from iot_app.services.device_inventory_service \
+                import get_device_uuid_validator
+
             result = get_device_uuid_validator()
 
         # Assert
         assert result['max_length'] == 128
+        assert re.match(result['pattern'], 'valid_device_-.%#*?,:\\')
+        assert not re.match(result['pattern'], 'invalid_device_@')
 
     @patch.dict(os.environ, {'AUTH_TYPE': 'unknown_provider'})
     def test_raises_value_error_when_auth_type_is_unknown(self):
         """1.1.6.1: 未知の AUTH_TYPE のとき ValueError が送出される"""
         # Arrange / Act / Assert
-        from iot_app.services.device_inventory_service import get_device_uuid_validator
+        from iot_app.services.device_inventory_service \
+            import get_device_uuid_validator
+
         with pytest.raises(ValueError, match="Unknown AUTH_TYPE: unknown_provider"):
             get_device_uuid_validator()
 
@@ -1721,7 +1974,9 @@ class TestValidateDeviceUuid:
     def test_valid_azure_uuid_returns_true_and_empty_message(self):
         """2.1.1: azure 環境で有効な device_uuid を渡すと (True, '') が返る"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
+
         valid_uuid = "MyDevice-001.%#_*?,:valid"
 
         # Act
@@ -1735,7 +1990,9 @@ class TestValidateDeviceUuid:
     def test_valid_aws_uuid_returns_true_and_empty_message(self):
         """2.1.1: aws 環境で有効な device_uuid を渡すと (True, '') が返る"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
+
         valid_uuid = 'MyDevice_001-abc'
 
         # Act
@@ -1749,7 +2006,9 @@ class TestValidateDeviceUuid:
     def test_uuid_at_max_length_returns_true(self):
         """1.1.2.1: ちょうど128文字の device_uuid は有効 (True が返る)"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
+
         uuid_128 = 'A' * 128
 
         # Act
@@ -1763,7 +2022,8 @@ class TestValidateDeviceUuid:
     def test_uuid_over_max_length_returns_false_with_message(self):
         """1.1.2.2: 129文字以上の device_uuid は (False, エラーメッセージ) が返る"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
         uuid_129 = 'A' * 129
 
         # Act
@@ -1797,7 +2057,8 @@ class TestValidateDeviceUuid:
         # Act
         result, message = validate_device_uuid(invalid_uuid)
 
-        # Assert
+        # As
+        # sert
         assert result is False
         assert 'device_uuidの形式が不正です' in message
 
@@ -1805,7 +2066,9 @@ class TestValidateDeviceUuid:
     def test_length_error_message_includes_max_length(self):
         """1.1.2.2: 文字数超過エラーメッセージに最大文字数（128）が含まれる"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
+
         too_long = 'A' * 200
 
         # Act
@@ -1818,7 +2081,9 @@ class TestValidateDeviceUuid:
     def test_pattern_error_message_includes_description(self):
         """1.1.6.1: パターン不一致エラーメッセージにバリデータ description が含まれる"""
         # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
+        from iot_app.services.device_inventory_service \
+            import validate_device_uuid
+
         invalid_uuid = 'invalid uuid!'
 
         # Act
@@ -1826,3 +2091,95 @@ class TestValidateDeviceUuid:
 
         # Assert — azure の description が含まれること
         assert 'ASCII 7ビット英数字' in message or 'device_uuidの形式が不正です' in message
+
+
+# ============================================================
+# 11. check_linked_device_master
+# 観点: 2.1 正常系処理, 2.2 対象データ存在チェック
+# ============================================================
+
+@pytest.mark.unit
+class TestCheckLinkedDeviceMaster:
+    """check_linked_device_master - 削除対象台帳に紐づくデバイスマスタ存在確認
+
+    観点セクション: 2.1 正常系処理, 2.2 対象データ存在チェック
+    """
+
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_returns_true_when_linked_device_exists(self, mock_dim, mock_dm):
+        """2.1.1: 紐づくデバイスマスタが1件以上存在する場合、True が返る"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import check_linked_device_master
+
+        mock_inv = Mock()
+        mock_inv.device_inventory_id = 100
+        mock_dim.query.filter.return_value.all.return_value = [
+            mock_inv]  # 台帳レコード1件
+        mock_dm.query.filter.return_value.count.return_value = 1          # デバイスマスタ1件存在
+
+        result = check_linked_device_master(
+            ['uuid-001'])                  # Act: デバイスマスタ存在チェック実行
+
+        # Assert: 紐づくデバイスマスタが存在するため True が返ること
+        assert result is True
+
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_returns_false_when_no_linked_device(self, mock_dim, mock_dm):
+        """2.1.1: 紐づくデバイスマスタが存在しない場合、False が返る"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import check_linked_device_master
+
+        mock_inv = Mock()
+        mock_inv.device_inventory_id = 100
+        mock_dim.query.filter.return_value.all.return_value = [
+            mock_inv]  # 台帳レコード1件
+        mock_dm.query.filter.return_value.count.return_value = 0          # デバイスマスタ0件
+
+        result = check_linked_device_master(
+            ['uuid-001'])                  # Act: デバイスマスタ存在チェック実行
+
+        # Assert: 紐づくデバイスマスタが存在しないため False が返ること
+        assert result is False
+
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_returns_false_when_inventory_not_found(self, mock_dim, mock_dm):
+        """2.2.2: 指定UUIDに対応する台帳レコードが存在しない場合、False が返る"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import check_linked_device_master
+
+        mock_dim.query.filter.return_value.all.return_value = []          # 台帳レコード0件（UUID未一致）
+        mock_dm.query.filter.return_value.count.return_value = 0          # デバイスマスタも0件
+
+        result = check_linked_device_master(
+            ['nonexistent-uuid'])          # Act: デバイスマスタ存在チェック実行
+
+        # Assert: 台帳レコードが存在しないため False が返ること
+        assert result is False
+
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_checks_multiple_inventory_uuids(self, mock_dim, mock_dm):
+        """2.1.3: 複数UUID指定時、いずれかに紐づくデバイスマスタが存在すれば True が返る"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import check_linked_device_master
+
+        inv1 = Mock()
+        inv1.device_inventory_id = 100
+        inv2 = Mock()
+        inv2.device_inventory_id = 200
+        mock_dim.query.filter.return_value.all.return_value = [
+            inv1, inv2]  # 台帳レコード2件
+        mock_dm.query.filter.return_value.count.return_value = 1            # デバイスマスタ1件存在
+
+        result = check_linked_device_master(
+            ['uuid-001', 'uuid-002'])       # Act: デバイスマスタ存在チェック実行（2件指定）
+
+        # Assert: 複数UUID指定時でも、1件以上デバイスマスタが存在するため True が返ること
+        assert result is True

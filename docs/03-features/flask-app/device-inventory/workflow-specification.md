@@ -112,7 +112,7 @@ flowchart TD
     CheckMaster -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
+    CheckMaster -->|成功| CheckCount[検索結果件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>LEFT JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE]
 
     CheckPage -->|ある<br>ページング（初期表示後・検索後）| GetCookie[Cookieから検索条件取得<br>get_search_conditions_cookie<br>※POST検索またはGET初期表示でセット済み]
     GetCookie --> OverridePage[Cookie検索条件に<br>pageパラメータを上書き<br>page=request.args.get'page']
@@ -122,7 +122,7 @@ flowchart TD
 
     CheckCountResult -->|失敗| Error500
 
-    CheckCountResult -->|成功| Query[検索結果取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>LIMIT per_page OFFSET offset]
+    CheckCountResult -->|成功| Query[検索結果取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>LEFT JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>LIMIT per_page OFFSET offset]
     Query --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500
@@ -139,9 +139,9 @@ flowchart TD
 
 #### Flaskルート
 
-| ルート       | エンドポイント                | 詳細                                                                                                                                                                                    |
-| ------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_item_id`, `sort_order` |
+| ルート       | エンドポイント                | 詳細                                                                                                                                                                                          |
+| ------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 台帳一覧表示 | `GET /admin/device-inventory` | クエリパラメータ: `page`, `device_uuid`, `device_name`, `device_type_id`, `inventory_status_id`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `sort_item_id`, `sort_order` |
 
 #### バリデーション
 
@@ -157,17 +157,25 @@ flowchart TD
 
 ```python
 # forms/device_inventory.py
+from wtforms import ValidationError
+
 
 class DeviceInventorySearchForm(FlaskForm):
-    device_uuid         = StringField('デバイスUUID')
-    device_name         = StringField('デバイス名')
-    device_type         = SelectField('デバイス種別', coerce=int)
-    inventory_status    = SelectField('在庫状況', coerce=int)
-    inventory_location  = StringField('在庫場所')
+    device_uuid         = StringField('デバイスUUID', validators=[Optional(), Length(max=128)])
+    device_name         = StringField('デバイス名',   validators=[Optional(), Length(max=100)])
+    device_type_id      = SelectField('デバイス種別', coerce=int)
+    inventory_status_id = SelectField('在庫状況',     coerce=int)
+    inventory_location  = StringField('在庫場所',     validators=[Optional(), Length(max=100)])
     purchase_date_from  = DateField('購入日（From）', validators=[Optional()])
-    purchase_date_to    = DateField('購入日（To）', validators=[Optional()])
+    purchase_date_to    = DateField('購入日（To）',   validators=[Optional()])
     sort_item_id        = SelectField('ソート項目', coerce=int)
     sort_order          = SelectField('ソート順', choices=[(-1, ''), (1, '昇順'), (2, '降順')], coerce=int)
+
+    def validate_purchase_date_to(self, field):
+        """購入日（From） ≤ 購入日（To） の相関チェック"""
+        if self.purchase_date_from.data and field.data:
+            if field.data < self.purchase_date_from.data:
+                raise ValidationError('開始日は終了日以前を指定してください')
 ```
 
 ```python
@@ -186,8 +194,8 @@ def get_default_search_params() -> dict:
         'per_page': PER_PAGE,
         'device_uuid': '',
         'device_name': '',
-        'device_type': -1,
-        'inventory_status': -1,
+        'device_type_id': -1,
+        'inventory_status_id': -1,
         'inventory_location': '',
         'purchase_date_from': None,
         'purchase_date_to': None,
@@ -242,21 +250,21 @@ def search_device_inventories(search_params: dict) -> tuple[list, int]:
         DeviceInventoryMaster.query
         .outerjoin(DeviceMaster, DeviceInventoryMaster.device_inventory_id == DeviceMaster.device_inventory_id)
         .filter(or_(DeviceMaster.delete_flag == False, DeviceMaster.device_id.is_(None)))
-        .join(DeviceTypeMaster, DeviceMaster.device_type_id == DeviceTypeMaster.device_type_id)
-        .filter(DeviceTypeMaster.delete_flag == False)
+        .outerjoin(DeviceTypeMaster, DeviceMaster.device_type_id == DeviceTypeMaster.device_type_id)
+        .filter(or_(DeviceTypeMaster.delete_flag == False, DeviceTypeMaster.device_type_id.is_(None)))
         .join(InventoryStatusMaster, DeviceInventoryMaster.inventory_status_id == InventoryStatusMaster.inventory_status_id)
         .filter(InventoryStatusMaster.delete_flag == False)
         .filter(DeviceInventoryMaster.delete_flag == False)
     )
 
     if search_params.get('device_uuid'):
-        query = query.filter(DeviceMaster.device_uuid.like(f"%{search_params['device_uuid']}%"))
+        query = query.filter(DeviceMaster.device_uuid.like(f"{search_params['device_uuid']}%"))
     if search_params.get('device_name'):
         query = query.filter(DeviceMaster.device_name.like(f"%{search_params['device_name']}%"))
-    if search_params.get('device_type') and search_params['device_type'] != -1:
-        query = query.filter(DeviceMaster.device_type_id == search_params['device_type'])
-    if search_params.get('inventory_status') and search_params['inventory_status'] != -1:
-        query = query.filter(DeviceInventoryMaster.inventory_status_id == search_params['inventory_status'])
+    if search_params.get('device_type_id') and search_params['device_type_id'] != -1:
+        query = query.filter(DeviceMaster.device_type_id == search_params['device_type_id'])
+    if search_params.get('inventory_status_id') and search_params['inventory_status_id'] != -1:
+        query = query.filter(DeviceInventoryMaster.inventory_status_id == search_params['inventory_status_id'])
     if search_params.get('inventory_location'):
         query = query.filter(DeviceInventoryMaster.inventory_location.like(f"%{search_params['inventory_location']}%"))
     if search_params.get('purchase_date_from'):
@@ -303,16 +311,20 @@ def list_device_inventory():
     """初期表示・ページング（統合）"""
 
     if 'page' not in request.args:
-        # 初期表示: デフォルト検索条件
+        # 初期表示: Cookie をクリアしてデフォルト検索条件をセット
         search_params = get_default_search_params()  # → device_inventory_service
-        save_cookie = True
+        @after_this_request
+        def reset_search_cookie(response):
+            """Cookie クリア → デフォルト値で再格納（after_this_request でレスポンス確定後に実行）"""
+            response = clear_search_conditions_cookie(response, 'device_inventory')
+            response = set_search_conditions_cookie(response, 'device_inventory', search_params)
+            return response
     else:
         # ページング: Cookie から検索条件取得 → page 上書き
         # CookieはPOST検索（search_device_inventory）またはGET初期表示（list_device_inventory）でセットされる
         # Cookieが存在しない場合（直接URLアクセス等）はデフォルト値にフォールバック
         search_params = get_search_conditions_cookie('device_inventory') or get_default_search_params()
         search_params['page'] = request.args.get('page', 1, type=int)
-        save_cookie = False
 
     try:
         inventories, total = search_device_inventories(search_params)  # → device_inventory_service
@@ -320,7 +332,7 @@ def list_device_inventory():
     except Exception:
         abort(500)
 
-    response = make_response(render_template(
+    return make_response(render_template(
         'admin/device_inventory/list.html',
         inventories=inventories,
         total=total,
@@ -329,10 +341,6 @@ def list_device_inventory():
         inventory_statuses=inventory_statuses,
         sort_items=sort_items,
     ))
-    if save_cookie:
-        response = clear_search_conditions_cookie(response, 'device_inventory')
-        response = set_search_conditions_cookie(response, 'device_inventory', search_params)
-    return response
 ```
 
 #### エラーハンドリング
@@ -373,13 +381,13 @@ flowchart TD
     ValidCheck -->|OK| ClearCookie[Cookieの検索条件をクリア<br>clear_search_conditions_cookie]
     ClearCookie --> Convert[検索条件を<br>クエリパラメータに変換<br>page: 1（リセット）]
     Convert --> LoadMaster[検索条件用マスタデータ取得<br>SELECT * FROM device_type_master<br>SELECT * FROM inventory_status_master<br>SELECT * FROM sort_item_master<br>WHERE view_id=7 AND delete_flag=FALSE]
-    LoadMaster --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
+    LoadMaster --> Count[表示件数取得DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>LEFT JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Count --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
     Error500 --> End
 
-    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
+    CheckDB -->|成功| Query[検索結果DBクエリ実行<br>device_inventory_master<br>LEFT JOIN device_master<br>LEFT JOIN device_type_master<br>JOIN inventory_status_master<br>各テーブルdelete_flag=FALSE<br>検索条件を適用]
     Query --> CheckDB2{DBクエリ結果}
 
     CheckDB2 -->|失敗| Error500
@@ -392,9 +400,9 @@ flowchart TD
 
 #### Flaskルート
 
-| ルート               | エンドポイント                 | 詳細                                                                                                                                                                                                                                          |
-| -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 台帳一覧表示（検索） | `POST /admin/device-inventory` | フォームデータ: `device_uuid`, `device_name`, `device_type`, `inventory_status`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_item_id`, `sort_order`。デバイス・在庫状況・ソート項目をDBから取得 |
+| ルート               | エンドポイント                 | 詳細                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 台帳一覧表示（検索） | `POST /admin/device-inventory` | フォームデータ: `device_uuid`, `device_name`, `device_type_id`, `inventory_status_id`, `inventory_location`, `purchase_date_from`, `purchase_date_to`, `page`, `per_page`, `sort_item_id`, `sort_order`。デバイス・在庫状況・ソート項目をDBから取得 |
 
 #### バリデーション
 
@@ -419,6 +427,12 @@ flowchart TD
 @require_role('system_admin')
 def search_device_inventory():
     form = DeviceInventorySearchForm(request.form)
+    device_types, inventory_statuses, sort_items = get_device_inventory_form_options()  # → device_inventory_service
+    in_all_flag = True
+    _head = (-1, 'すべて') if in_all_flag else (None, '')
+    form.device_type_id.choices      = [_head] + [(dt.device_type_id, dt.device_type_name) for dt in device_types]
+    form.inventory_status_id.choices = [_head] + [(s.inventory_status_id, s.inventory_status_name) for s in inventory_statuses]
+    form.sort_item_id.choices        = [(-1, '---')] + [(s.sort_item_id, s.sort_item_display_name) for s in sort_items]
     if not form.validate():
         abort(400)
 
@@ -427,8 +441,8 @@ def search_device_inventory():
         'per_page': PER_PAGE,
         'device_uuid':        form.device_uuid.data or '',
         'device_name':        form.device_name.data or '',
-        'device_type':        form.device_type.data if form.device_type.data is not None else -1,
-        'inventory_status':   form.inventory_status.data if form.inventory_status.data is not None else -1,
+        'device_type_id':        form.device_type_id.data if form.device_type_id.data is not None else -1,
+        'inventory_status_id':   form.inventory_status_id.data if form.inventory_status_id.data is not None else -1,
         'inventory_location': form.inventory_location.data or '',
         'purchase_date_from': form.purchase_date_from.data,
         'purchase_date_to':   form.purchase_date_to.data,
@@ -438,7 +452,6 @@ def search_device_inventory():
 
     try:
         inventories, total = search_device_inventories(search_params)  # → device_inventory_service
-        device_types, inventory_statuses, sort_items = get_device_inventory_form_options()  # → device_inventory_service
     except Exception:
         abort(500)
 
@@ -471,30 +484,31 @@ def search_device_inventory():
 
 **テーブル構造:** `sort_item_master`
 
-| カラム物理名   | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
-| -------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| view_id        | 画面ID       | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID                            |
-| sort_item_id   | ソート項目ID | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
-| sort_item_name | ソート項目名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | ソート項目の内容（カラム名）            |
-| sort_order     | 表示順序     | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
-| delete_flag    | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
-| create_date    | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| update_date    | 更新日時     | DATETIME     | NULL     | -   | -   | -                 | レコード更新日時                        |
+| カラム物理名           | カラム論理名     | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| ---------------------- | ---------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
+| view_id                | 画面ID           | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID                            |
+| sort_item_id           | ソート項目ID     | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
+| sort_item_name         | ソート項目名     | VARCHAR(100) | NOT NULL | -   | -   | -                 | ソート項目の内容（物理カラム名）        |
+| sort_item_display_name | ソート項目表示名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | ドロップダウンに表示する論理名          |
+| sort_order             | 表示順序         | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
+| delete_flag            | 削除フラグ       | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| create_date            | 作成日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| update_date            | 更新日時         | DATETIME     | NULL     | -   | -   | -                 | レコード更新日時                        |
 
 **デバイス台帳管理画面の初期データ（view_id = 7）:**
 
-| view_id | sort_item_id | sort_item_name                 | sort_order | delete_flag | 説明                                   |
-| ------- | ------------ | ------------------------------ | ---------- | ----------- | -------------------------------------- |
-| 7       | 0            | device_inventory_id            | 0          | FALSE       | デバイス在庫ID（未選択時のデフォルト） |
-| 7       | 1            | device_uuid                    | 1          | FALSE       | クラウドに登録するデバイスID           |
-| 7       | 2            | device_name                    | 2          | FALSE       | デバイス名                             |
-| 7       | 3            | device_type_id                 | 3          | FALSE       | デバイス種別                           |
-| 7       | 4            | sim_id                         | 4          | FALSE       | SIMID                                  |
-| 7       | 5            | mac_address                    | 5          | FALSE       | MACアドレス                            |
-| 7       | 6            | inventory_status_id            | 6          | FALSE       | 在庫状況                               |
-| 7       | 7            | purchase_date                  | 7          | FALSE       | 購入日                                 |
-| 7       | 8            | manufacturer_warranty_end_date | 8          | FALSE       | メーカー保証終了日                     |
-| 7       | 9            | inventory_location             | 9          | FALSE       | 在庫場所                               |
+| view_id | sort_item_id | sort_item_name                 | sort_item_display_name           | sort_order | delete_flag | 説明                                   |
+| ------- | ------------ | ------------------------------ | -------------------------------- | ---------- | ----------- | -------------------------------------- |
+| 7       | 0            | device_inventory_id            | デバイス在庫ID                   | 0          | FALSE       | デバイス在庫ID（未選択時のデフォルト） |
+| 7       | 1            | device_uuid                    | クラウドに登録するデバイスID     | 1          | FALSE       | クラウドに登録するデバイスID           |
+| 7       | 2            | device_name                    | デバイス名                       | 2          | FALSE       | デバイス名                             |
+| 7       | 3            | device_type_id                 | デバイス種別                     | 3          | FALSE       | デバイス種別                           |
+| 7       | 4            | sim_id                         | SIMID                            | 4          | FALSE       | SIMID                                  |
+| 7       | 5            | mac_address                    | MACアドレス                      | 5          | FALSE       | MACアドレス                            |
+| 7       | 6            | inventory_status_id            | 在庫状況                         | 6          | FALSE       | 在庫状況                               |
+| 7       | 7            | purchase_date                  | 購入日                           | 7          | FALSE       | 購入日                                 |
+| 7       | 8            | manufacturer_warranty_end_date | 保証期限                         | 8          | FALSE       | メーカー保証終了日                     |
+| 7       | 9            | inventory_location             | 在庫場所                         | 9          | FALSE       | 在庫場所                               |
 
 **注意事項:**
 - `sort_item_id=-1` または `sort_order=-1` の場合はデフォルトソート: `device_inventory_id DESC`
@@ -666,9 +680,29 @@ flowchart TD
 
 ```python
 # forms/device_inventory.py
+from wtforms import ValidationError
+from iot_app.services.device_inventory_service import validate_device_uuid
+
+
+def device_uuid_format_validator(form, field):
+    """AUTH_TYPE に応じた device_uuid フォーマット検証（validate_device_uuid は device_inventory_service に定義）"""
+    if field.data:
+        ok, msg = validate_device_uuid(field.data)
+        if not ok:
+            raise ValidationError(msg)
+
+
+def date_after_purchase_validator(field_label: str):
+    """purchase_date 以降であることを検証するバリデーターファクトリ"""
+    def _validate(form, field):
+        if field.data and form.purchase_date.data:
+            if field.data < form.purchase_date.data:
+                raise ValidationError(f'{field_label}は購入日以降を指定してください')
+    return _validate
+
 
 class DeviceInventoryCreateForm(FlaskForm):
-    device_uuid                     = StringField('デバイスUUID', validators=[DataRequired(), Length(max=128)])
+    device_uuid                     = StringField('デバイスUUID', validators=[DataRequired(), Length(max=128), device_uuid_format_validator])
     device_name                     = StringField('デバイス名', validators=[DataRequired(), Length(max=100)])
     device_type_id                  = SelectField('デバイス種別', coerce=int, validators=[DataRequired()])
     device_model                    = StringField('モデル情報', validators=[DataRequired(), Length(max=100)])
@@ -677,12 +711,12 @@ class DeviceInventoryCreateForm(FlaskForm):
     software_version                = StringField('ソフトウェアバージョン', validators=[Optional(), Length(max=100)])
     device_location                 = StringField('設置場所', validators=[Optional(), Length(max=100)])
     certificate_expiration_date     = DateField('証明書有効期限', validators=[Optional()])
-    organization_id                 = SelectField('組織', validators=[DataRequired()])
+    organization_id                 = SelectField('組織', coerce=int, validators=[DataRequired()])
     inventory_status_id             = SelectField('在庫状況', coerce=int, validators=[DataRequired()])
     purchase_date                   = DateField('購入日', validators=[DataRequired()])
-    estimated_ship_date             = DateField('出荷予定日', validators=[Optional()])
-    ship_date                       = DateField('出荷日', validators=[Optional()])
-    manufacturer_warranty_end_date  = DateField('メーカー保証終了日', validators=[DataRequired()])
+    estimated_ship_date             = DateField('出荷予定日', validators=[Optional(), date_after_purchase_validator('出荷予定日')])
+    ship_date                       = DateField('出荷日',     validators=[Optional(), date_after_purchase_validator('出荷日')])
+    manufacturer_warranty_end_date  = DateField('メーカー保証終了日', validators=[DataRequired(), date_after_purchase_validator('メーカー保証終了日')])
     inventory_location              = StringField('在庫場所', validators=[DataRequired(), Length(max=100)])
 ```
 
@@ -805,6 +839,11 @@ def show_create_device_inventory():
     form = DeviceInventoryCreateForm()
     device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
     organizations = get_organization_options()                                  # → device_inventory_service
+    in_all_flag = False
+    _head = (-1, 'すべて') if in_all_flag else (None, '')
+    form.device_type_id.choices      = [_head] + [(dt.device_type_id, dt.device_type_name) for dt in device_types]
+    form.inventory_status_id.choices = [_head] + [(s.inventory_status_id, s.inventory_status_name) for s in inventory_statuses]
+    form.organization_id.choices     = [_head] + [(org.organization_id, org.organization_name) for org in organizations]
     return render_template('admin/device_inventory/form.html',
                            mode='create', form=form,
                            device_types=device_types,
@@ -819,9 +858,14 @@ def show_create_device_inventory():
 @require_role('system_admin')
 def create_device_inventory_view():
     form = DeviceInventoryCreateForm(request.form)
+    device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+    organizations = get_organization_options()                                  # → device_inventory_service
+    in_all_flag = False
+    _head = (-1, 'すべて') if in_all_flag else (None, '')
+    form.device_type_id.choices      = [_head] + [(dt.device_type_id, dt.device_type_name) for dt in device_types]
+    form.inventory_status_id.choices = [_head] + [(s.inventory_status_id, s.inventory_status_name) for s in inventory_statuses]
+    form.organization_id.choices     = [_head] + [(org.organization_id, org.organization_name) for org in organizations]
     if not form.validate():
-        device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
-        organizations = get_organization_options()                                  # → device_inventory_service
         return render_template('admin/device_inventory/form.html',
                                mode='create', form=form,
                                device_types=device_types,
@@ -876,13 +920,17 @@ flowchart TD
     CheckAuth -->|認証済み| Permission[権限チェック<br>system_admin ロール確認]
     Permission --> CheckPerm{権限OK?}
 
-    CheckPerm -->|権限OK| Query[在庫・デバイス情報を取得<br>device_inventory_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>JOIN inventory_status_master<br>WHERE device_inventory_uuid = :uuid<br>各テーブルdelete_flag=FALSE]
-    Query --> CheckDB{DBクエリ結果}
+    CheckPerm -->|権限OK| Query1[台帳情報を取得<br>SELECT FROM device_inventory_master<br>WHERE device_inventory_uuid = :uuid<br>AND delete_flag=FALSE]
+    Query1 --> CheckDB1{クエリ結果①}
 
-    CheckDB -->|データなし| Error404[404エラーモーダル表示]
+    CheckDB1 -->|データなし| Error404[404エラーモーダル表示]
     Error404 --> End
 
-    CheckDB -->|成功| LoadMaster[フォーム用マスタデータを取得<br>get_device_inventory_form_options（種別・在庫状況）<br>get_organization_options（組織）<br>device_type_master, inventory_status_master,<br>organization_master<br>各テーブルdelete_flag=FALSE]
+    CheckDB1 -->|成功| Query2[デバイス情報を取得<br>SELECT FROM device_master<br>WHERE device_inventory_id = :device_inventory_id<br>AND delete_flag=FALSE]
+    Query2 --> CheckDB2{クエリ結果②}
+
+    CheckDB2 -->|データなし| Error404
+    CheckDB2 -->|成功| LoadMaster[フォーム用マスタデータを取得<br>get_device_inventory_form_options（種別・在庫状況）<br>get_organization_options（組織）<br>device_type_master, inventory_status_master,<br>organization_master<br>各テーブルdelete_flag=FALSE]
     LoadMaster --> Template[更新モーダルをレンダリング<br>フォームに既定値を設定]
     Template --> OpenModal[更新モーダルを開く]
 
@@ -978,7 +1026,7 @@ flowchart TD
 # forms/device_inventory.py
 
 class DeviceInventoryUpdateForm(FlaskForm):
-    device_uuid                     = StringField('デバイスUUID', validators=[DataRequired(), Length(max=128)])
+    device_uuid                     = StringField('デバイスUUID', validators=[DataRequired(), Length(max=128), device_uuid_format_validator])
     device_name                     = StringField('デバイス名', validators=[DataRequired(), Length(max=100)])
     device_type_id                  = SelectField('デバイス種別', coerce=int, validators=[DataRequired()])
     device_model                    = StringField('モデル情報', validators=[DataRequired(), Length(max=100)])
@@ -987,12 +1035,12 @@ class DeviceInventoryUpdateForm(FlaskForm):
     software_version                = StringField('ソフトウェアバージョン', validators=[Optional(), Length(max=100)])
     device_location                 = StringField('設置場所', validators=[Optional(), Length(max=100)])
     certificate_expiration_date     = DateField('証明書有効期限', validators=[Optional()])
-    organization_id                 = SelectField('組織', validators=[DataRequired()])
+    organization_id                 = SelectField('組織', coerce=int, validators=[DataRequired()])
     inventory_status_id             = SelectField('在庫状況', coerce=int, validators=[DataRequired()])
     purchase_date                   = DateField('購入日', validators=[DataRequired()])
-    estimated_ship_date             = DateField('出荷予定日', validators=[Optional()])
-    ship_date                       = DateField('出荷日', validators=[Optional()])
-    manufacturer_warranty_end_date  = DateField('メーカー保証終了日', validators=[DataRequired()])
+    estimated_ship_date             = DateField('出荷予定日', validators=[Optional(), date_after_purchase_validator('出荷予定日')])
+    ship_date                       = DateField('出荷日',     validators=[Optional(), date_after_purchase_validator('出荷日')])
+    manufacturer_warranty_end_date  = DateField('メーカー保証終了日', validators=[DataRequired(), date_after_purchase_validator('メーカー保証終了日')])
     inventory_location              = StringField('在庫場所', validators=[DataRequired(), Length(max=100)])
 ```
 
@@ -1155,6 +1203,9 @@ def show_edit_device_inventory(device_inventory_uuid):
     form.mac_address.data            = inventory.mac_address
     device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
     organizations = get_organization_options()                                  # → device_inventory_service
+    form.device_type_id.choices      = [(dt.device_type_id, dt.device_type_name) for dt in device_types]
+    form.inventory_status_id.choices = [(s.inventory_status_id, s.inventory_status_name) for s in inventory_statuses]
+    form.organization_id.choices     = [(org.organization_id, org.organization_name) for org in organizations]
     return render_template('admin/device_inventory/edit.html',
                            mode='edit', form=form,
                            device_inventory_uuid=device_inventory_uuid,
@@ -1170,9 +1221,12 @@ def show_edit_device_inventory(device_inventory_uuid):
 @require_role('system_admin')
 def update_device_inventory_view(device_inventory_uuid):
     form = DeviceInventoryUpdateForm(request.form)
+    device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
+    organizations = get_organization_options()                                  # → device_inventory_service
+    form.device_type_id.choices      = [(dt.device_type_id, dt.device_type_name) for dt in device_types]
+    form.inventory_status_id.choices = [(s.inventory_status_id, s.inventory_status_name) for s in inventory_statuses]
+    form.organization_id.choices     = [(org.organization_id, org.organization_name) for org in organizations]
     if not form.validate():
-        device_types, inventory_statuses, _ = get_device_inventory_form_options()  # → device_inventory_service
-        organizations = get_organization_options()                                  # → device_inventory_service
         return render_template('admin/device_inventory/edit.html',
                                mode='edit', form=form,
                                device_inventory_uuid=device_inventory_uuid,
@@ -1278,6 +1332,27 @@ flowchart TD
 ```python
 # services/device_inventory_service.py
 
+def check_linked_device_master(inventory_uuids: list[str]) -> bool:
+    """削除対象の台帳に紐づくデバイスマスタレコードが存在するか確認する
+
+    Args:
+        inventory_uuids: 削除対象のデバイス在庫UUIDリスト
+
+    Returns:
+        True: 紐づくデバイスマスタレコードが1件以上存在する
+        False: 紐づくデバイスマスタレコードが存在しない
+    """
+    inventories = DeviceInventoryMaster.query.filter(
+        DeviceInventoryMaster.device_inventory_uuid.in_(inventory_uuids),
+        DeviceInventoryMaster.delete_flag == False,
+    ).all()
+    inventory_ids = [inv.device_inventory_id for inv in inventories]
+    return DeviceMaster.query.filter(
+        DeviceMaster.device_inventory_id.in_(inventory_ids),
+        DeviceMaster.delete_flag == False,
+    ).count() > 0
+
+
 def delete_device_inventories(inventory_uuids: list[str], modifier_id: int) -> None:
     """デバイス台帳を論理削除する（device_inventory_master のみ）
 
@@ -1322,6 +1397,17 @@ def delete_device_inventory_view():
     if not inventory_uuids:
         flash('削除対象が選択されていません', 'error')
         return redirect(url_for('device_inventory.list_device_inventory'))
+
+    # デバイスマスタに紐づくデータが存在するか確認（確認モーダルへの警告表示フラグ）
+    has_linked_device = check_linked_device_master(inventory_uuids)  # → device_inventory_service
+
+    # 確認フラグがリクエストに含まれていない場合は確認モーダルを表示する
+    if not request.form.get('confirmed'):
+        return render_template(
+            'admin/device_inventory/delete_confirm.html',
+            inventory_uuids=inventory_uuids,
+            has_linked_device=has_linked_device,
+        )
 
     try:
         delete_device_inventories(inventory_uuids, g.current_user.user_id)  # → device_inventory_service
@@ -1390,10 +1476,13 @@ def show_device_inventory(device_inventory_uuid):
             .filter(InventoryStatusMaster.delete_flag == False)
             .filter(DeviceInventoryMaster.device_inventory_uuid == device_inventory_uuid)
             .filter(DeviceInventoryMaster.delete_flag == False)
-            .first_or_404()
+            .first()
         )
     except Exception:
         abort(500)
+
+    if inventory is None:
+        abort(404)
 
     return render_template('admin/device_inventory/show.html', inventory=inventory)
 ```
@@ -1418,7 +1507,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーモーダル表示]
     Error403 --> End
 
-    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_inventory_master<br>JOIN inventory_status_master<br>LEFT JOIN device_master<br>JOIN device_type_master<br>現在の検索条件を適用]
+    CheckPerm -->|権限OK| GetParams[DBクエリ実行<br>device_inventory_master<br>JOIN inventory_status_master<br>LEFT JOIN device_master<br>LEFT JOIN device_type_master<br>現在の検索条件を適用]
     GetParams --> CheckDB{DBクエリ結果}
 
     CheckDB -->|失敗| Error500[500エラーモーダル表示]
@@ -1460,11 +1549,11 @@ def export_device_inventories_csv(search_params: dict) -> str:
     })
     df = pd.DataFrame([{
         '操作列':            '',
-        'デバイス名':         d.device.device_name,
-        'デバイス種別':       d.device.device_type.device_type_name,
-        'モデル情報':         d.device.device_model or '',
-        'SIMID':             d.device.sim_id or '',
-        'MACアドレス':        d.device.mac_address or '',
+        'デバイス名':         d.device.device_name if d.device else '',
+        'デバイス種別':       d.device.device_type.device_type_name if d.device and d.device.device_type else '',
+        'モデル情報':         d.device.device_model or '' if d.device else '',
+        'SIMID':             d.device.sim_id or '' if d.device else '',
+        'MACアドレス':        d.device.mac_address or '' if d.device else '',
         '在庫状況':           d.inventory_status.inventory_status_name,
         '購入日':             d.purchase_date.strftime('%Y/%m/%d') if d.purchase_date else '',
         '出荷予定日':         d.estimated_ship_date.strftime('%Y/%m/%d') if d.estimated_ship_date else '',
@@ -1521,7 +1610,7 @@ def export_device_inventory():
 device_inventory_master (dim)
     ├── LEFT JOIN device_master (dm)
     │       ON dim.device_inventory_id = dm.device_inventory_id
-    │       └── INNER JOIN device_type_master (dtm)
+    │       └── LEFT JOIN device_type_master (dtm)
     │               ON dm.device_type_id = dtm.device_type_id
     │       └── INNER JOIN organization_master (om)
     │               ON dm.organization_id = om.organization_id
@@ -1569,7 +1658,7 @@ device_inventory_master (dim)
 | device_inventory_uuid          | UUID形式、ユニーク制約（DB側）               | 台帳マスタ、自動生成 |
 | device_uuid                    | 必須、最大128文字、ユニーク制約（DB側）      | デバイスマスタ       |
 | device_name                    | 必須、最大100文字                            | デバイスマスタ       |
-| device_type                    | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ       |
+| device_type_id                 | 必須（デバイス種別マスタにあるレコードのみ） | デバイスマスタ       |
 | organization_id                | 必須（組織マスタにあるレコードのみ）         | デバイスマスタ       |
 | sim_id                         | 最大20文字                                   | デバイスマスタ       |
 | software_version               | 最大100文字                                  | デバイスマスタ       |
@@ -1690,6 +1779,22 @@ def validate_device_uuid(device_uuid: str) -> tuple[bool, str]:
 | 2026-04-13 | 1.4  | ルート呼び出しマッピングにページング行追加。初期表示フロー（mermaid・viewsコード）に検索後ページング（Cookie経由）の依存関係を明記。ページングセクションにCookie設定タイミング表を追加                                                                                                                                                                                                                                                                                                                                                                                                 | Kei Sugiyama        |
 | 2026-04-13 | 1.5  | `execute_dml()` メソッド追加・全DML呼び出しを `uc.execute()` → `uc.execute_dml()` に変更。UC INSERT失敗時の補償DELETE追加。UC `device_master` INSERTに `device_id`（`flush()` 後のSEQUENCE値）追加。`search_device_inventories()` に `per_page=-1` 全件取得分岐追加。ルート呼び出しマッピングCSVエクスポート行修正（URL・トリガー・パラメータ）。テーブル結合関係から `organization_closure` 削除・未使用理由注記追加。入力検証一覧に `inventory_status_id` 追加。登録モーダル表示フローmermaid修正・`GET /create` views実装例追加。更新フローmermaidノードラベル「追加」→「更新」修正 | Kei Sugiyama        |
 | 2026-04-13 | 1.6  | `search_device_inventories()` にセカンダリソートキー（`device_inventory_id ASC`）追加。`get_organization_options()` 関数新設（組織選択肢の別関数化）。登録・更新モーダル表示フロー mermaid および GET/POST views 実装例に `organizations` 渡す処理を追加。`show_edit_device_inventory`（`GET /edit`）views 実装例追加。更新モーダル表示フロー `Query` ノードから `JOIN organization_master` 削除し `LoadMaster` ノード追加。「更新処理の概要」ステップ1〜3のフィールド説明を実装コードに合わせて更新。テーブル結合関係注記の関数例示に `get_organization_options()` を追加             | Kei Sugiyama        |
+| 2026-04-17 | 1.7  | SelectField の choices を `(ID, 名称)` タプルで明示。検索フォームの `device_type_id`・`inventory_status_id` 未選択値を `(-1, 'すべて')`、`sort_item_id` を `(-1, '---')` に設定。登録・更新フォームは `[(id, name)]` 形式で選択肢を設定。各 views の options 取得処理をバリデーション前に移動                                                                                                                                                                                                                                                                                                                                                                          | Kei Sugiyama        |
+| 2026-04-17 | 1.8  | `in_all_flag` による先頭選択肢制御を追加。検索フォームは `in_all_flag=True` → `_head=(-1, 'すべて')`、登録フォームは `in_all_flag=False` → `_head=(None, '')` を先頭に設定。`_head` 変数でデバイス種別・在庫状況・組織の先頭オプションを統一管理                                                                                                                                                                                                                                                                                                                                                                                                                          | Kei Sugiyama        |
+| 2026-04-17 | 1.9  | 更新フォーム（`show_edit_device_inventory`・`update_device_inventory_view`）の選択肢から先頭の空欄オプションを非表示に変更。既存レコードの値が常に選択状態となるため `in_all_flag`・`_head` を削除し、データのみの choices に統一                                                                                                                                                                                                                                                                                                                                                                                                                                              | Kei Sugiyama        |
+
+| 2026-04-17 | 2.0  | `sort_item_master` に `sort_item_display_name`（ソート項目表示名）カラムを追加。ドロップダウンに物理カラム名ではなく日本語論理名を表示するため、choices 構築を `s.sort_item_name` → `s.sort_item_display_name` に変更。初期データに各ソート項目の表示名を追加                                                                                                                                                                                                                                                                                                                                                                                                  | Kei Sugiyama        |
+
+| 2026-04-17 | 2.1  | CSVエクスポートの `export_device_inventories_csv()` に NULLガードを追加。`d.device` が `None` の場合 `d.device.device_name` 等で `AttributeError` が発生するため、デバイス名・デバイス種別・モデル情報・SIMID・MACアドレスの各フィールドに `if d.device` / `if d.device and d.device.device_type` による条件式を追加。`device_master` が存在しないレコードは空文字列を出力する | Kei Sugiyama        |
+
+| 2026-04-17 | 2.2  | 登録フォーム・更新フォームの `organization_id` SelectField に `coerce=int` を追加。`coerce=int` がないとフォーム送信時に `form.organization_id.data` が文字列として返り、`update_device_inventory()` でDBに渡す際に型不整合が発生するため                                                                                                                                                                                                                                                                                                                                                                                                                         | Kei Sugiyama        |
+
+| 2026-04-17 | 2.3  | `search_device_inventories()` の `device_uuid` 検索を部分一致（`%value%`）から前方一致（`value%`）に変更。インデックス効率改善のため                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Kei Sugiyama        |
+
+| 2026-04-17 | 2.4  | `search_device_inventories()` の `inventory_status_id_id` タイポを修正。`device_type_master` との結合を INNER JOIN → LEFT JOIN（`outerjoin`）に変更し、device_master 欠損レコードが検索結果から除外されないよう対応。登録・更新フォームの `device_uuid` バリデーターに `device_uuid_format_validator` を追加（AUTH_TYPE 別フォーマットチェックをフォーム検証に組み込み）。削除処理に `check_linked_device_master()` 関数を追加し、紐づくデバイスマスタが存在する場合に削除確認モーダルへ警告フラグを渡すよう views を更新 | Kei Sugiyama        |
+| 2026-04-17 | 2.5  | mermaid フロー図（初期表示・検索・CSVエクスポート 計5箇所）の `JOIN device_type_master` を `LEFT JOIN device_type_master` に修正（v2.4 の outerjoin 変更との整合）。テーブル結合関係テキストダイアグラムの `INNER JOIN device_type_master` も同様に修正。更新モーダル表示フロー mermaid の Query ノードを JOIN 結合から2クエリ個別取得（device_inventory_master・device_master）の表記に修正。`forms/device_inventory.py` コードブロックに `ValidationError` および `validate_device_uuid` のインポート文を追加 | Kei Sugiyama        |
+| 2026-04-17 | 2.6  | 登録・更新フォームに日付相関バリデーター `date_after_purchase_validator` を追加し、`estimated_ship_date`・`ship_date`・`manufacturer_warranty_end_date` に「購入日以降」チェックを適用。`DeviceInventorySearchForm` の `device_uuid`・`device_name`・`inventory_location` に `Length` バリデーターを追加、`validate_purchase_date_to` メソッドで購入日範囲相関チェックを追加。`list_device_inventory` views を `after_this_request` パターンに変更し、Cookie クリア処理を初期表示分岐内（クエリ前）に記述するよう構造化 | Kei Sugiyama        |
+| 2026-04-17 | 2.7  | `show_device_inventory` の `first_or_404()` を `first()` + `if inventory is None: abort(404)` に変更。`except Exception: abort(500)` の外で 404 チェックを行うことで、レコード未検出時に 404 が 500 に変換されるバグを修正 | Kei Sugiyama        |
 
 ---
 

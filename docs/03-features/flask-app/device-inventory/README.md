@@ -101,6 +101,18 @@
 
 ---
 
+### ソート項目マスタ (sort_item_master)
+
+→ [アプリケーションデータベース設計書 §sort_item_master](../../common/app-database-specification.md)
+
+**ビジネスルール（本機能での利用）:**
+- `view_id = 7` のレコードのみ使用（本機能専用のソート項目）
+- `sort_item_name` は物理カラム名（SQLAlchemy の `getattr` でモデル属性へマッピング）
+- `sort_item_display_name` は画面に表示する日本語論理名（ソート項目ドロップダウンの表示値として使用）
+- ソート項目ドロップダウン未選択時（sort_item_id=-1 または sort_order=-1）はデフォルトソート（デバイス在庫ID降順）を適用
+
+---
+
 ## Flaskルート一覧
 
 | No  | ルート名             | エンドポイント                                           | メソッド | 用途                               |

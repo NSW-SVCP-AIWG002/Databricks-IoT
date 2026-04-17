@@ -662,32 +662,32 @@
 
 **概要**: 一覧のソート項目を管理するマスタテーブル
 
-| #   | カラム物理名   | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
-| --- | -------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | view_id        | 画面ID       | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID                            |
-| 2   | sort_item_id   | ソート項目ID | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
-| 3   | sort_item_name | ソート項目名 | VARCHAR(100) | NOT NULL | -   | -   |                   | ソート項目の内容                        |
-| 4   | sort_order     | 表示順序     | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
-| 5   | delete_flag    | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
-| 6   | create_date    | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 7   | update_date    | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
+| #   | カラム物理名           | カラム論理名     | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| --- | ---------------------- | ---------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
+| 1   | view_id                | 画面ID           | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID                            |
+| 2   | sort_item_id           | ソート項目ID     | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
+| 3   | sort_item_name         | ソート項目名     | VARCHAR(100) | NOT NULL | -   | -   | -                 | ソート項目の内容（物理カラム名）        |
+| 4   | sort_item_display_name | ソート項目表示名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | ドロップダウンに表示する論理名          |
+| 5   | sort_order             | 表示順序         | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
+| 6   | delete_flag            | 削除フラグ       | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| 7   | create_date            | 作成日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| 8   | update_date            | 更新日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
 
 - [ ] 各画面のソート項目が決まり次第、以下の初期データに記載すること
 
 **初期データ:**
 
-| view_id | sort_item_id | sort_item_name                 | sort_order | 説明                                                     |
-| ------- | ------------ | ------------------------------ | ---------- | -------------------------------------------------------- |
-| 7       | 0            | device_inventory_id            | 0          | デバイス台帳管理: デバイス在庫ID（未選択時のデフォルト） |
-| 7       | 1            | device_uuid                    | 1          | デバイス台帳管理: クラウドに登録するデバイスID           |
-| 7       | 2            | device_name                    | 2          | デバイス台帳管理: デバイス名                             |
-| 7       | 3            | device_type_id                 | 3          | デバイス台帳管理: デバイス種別                           |
-| 7       | 4            | sim_id                         | 4          | デバイス台帳管理: SIMID                                  |
-| 7       | 5            | mac_address                    | 5          | デバイス台帳管理: MACアドレス                            |
-| 7       | 6            | inventory_status_id            | 6          | デバイス台帳管理: 在庫状況                               |
-| 7       | 7            | purchase_date                  | 7          | デバイス台帳管理: 購入日                                 |
-| 7       | 8            | manufacturer_warranty_end_date | 8          | デバイス台帳管理: 保証期限                               |
-| 7       | 9            | inventory_location             | 9          | デバイス台帳管理: 在庫場所                               |
+| view_id | sort_item_id | sort_item_name                 | sort_item_display_name | sort_order | 説明                                           |
+| ------- | ------------ | ------------------------------ | ---------------------- | ---------- | ---------------------------------------------- |
+| 7       | 1            | device_uuid                    | デバイスUUID           | 1          | デバイス台帳管理: クラウドに登録するデバイスID |
+| 7       | 2            | device_name                    | デバイス名             | 2          | デバイス台帳管理: デバイス名                   |
+| 7       | 3            | device_type_id                 | デバイス種別           | 3          | デバイス台帳管理: デバイス種別                 |
+| 7       | 4            | sim_id                         | SIMID                  | 4          | デバイス台帳管理: SIMID                        |
+| 7       | 5            | mac_address                    | MACアドレス            | 5          | デバイス台帳管理: MACアドレス                  |
+| 7       | 6            | inventory_status_id            | 在庫状況               | 6          | デバイス台帳管理: 在庫状況                     |
+| 7       | 7            | purchase_date                  | 購入日                 | 7          | デバイス台帳管理: 購入日                       |
+| 7       | 8            | manufacturer_warranty_end_date | 保証期限               | 8          | デバイス台帳管理: 保証期限                     |
+| 7       | 9            | inventory_location             | 在庫場所               | 9          | デバイス台帳管理: 在庫場所                     |
 
 ---
 
@@ -695,13 +695,13 @@
 
 **概要**: デバイスの接続状態を保持するテーブル
 
-| #   | カラム物理名       | カラム論理名 | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                                                              |
-| --- | ------------------ | ------------ | --------- | -------- | --- | --- | ----------------- | --------------------------------------------------------------------------------- |
-| 1   | device_id          | デバイスID   | INT       | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                  |
-| 2   | last_received_time | 最終受信時刻 | TIMESTAMP | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 ※1|
-| 3   | delete_flag        | 削除フラグ   | BOOLEAN   | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                           |
-| 4   | create_date        | 作成日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                  |
-| 5   | update_date        | 更新日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                  |
+| #   | カラム物理名       | カラム論理名 | データ型  | NULL     | PK  | FK  | デフォルト値      | 説明                                                                                 |
+| --- | ------------------ | ------------ | --------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------------------------------ |
+| 1   | device_id          | デバイスID   | INT       | NOT NULL | ○   | -   | -                 | デバイス固有のID                                                                     |
+| 2   | last_received_time | 最終受信時刻 | TIMESTAMP | NULL     | -   | -   | -                 | NULL：テレメトリデータ未受信 　その他の場合：テレメトリデータの最終受信時刻を表示 ※1 |
+| 3   | delete_flag        | 削除フラグ   | BOOLEAN   | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE                                              |
+| 4   | create_date        | 作成日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                                                     |
+| 5   | update_date        | 更新日時     | DATETIME  | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                                                                     |
 
 ※1　このテーブルでは、アラート発生中かどうかといったステータスではなく、テレメトリデータが一度も受信されていない（未接続）か、受信している（接続済み）かのステータスを管理する。
 
