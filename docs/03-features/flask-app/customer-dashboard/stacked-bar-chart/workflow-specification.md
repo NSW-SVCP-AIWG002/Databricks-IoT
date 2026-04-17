@@ -1,14 +1,14 @@
-# 顧客作成ダッシュボード帯グラフガジェット - ワークフロー仕様書
+# 顧客作成ダッシュボード積み上げ棒グラフガジェット - ワークフロー仕様書
 
 ## 📑 目次
 
-- [顧客作成ダッシュボード帯グラフガジェット - ワークフロー仕様書](#顧客作成ダッシュボード帯グラフガジェット---ワークフロー仕様書)
+- [顧客作成ダッシュボード積み上げ棒グラフガジェット - ワークフロー仕様書](#顧客作成ダッシュボード積み上げ棒グラフガジェット---ワークフロー仕様書)
   - [📑 目次](#-目次)
   - [概要](#概要)
   - [使用するFlaskルート一覧](#使用するflaskルート一覧)
   - [ルート呼び出しマッピング](#ルート呼び出しマッピング)
-    - [帯グラフガジェット](#帯グラフガジェット)
-    - [帯グラフガジェット登録モーダル](#帯グラフガジェット登録モーダル)
+    - [積み上げ棒グラフガジェット](#積み上げ棒グラフガジェット)
+    - [積み上げ棒グラフガジェット登録モーダル](#積み上げ棒グラフガジェット登録モーダル)
   - [ワークフロー一覧](#ワークフロー一覧)
     - [ガジェット初期表示](#ガジェット初期表示)
       - [処理フロー](#処理フロー)
@@ -49,7 +49,7 @@
 
 ## 概要
 
-このドキュメントは、顧客作成ダッシュボード帯グラフ機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
+このドキュメントは、顧客作成ダッシュボード積み上げ棒グラフ機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
 
 **このドキュメントの役割:**
 - ✅ ユーザー操作のトリガー条件
@@ -74,10 +74,10 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に帯グラフガジェットを埋め込み） | HTML | - |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に積み上げ棒グラフガジェットを埋め込み） | HTML | - |
 | 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
-| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/belt-chart/create` | GET | 帯グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/belt-chart/register` | POST | 帯グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | GET | 積み上げ棒グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | POST | 積み上げ棒グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
 | 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
@@ -93,23 +93,23 @@
 
 ## ルート呼び出しマッピング
 
-### 帯グラフガジェット
+### 積み上げ棒グラフガジェット
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に帯グラフガジェットを埋め込み） | エラーページ表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に積み上げ棒グラフガジェットを埋め込み） | エラーページ表示 |
 | 表示時間単位切替（時/日/週/月） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | 集計時間幅選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | 時間帯選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
 
-### 帯グラフガジェット登録モーダル
+### 積み上げ棒グラフガジェット登録モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/belt-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
-| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/belt-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` | リダイレクト | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` | リダイレクト | エラーモーダル表示 |
 
 ---
 
@@ -150,7 +150,7 @@
 
 [共通ワークフロー仕様書](../common/workflow-specification.md) のダッシュボード初期表示の処理詳細（①〜⑨）と同様の処理を実行します。
 
-帯グラフガジェット固有の追加処理はありません。
+積み上げ棒グラフガジェット固有の追加処理はありません。
 
 ---
 
@@ -407,7 +407,7 @@ ORDER BY
 
 **④ データ整形**
 
-取得データを ECharts 帯グラフ用の `labels` / `series` 配列に変換します。
+取得データを ECharts 積み上げ棒グラフ用の `labels` / `series` 配列に変換します。
 
 | display_unit | ラベル形式 | 備考 |
 |-------------|---------|------|
@@ -422,7 +422,7 @@ INTERVAL_MINUTES = {
     '5min': 5, '10min': 10, '15min': 15
 }
 
-def format_belt_chart_data(rows, display_unit, measurement_items, interval='10min', summary_method_id=1):
+def format_stacked_bar_chart_data(rows, display_unit, measurement_items, interval='10min', summary_method_id=1):
     """
     measurement_items: list of dict, e.g.
         [{'silver_data_column_name': 'external_temp', 'display_name': '外気温度'}, ...]
@@ -528,8 +528,8 @@ def format_belt_chart_data(rows, display_unit, measurement_items, interval='10mi
 ```python
 @customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
 @require_auth
-def gadget_belt_chart_data(gadget_uuid):
-    """帯グラフガジェットデータ取得（AJAX）"""
+def gadget_stacked_bar_chart_data(gadget_uuid):
+    """積み上げ棒グラフガジェットデータ取得（AJAX）"""
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # ① ガジェット設定取得
@@ -563,7 +563,7 @@ def gadget_belt_chart_data(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ 表示単位別センサーデータ取得
-        rows = fetch_belt_chart_data(
+        rows = fetch_stacked_bar_chart_data(
             device_id=device_id,
             display_unit=display_unit,
             interval=interval,
@@ -573,7 +573,7 @@ def gadget_belt_chart_data(gadget_uuid):
         )
 
         # ④ データ整形（measurement_items は ③ のSQL取得結果を渡す）
-        chart_data = format_belt_chart_data(
+        chart_data = format_stacked_bar_chart_data(
             rows, display_unit, measurement_items,
             interval=interval,
             summary_method_id=chart_config['summary_method_id']
@@ -586,7 +586,7 @@ def gadget_belt_chart_data(gadget_uuid):
         })
 
     except Exception as e:
-        logger.error(f'帯グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'積み上げ棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
 
@@ -648,7 +648,7 @@ flowchart TD
 
     SummaryMethodQuery --> CheckSummaryMethodQuery{DBクエリ結果}
     CheckSummaryMethodQuery -->|失敗| Error500
-    CheckSummaryMethodQuery -->|成功| Template[帯グラフガジェット登録モーダル表示]
+    CheckSummaryMethodQuery -->|成功| Template[積み上げ棒グラフガジェット登録モーダル表示]
 
     Template --> Response[HTMLレスポンス返却]
 
@@ -663,7 +663,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 帯グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/belt-chart/create` | パラメータ: なし |
+| 積み上げ棒グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | パラメータ: なし |
 
 #### バリデーション
 
@@ -813,10 +813,10 @@ ORDER BY
 **⑧ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/belt-chart/create', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/stacked-bar-chart/create', methods=['GET'])
 @require_auth
-def gadget_belt_chart_create():
-    """帯グラフガジェット登録モーダル表示"""
+def gadget_stacked_bar_chart_create():
+    """積み上げ棒グラフガジェット登録モーダル表示"""
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # ① ユーザー設定取得
@@ -846,7 +846,7 @@ def gadget_belt_chart_create():
 
     form = BeltChartGadgetForm()
     return render_template(
-        'customer_dashboard/modals/gadget_register/belt_chart.html',
+        'customer_dashboard/modals/gadget_register/stacked_bar_chart.html',
         form=form,
         dashboard=dashboard,
         groups=groups,
@@ -914,7 +914,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 帯グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/belt-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` |
+| 積み上げ棒グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` |
 
 #### バリデーション
 
@@ -1025,14 +1025,14 @@ INSERT INTO dashboard_gadget_master (
 **④ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/belt-chart/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/stacked-bar-chart/register', methods=['POST'])
 @require_auth
-def gadget_belt_chart_register():
-    """帯グラフガジェット登録実行"""
+def gadget_stacked_bar_chart_register():
+    """積み上げ棒グラフガジェット登録実行"""
     form = BeltChartGadgetForm()
     if not form.validate_on_submit():
         return render_template(
-            'customer_dashboard/modals/gadget_register/belt_chart.html',
+            'customer_dashboard/modals/gadget_register/stacked_bar_chart.html',
             form=form
         ), 400
 
@@ -1069,9 +1069,9 @@ def gadget_belt_chart_register():
             DashboardGadgetMaster.delete_flag == False
         ).scalar() or 0
 
-        # 帯グラフのgadget_type_idを事前に取得する
+        # 積み上げ棒グラフのgadget_type_idを事前に取得する
         gadget_type = db.session.query(GadgetTypeMaster).filter_by(
-            gadget_type_name='帯グラフ',
+            gadget_type_name='積み上げ棒グラフ',
             delete_flag=False
         ).first()
         gadget_type_id = gadget_type.gadget_type_id
@@ -1098,7 +1098,7 @@ def gadget_belt_chart_register():
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'帯グラフガジェット登録エラー: {str(e)}')
+        logger.error(f'積み上げ棒グラフガジェット登録エラー: {str(e)}')
         abort(500)
 ```
 
@@ -1274,7 +1274,7 @@ DEV-001,2026/02/03,25.52,5.02,6.02,7.02,8.02
 @customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
 @require_auth
 def gadget_csv_export(gadget_uuid):
-    """帯グラフガジェット CSVエクスポート"""
+    """積み上げ棒グラフガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
 
@@ -1306,7 +1306,7 @@ def gadget_csv_export(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ センサーデータ取得（最大10万件）
-        rows = fetch_belt_chart_data(
+        rows = fetch_stacked_bar_chart_data(
             device_id=device_id,
             display_unit=display_unit,
             interval=interval,
@@ -1315,7 +1315,7 @@ def gadget_csv_export(gadget_uuid):
             summary_method_id=chart_config['summary_method_id'],
             limit=100000
         )
-        chart_data = format_belt_chart_data(
+        chart_data = format_stacked_bar_chart_data(
             rows, display_unit, measurement_items,
             interval=interval,
             summary_method_id=chart_config['summary_method_id']
@@ -1340,7 +1340,7 @@ def gadget_csv_export(gadget_uuid):
         )
 
     except Exception as e:
-        logger.error(f'帯グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'積み上げ棒グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         abort(500)
 ```
 

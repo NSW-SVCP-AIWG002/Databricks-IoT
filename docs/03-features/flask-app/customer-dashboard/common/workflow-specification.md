@@ -1791,7 +1791,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 - **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
 - **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
-- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **積み上げ棒グラフ:** [積み上げ棒グラフ-ワークフロー仕様書](../stacked-bar-chart/workflow-specification.md)
 - **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
 - **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
@@ -1803,7 +1803,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 - **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
 - **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
-- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **積み上げ棒グラフ:** [積み上げ棒グラフ-ワークフロー仕様書](../stacked-bar-chart/workflow-specification.md)
 - **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
 - **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
@@ -2005,7 +2005,7 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 - **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
 - **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
-- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **積み上げ棒グラフ:** [積み上げ棒グラフ-ワークフロー仕様書](../stacked-bar-chart/workflow-specification.md)
 - **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
 - **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
@@ -2184,7 +2184,7 @@ flowchart TD
 
 **日時設定ボタン押下時のガジェット種別ごとの変換ルール:**
 
-| 日時設定ボタン | 棒グラフ・帯グラフ（日次） | 棒グラフ・帯グラフ（年次） | 表・時系列グラフ | 円グラフ・メーター |
+| 日時設定ボタン | 棒グラフ・積み上げ棒グラフ（日次） | 棒グラフ・積み上げ棒グラフ（年次） | 表・時系列グラフ | 円グラフ・メーター |
 |---------------|--------------------------|--------------------------|----------------|-------------------|
 | 今日 | 表示時間単位: 時、時間帯: 現在時刻 | 今年 | 現在時刻より1時間前～現在時刻 | 最新値 |
 | 昨日 | 表示時間単位: 日、表示日: 昨日 | 昨年 | 昨日の00:00～23:59 | 最新値 |
@@ -2254,8 +2254,10 @@ flowchart TD
     CheckEnabled -->|OFF| ClearInterval[タイマー停止<br>clearInterval]
     ClearInterval --> End([処理完了])
 
-    CheckEnabled -->|ON| FetchData[各ガジェットのデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data]
-    FetchData --> UpdateChart[EChartsグラフを再描画]
+    CheckEnabled -->|ON| FetchData[全ガジェットに対してデータを再取得<br>AJAX: POST /analysis/customer-dashboard/gadgets/gadget_uuid/data]
+    FetchData --> GetGadgetType[ガジェットUUIDからガジェット種別を取得]
+    GetGadgetType --> CallGetData[ガジェット種別によって異なる個別のデータ取得処理を呼び出す]
+    CallGetData --> UpdateChart[各ガジェット毎にEChartsグラフを再描画]
     UpdateChart --> UpdateTime[最終更新時刻を更新]
     UpdateTime --> Wait
 ```
@@ -2341,7 +2343,7 @@ ORDER BY
 
 - **棒グラフ:** [棒グラフ-ワークフロー仕様書](../bar-chart/workflow-specification.md)
 - **円グラフ:** [円グラフ-ワークフロー仕様書](../circle/workflow-specification.md)
-- **帯グラフ:** [帯グラフ-ワークフロー仕様書](../belt-chart/workflow-specification.md)
+- **積み上げ棒グラフ:** [積み上げ棒グラフ-ワークフロー仕様書](../stacked-bar-chart/workflow-specification.md)
 - **時系列グラフ:** [時系列グラフ-ワークフロー仕様書](../timeline/workflow-specification.md)
 - **表:** [表-ワークフロー仕様書](../grid/workflow-specification.md)
 
