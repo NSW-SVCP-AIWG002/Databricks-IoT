@@ -155,7 +155,6 @@
 
 - [UI共通仕様書](../common/ui-common-specification.md) - すべての画面に共通するUI仕様
 - [共通仕様書](../common/common-specification.md) - HTTPステータスコード、エラーコード等
-- [認証仕様書](../common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 
 ### 関連機能
 
