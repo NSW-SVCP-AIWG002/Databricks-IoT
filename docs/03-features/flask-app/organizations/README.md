@@ -22,24 +22,17 @@
       - [インデックス](#インデックス-3)
   - [Flaskルート一覧](#flaskルート一覧)
   - [アクセス権限](#アクセス権限)
-  - [外部連携](#外部連携)
-    - [Databricks ワークスペースグループ API](#databricks-ワークスペースグループ-api)
-      - [連携タイミング](#連携タイミング)
-      - [認証方式](#認証方式)
-      - [グループ命名規則](#グループ命名規則)
-      - [エラーハンドリング](#エラーハンドリング)
-  - [実装ステータス](#実装ステータス)
   - [関連ドキュメント](#関連ドキュメント)
-    - [機能設計・仕様](#機能設計仕様)
+    - [設計仕様書](#設計仕様書)
+    - [要件定義書](#要件定義書)
     - [アーキテクチャ設計](#アーキテクチャ設計)
     - [共通仕様](#共通仕様)
-    - [類似機能](#類似機能)
 
 ---
 
 ## 概要
 
-組織管理機能は、Databricks IoTシステムにおける組織マスタの管理を行う機能です。組織の一覧表示、検索、参照、登録、更新、削除、CSVエクスポートの操作を提供し、Databricks ワークスペースグループとの連携を行います。
+組織管理機能は、Databricks IoTシステムにおける組織マスタの管理を行う機能です。組織の一覧表示、検索、参照、登録、更新、削除、CSVエクスポートの操作を提供します。
 
 **機能ID:** FR-004-4
 
@@ -54,6 +47,7 @@
 | FR-004-4-3 | 組織更新 | 組織基本情報の変更 |
 | FR-004-4-4 | 組織参照 | 組織の詳細情報表示 |
 | FR-004-4-5 | 組織削除 | 組織の論理削除 |
+| FR-004-4-6 | CSVエクスポート | 組織のCSVエクスポート |
 
 ---
 
@@ -63,8 +57,8 @@
 |--------|-------|----------|---------|------|
 | ADM-009 | 組織一覧画面 | `/admin/organizations` | 画面 | 組織の一覧・検索・削除 |
 | ADM-010 | 組織登録画面 | `/admin/organizations/create` | モーダル | 組織の新規登録 |
-| ADM-011 | 組織更新画面 | `/admin/organizations/<databricks_group_id>/edit` |  モーダル | 組織の更新 |
-| ADM-012 | 組織参照画面 | `/admin/organizations/<databricks_group_id>` | モーダル | 組織の詳細情報表示 |
+| ADM-011 | 組織更新画面 | `/admin/organizations/<organization_uuid>/edit` |  モーダル | 組織の更新 |
+| ADM-012 | 組織参照画面 | `/admin/organizations/<organization_uuid>` | モーダル | 組織の詳細情報表示 |
 
 ---
 
@@ -77,6 +71,7 @@
 | カラム名 | 論理名 | データ型 | 必須 | 備考 |
 |----------|-------|---------|------|------|
 | organization_id | 組織ID | INT | ○ | 組織の一意識別子（主キー） |
+| organization_uuid | 組織UUID | VARCHAR(36) | ○ | 組織の外部公開用識別子（URLパスパラメータとして使用） |
 | organization_name | 組織名 | VARCHAR(200) | ○ | 組織の名称 |
 | organization_type_id | 組織種別ID | INT | ○ | 組織種別の一意識別子（外部キー） |
 | address | 住所 | VARCHAR(500) | ○ | 組織の所在地 |
@@ -86,11 +81,10 @@
 | contract_status_id | 契約状態ID | INT | ○ | 契約状態の一意識別子（外部キー） |
 | contract_start_date | 契約開始日 | DATE | ○ | 契約開始日 |
 | contract_end_date | 契約終了日 | DATE | - | 契約終了日 |
-| databricks_group_id | DatabricksグループID | VARCHAR(20) | ○ | DatabricksワークスペースグループID |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
-| creator | 作成者 | VARCHAR(20) | ○ | レコード作成者 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
-| modifier | 更新者 | VARCHAR(20) | ○ | レコード更新者 |
+| modifier | 更新者 | INT | ○ | レコード更新者のユーザID |
 | delete_flag | 削除フラグ | BOOLEAN | ○ | 論理削除フラグ（0: 有効, 1: 削除） |
 
 #### インデックス
@@ -125,9 +119,9 @@
 | organization_type_id | 組織種別ID | INT | ○ | 組織種別の一意識別子（主キー） |
 | organization_type_name | 組織種別名 | VARCHAR(50) | ○ | 組織の種別（管理会社、販売会社等） |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
-| creator | 作成者 | VARCHAR(20) | ○ | レコード作成者 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
-| modifier | 更新者 | VARCHAR(20) | ○ | レコード更新者 |
+| modifier | 更新者 | INT | ○ | レコード更新者のユーザID |
 | delete_flag | 削除フラグ | BOOLEAN | ○ | 論理削除フラグ（0: 有効, 1: 削除） |
 
 #### インデックス
@@ -145,9 +139,9 @@
 | contract_status_id | 契約状態ID | INT | ○ | 契約状態の一意識別子（主キー） |
 | contract_status_name | 契約状態名 | VARCHAR(20) | ○ | 契約状態（契約中, 契約終了等） |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
-| creator | 作成者 | VARCHAR(20) | ○ | レコード作成者 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
-| modifier | 更新者 | VARCHAR(20) | ○ | レコード更新者 |
+| modifier | 更新者 | INT | ○ | レコード更新者のユーザID |
 | delete_flag | 削除フラグ | BOOLEAN | ○ | 論理削除フラグ（0: 有効, 1: 削除） |
 
 #### インデックス
@@ -162,15 +156,15 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 |
 |----|---------|---------------|---------|------|---------------|
-| 1 | 組織一覧初期表示 | `/admin/organizations` | GET | 組織一覧の初期表示 | HTML |
-| 2 | 組織一覧検索 | `/admin/organizations` | POST | 組織検索・一覧表示 | HTML |
-| 3 | 組織登録画面 | `/admin/organizations/create` | GET | 組織登録画面表示 | HTML（モーダル） |
+| 1 | 組織一覧初期表示 | `/admin/organizations` | GET | 組織一覧初期表示・ページング | HTML |
+| 2 | 組織一覧検索 | `/admin/organizations` | POST | 組織検索実行 | HTML |
+| 3 | 組織登録画面 | `/admin/organizations/create` | GET | 組織登録フォーム表示 | HTML（モーダル） |
 | 4 | 組織登録実行 | `/admin/organizations/register` | POST | 組織登録処理 | リダイレクト (302) |
-| 5 | 組織参照画面 | `/admin/organizations/<databricks_group_id>` | GET | 組織詳細情報表示 | HTML（モーダル） |
-| 6 | 組織更新画面 | `/admin/organizations/<databricks_group_id>/edit` | GET | 組織更新画面表示 | HTML（モーダル） |
-| 7 | 組織更新実行 | `/admin/organizations/<databricks_group_id>/update` | POST | 組織更新処理 | リダイレクト (302) |
-| 8 | 組織削除実行 | `/admin/organizations/delete` | POST | 組織削除処理 | リダイレクト (302) |
-| 9 | CSVエクスポート | `/admin/organizations?export=csv` | GET | 組織一覧CSVダウンロード | CSV |
+| 5 | 組織参照画面 | `/admin/organizations/<organization_uuid>` | GET | 組織詳細情報表示 | HTML（モーダル） |
+| 6 | 組織更新画面 | `/admin/organizations/<organization_uuid>/edit` | GET | 組織更新フォーム表示 | HTML（モーダル） |
+| 7 | 組織更新実行 | `/admin/organizations/<organization_uuid>/update` | POST | 組織更新処理 | リダイレクト (302) |
+| 8 | 組織削除実行 | `/admin/organizations/delete` | POST | 組織削除処理（複数件対応）| リダイレクト (302) |
+| 9 | CSVエクスポート | `/admin/organizations/export` | POST | 組織一覧CSVダウンロード | CSV |
 
 ---
 
@@ -183,6 +177,7 @@
 | 組織登録 | ○ | ○ | ○ | - |
 | 組織更新 | ○ | ○ | ○ | - |
 | 組織削除 | ○ | ○ | ○ | - |
+| CSVエクスポート | ○ | ○ | ○ | - |
 
 **凡例**:
 - **○**: 利用可能
@@ -197,81 +192,27 @@
 
 ---
 
-## 外部連携
-
-### Databricks ワークスペースグループ API
-
-#### 連携タイミング
-
-| 操作 | 連携内容 | API |
-|------|---------|-----|
-| 組織登録 | ワークスペースグループ作成 | `POST /api/2.0/preview/scim/v2/Groups` |
-| 組織削除 | ワークスペースグループ削除 | `DELETE /api/2.0/preview/scim/v2/Groups/{id}` |
-
-#### 認証方式
-
-- **サービスプリンシパル認証**: 管理者権限を持つサービスプリンシパルのトークンを使用
-- **環境変数**: `DATABRICKS_SERVICE_PRINCIPAL_TOKEN`
-
-#### グループ命名規則
-
-- グループ名: `organization_{organization_id}`
-- 例: `organization_1`
-
-#### エラーハンドリング
-
-**組織登録時:**
-- Databricks API失敗 → エラーページ表示
-
-**組織更新時:**
-- Databricks API失敗 → エラーページ表示
-
-**組織削除時:**
-- Databricks API失敗 → エラーページ表示
-
----
-
-## 実装ステータス
-
-| 機能 | UI仕様書 | ワークフロー仕様書 | 実装 | テスト | ステータス | 
-|------|----------|------------------|------|-------|-----------|
-| 組織一覧・検索 | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-| 組織登録 | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-| 組織編集 | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-| 組織参照 | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-| 組織削除 | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-| CSVエクスポート | 完了 | 完了 | 未着手 | 未着手 | 設計中 |
-
----
-
 ## 関連ドキュメント
 
-### 機能設計・仕様
+### 設計仕様書
 
 - [UI仕様書](./ui-specification.md) - 画面レイアウト、UI要素の詳細仕様
 - [ワークフロー仕様書](./workflow-specification.md) - 処理フロー、API統合、エラーハンドリング
-- [機能要件定義書](../../02-requirements/functional-requirements.md) - FR-004-4（組織管理）
-- [技術要件定義書](../../02-requirements/technical-requirements.md) - TR-SEC-001, TR-SEC-004, TR-SEC-005
-- [非機能要件定義書](../../02-requirements/non-functional-requirements.md) - NFR-SEC-006, NFR-SEC-007
+
+### 要件定義書
+
+- [機能要件定義書](../../../02-requirements/functional-requirements.md) - FR-004-4: 組織管理
+- [非機能要件定義書](../../../02-requirements/non-functional-requirements.md) - NFR-SEC-006, NFR-SEC-007
+- [技術要件定義書](../../../02-requirements/technical-requirements.md) - TR-SEC-001, TR-SEC-004, TR-SEC-005
 
 ### アーキテクチャ設計
 
-- [バックエンド設計](../../01-architecture/backend.md) - Flask/LDP設計、Blueprint構成
-- [データベース設計](../../01-architecture/database.md) - テーブル定義、インデックス設計
-- [インフラストラクチャ設計](../../01-architecture/infrastructure.md) - Databricks環境、Private Link
+- [バックエンド設計](../../../01-architecture/backend.md) - Flask/LDP設計
+- [フロントエンド設計](../../../01-architecture/frontend.md) - Flask + Jinja2設計
+- [データベース設計](../../../01-architecture/database.md) - テーブル定義、インデックス設計
 
 ### 共通仕様
 
-- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理
+- [共通仕様書](../../common/common-specification.md) - HTTPステータスコード、エラーコード、トランザクション管理、セキュリティ等
 - [認証仕様書](../../common/authentication-specification.md) - 認証アーキテクチャ、Token Exchange、Unity Catalog接続
 - [UI共通仕様書](../../common/ui-common-specification.md) - すべての画面に共通するUI仕様
-
-### 類似機能
-
-- [デバイス管理機能](../devices/README.md) - 同様のCRUD画面構成
-- [ユーザー管理機能](../users/README.md) - 同様のDatabricks連携（ワークスペースグループ）
-
----
-
-**最終更新日:** 2025-12-19
-**作成者:** Claude Sonnet 4.5
