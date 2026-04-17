@@ -595,7 +595,9 @@ class TestAlertSettingServiceUpdate:
         # Act
         service.update(alert_uuid=target_uuid, data=data, user_id=1)
         # Assert
-        mock_session.query.assert_called()
+        mock_session.query.return_value.filter.assert_called_once()
+        filter_call_args = str(mock_session.query.return_value.filter.call_args)
+        assert target_uuid in filter_call_args
 
     # ----------------------------------------------------------------
     # 2.2 対象データ存在チェック
@@ -609,16 +611,6 @@ class TestAlertSettingServiceUpdate:
         # Act & Assert
         with pytest.raises(Exception):
             service.update(alert_uuid="nonexistent-uuid", data=data, user_id=1)
-
-    def test_update_deleted_alert_raises(self, service, mock_session):
-        """2.2.3: 論理削除済み（delete_flag=True）のアラートを更新しようとすると NotFoundError がスローされる"""
-        # Arrange
-        mock_alert = make_alert_setting_mock(delete_flag=True)
-        mock_session.query.return_value.filter.return_value.first.return_value = None
-        data = make_valid_form_data()
-        # Act & Assert
-        with pytest.raises(Exception):
-            service.update(alert_uuid=mock_alert.alert_uuid, data=data, user_id=1)
 
     # ----------------------------------------------------------------
     # 2.3 副作用チェック
@@ -666,6 +658,10 @@ class TestAlertSettingServiceDelete:
         # Act
         service.delete(alert_uuids=uuids, user_id=1)
         # Assert
+        mock_q.filter.assert_called_once()
+        filter_call_args = str(mock_q.filter.call_args)
+        for uuid in uuids:
+            assert uuid in filter_call_args
         mock_session.commit.assert_called_once()
 
     # ----------------------------------------------------------------
