@@ -10,10 +10,8 @@ class MailTypeMaster(db.Model):
     mail_type_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     mail_type_name = db.Column(db.String(50), nullable=False)
     delete_flag = db.Column(db.Boolean, nullable=False, default=False)
-    create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    creator = db.Column(db.Integer, nullable=False)
+    create_date = db.Column(db.DateTime, nullable=True)
     update_date = db.Column(db.DateTime, nullable=True)
-    modifier = db.Column(db.Integer, nullable=True)
 
 
 class MailHistory(db.Model):
