@@ -18,6 +18,17 @@ from sqlalchemy import func
 
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError, ValidationError
+from iot_app.common.messages import (
+    ERR_DATETIME_FORMAT,
+    ERR_DATETIME_RANGE_24H,
+    ERR_END_BEFORE_START,
+    err_invalid,
+    err_max_length,
+    err_min_less_than_max,
+    err_numeric,
+    err_required,
+    err_select_required,
+)
 from iot_app.common.logger import get_logger
 from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster
@@ -265,25 +276,25 @@ def validate_chart_params(start_datetime_str, end_datetime_str):
         str | None: エラーメッセージ（正常時は None）
     """
     if not start_datetime_str or not end_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     try:
         start = datetime.strptime(start_datetime_str, _DATETIME_FORMAT)
         end   = datetime.strptime(end_datetime_str,   _DATETIME_FORMAT)
     except ValueError:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     # 1桁月などの曖昧な表記を排除（strftime で再フォーマットして一致確認）
     if start.strftime(_DATETIME_FORMAT) != start_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
     if end.strftime(_DATETIME_FORMAT) != end_datetime_str:
-        return '正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）'
+        return ERR_DATETIME_FORMAT
 
     if start >= end:
-        return '終了日時は開始日時以降の日時を入力してください'
+        return ERR_END_BEFORE_START
 
     if (end - start) > timedelta(hours=24):
-        return '取得期間は24時間以内で指定してください'
+        return ERR_DATETIME_RANGE_24H
 
     return None
 
@@ -315,23 +326,23 @@ def validate_gadget_registration(params):
 
     # タイトル
     if title is None or title == '':
-        raise ValidationError('タイトルを入力してください')
+        raise ValidationError(err_required('タイトル'))
     if len(title) > 20:
-        raise ValidationError('タイトルは20文字以内で入力してください')
+        raise ValidationError(err_max_length('タイトル', 20))
 
     # デバイスID（デバイス固定モード時は必須）
     if device_mode == 'fixed' and device_id is None:
-        raise ValidationError('デバイスを選択してください')
+        raise ValidationError(err_select_required('デバイス'))
 
     # グループID
     if group_id is None:
-        raise ValidationError('グループを選択してください')
+        raise ValidationError(err_select_required('グループ'))
 
     # 表示項目
     if left_item_id is None:
-        raise ValidationError('左表示項目を選択してください')
+        raise ValidationError(err_select_required('左表示項目'))
     if right_item_id is None:
-        raise ValidationError('右表示項目を選択してください')
+        raise ValidationError(err_select_required('右表示項目'))
 
     # 最小値・最大値（数値形式チェック）
     def _to_float_or_none(value, field_label):
@@ -340,7 +351,7 @@ def validate_gadget_registration(params):
         try:
             return float(value)
         except (TypeError, ValueError):
-            raise ValidationError(f'{field_label}は数値で入力してください')
+            raise ValidationError(err_numeric(field_label))
 
     left_min_f  = _to_float_or_none(left_min_value,  '左表示項目の最小値')
     left_max_f  = _to_float_or_none(left_max_value,  '左表示項目の最大値')
@@ -350,17 +361,17 @@ def validate_gadget_registration(params):
     # 最小値 < 最大値 チェック
     if left_min_f is not None and left_max_f is not None:
         if left_min_f >= left_max_f:
-            raise ValidationError('左表示項目の最小値は最大値より小さい値を入力してください')
+            raise ValidationError(err_min_less_than_max('左表示項目'))
 
     if right_min_f is not None and right_max_f is not None:
         if right_min_f >= right_max_f:
-            raise ValidationError('右表示項目の最小値は最大値より小さい値を入力してください')
+            raise ValidationError(err_min_less_than_max('右表示項目'))
 
     # 部品サイズ
     if gadget_size is None:
-        raise ValidationError('部品サイズを選択してください')
+        raise ValidationError(err_select_required('部品サイズ'))
     if gadget_size not in _ALLOWED_GADGET_SIZES:
-        raise ValidationError('部品サイズが不正です')
+        raise ValidationError(err_invalid('部品サイズ'))
 
 
 # ---------------------------------------------------------------------------
@@ -658,13 +669,13 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
 
     # 開始日時バリデーション
     if not end_datetime_str or not start_datetime_str:
-        raise ValidationError('正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）')
+        raise ValidationError(ERR_DATETIME_FORMAT)
     try:
         start_dt = datetime.strptime(start_datetime_str, _DATETIME_FORMAT)
         if start_dt.strftime(_DATETIME_FORMAT) != start_datetime_str:
             raise ValueError
     except (ValueError, TypeError):
-        raise ValidationError('正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）')
+        raise ValidationError(ERR_DATETIME_FORMAT)
 
     # 終了日時バリデーション
     try:
@@ -672,15 +683,15 @@ def export_timeline_csv(gadget_uuid, start_datetime, end_datetime, current_user_
         if end_dt.strftime(_DATETIME_FORMAT) != end_datetime_str:
             raise ValueError
     except (ValueError, TypeError):
-        raise ValidationError('正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss）')
+        raise ValidationError(ERR_DATETIME_FORMAT)
 
     # 開始 < 終了チェック
     if start_dt >= end_dt:
-        raise ValidationError('終了日時は開始日時以降の日時を入力してください')
+        raise ValidationError(ERR_END_BEFORE_START)
 
     # 24時間以内チェック
     if (end_dt - start_dt) > timedelta(hours=24):
-        raise ValidationError('取得期間は24時間以内で指定してください')
+        raise ValidationError(ERR_DATETIME_RANGE_24H)
 
     try:
         gadget = get_gadget_by_uuid(gadget_uuid)

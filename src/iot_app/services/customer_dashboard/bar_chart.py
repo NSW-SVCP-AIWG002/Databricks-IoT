@@ -12,6 +12,14 @@ from iot_app.common.exceptions import NotFoundError, ValidationError
 from iot_app.common.logger import get_logger
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster, GoldSummaryMethodMaster
 from iot_app.services.customer_dashboard.common import GADGET_SIZE_TO_INT
+from iot_app.common.messages import (
+    ERR_DATETIME_FORMAT,
+    err_invalid,
+    err_numeric,
+    err_required,
+    err_max_length,
+    err_select_required,
+)
 
 logger = get_logger(__name__)
 
@@ -40,18 +48,18 @@ def validate_chart_params(display_unit, interval, base_datetime_str):
         str | None: エラーメッセージ（正常時は None）
     """
     if display_unit not in _VALID_DISPLAY_UNITS:
-        return '表示単位が不正です'
+        return err_invalid('表示単位')
 
     if interval not in INTERVAL_MINUTES:
-        return '集計間隔が不正です'
+        return err_invalid('集計間隔')
 
     if not base_datetime_str:
-        return '日付形式が不正です'
+        return ERR_DATETIME_FORMAT
 
     try:
         datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        return '日付形式が不正です'
+        return ERR_DATETIME_FORMAT
 
     return None
 
@@ -68,25 +76,25 @@ def validate_gadget_registration(params):
     title = params.get("title")
     if not title and title != " ":
         if title is None or title == "":
-            raise ValidationError("タイトルを入力してください")
+            raise ValidationError(err_required("タイトル"))
 
     if title is not None and len(str(title)) > 20:
-        raise ValidationError("タイトルは20文字以内で入力してください")
+        raise ValidationError(err_max_length("タイトル", 20))
 
     device_mode = params.get("device_mode")
     if device_mode == "fixed":
         device_id = params.get("device_id")
         if device_id is None:
-            raise ValidationError("デバイスを選択してください")
+            raise ValidationError(err_select_required("デバイス"))
 
     if params.get("group_id") is None:
-        raise ValidationError("グループを選択してください")
+        raise ValidationError(err_select_required("グループ"))
 
     if params.get("summary_method_id") is None:
-        raise ValidationError("集約方法を選択してください")
+        raise ValidationError(err_select_required("集約方法"))
 
     if params.get("measurement_item_id") is None:
-        raise ValidationError("表示項目を選択してください")
+        raise ValidationError(err_select_required("表示項目"))
 
     min_value = params.get("min_value")
     max_value = params.get("max_value")
@@ -94,22 +102,17 @@ def validate_gadget_registration(params):
         try:
             min_value = float(min_value)
         except (TypeError, ValueError):
-            raise ValidationError("最小値は数値で入力してください")
+            raise ValidationError(err_numeric("最小値"))
     if max_value is not None:
         try:
             max_value = float(max_value)
         except (TypeError, ValueError):
-            raise ValidationError("最大値は数値で入力してください")
-    if min_value is not None and max_value is not None and min_value >= max_value:
-        raise ValidationError(
-            "最小値は最大値より小さい値を入力してください。最大値は最小値より大きい値を入力してください。"
-        )
-
+            raise ValidationError(err_numeric("最大値"))
     gadget_size = params.get("gadget_size")
     if gadget_size is None:
-        raise ValidationError("部品サイズを選択してください")
+        raise ValidationError(err_select_required("部品サイズ"))
     if gadget_size not in _VALID_GADGET_SIZES:
-        raise ValidationError("部品サイズが不正です")
+        raise ValidationError(err_invalid("部品サイズ"))
 
 
 
@@ -483,8 +486,7 @@ def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
 
         return []
 
-    except Exception as e:
-        logger.error(f"棒グラフデータ取得エラー: device_id={device_id}, error={str(e)}")
+    except Exception:
         raise
 
 
@@ -522,20 +524,20 @@ def export_bar_chart_csv(gadget_uuid, device_id, display_unit, interval,
 
     # display_unit バリデーション
     if display_unit not in _VALID_DISPLAY_UNITS:
-        raise ValidationError("表示単位が不正です")
+        raise ValidationError(err_invalid("表示単位"))
 
     # interval バリデーション
     if interval not in INTERVAL_MINUTES:
-        raise ValidationError("集計間隔が不正です")
+        raise ValidationError(err_invalid("集計間隔"))
 
     # base_datetime バリデーション
     if not base_datetime_str:
-        raise ValidationError("日付形式が不正です")
+        raise ValidationError(ERR_DATETIME_FORMAT)
     try:
         if isinstance(base_datetime, str):
             base_datetime = datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
     except (ValueError, TypeError):
-        raise ValidationError("日付形式が不正です")
+        raise ValidationError(ERR_DATETIME_FORMAT)
 
     try:
         rows = fetch_bar_chart_data(

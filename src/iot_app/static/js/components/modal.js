@@ -82,7 +82,7 @@ const Modal = (function () {
         if (!res.ok) {
           const data = await res.json();
           if (onClose) onClose();
-          Toast.show(data.error || 'エラーが発生しました', 'error');
+          Toast.show(data.error, 'error');
           return;
         }
 
@@ -92,7 +92,7 @@ const Modal = (function () {
         // リロード後の DOMContentLoaded（main.js）で表示する
         const data = await res.json();
         if (onClose) onClose();
-        Toast.showAfterReload(data.message || '完了しました', 'success');
+        Toast.showAfterReload(data.message, 'success');
         window.location.reload();
 
       } catch (err) {
