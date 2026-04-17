@@ -56,6 +56,8 @@
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
     - [7. メール通知履歴一覧用VIEW (v\_mail\_history\_by\_user)](#7-メール通知履歴一覧用view-v_mail_history_by_user)
+    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#8-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
+    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#9-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -2484,6 +2486,265 @@ def list_mail_history():
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - mail_historyテーブルにはdelete_flagがないため、全てのレコードが結果に含まれる
 - recipientsフィールドはJSON形式のため、アプリケーション側でパースが必要
+
+---
+
+### 8. ダッシュボードグループ一覧用VIEW (v_dashboard_group_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織のダッシュボードグループ情報を取得するためのVIEW。
+
+**目的:**
+
+- 顧客作成ダッシュボード画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織のダッシュボードグループのみを取得
+- user_masterテーブルとdashboard_masterテーブルを使用し、ログインユーザーの所属組織に属するダッシュボード配下のアクセス制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_dashboard_group_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id,
+    g.dashboard_group_id,
+    g.dashboard_group_uuid,
+    g.dashboard_group_name,
+    g.dashboard_id,
+    g.display_order,
+    g.create_date,
+    g.creator,
+    g.update_date,
+    g.modifier,
+    g.delete_flag
+FROM
+    user_master u
+    INNER JOIN dashboard_master d
+        ON u.organization_id = d.organization_id
+    INNER JOIN dashboard_group_master g
+        ON d.dashboard_id = g.dashboard_id
+WHERE
+    u.delete_flag = FALSE
+    AND d.delete_flag = FALSE;
+```
+
+**カラム一覧:**
+
+| カラム物理名                | カラム論理名               | データ型     | 説明                                                        |
+| --------------------------- | -------------------------- | ------------ | ----------------------------------------------------------- |
+| user_id                     | ユーザーID                 | INT          | ログインユーザーのID                                        |
+| user_name                   | ユーザー名                 | VARCHAR(20)  | ログインユーザーの名前                                      |
+| organization_id             | 組織ID                     | INT          | ログインユーザーの所属組織ID                                |
+| dashboard_group_id          | ダッシュボードグループID   | INT          | ダッシュボードグループの一意識別子（主キー、AutoIncrement） |
+| dashboard_group_uuid        | ダッシュボードグループUUID | VARCHAR(36)  | ダッシュボードグループのUUID（URLパラメータ用）             |
+| dashboard_group_name        | ダッシュボードグループ名   | VARCHAR(50)  | ダッシュボードグループ名                                    |
+| dashboard_id                | ダッシュボードID           | INT          | ダッシュボードの一意識別子（外部キー）                      |
+| display_order               | 表示順                     | INT          | ダッシュボードグループの表示順                              |
+| create_date                 | 作成日時                   | DATETIME     | レコード作成日時                                            |
+| creator                     | 作成者                     | INT          | レコード作成者のユーザーID                                  |
+| update_date                 | 更新日時                   | DATETIME     | レコード最終更新日時                                        |
+| modifier                    | 更新者                     | INT          | レコード更新者のユーザーID                                  |
+| delete_flag                 | 削除フラグ                 | BOOLEAN      | 論理削除状態                                                |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全ダッシュボードグループを取得
+SELECT
+    dashboard_group_id,
+    dashboard_group_uuid,
+    dashboard_group_name,
+    dashboard_id,
+    display_order
+FROM v_dashboard_group_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY display_order;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@customer_dashboard_bp.route('', methods=['GET'])
+def customer_dashboard():
+    """ダッシュボードグループ一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してデバイスを取得
+    query = text("""
+        SELECT
+            dashboard_group_id,
+            dashboard_group_uuid,
+            dashboard_group_name,
+            dashboard_id,
+            display_order
+        FROM v_dashboard_group_master_by_user
+        WHERE user_id = :user_id
+        AND delete_flag = FALSE
+        ORDER BY display_order
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    groups = result.fetchall()
+
+    return render_template('analysis/customer_dashboard/index.html', groups=groups)
+```
+
+**ビジネスルール:**
+
+- このVIEWは、ユーザーの所属組織に紐づくダッシュボードグループを返す
+- 論理削除されたダッシュボードグループ（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたユーザー（`u.delete_flag = TRUE`）はVIEW側で除外される
+- ユーザーが存在しない組織に所属している場合、結果は0件となる
+
+---
+
+### 9. ガジェット一覧用VIEW (v_dashboard_gadget_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織のガジェット情報を取得するためのVIEW。
+
+**目的:**
+
+- 顧客作成ダッシュボード画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織のガジェットのみを取得
+- user_masterテーブル、dashboard_masterテーブル、dashboard_gadget_masterテーブルを使用し、ログインユーザーの所属組織に属するダッシュボード配下のアクセス制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_dashboard_gadget_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id,
+    gd.gadget_id,
+    gd.gadget_uuid,
+    gd.gadget_name,
+    gd.dashboard_group_id,
+    gd.gadget_type_id,
+    gd.chart_config,
+    gd.data_source_config,
+    gd.position_x,
+    gd.position_y,
+    gd.gadget_size,
+    gd.display_order,
+    gd.create_date,
+    gd.creator,
+    gd.update_date,
+    gd.modifier,
+    gd.delete_flag
+FROM
+    user_master u
+    INNER JOIN dashboard_master d
+        ON u.organization_id = d.organization_id
+    INNER JOIN dashboard_group_master gp
+        ON d.dashboard_id = gp.dashboard_id
+    INNER JOIN dashboard_gadget_master gd
+        ON gp.dashboard_group_id = gd.dashboard_group_id
+WHERE
+    u.delete_flag = FALSE
+    AND d.delete_flag = FALSE
+    AND gp.delete_flag = FALSE;
+```
+
+**カラム一覧:**
+
+| カラム物理名       | カラム論理名             | データ型     | 説明                                                                                |
+| ------------------ | ------------------------ | ------------ | ----------------------------------------------------------------------------------- |
+| user_id            | ユーザーID               | INT          | ログインユーザーのID                                                                |
+| user_name          | ユーザー名               | VARCHAR(20)  | ログインユーザーの名前                                                              |
+| organization_id    | 組織ID                   | INT          | ログインユーザーの所属組織ID                                                        |
+| gadget_id          | ガジェットID             | INT          | ガジェットの一意識別子（主キー、AutoIncrement）                                     |
+| gadget_uuid        | ガジェットUUID           | VARCHAR(36)  | ガジェットのUUID（URLパラメータ用）                                                 |
+| gadget_name        | ガジェット名             | VARCHAR(20)  | ガジェット名                                                                        |
+| dashboard_group_id | ダッシュボードグループID | INT          | ダッシュボードグループの一意識別子（外部キー）                                      |
+| gadget_type_id     | ガジェット種別ID         | INT          | ガジェット種別の一意識別子（外部キー）                                              |
+| chart_config       | チャート設定             | JSON         | 抽象化されたアプリケーション設定（EChartsオプションへの変換はレンダリング時に実行） |
+| data_source_config | データソース設定         | JSON         |ガジェットが参照するデータの種別・表示設定（デフォルト設定）                         |
+| position_x         | X座標                    | INT          | グリッド位置                                                                        |
+| position_y         | Y座標                    | INT          | グリッド位置                                                                        |
+| gadget_size        | ガジェットサイズ         | INT          | 0: 2x2（480×480px）、1: 2×4（960×480px）                                         |
+| display_order      | 表示順                   | INT          | ガジェットの表示順                                                                  |
+| create_date        | 作成日時                 | DATETIME     | レコード作成日時                                                                    |
+| creator            | 作成者                   | INT          | レコード作成者のユーザーID                                                          |
+| update_date        | 更新日時                 | DATETIME     | レコード最終更新日時                                                                |
+| modifier           | 更新者                   | INT          | レコード更新者のユーザーID                                                          |
+| delete_flag        | 削除フラグ               | BOOLEAN      | 論理削除状態                                                                        |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全ガジェットを取得
+SELECT
+    gadget_id,
+    gadget_uuid,
+    gadget_name,
+    dashboard_group_id,
+    gadget_type_id,
+    chart_config,
+    data_source_config,
+    position_x,
+    position_y,
+    gadget_size,
+    display_order
+FROM v_dashboard_gadget_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY display_order;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@customer_dashboard_bp.route('', methods=['GET'])
+def customer_dashboard():
+    """ガジェット一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してデバイスを取得
+    query = text("""
+        SELECT
+            gadget_id,
+            gadget_uuid,
+            gadget_name,
+            dashboard_group_id,
+            gadget_type_id,
+            chart_config,
+            data_source_config,
+            position_x,
+            position_y,
+            gadget_size,
+            display_order
+        FROM v_dashboard_gadget_master_by_user
+        WHERE user_id = :user_id
+        AND delete_flag = FALSE
+        ORDER BY display_order
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    gadgets = result.fetchall()
+
+    return render_template('analysis/customer_dashboard/index.html', gadgets=gadgets)
+```
+
+**ビジネスルール:**
+
+- このVIEWは、ユーザーの所属組織に紐づくガジェットを返す
+- 論理削除されたガジェット（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたユーザー（`u.delete_flag = TRUE`）はVIEW側で除外される
+- ユーザーが存在しない組織に所属している場合、結果は0件となる
 
 ---
 
