@@ -1386,19 +1386,19 @@ flowchart TD
     CheckExistDB -->|失敗| Error500[500エラーページ表示]
 
     CheckExists -->|なし| Error404[404エラートースト表示]
-    CheckExists -->|あり| UpdateUCMstr[UnitiyCatalog<br>organization_master<br>組織更新]
-
-    UpdateUCMstr --> CheckUpdateUCMstr{UnitiyCatalog<br>操作結果}
-
-    CheckUpdateUCMstr -->|成功| UpdateDBMstr[OLTP DB<br>organization_master<br>組織更新]
-    CheckUpdateUCMstr -->|失敗| Error500
+    CheckExists -->|あり| UpdateDBMstr[OLTP DB<br>organization_master<br>組織更新]
 
     UpdateDBMstr --> CheckUpdateDBMstr{DB操作結果}
+    CheckUpdateDBMstr -->|成功| DBCommit[OLTP DB Commit]
+    CheckUpdateDBMstr -->|失敗| Error500
 
-    CheckUpdateDBMstr -->|成功| Toast[トーストメッセージ設定<br>組織情報を更新しました]
-    CheckUpdateDBMstr -->|失敗| RollbackUCMstr[元データを復元<br>UnitiyCatalog.<br>oraganization_master]
+    DBCommit --> UpdateUCMstr[UnitiyCatalog<br>organization_master<br>組織更新]
+    UpdateUCMstr --> CheckUpdateUCMstr{UnitiyCatalog<br>操作結果}
 
-    RollbackUCMstr --> Error500
+    CheckUpdateUCMstr -->|成功| Toast[トーストメッセージ設定<br>組織情報を更新しました]
+    CheckUpdateUCMstr -->|失敗| RollbackDBMstr[元データを復元<br>OLTP DB.<br>organization_master]
+
+    RollbackDBMstr --> Error500
 
     Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_organizations]
 
@@ -1411,8 +1411,6 @@ flowchart TD
 ```
 
 ※1　403エラー発生時、更新モーダルを閉じる。
-
-**注:** 組織更新時にDatabricks API連携は不要
 
 ##### 処理詳細（サーバーサイド）
 
@@ -1491,43 +1489,30 @@ def _update_unity_catalog_organization(organization_id: int, organization_data: 
     )
 
 
-def _rollback_update_organization(organization_id: int) -> None:
-    """Databricks/UC を元データで復元する（db.session.rollback() 後に呼ぶこと）
+def _rollback_update_organization(organization_id: int, original_data: dict) -> None:
+    """OLTP DB を元データで復元する補償トランザクション（ベストエフォート）
 
-    db.session.rollback() 後は OLTP が元データに戻っているため、
-    OLTP から元値を取得して Databricks と UC を復元する。
+    OLTP DB commit 後に UC 更新が失敗した場合に呼ぶ。
+    UC 側は更新が失敗しているため元データのまま。
     ロールバック自体の失敗はログ出力のみでエラーを握りつぶす（ベストエフォート）。
     """
     try:
-        original = Organization.query.get(organization_id)
-        if not original:
+        organization = Organization.query.get(organization_id)
+        if not organization:
             return
-        uc = UnityCatalogConnector()
-        uc.execute_dml(
-            """
-            UPDATE iot_catalog.oltp_db.organization_master
-            SET organization_name=:organization_name, organization_type_id=:organization_type_id, address=:address,
-                phone_number=:phone_number, fax_number=:fax_number, contact_person=:contact_person,
-                contract_status_id=:contract_status_id, contract_start_date=:contract_start_date, contract_end_date=:contract_end_date,
-                update_date=CURRENT_TIMESTAMP(), modifier=:modifier
-            WHERE organization_id=:organization_id
-            """,
-            {
-                'organization_name':     original.organization_name,
-                'organization_type_id':  original.organization_type_id,
-                'address':               original.address,
-                'phone_number':          original.phone_number,
-                'fax_number':            original.fax_number,
-                'contact_person':        original.contact_person,
-                'contract_status_id':    original.contract_status_id,
-                'contract_start_date':   original.contract_start_date,
-                'contract_end_date':     original.contract_end_date,
-                'modifier':              original.modifier,
-                'organization_id':       organization_id,
-            },
-            operation="UC organization_master 更新ロールバック",
-        )
+        organization.organization_name     = original_data['organization_name']
+        organization.organization_type_id  = original_data['organization_type_id']
+        organization.address               = original_data['address']
+        organization.phone_number          = original_data['phone_number']
+        organization.fax_number            = original_data['fax_number']
+        organization.contact_person        = original_data['contact_person']
+        organization.contract_status_id    = original_data['contract_status_id']
+        organization.contract_start_date   = original_data['contract_start_date']
+        organization.contract_end_date     = original_data['contract_end_date']
+        organization.modifier              = original_data['modifier']
+        db.session.commit()
     except Exception:
+        db.session.rollback()
         logger.error("組織更新ロールバック失敗", exc_info=True)
 
 
@@ -1558,17 +1543,40 @@ def update_organization(organization_id: int, organization_data: dict, modifier_
     Raises:
         Exception: 更新失敗時（ロールバック済み）
     """
-    try:
-        # ① UC organization_master更新
-        _update_unity_catalog_organization(organization_id, organization_data, modifier_id)
+    # 補償トランザクション用に更新前の元データを保持
+    original = Organization.query.get(organization_id)
+    original_data = {
+        'organization_name':    original.organization_name,
+        'organization_type_id': original.organization_type_id,
+        'address':              original.address,
+        'phone_number':         original.phone_number,
+        'fax_number':           original.fax_number,
+        'contact_person':       original.contact_person,
+        'contract_status_id':   original.contract_status_id,
+        'contract_start_date':  original.contract_start_date,
+        'contract_end_date':    original.contract_end_date,
+        'modifier':             original.modifier,
+    }
 
-        # ② OLTP DB更新
+    # === OLTP DB フェーズ ===
+    try:
+        # ① OLTP DB organization_master UPDATE
         _update_oltp_organization(organization_id, organization_data, modifier_id)
+
+        # ② OLTP DB COMMIT
         db.session.commit()
 
     except Exception:
-        db.session.rollback()  # OLTPは自動巻き戻し（元データに復元済み）
-        _rollback_update_organization(organization_id)  # rollback後にOLTPから元データ取得してDatabricks/UC復元
+        db.session.rollback()
+        raise
+
+    # === Unity Catalog フェーズ ===
+    try:
+        # ③ UC organization_master UPDATE
+        _update_unity_catalog_organization(organization_id, organization_data, modifier_id)
+
+    except Exception:
+        _rollback_update_organization(organization_id, original_data)  # OLTP を元データで復元（補償トランザクション）
         raise
 
 

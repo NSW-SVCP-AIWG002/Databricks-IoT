@@ -1825,7 +1825,9 @@ FROM
     INNER JOIN organization_closure oc
         ON u.organization_id = oc.parent_organization_id
     INNER JOIN organization_master o
-        ON oc.subsidiary_organization_id = o.organization_id;
+        ON oc.subsidiary_organization_id = o.organization_id
+WHERE
+    u.delete_flag = FALSE;
 ```
 
 **カラム一覧:**
@@ -1916,6 +1918,7 @@ def list_organizations():
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織を返す
 - `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
 - 論理削除された組織（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたユーザー（`u.delete_flag = TRUE`）はVIEW側で除外される
 - ユーザーの所属組織自身も結果に含まれる（depth=0の自己参照）
 
 ---
