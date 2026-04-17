@@ -323,7 +323,7 @@ class TestSearchDeviceInventories:
         # ソート項目マスタに対する.query.filter_by.return_value.first.return_valueの結果をNoneに設定
         mock_sim.query.filter_by.return_value.first.return_value = None
         params = make_default_search_params(                            # ヘルパーの値を書き換えてパラメータ生成
-            device_type=1,
+            device_type_id=1,
             sort_item_id=1,
             sort_order=1
         )
@@ -713,7 +713,7 @@ class TestCreateDeviceInventory:
 
         # Assert: db.session.add()が2回（デバイス台帳マスタ、デバイスマスタへの登録の2回）呼ばれること
         assert mock_db.session.add.call_count >= 2
-        mock_db.session.flush.assert_called()               # Assert: db.flush()が呼ばれること
+        mock_db.session.flush.assert_called()               # Assert: db.session.flush()が呼ばれること
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
