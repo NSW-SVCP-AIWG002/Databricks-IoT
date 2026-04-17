@@ -20,4 +20,11 @@ const MESSAGES = {
 
   // CSVエクスポート
   ERR_CSV_DOWNLOAD_FAILED: 'CSVのダウンロードに失敗しました',
+
+  // CSVインポート
+  MSG_PROCESSING: 'ファイルを解析しています。しばらくお待ちください。',
+
+  // デバイス台帳バッジ
+  BADGE_CERT_EXPIRED:       '⚠ 期限切れ',
+  BADGE_CERT_EXPIRING_SOON: '⚠ 期限間近',
 };
