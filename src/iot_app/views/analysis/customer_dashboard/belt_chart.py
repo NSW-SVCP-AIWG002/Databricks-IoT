@@ -35,6 +35,7 @@ from iot_app.services.customer_dashboard.common import (
     get_organization_id_by_user,
     get_organizations,
 )
+from iot_app.common.messages import err_fetch_failed, err_not_found, msg_created
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp  # noqa: E402
 
 logger = get_logger(__name__)
@@ -64,15 +65,16 @@ def handle_gadget_data(gadget_uuid):
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
     gadget = check_gadget_access(gadget_uuid, accessible_org_ids)
     if gadget is None:
-        return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+        return jsonify({'error': err_not_found('ガジェット')}), 404
 
     params = request.get_json() or {}
     display_unit = params.get('display_unit', 'hour')
     interval = params.get('interval', '10min')
     base_datetime_str = params.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
-        return jsonify({'error': 'パラメータが不正です'}), 400
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
@@ -110,7 +112,7 @@ def handle_gadget_data(gadget_uuid):
     except Exception as e:
         g.last_exception_type = type(e).__name__
         logger.error(f'帯グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}', exc_info=True)
-        return jsonify({'error': 'データの取得に失敗しました'}), 500
+        return jsonify({'error': err_fetch_failed('データ')}), 500
 
 
 # ============================================================
@@ -209,7 +211,7 @@ def handle_gadget_register(gadget_type):
 
     try:
         register_belt_chart_gadget(form_data, g.current_user.user_id, accessible_org_ids)
-        return jsonify({'message': 'ガジェットを登録しました'})
+        return jsonify({'message': msg_created('ガジェット')})
     except NotFoundError:
         abort(404)
     except Exception as e:
@@ -235,8 +237,9 @@ def handle_gadget_csv_export(gadget_uuid):
     interval = request.args.get('interval', '10min')
     base_datetime_str = request.args.get('base_datetime')
 
-    if not validate_chart_params(display_unit, interval, base_datetime_str):
-        abort(400)
+    error = validate_chart_params(display_unit, interval, base_datetime_str)
+    if error:
+        return jsonify({'error': error}), 400
 
     try:
         data_source_config = json.loads(gadget.data_source_config or '{}')
