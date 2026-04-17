@@ -1223,20 +1223,21 @@ flowchart TD
     DupResult -->|重複あり| DupError[フォーム再表示<br>このMACアドレスは既に登録されています]
     DupError --> ValidEnd
 
-    DupResult -->|重複なし| UpdateUC[UnityCatalog.<br>device_masterを更新<br>UPDATE device_master]
+    DupResult -->|重複なし| Update[デバイス更新<br>UPDATE device_master]
 
+    Update --> CheckDB{DB操作結果}
+    CheckDB -->|成功| DBCommit[OLTP DB Commit]
+    CheckDB -->|失敗| Error500
+
+    DBCommit --> UpdateUC[UnityCatalog.<br>device_masterを更新<br>UPDATE device_master]
     UpdateUC --> CheckUC{UnityCatalog<br>操作結果}
 
-    CheckUC -->|成功| Update[デバイス更新<br>UPDATE device_master]
-    Update --> CheckDB{DB操作結果}
-    CheckDB -->|成功| Toast[成功メッセージトースト設定<br>デバイスを更新しました]
+    CheckUC -->|成功| Toast[成功メッセージトースト設定<br>デバイスを更新しました]
     Toast --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_devices]
 
-    CheckUC -->|失敗| RollbackUC[UnityCatalog.<br>device_master<br>ロールバック]
-    CheckDB -->|失敗| Rollback[DB.device_master<br>ロールバック]
+    CheckUC -->|失敗| RollbackDB[DB.device_master<br>元データを復元]
 
-    RollbackUC --> Error500
-    Rollback --> RollbackUC
+    RollbackDB --> Error500
 
     LoginRedirect --> End([処理完了])
     ValidEnd --> End
@@ -1316,42 +1317,28 @@ def _update_unity_catalog_device(device_uuid: str, device_data: dict, modifier_i
     )
 
 
-def _rollback_update_device(device_uuid: str) -> None:
-    """db.session.rollback() 後に UC を元データで復元する（ベストエフォート）
+def _rollback_update_device(device_uuid: str, original_data: dict) -> None:
+    """OLTP DB を元データで復元する補償トランザクション（ベストエフォート）
 
-    db.session.rollback() 後は OLTP が元データに戻っているため、
-    OLTP から元値を取得して UC を復元する。
+    OLTP DB commit 後に UC 更新が失敗した場合に呼ぶ。
+    UC 側は更新が失敗しているため元データのまま。
     ロールバック自体の失敗はログ出力のみでエラーを握りつぶす（ベストエフォート）。
     """
     try:
-        original = DeviceMaster.query.filter_by(device_uuid=device_uuid).first()
-        if not original:
+        device = DeviceMaster.query.filter_by(device_uuid=device_uuid).first()
+        if not device:
             return
-        uc = UnityCatalogConnector()
-        uc.execute_dml(
-            """
-            UPDATE iot_catalog.oltp_db.device_master
-            SET device_name=:device_name, device_type_id=:device_type_id,
-                device_organization_id=:device_organization_id, device_model=:device_model,
-                device_location=:device_location,
-                mac_address=:mac_address, certificate_expiration_date=:certificate_expiration_date,
-                update_date=CURRENT_TIMESTAMP(), modifier=:modifier
-            WHERE device_uuid=:device_uuid
-            """,
-            {
-                'device_name':                  original.device_name,
-                'device_type_id':               original.device_type_id,
-                'device_organization_id':       original.device_organization_id,
-                'device_model':                 original.device_model,
-                'device_location':              original.device_location,
-                'mac_address':                  original.mac_address,
-                'certificate_expiration_date':  original.certificate_expiration_date,
-                'modifier':                     original.modifier,
-                'device_uuid':                  device_uuid,
-            },
-            operation="UC device_master 更新ロールバック",
-        )
+        device.device_name                 = original_data['device_name']
+        device.device_type_id              = original_data['device_type_id']
+        device.organization_id             = original_data['organization_id']
+        device.device_model                = original_data['device_model']
+        device.device_location             = original_data['device_location']
+        device.mac_address                 = original_data['mac_address']
+        device.certificate_expiration_date = original_data['certificate_expiration_date']
+        device.modifier                    = original_data['modifier']
+        db.session.commit()
     except Exception:
+        db.session.rollback()
         logger.error("デバイス更新ロールバック失敗", exc_info=True)
 
 
@@ -1389,19 +1376,38 @@ def update_device(device_uuid: str, device_data: dict, modifier_id: int) -> None
     ).first():
         raise DuplicateMacAddressError(device_data['mac_address'])
 
-    try:
-        # ① UC device_master 更新
-        _update_unity_catalog_device(device_uuid, device_data, modifier_id)
+    # 補償トランザクション用に更新前の元データを保持
+    original = DeviceMaster.query.filter_by(device_uuid=device_uuid).first()
+    original_data = {
+        'device_name':                  original.device_name,
+        'device_type_id':               original.device_type_id,
+        'organization_id':              original.organization_id,
+        'device_model':                 original.device_model,
+        'device_location':              original.device_location,
+        'mac_address':                  original.mac_address,
+        'certificate_expiration_date':  original.certificate_expiration_date,
+        'modifier':                     original.modifier,
+    }
 
-        # ② OLTP DB 更新
+    # === OLTP DB フェーズ ===
+    try:
+        # ① OLTP DB device_master UPDATE
         _update_oltp_device(device_uuid, device_data, modifier_id)
+
+        # ② OLTP DB COMMIT
         db.session.commit()
 
-    except DuplicateMacAddressError:
-        raise
     except Exception:
-        db.session.rollback()  # OLTPは自動巻き戻し（元データに復元済み）
-        _rollback_update_device(device_uuid)  # rollback後にOLTPから元データ取得してUC復元
+        db.session.rollback()
+        raise
+
+    # === Unity Catalog フェーズ ===
+    try:
+        # ③ UC device_master UPDATE
+        _update_unity_catalog_device(device_uuid, device_data, modifier_id)
+
+    except Exception:
+        _rollback_update_device(device_uuid, original_data)  # OLTP を元データで復元（補償トランザクション）
         raise
 
 
