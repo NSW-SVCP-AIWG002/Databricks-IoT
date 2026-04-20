@@ -40,9 +40,9 @@
 
 | #   | カラム物理名       | カラム論理名           | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                            |
 | --- | ------------------ | ---------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------------- |
-| 1   | mail_template_id   | メールテンプレートID   | INT          | NOT NULL | ○   | -   | -                 | メールテンプレートの一意識別子（自動採番）      |
+| 1   | mail_default_content_id | メールデフォルト内容ID | INT          | NOT NULL | ○   | -   | -                 | メールデフォルト内容の一意識別子（自動採番）    |
 | 2   | mail_type_id       | メール種別ID           | INT          | NOT NULL | -   | ○   | -                 | メール種別ID（mail_type_master参照）            |
-| 3   | language_id        | 言語ID                 | INT          | NOT NULL | -   | ○   | 1                 | 対象言語ID（language_master参照）               |
+| 3   | language_code      | 言語コード             | VARCHAR(10)  | NOT NULL | -   | ○   | 'ja'              | 対象言語コード（language_master参照）           |
 | 4   | default_subject    | デフォルト件名         | VARCHAR(500) | NOT NULL | -   | -   | -                 | メールのデフォルト件名                          |
 | 5   | default_body       | デフォルト本文         | TEXT         | NOT NULL | -   | -   | -                 | メールのデフォルト本文                          |
 | 6   | template_variables | テンプレート変数       | JSON         | NULL     | -   | -   | -                 | 利用可能な変数の説明（JSON形式）                |
@@ -56,13 +56,13 @@
 
 **外部キー:**
 - `mail_type_id` → `mail_type_master.mail_type_id`
-- `language_id` → `language_master.language_id`
+- `language_code` → `language_master.language_code`
 
 **インデックス:**
-- PRIMARY KEY: `mail_template_id`
-- UNIQUE INDEX: `mail_type_id, language_id` （メール種別と言語の組み合わせは一意）
+- PRIMARY KEY: `mail_default_content_id`
+- UNIQUE INDEX: `mail_type_id, language_code` （メール種別と言語の組み合わせは一意）
 - INDEX: `mail_type_id`
-- INDEX: `language_id`
+- INDEX: `language_code`
 - INDEX: `is_active`
 
 ---
@@ -71,17 +71,17 @@
 
 ```sql
 -- 主キー
-CREATE INDEX PK_mail_default_content_master ON mail_default_content_master(mail_template_id);
+CREATE INDEX PK_mail_default_content_master ON mail_default_content_master(mail_default_content_id);
 
 -- メール種別と言語の組み合わせは一意（1つのメール種別に対して1言語1レコード）
-CREATE UNIQUE INDEX UX_mail_default_content_type_lang ON mail_default_content_master(mail_type_id, language_id)
+CREATE UNIQUE INDEX UX_mail_default_content_type_lang ON mail_default_content_master(mail_type_id, language_code)
 WHERE delete_flag = FALSE;
 
 -- メール種別での検索用
 CREATE INDEX IX_mail_default_content_type ON mail_default_content_master(mail_type_id);
 
 -- 言語での検索用
-CREATE INDEX IX_mail_default_content_language ON mail_default_content_master(language_id);
+CREATE INDEX IX_mail_default_content_language ON mail_default_content_master(language_code);
 
 -- 有効なテンプレートの検索用
 CREATE INDEX IX_mail_default_content_active ON mail_default_content_master(is_active);
@@ -101,8 +101,8 @@ REFERENCES mail_type_master(mail_type_id);
 
 -- 言語マスタへの外部キー
 ALTER TABLE mail_default_content_master
-ADD CONSTRAINT FK_mail_default_content_language FOREIGN KEY (language_id)
-REFERENCES language_master(language_id);
+ADD CONSTRAINT FK_mail_default_content_language FOREIGN KEY (language_code)
+REFERENCES language_master(language_code);
 ```
 
 ### ビジネスルール
@@ -113,21 +113,25 @@ REFERENCES language_master(language_id);
 
 2. **多言語対応**
    - 同一のmail_type_idに対して、複数の言語のテンプレートを登録可能
-   - mail_type_idとlanguage_idの組み合わせは一意制約（削除フラグがFALSEの場合）
-   - 未登録の言語の場合は、デフォルト言語（language_id = 1: 日本語）のテンプレートを使用
+   - mail_type_idとlanguage_codeの組み合わせは一意制約（削除フラグがFALSEの場合）
+   - 未登録の言語の場合は、デフォルト言語（language_code = 'ja': 日本語）のテンプレートを使用
 
 3. **テンプレート変数の管理**
    - `template_variables` カラムにJSON形式で利用可能な変数を記載
    - 例: `{"user_name": "ユーザー名", "alert_message": "アラートメッセージ", "device_name": "デバイス名"}`
    - アプリケーション側でテンプレート変数を実際の値に置換してメール送信
 
-4. **有効フラグの管理**
-   - `is_active = TRUE` のテンプレートのみが使用される
-   - テンプレート更新時は、新規レコードを作成し、旧レコードは `is_active = FALSE` に更新
-   - バージョン管理のような運用も可能
+4. **有効フラグ・削除フラグの使い分け**
+   - `is_active`（有効フラグ）: テンプレートの一時的な有効・無効を管理する
+     - `is_active = TRUE`: 有効（メール送信時に使用される）
+     - `is_active = FALSE`: 一時無効（メンテナンスや差し替え準備中など、一時的に使用を停止する場合に使用）
+   - `delete_flag`（削除フラグ）: テンプレートの論理削除状態を管理する
+     - `delete_flag = FALSE`: 有効なレコード（UNIQUE制約の対象）
+     - `delete_flag = TRUE`: 論理削除済み（UNIQUE制約から除外、参照・一覧表示の対象外）
+   - テンプレート内容を更新する場合は、旧レコードを `delete_flag = TRUE` に変更したうえで新レコードを作成する（`mail_type_id + language_code` の一意制約があるため、`is_active = FALSE` のままでは新レコードを登録できない）
 
 5. **デフォルト値**
-   - 新規メール種別追加時は、最低限日本語（language_id = 1）のテンプレートを登録必須
+   - 新規メール種別追加時は、最低限日本語（language_code = 'ja'）のテンプレートを登録必須
 
 ---
 
