@@ -55,7 +55,6 @@
     - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
-    - [7. メール通知履歴一覧用VIEW (v\_mail\_history\_by\_user)](#7-メール通知履歴一覧用view-v_mail_history_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -190,7 +189,7 @@
 
 | #   | カラム物理名             | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                              |
 | --- | ------------------------ | -------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------- |
-| 1   | user_id                  | ユーザーID           | INT          | NOT NULL | ○   | -   | -                 | ユーザーの一意識別子                              |
+| 1   | user_id                  | ユーザーID           | INT          | NOT NULL | ○   | -   | -                 | ユーザーの一意識別子、AUTO_INCREMENT                              |
 | 2   | databricks_user_id       | DatabricksユーザーID | VARCHAR(36)  | NOT NULL | -   | -   | -                 | Databricks SCIM APIから返されるユーザーID（UUID） |
 | 3   | user_name                | 名称                 | VARCHAR(20)  | NOT NULL | -   | -   | -                 | ユーザーの表示名                                  |
 | 4   | organization_id          | 組織ID               | INT          | NOT NULL | -   | ○   | -                 | 所属組織ID（organization_master参照）             |
@@ -236,7 +235,7 @@
 
 | #   | カラム物理名   | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | -------------- | -------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | user_type_id   | ユーザー種別ID | INT         | NOT NULL | ○   | -   | -                 | ユーザー種別の一意識別子                |
+| 1   | user_type_id   | ユーザー種別ID | INT         | NOT NULL | ○   | -   | -                 | ユーザー種別の一意識別子、AUTO_INCREMENT                |
 | 2   | user_type_name | ユーザー種別名 | VARCHAR(20) | NOT NULL | -   | -   | -                 | ユーザー種別の表示名                    |
 | 3   | create_date    | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator        | 作成者         | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -293,7 +292,7 @@
 
 | #   | カラム物理名         | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                       |
 | --- | -------------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------ |
-| 1   | organization_id      | 組織ID               | INT          | NOT NULL | ○   | -   | -                 | 組織の一意識別子                           |
+| 1   | organization_id      | 組織ID               | INT          | NOT NULL | ○   | -   | -                 | 組織の一意識別子、AUTO_INCREMENT                           |
 | 2   | organization_name    | 組織名               | VARCHAR(200) | NOT NULL | -   | -   | -                 | 組織の表示名                               |
 | 3   | organization_type_id | 組織種別ID           | INT          | NOT NULL | -   | ○   | -                 | 組織種別ID（organization_type_master参照） |
 | 4   | address              | 住所                 | VARCHAR(500) | NOT NULL | -   | -   | -                 | 組織の所在地住所                           |
@@ -333,7 +332,7 @@
 
 | #   | カラム物理名           | カラム論理名 | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ---------------------- | ------------ | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | organization_type_id   | 組織種別ID   | INT         | NOT NULL | ○   | -   | -                 | 組織種別の一意識別子                    |
+| 1   | organization_type_id   | 組織種別ID   | INT         | NOT NULL | ○   | -   | -                 | 組織種別の一意識別子、AUTO_INCREMENT                    |
 | 2   | organization_type_name | 組織種別名   | VARCHAR(50) | NOT NULL | -   | -   | -                 | 組織種別の表示名                        |
 | 3   | create_date            | 作成日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator                | 作成者       | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -353,7 +352,7 @@
 
 | #   | カラム物理名         | カラム論理名 | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | -------------------- | ------------ | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | contract_status_id   | 契約状態ID   | INT         | NOT NULL | ○   | -   | -                 | 契約状態の一意識別子                    |
+| 1   | contract_status_id   | 契約状態ID   | INT         | NOT NULL | ○   | -   | -                 | 契約状態の一意識別子、AUTO_INCREMENT                   |
 | 2   | contract_status_name | 契約状態名   | VARCHAR(20) | NOT NULL | -   | -   | -                 | 契約状態の表示名                        |
 | 3   | create_date          | 作成日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator              | 作成者       | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -405,7 +404,7 @@
 
 | #   | カラム物理名                | カラム論理名           | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                          |
 | --- | --------------------------- | ---------------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------- |
-| 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | -                 | デバイスの一意識別子                          |
+| 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | -                 | デバイスの一意識別子、AUTO_INCREMENT                          |
 | 2   | device_uuid                 | デバイスUUID           | VARCHAR(128) | NOT NULL | ○   | -   | -                 | AzureIoTHub、AWSIoTCoreで管理されるデバイスID |
 | 3   | organization_id             | 組織ID                 | INT          | NOT NULL | -   | ○   | -                 | 所属組織ID（organization_master参照）         |
 | 4   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）      |
@@ -450,7 +449,7 @@
 
 | #   | カラム物理名     | カラム論理名   | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ---------------- | -------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | device_type_id   | デバイス種別ID | INT          | NOT NULL | ○   | -   | -                 | デバイス種別の一意識別子                |
+| 1   | device_type_id   | デバイス種別ID | INT          | NOT NULL | ○   | -   | -                 | デバイス種別の一意識別子、AUTO_INCREMENT                |
 | 2   | device_type_name | デバイス種別名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイス種別の表示名                    |
 | 3   | create_date      | 作成日時       | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator          | 作成者         | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -470,7 +469,7 @@
 
 | #   | カラム物理名                   | カラム論理名       | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                       |
 | --- | ------------------------------ | ------------------ | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------ |
-| 1   | device_inventory_id            | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | デバイス在庫ID                             |
+| 1   | device_inventory_id            | デバイス在庫ID     | INT          | NOT NULL | ○   | -   | -    | デバイス在庫ID、AUTO_INCREMENT                             |
 | 2   | device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | NOT NULL | -   | -   | -                 | デバイス在庫UUID（ユニーク制約、自動生成） |
 | 3   | inventory_status_id            | 在庫状況ID         | INT          | NOT NULL | -   | ○   | -                 | 在庫状況ID（inventory_status_master参照）  |
 | 4   | device_model                   | モデル情報         | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル情報                       |
@@ -510,7 +509,7 @@
 
 | #   | カラム物理名          | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | --------------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | inventory_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | -                 | 在庫状況の一意識別子                    |
+| 1   | inventory_status_id   | 在庫状況ID   | INT          | NOT NULL | ○   | -   | -                 | 在庫状況の一意識別子、AUTO_INCREMENT                    |
 | 2   | inventory_status_name | 在庫状況名   | VARCHAR(100) | NOT NULL | -   | -   | -                 | 在庫状況の表示名                        |
 | 3   | create_date           | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator               | 作成者       | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -542,7 +541,7 @@
 
 | #   | カラム物理名                                  | カラム論理名                | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                                          |
 | --- | --------------------------------------------- | --------------------------- | ------------ | -------- | --- | --- | ----------------- | ------------------------------------------------------------- |
-| 1   | alert_id                                      | アラートID                  | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | アラート設定の一意識別子                                      |
+| 1   | alert_id                                      | アラートID                  | INT          | NOT NULL | ○   | -   | -    | アラート設定の一意識別子、AUTO_INCREMENT                                      |
 | 2   | alert_uuid                                    | アラートUUID                | VARCHAR(36)  | NOT NULL | -   | -   | UUID自動生成      | アラート設定の外部公開用識別子（URLパスパラメータとして使用） |
 | 3   | alert_name                                    | アラート名                  | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラート設定の表示名                                          |
 | 4   | device_id                                     | デバイスID                  | INT          | NOT NULL | -   | ○   | -                 | 対象デバイスID（device_master参照）                           |
@@ -586,7 +585,7 @@
 
 | #   | カラム物理名            | カラム論理名           | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
 | --- | ----------------------- | ---------------------- | ----------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
-| 1   | measurement_item_id     | 測定項目ID             | INT         | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、測定項目の一意識別子                               |
+| 1   | measurement_item_id     | 測定項目ID             | INT         | NOT NULL | ○   | -   | -   | 測定項目の一意識別子、AUTO_INCREMENT                               |
 | 2   | measurement_item_name   | 測定項目名             | VARCHAR(50) | NOT NULL | -   | -   | -                 | センサーで読み取る、機器に関する測定項目の名前               |
 | 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名           |
 | 4   | display_name            | 表示名                 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する名前 |
@@ -636,7 +635,7 @@
 
 | #   | カラム物理名     | カラム論理名     | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ---------------- | ---------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | alert_level_id   | アラートレベルID | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、アラートレベルの一意識別子    |
+| 1   | alert_level_id   | アラートレベルID | INT          | NOT NULL | ○   | -   | -    | アラートレベルの一意識別子、AUTO_INCREMENT    |
 | 2   | alert_level_name | アラートレベル名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | アラートレベルの表示名                  |
 | 3   | create_date      | 作成日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator          | 作成者           | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザID                |
@@ -662,16 +661,15 @@
 
 **概要**: 一覧のソート項目を管理するマスタテーブル
 
-| #   | カラム物理名           | カラム論理名     | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
-| --- | ---------------------- | ---------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | view_id                | 画面ID           | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID                            |
-| 2   | sort_item_id           | ソート項目ID     | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
-| 3   | sort_item_name         | ソート項目名     | VARCHAR(100) | NOT NULL | -   | -   | -                 | ソート項目の内容（物理カラム名）        |
-| 4   | sort_item_display_name | ソート項目表示名 | VARCHAR(100) | NOT NULL | -   | -   | -                 | ドロップダウンに表示する論理名          |
-| 5   | sort_order             | 表示順序         | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
-| 6   | delete_flag            | 削除フラグ       | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
-| 7   | create_date            | 作成日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
-| 8   | update_date            | 更新日時         | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
+| #   | カラム物理名   | カラム論理名 | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
+| --- | -------------- | ------------ | ------------ | -------- | --- | --- | ----------------- | --------------------------------------- |
+| 1   | view_id        | 画面ID       | INT          | NOT NULL | ○   | -   | -                 | 画面固有のID、AUTO_INCREMENT                            |
+| 2   | sort_item_id   | ソート項目ID | INT          | NOT NULL | ○   | -   | -                 | ソート項目固有のID                      |
+| 3   | sort_item_name | ソート項目名 | VARCHAR(100) | NOT NULL | -   | -   |                   | ソート項目の内容                        |
+| 4   | sort_order     | 表示順序     | INT          | NOT NULL | -   | -   | -                 | ソート項目リストでの表示順              |
+| 5   | delete_flag    | 削除フラグ   | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
+| 6   | create_date    | 作成日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
+| 7   | update_date    | 更新日時     | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード更新日時                        |
 
 - [ ] 各画面のソート項目が決まり次第、以下の初期データに記載すること
 
@@ -717,7 +715,7 @@
 
 | #   | カラム物理名 | カラム論理名 | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ------------ | ------------ | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | region_id    | 地域ID       | INT         | NOT NULL | ○   | -   | -                 | 地域固有のID                            |
+| 1   | region_id    | 地域ID       | INT         | NOT NULL | ○   | -   | -                 | 地域固有のID、AUTO_INCREMENT                            |
 | 2   | region_name  | 地域名       | VARCHAR(50) | NOT NULL | -   | -   | -                 | 地域の表示名                            |
 | 3   | time_zone    | タイムゾーン | VARCHAR(64) | NOT NULL | -   | -   | -                 | 地域のタイムゾーン設定                  |
 | 4   | delete_flag  | 削除フラグ   | BOOLEAN     | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE |
@@ -740,7 +738,7 @@
 
 | #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                      |
 | --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ----------------- | ----------------------------------------- |
-| 1   | mail_history_id   | メール送信履歴ID     | INT          | NOT NULL | ○   | -   | -                 | メール送信履歴の一意識別子                |
+| 1   | mail_history_id   | メール送信履歴ID     | INT          | NOT NULL | ○   | -   | -                 | メール送信履歴の一意識別子、AUTO_INCREMENT                |
 | 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(36)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
 | 3   | mail_type         | メール種別ID         | INT          | NOT NULL | -   | ○   | -                 | メール種別ID（mail_type_master参照）      |
 | 4   | sender_email      | 送信元メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 送信元のメールアドレス                    |
@@ -784,7 +782,7 @@
 
 | #   | カラム物理名   | カラム論理名 | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                             |
 | --- | -------------- | ------------ | ----------- | -------- | --- | --- | ----------------- | -------------------------------- |
-| 1   | mail_type_id   | メール種別ID | INT         | NOT NULL | ○   | -   | -                 | メール種別の一意識別子           |
+| 1   | mail_type_id   | メール種別ID | INT         | NOT NULL | ○   | -   | -                 | メール種別の一意識別子、AUTO_INCREMENT           |
 | 2   | mail_type_name | メール種別名 | VARCHAR(50) | NOT NULL | -   | -   | -                 | メール種別の表示名               |
 | 3   | delete_flag    | 削除フラグ   | TINYINT     | NOT NULL | -   | -   | 0                 | 論理削除フラグ（0:有効、1:削除） |
 | 4   | create_date    | 作成日時     | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                 |
@@ -883,7 +881,7 @@
 
 | #   | カラム物理名 | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ------------ | -------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
-| 1   | master_id    | マスタID       | INT         | NOT NULL | ○   | -   | -                 | マスタの一意識別子（主キー）            |
+| 1   | master_id    | マスタID       | INT         | NOT NULL | ○   | -   | -                 | マスタの一意識別子（主キー、AUTO_INCREMENT）            |
 | 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | -   | -   | -                 | アクセス可能なユーザーID（主キー）      |
 | 2   | master_name  | マスタ名       | VARCHAR(20) | NOT NULL | -   | -   | -                 | マスタの名称                            |
 | 3   | create_date  | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
@@ -922,7 +920,7 @@
 
 | #   | カラム物理名      | カラム論理名         | データ型      | NULL     | PK  | FK  | デフォルト値      | 説明                                                         |
 | --- | ----------------- | -------------------- | ------------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
-| 1   | queue_id          | キューID             | BIGINT        | NOT NULL | 〇  | -   | -                 | キューレコードの一意識別子（自動採番）                       |
+| 1   | queue_id          | キューID             | BIGINT        | NOT NULL | 〇  | -   | -                 | キューレコードの一意識別子、AUTO_INCREMENT                       |
 | 2   | device_id         | デバイスID           | INT           | NOT NULL | -   | 〇  | -                 | アラート発生元デバイスID                                     |
 | 3   | organization_id   | 組織ID               | INT           | NOT NULL | -   | 〇  | -                 | デバイス所属組織ID                                           |
 | 4   | alert_id          | アラートID           | INT           | NOT NULL | -   | 〇  | -                 | 発生したアラートの設定ID                                     |
@@ -1087,7 +1085,7 @@
 
 | #   | カラム物理名     | カラム論理名   | データ型     | NULL     | PK  | FK  | デフォルト値      | 説明                                          |
 | --- | ---------------- | -------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------- |
-| 1   | login_history_id | ログイン履歴ID | INT          | NOT NULL | ○   | -   | AUTO_INCREMENT    | ログイン履歴ID（PK）                          |
+| 1   | login_history_id | ログイン履歴ID | INT          | NOT NULL | ○   | -   | -    | ログイン履歴ID（PK、AUTO_INCREMENT）                          |
 | 2   | user_id          | ユーザーID     | INT          | NULL     | -   | ○   | -                 | ユーザーID、成功時のみ設定（user_master参照） |
 | 3   | email            | メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 入力されたメールアドレス                      |
 | 4   | login_date       | ログイン日時   | DATETIME     | NOT NULL | -   | -   | -                 | ログイン試行日時                              |
@@ -1321,7 +1319,7 @@
 
 | #   | カラム物理名        | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                           |
 | --- | ------------------- | -------------- | ----------- | -------- | --- | --- | ----------------- | ---------------------------------------------- |
-| 1   | summary_method_id   | 集約方法ID     | INT         | NOT NULL | 〇  | -   | -                 | システム内での一意識別子                       |
+| 1   | summary_method_id   | 集約方法ID     | INT         | NOT NULL | 〇  | -   | -                 | システム内での一意識別子、AUTO_INCREMENT                       |
 | 2   | summary_method_code | 集約方法コード | VARCHAR(20) | NOT NULL | -   | -   | -                 | 集約方法をコードで表現したもの（MAX、MINなど） |
 | 3   | summary_method_name | 集約方法名     | VARCHAR(30) | NOT NULL | -   | -   | -                 | 集約方法名（最大値、最小値など）               |
 | 4   | create_date         | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                               |
@@ -1346,7 +1344,7 @@
 
 | #   | カラム物理名                     | カラム論理名             | データ型    | NULL     | PK  | FK  | デフォルト値   | 説明                                          |
 | --- | -------------------------------- | ------------------------ | ----------- | -------- | --- | --- | -------------- | --------------------------------------------- |
-| 1   | my_row_id                        | 行ID                     | BIGINT      | NOT NULL | 〇  |     | AUTO INCREMENT | 行をユニークにするための疑似ID。INVISIBLE設定 |
+| 1   | my_row_id                        | 行ID                     | BIGINT      | NOT NULL | 〇  |     | AUTO INCREMENT | 行をユニークにするための疑似ID。INVISIBLE設定、AUTO_INCREMENT |
 | 2   | device_id                        | デバイスID               | INT         | NOT NULL |     | 〇  |                | データ送信元のデバイスID                      |
 | 3   | organization_id                  | 組織ID                   | INT         | NOT NULL |     | 〇  |                | データ送信元のデバイスが属する組織の組織ID    |
 | 4   | event_timestamp                  | イベント発生日時         | DATETIME(6) | NOT NULL |     |     |                | データ送信イベントの発生時刻                  |
@@ -2351,141 +2349,6 @@ def list_alert_history():
 - 論理削除されたアラート履歴（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
 - 論理削除されたデバイス（`d.delete_flag = TRUE`）およびアラート設定（`a.delete_flag = TRUE`）はVIEW側で除外される
 
----
-
-### 7. メール通知履歴一覧用VIEW (v_mail_history_by_user)
-
-**概要:**
-
-ログインユーザーが参照可能な組織配下のメール通知履歴情報を取得するためのVIEW。
-
-**目的:**
-
-- メール通知履歴一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のメール通知履歴のみを取得
-- organization_closureテーブルを使用した組織階層の権限制御を自動適用
-
-**CREATE文:**
-
-```sql
-CREATE OR REPLACE VIEW v_mail_history_by_user AS
-SELECT
-    u.user_id,
-    u.user_name,
-    u.organization_id AS user_organization_id,
-    m.mail_history_id,
-    m.mail_history_uuid,
-    m.mail_type,
-    m.sender_email,
-    m.recipients,
-    m.subject,
-    m.body,
-    m.sent_at,
-    m.user_id AS mail_user_id,
-    m.organization_id AS mail_organization_id,
-    m.create_date,
-    m.creator,
-    m.update_date,
-    m.modifier,
-    oc.depth
-FROM
-    user_master u
-    INNER JOIN organization_closure oc
-        ON u.organization_id = oc.parent_organization_id
-    INNER JOIN mail_history m
-        ON oc.subsidiary_organization_id = m.organization_id;
-```
-
-**カラム一覧:**
-
-| カラム物理名         | カラム論理名         | データ型     | 説明                                           |
-| -------------------- | -------------------- | ------------ | ---------------------------------------------- |
-| user_id              | ユーザーID           | INT          | ログインユーザーのID                           |
-| user_name            | ユーザー名           | VARCHAR(20)  | ログインユーザーの名前                         |
-| user_organization_id | ユーザー組織ID       | INT          | ログインユーザーの所属組織ID                   |
-| mail_history_id      | メール送信履歴ID     | INT          | メール送信履歴の一意識別子                     |
-| mail_history_uuid    | メール送信履歴UUID   | VARCHAR(36)  | UUID（外部公開用一意識別子）                   |
-| mail_type            | メール種別ID         | INT          | メール種別ID                                   |
-| sender_email         | 送信元メールアドレス | VARCHAR(254) | 送信元のメールアドレス                         |
-| recipients           | 送信先メールアドレス | JSON         | 送信先のメールアドレス（JSON形式）             |
-| subject              | メール件名           | VARCHAR(500) | メールの件名                                   |
-| body                 | メール本文           | TEXT         | メールの本文                                   |
-| sent_at              | 送信日時             | DATETIME     | メール送信日時                                 |
-| mail_user_id         | 関連ユーザーID       | INT          | 関連するユーザーID                             |
-| mail_organization_id | 関連組織ID           | INT          | メール送信に関連する組織ID                     |
-| create_date          | 作成日時             | DATETIME     | レコード作成日時                               |
-| creator              | 作成者               | INT          | レコード作成者のユーザーID                     |
-| update_date          | 更新日時             | DATETIME     | レコード最終更新日時                           |
-| modifier             | 更新者               | INT          | レコード更新者のユーザーID                     |
-| depth                | 組織階層深さ         | INT          | ユーザー組織からメール関連組織までの階層の深さ |
-
-**使用例（SQL）:**
-
-```sql
--- ログインユーザーID=123が参照可能な全メール通知履歴を取得
-SELECT
-    mail_history_id,
-    mail_type,
-    sender_email,
-    subject,
-    sent_at,
-    mail_organization_id,
-    depth
-FROM v_mail_history_by_user
-WHERE user_id = 123
-ORDER BY sent_at DESC;
-
--- アラート通知メールのみ取得（mail_type=1）
-SELECT *
-FROM v_mail_history_by_user
-WHERE user_id = 123
-  AND mail_type = 1
-ORDER BY sent_at DESC;
-```
-
-**使用例（Flask）:**
-
-```python
-from flask import session
-from sqlalchemy import text
-
-@bp.route('/mail-history', methods=['GET'])
-def list_mail_history():
-    """メール通知履歴一覧表示"""
-
-    # セッションからログインユーザーIDを取得
-    user_id = session.get('user_id')
-
-    # VIEWを使用してメール通知履歴を取得
-    query = text("""
-        SELECT
-            mail_history_id,
-            mail_history_uuid,
-            mail_type,
-            sender_email,
-            recipients,
-            subject,
-            sent_at,
-            mail_organization_id,
-            depth
-        FROM v_mail_history_by_user
-        WHERE user_id = :user_id
-        ORDER BY sent_at DESC
-    """)
-
-    result = db.session.execute(query, {'user_id': user_id})
-    mail_history = result.fetchall()
-
-    return render_template('mail_history/list.html', mail_history=mail_history)
-```
-
-**ビジネスルール:**
-
-- このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくメール通知履歴を返す
-- `depth`カラムで組織階層の深さを確認可能（0=自組織、1=直下の組織、2以上=孫組織以降）
-- mail_historyテーブルにはdelete_flagがないため、全てのレコードが結果に含まれる
-- recipientsフィールドはJSON形式のため、アプリケーション側でパースが必要
-
----
 
 ## インデックス設計
 
