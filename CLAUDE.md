@@ -210,7 +210,7 @@ src/
     │   ├── organization.py        # organization_master, organization_type_master, organization_closure
     │   ├── alert.py               # alert_setting_master, alert_level_master, alert_history, alert_status_master
     │   ├── notification.py        # mail_history, mail_type_master
-    │   ├── device_stock.py        # device_stock_info_master, stock_status_master
+    │   ├── device_inventory.py        # device_inventory_master, inventory_status_master
     │   ├── contract.py            # contract_status_master
     │   ├── region.py              # region_master
     │   ├── language.py            # language_master
@@ -224,7 +224,7 @@ src/
     │   ├── user.py                # ユーザー登録・更新フォーム
     │   ├── organization.py        # 組織登録・更新フォーム
     │   ├── alert_setting.py       # アラート設定登録・更新フォーム
-    │   ├── device_stock.py        # デバイス台帳登録・更新フォーム
+    │   ├── device_inventory.py        # デバイス台帳登録・更新フォーム
     │   ├── mail_setting.py        # メール通知設定フォーム
     │   └── transfer.py            # CSVインポートフォーム
     │
@@ -234,7 +234,7 @@ src/
     │   ├── user_service.py        # ユーザーCRUD
     │   ├── organization_service.py # 組織CRUD（organization_closure連携含む）
     │   ├── alert_setting_service.py # アラート設定CRUD
-    │   ├── device_stock_service.py  # デバイス台帳CRUD
+    │   ├── device_inventory_service.py  # デバイス台帳CRUD
     │   ├── mail_setting_service.py  # メール通知設定CRUD
     │   ├── alert_history_service.py # アラート履歴参照
     │   ├── mail_history_service.py  # メール通知履歴参照
@@ -359,7 +359,7 @@ tests/
 │   │   ├── test_organization_service.py
 │   │   ├── test_alert_setting_service.py
 │   │   ├── test_alert_history_service.py
-│   │   ├── test_device_stock_service.py
+│   │   ├── test_device_inventory_service.py
 │   │   ├── test_mail_setting_service.py
 │   │   ├── test_mail_history_service.py
 │   │   ├── test_industry_dashboard_service.py
@@ -372,7 +372,7 @@ tests/
 │   │   ├── test_organization.py
 │   │   ├── test_alert.py
 │   │   ├── test_notification.py
-│   │   └── test_device_stock.py
+│   │   └── test_device_inventory.py
 │   ├── auth/                            # src/auth/と1:1対応
 │   │   ├── test_factory.py
 │   │   ├── test_middleware.py
