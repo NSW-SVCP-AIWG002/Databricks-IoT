@@ -1,14 +1,14 @@
-# 顧客作成ダッシュボード時系列グラフガジェット - ワークフロー仕様書
+# 顧客作成ダッシュボード積み上げ棒グラフガジェット - ワークフロー仕様書
 
 ## 📑 目次
 
-- [顧客作成ダッシュボード時系列グラフガジェット - ワークフロー仕様書](#顧客作成ダッシュボード時系列グラフガジェット---ワークフロー仕様書)
+- [顧客作成ダッシュボード積み上げ棒グラフガジェット - ワークフロー仕様書](#顧客作成ダッシュボード積み上げ棒グラフガジェット---ワークフロー仕様書)
   - [📑 目次](#-目次)
   - [概要](#概要)
   - [使用するFlaskルート一覧](#使用するflaskルート一覧)
   - [ルート呼び出しマッピング](#ルート呼び出しマッピング)
-    - [時系列グラフガジェット](#時系列グラフガジェット)
-    - [時系列グラフガジェット登録モーダル](#時系列グラフガジェット登録モーダル)
+    - [積み上げ棒グラフガジェット](#積み上げ棒グラフガジェット)
+    - [積み上げ棒グラフガジェット登録モーダル](#積み上げ棒グラフガジェット登録モーダル)
   - [ワークフロー一覧](#ワークフロー一覧)
     - [ガジェット初期表示](#ガジェット初期表示)
       - [処理フロー](#処理フロー)
@@ -49,7 +49,7 @@
 
 ## 概要
 
-このドキュメントは、顧客作成ダッシュボード時系列グラフ機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
+このドキュメントは、顧客作成ダッシュボード積み上げ棒グラフ機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
 
 **このドキュメントの役割:**
 - ✅ ユーザー操作のトリガー条件
@@ -74,10 +74,10 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に時系列グラフガジェットを埋め込み） | HTML | - |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に積み上げ棒グラフガジェットを埋め込み） | HTML | - |
 | 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
-| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/timeline/create` | GET | 時系列グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/timeline/register` | POST | 時系列グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | GET | 積み上げ棒グラフガジェット登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | POST | 積み上げ棒グラフガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
 | 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
@@ -93,21 +93,23 @@
 
 ## ルート呼び出しマッピング
 
-### 時系列グラフガジェット
+### 積み上げ棒グラフガジェット
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に時系列グラフガジェットを埋め込み） | エラーページ表示 |
-| 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に積み上げ棒グラフガジェットを埋め込み） | エラーページ表示 |
+| 表示時間単位切替（時/日/週/月） | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 集計時間幅選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
+| 時間帯選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
 | CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
 
-### 時系列グラフガジェット登録モーダル
+### 積み上げ棒グラフガジェット登録モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/timeline/create` | なし | HTML（モーダル） | エラーページ表示 |
-| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/timeline/register` | `title, device_mode, device_id, group_id, primary_item_id, secondary_item_id, primary_min_value, secondary_min_value, primary_max_value, secondary_max_value, gadget_size` | リダイレクト | エラーモーダル表示 |
+| 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | なし | HTML（モーダル） | エラーページ表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` | リダイレクト | エラーモーダル表示 |
 
 ---
 
@@ -148,13 +150,13 @@
 
 [共通ワークフロー仕様書](../common/workflow-specification.md) のダッシュボード初期表示の処理詳細（①〜⑨）と同様の処理を実行します。
 
-時系列グラフガジェット固有の追加処理はありません。
+積み上げ棒グラフガジェット固有の追加処理はありません。
 
 ---
 
 ### ガジェットデータ取得
 
-**トリガー:** 画面初期表示時 / 開始日時・終了日時選択時 / 更新ボタン押下時
+**トリガー:** 画面初期表示時 / 表示時間単位切替時 / 集計時間幅選択時 / 時間帯選択時 / 更新ボタン押下時
 
 **前提条件:**
 - ガジェットが表示されている
@@ -183,13 +185,38 @@ flowchart TD
 
     CheckDeviceId --> ExistDeviceId{デバイスID設定あり?}
     ExistDeviceId -->|設定なし| GetUserSetting[ユーザー設定から選択中デバイスIDを取得]
-    ExistDeviceId -->|設定あり| QuerySilver[センサーデータ取得<br>sensor_data_view]
+    ExistDeviceId -->|設定あり| UnitCheck{表示単位<br>判定}
 
-    GetUserSetting --> QuerySilver
+    GetUserSetting --> UnitCheck
+
+    UnitCheck -->|時| SilverDataColumnNameQuery[シルバーデータカラム名取得<br>DB measurement_item_master]
+    SilverDataColumnNameQuery --> CheckSilverDataColumnNameQuery{DBクエリ結果}
+    CheckSilverDataColumnNameQuery -->|NG| Error500
+    CheckSilverDataColumnNameQuery -->|OK| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
 
     QuerySilver --> CheckQuerySilver{DBクエリ結果}
     CheckQuerySilver -->|NG| Error500
-    CheckQuerySilver -->|OK| Format[データ整形<br>labels/values配列生成]
+    CheckQuerySilver -->|OK| AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
+
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
+    QueryGoldDay --> CheckQueryGoldDay{DBクエリ結果}
+    CheckQueryGoldDay -->|NG| Error500
+    CheckQueryGoldDay -->|OK| AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
+
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldWeek --> CheckQueryGoldWeek{DBクエリ結果}
+    CheckQueryGoldWeek -->|NG| Error500
+    CheckQueryGoldWeek -->|OK| AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
+
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldMonth --> CheckQueryGoldMonth{DBクエリ結果}
+    CheckQueryGoldMonth -->|NG| Error500
+    CheckQueryGoldMonth -->|OK| AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
+
+    AggregateSilver --> Format[データ整形<br>labels/values配列生成]
+    AggregateDay --> Format
+    AggregateWeek --> Format
+    AggregateMonth --> Format
 
     Format --> ReturnData[JSONデータ返却]
 
@@ -204,7 +231,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `start_datetime, end_datetime, chart_config` |
+| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
 
 #### バリデーション
 
@@ -214,9 +241,9 @@ flowchart TD
 
 | 項目 | ルール | エラーメッセージ |
 |------|--------|-----------------|
-| 開始日時 | 日付形式 | 正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss） |
-| 終了日時 | 日付形式 | 正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss） |
-| 開始日時 | 開始日時 < 終了日時 | 終了日時は開始日時以降の日時を入力してください |
+| 表示単位 | 許容値（hour/day/week/month） | 表示単位が不正です |
+| 集計間隔（時単位のみ） | 許容値（1min, 2min, 3min, 5min, 10min, 15min） | 集計間隔が不正です |
+| 基準日時 | 形式（YYYY/MM/DD HH:mm:ss） | 日付形式が不正です |
 
 #### 処理詳細（サーバーサイド）
 
@@ -242,12 +269,8 @@ WHERE
 **chart_config JSON スキーマ:**
 ```json
 {
-  "primary_item_id": 1,
-  "secondary_item_id": 2,
-  "primary_min_value": 0.0,
-  "secondary_min_value": 10.0,
-  "primary_max_value": 100.0,
-  "secondary_max_value": 110.0
+  "measurement_item_ids": [1, 2, 3],
+  "summary_method_id": 1
 }
 ```
 
@@ -281,11 +304,25 @@ WHERE
 
 ---
 
-**③ センサーデータ取得**
+**③ 表示単位別センサーデータ取得**
 
-**使用テーブル:** sensor_data_view 
+| display_unit | 参照層 | テーブル | 集計粒度 |
+|-------------|-------|---------|--------|
+| hour | シルバー層 | sensor_data_view | インターバル単位（1/2/3/5/10/15分） |
+| day | ゴールド層 | gold_sensor_data_hourly_summary | 1時間単位（24本） |
+| week | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（7本、日曜〜土曜） |
+| month | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（月の全日） |
 
-**SQL詳細:** 
+**時間範囲の決定:**
+
+| display_unit | start | end |
+|-------------|-------|-----|
+| hour | base_datetime の時刻を00分00秒に切り捨て | start + 1時間 |
+| day | base_datetime の日付 00:00:00 | base_datetime の日付 23:59:59 |
+| week | base_datetime の週の日曜日 00:00:00 | base_datetime の週の土曜日 23:59:59 |
+| month | base_datetime の月の初日 00:00:00 | base_datetime の月の最終日 23:59:59 |
+
+**SQL詳細（display_unit=hour / シルバー層）:**
 ```sql
 SELECT
   event_timestamp 
@@ -320,24 +357,135 @@ ORDER BY
   event_timestamp ASC
 ```
 
-※ 表示項目選択はPython側で実施する（下記④参照）
+**SQL詳細（display_unit=hour / 測定項目マスタ）:**
+```sql
+SELECT
+  silver_data_column_name
+FROM
+  measurement_item_master
+WHERE
+  measurement_item_id IN :measurement_item_ids
+```
+
+※ インターバル単位のグループ化・集計・表示項目選択はPython側で実施する（下記④参照）
+
+**SQL詳細（display_unit=day / ゴールド層 hourly）:**
+```sql
+SELECT
+  summary_item,
+  collection_hour,
+  summary_value
+FROM
+  iot_catalog.gold.gold_sensor_data_hourly_summary
+WHERE
+  device_id = :device_id
+  AND summary_item IN :measurement_item_ids
+  AND summary_method_id = :summary_method_id
+  AND collection_date = :target_date
+ORDER BY
+  collection_hour ASC
+```
+
+**SQL詳細（display_unit=week または month / ゴールド層 daily）:**
+```sql
+SELECT
+  summary_item,
+  collection_date,
+  summary_value
+FROM
+  iot_catalog.gold.gold_sensor_data_daily_summary
+WHERE
+  device_id = :device_id
+  AND summary_item IN :measurement_item_ids
+  AND summary_method_id = :summary_method_id
+  AND collection_date BETWEEN :start_date AND :end_date
+ORDER BY
+  collection_date ASC
+```
 
 ---
 
 **④ データ整形**
 
-取得データを ECharts 時系列グラフ用の `labels` / `values` 配列に変換します。
+取得データを ECharts 積み上げ棒グラフ用の `labels` / `series` 配列に変換します。
+
+| display_unit | ラベル形式 | 備考 |
+|-------------|---------|------|
+| hour | HH:mm | インターバル単位の開始時刻 |
+| day | HH | 0〜23時（24本） |
+| week | E | 日曜〜土曜（7本） |
+| month | DD | 月初〜月末（目盛りはフロント側で奇数日のみ表示） |
 
 ```python
-def format_timeline_data(rows, left_column_name, right_column_name):
+INTERVAL_MINUTES = {
+    '1min': 1, '2min': 2, '3min': 3,
+    '5min': 5, '10min': 10, '15min': 15
+}
+
+def format_stacked_bar_chart_data(rows, display_unit, measurement_items, interval='10min', summary_method_id=1):
+    """
+    measurement_items: list of dict, e.g.
+        [{'silver_data_column_name': 'external_temp', 'display_name': '外気温度'}, ...]
+    """
     labels = []
-    left_values = []
-    right_values = []
-    for row in rows:
-        labels.append(row['event_timestamp'].strftime('%Y/%m/%d %H:%M:%S'))
-        left_values.append(row[left_column_name])
-        right_values.append(row[right_column_name])
-    return {'labels': labels, 'left_values': left_values, 'right_values': right_values}
+    # センサー項目ごとに values バッファを用意
+    series_buffers = {item['display_name']: [] for item in measurement_items}
+
+    if display_unit == 'hour':
+        interval_min = INTERVAL_MINUTES.get(interval, 1)
+        # センサー項目ごとにバケットごとの値リストを収集
+        groups = {item['display_name']: {} for item in measurement_items}
+        col_map = {item['display_name']: item['silver_data_column_name'] for item in measurement_items}
+
+        for row in rows:
+            dt = row['event_timestamp']
+            bucket = dt.replace(
+                minute=(dt.minute // interval_min) * interval_min,
+                second=0, microsecond=0
+            )
+            key = bucket.strftime('%H:%M')
+            for item in measurement_items:
+                col = col_map[item['display_name']]
+                groups[item['display_name']].setdefault(key, []).append(row[col])
+
+        sorted_keys = sorted({k for g in groups.values() for k in g})
+        labels = sorted_keys
+        for item in measurement_items:
+            series_buffers[item['display_name']] = [
+                aggregate_values(groups[item['display_name']].get(k, []), summary_method_id)
+                for k in sorted_keys
+            ]
+
+    elif display_unit == 'day':
+        # summary_item でグループ化してラベルと値を収集
+        item_id_map = {item['measurement_item_id']: item['display_name'] for item in measurement_items}
+        hour_set = sorted({row['collection_hour'] for row in rows})
+        labels = [f"{h:02d}:00" for h in hour_set]
+        hour_data = {item['display_name']: {h: None for h in hour_set} for item in measurement_items}
+        for row in rows:
+            name = item_id_map.get(row['summary_item'])
+            if name:
+                hour_data[name][row['collection_hour']] = row['summary_value']
+        for item in measurement_items:
+            series_buffers[item['display_name']] = [hour_data[item['display_name']][h] for h in hour_set]
+
+    elif display_unit in ('week', 'month'):
+        item_id_map = {item['measurement_item_id']: item['display_name'] for item in measurement_items}
+        date_set = sorted({row['collection_date'] for row in rows})
+        labels = [d.strftime('%m/%d') for d in date_set]
+        date_data = {item['display_name']: {d: None for d in date_set} for item in measurement_items}
+        for row in rows:
+            name = item_id_map.get(row['summary_item'])
+            if name:
+                date_data[name][row['collection_date']] = row['summary_value']
+        for item in measurement_items:
+            series_buffers[item['display_name']] = [date_data[item['display_name']][d] for d in date_set]
+
+    series = [
+        {'name': item['display_name'], 'values': series_buffers[item['display_name']]}
+        for item in measurement_items
+    ]
+    return {'labels': labels, 'series': series}
 ```
 
 ---
@@ -348,9 +496,17 @@ def format_timeline_data(rows, left_column_name, right_column_name):
 {
   "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "chart_data": {
-    "labels": ["2026/02/17 00:00:00", "2026/02/17 00:01:00", "..."],
-    "left_values": [10.5, 12.3, 9.8],
-    "right_values": [2500.0, 2480.0, 2510.0]
+    "labels": ["00:00", "00:05", "00:10"],
+    "series": [
+      {
+        "name": "外気温度",
+        "values": [10.5, 12.3, 9.8]
+      },
+      {
+        "name": "第1冷凍 設定温度",
+        "values": [5.0, 5.1, 5.2]
+      }
+    ]
   },
   "updated_at": "2026/03/05 12:00:00"
 }
@@ -360,7 +516,7 @@ def format_timeline_data(rows, left_column_name, right_column_name):
 ```json
 {
   "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "chart_data": {"labels": [], "left_values": [], "right_values": []},
+  "chart_data": {"labels": [], "series": []},
   "updated_at": "2026/03/05 12:00:00"
 }
 ```
@@ -372,8 +528,8 @@ def format_timeline_data(rows, left_column_name, right_column_name):
 ```python
 @customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
 @require_auth
-def gadget_timeline_data(gadget_uuid):
-    """時系列グラフガジェットデータ取得（AJAX）"""
+def gadget_stacked_bar_chart_data(gadget_uuid):
+    """積み上げ棒グラフガジェットデータ取得（AJAX）"""
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # ① ガジェット設定取得
@@ -387,15 +543,15 @@ def gadget_timeline_data(gadget_uuid):
 
     # リクエストパラメータ取得・バリデーション
     params = request.get_json() or {}
-    start_datetime_str = params.get('start_datetime')
-    end_datetime_str = params.get('end_datetime')
+    display_unit = params.get('display_unit', 'hour')
+    interval = params.get('interval', '10min')
+    base_datetime_str = params.get('base_datetime')
 
-    if not validate_chart_params(start_datetime_str, end_datetime_str):
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
         return jsonify({'error': 'パラメータが不正です'}), 400
 
     try:
-        start_datetime = datetime.strptime(start_datetime_str, '%Y/%m/%d %H:%M:%S')
-        end_datetime = datetime.strptime(end_datetime_str, '%Y/%m/%d %H:%M:%S')
+        base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
         # ② デバイスID決定
         data_source_config = json.loads(gadget.data_source_config)
@@ -407,22 +563,20 @@ def gadget_timeline_data(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ 表示単位別センサーデータ取得
-        left_item = get_measurement_item(chart_config['primary_item_id'])
-        right_item = get_measurement_item(chart_config['secondary_item_id'])
-        left_column_name = left_item.silver_data_column_name
-        right_column_name = right_item.silver_data_column_name
-
-        rows = fetch_timeline_data(
+        rows = fetch_stacked_bar_chart_data(
             device_id=device_id,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-            primary_item_id=chart_config['primary_item_id'],
-            secondary_item_id=chart_config['secondary_item_id']
+            display_unit=display_unit,
+            interval=interval,
+            base_datetime=base_datetime,
+            measurement_item_ids=chart_config['measurement_item_ids'],
+            summary_method_id=chart_config['summary_method_id']
         )
 
-        # ④ データ整形
-        chart_data = format_timeline_data(
-            rows, left_column_name, right_column_name
+        # ④ データ整形（measurement_items は ③ のSQL取得結果を渡す）
+        chart_data = format_stacked_bar_chart_data(
+            rows, display_unit, measurement_items,
+            interval=interval,
+            summary_method_id=chart_config['summary_method_id']
         )
 
         return jsonify({
@@ -432,7 +586,7 @@ def gadget_timeline_data(gadget_uuid):
         })
 
     except Exception as e:
-        logger.error(f'時系列グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'積み上げ棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
 
@@ -490,7 +644,11 @@ flowchart TD
 
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
     CheckDeviceQuery -->|失敗| Error500
-    CheckDeviceQuery -->|成功| Template[時系列グラフガジェット登録モーダル表示]
+    CheckDeviceQuery -->|成功| SummaryMethodQuery[集約方法一覧取得<br>DB gold_summary_method_master]
+
+    SummaryMethodQuery --> CheckSummaryMethodQuery{DBクエリ結果}
+    CheckSummaryMethodQuery -->|失敗| Error500
+    CheckSummaryMethodQuery -->|成功| Template[積み上げ棒グラフガジェット登録モーダル表示]
 
     Template --> Response[HTMLレスポンス返却]
 
@@ -505,7 +663,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 時系列グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/timeline/create` | パラメータ: なし |
+| 積み上げ棒グラフガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/stacked-bar-chart/create` | パラメータ: なし |
 
 #### バリデーション
 
@@ -634,13 +792,31 @@ ORDER BY
 
 ---
 
+**⑦ 集約方法一覧取得**
+
+**使用テーブル:** gold_summary_method_master
+
+```sql
+SELECT
+  summary_method_id,
+  summary_method_name
+FROM
+  gold_summary_method_master
+WHERE
+  delete_flag = FALSE
+ORDER BY
+  summary_method_id ASC
+```
+
+---
+
 **⑧ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/create', methods=['GET'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/stacked-bar-chart/create', methods=['GET'])
 @require_auth
-def gadget_timeline_create():
-    """時系列グラフガジェット登録モーダル表示"""
+def gadget_stacked_bar_chart_create():
+    """積み上げ棒グラフガジェット登録モーダル表示"""
     accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # ① ユーザー設定取得
@@ -665,15 +841,19 @@ def gadget_timeline_create():
     # ⑥ デバイス一覧取得
     devices = get_all_devices_in_scope(accessible_org_ids)
 
-    form = TimelineGadgetForm()
+    # ⑦ 集約方法一覧取得
+    aggregation_methods = get_aggregation_methods()
+
+    form = BeltChartGadgetForm()
     return render_template(
-        'customer_dashboard/modals/gadget_register/timeline.html',
+        'customer_dashboard/modals/gadget_register/stacked_bar_chart.html',
         form=form,
         dashboard=dashboard,
         groups=groups,
         measurement_items=measurement_items,
         organizations=organizations,
-        devices=devices
+        devices=devices,
+        aggregation_methods=aggregation_methods
     )
 ```
 
@@ -734,13 +914,22 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 時系列グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/timeline/register` | フォームデータ: `title, device_mode, device_id, group_id, primary_item_id, secondary_item_id, primary_min_value, secondary_min_value, primary_max_value, secondary_max_value, gadget_size` |
+| 積み上げ棒グラフガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/stacked-bar-chart/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_ids, gadget_size` |
 
 #### バリデーション
 
 **実行タイミング:** フォーム送信時（サーバーサイド）
 
-**バリデーションルール:** [UI仕様書](./ui-specification.md) の バリデーション（登録画面） を参照
+| 項目 | ルール | エラーメッセージ |
+|------|--------|-----------------|
+| タイトル | 必須 | タイトルを入力してください |
+| タイトル | 最大20文字 | タイトルは20文字以内で入力してください |
+| 表示デバイス | 必須 | 表示デバイスを選択してください |
+| デバイス（デバイス固定時のみ） | 必須 | デバイスを選択してください |
+| グループ | 必須 | グループを選択してください |
+| 集約方法 | 必須 | 集約方法を選択してください |
+| 表示項目 | 1-5個選択必須 | 表示項目を1つ以上5つ以下で選択してください |
+| 部品サイズ | 必須 | 部品サイズを選択してください |
 
 #### 処理詳細（サーバーサイド）
 
@@ -768,12 +957,8 @@ WHERE
 ```json
 // chart_config
 {
-  "primary_item_id": 1,
-  "secondary_item_id": 2,
-  "primary_min_value": 0.0,
-  "secondary_min_value": 10.0,
-  "primary_max_value": 100.0,
-  "secondary_max_value": 110.0
+  "measurement_item_ids": [1, 2, 3],
+  "summary_method_id": 1
 }
 
 // data_source_config（デバイス固定モード）
@@ -840,14 +1025,14 @@ INSERT INTO dashboard_gadget_master (
 **④ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/stacked-bar-chart/register', methods=['POST'])
 @require_auth
-def gadget_timeline_register():
-    """時系列グラフガジェット登録実行"""
-    form = TimelineGadgetForm()
+def gadget_stacked_bar_chart_register():
+    """積み上げ棒グラフガジェット登録実行"""
+    form = BeltChartGadgetForm()
     if not form.validate_on_submit():
         return render_template(
-            'customer_dashboard/modals/gadget_register/timeline.html',
+            'customer_dashboard/modals/gadget_register/stacked_bar_chart.html',
             form=form
         ), 400
 
@@ -864,12 +1049,8 @@ def gadget_timeline_register():
     try:
         # ② chart_config / data_source_config 生成
         chart_config = json.dumps({
-            "primary_item_id": form.primary_item_id.data,
-            "secondary_item_id": form.secondary_item_id.data,
-            "primary_min_value": form.primary_min_value.data,
-            "secondary_min_value": form.secondary_min_value.data,
-            "primary_max_value": form.primary_max_value.data,
-            "secondary_max_value": form.secondary_max_value.data
+            'measurement_item_ids': form.measurement_item_ids.data,
+            'summary_method_id': form.summary_method_id.data
         })
         data_source_config = json.dumps({'device_id': device_id})
 
@@ -888,9 +1069,9 @@ def gadget_timeline_register():
             DashboardGadgetMaster.delete_flag == False
         ).scalar() or 0
 
-        # 時系列グラフのgadget_type_idを事前に取得する
+        # 積み上げ棒グラフのgadget_type_idを事前に取得する
         gadget_type = db.session.query(GadgetTypeMaster).filter_by(
-            gadget_type_name='時系列グラフ',
+            gadget_type_name='積み上げ棒グラフ',
             delete_flag=False
         ).first()
         gadget_type_id = gadget_type.gadget_type_id
@@ -917,7 +1098,7 @@ def gadget_timeline_register():
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'時系列グラフガジェット登録エラー: {str(e)}')
+        logger.error(f'積み上げ棒グラフガジェット登録エラー: {str(e)}')
         abort(500)
 ```
 
@@ -963,13 +1144,26 @@ flowchart TD
 
     CheckDeviceId --> ExistDeviceId{デバイスID設定あり?}
     ExistDeviceId -->|設定なし| GetUserSetting[ユーザー設定から選択中デバイスIDを取得]
-    ExistDeviceId -->|設定あり| QuerySilver[センサーデータ取得<br>sensor_data_view]
+    ExistDeviceId -->|設定あり| UnitCheck{表示単位<br>判定}
 
-    GetUserSetting --> QuerySilver
+    GetUserSetting --> UnitCheck
 
-    QuerySilver --> CheckQuerySilver{DBクエリ結果}
-    CheckQuerySilver -->|NG| Error500
-    CheckQuerySilver -->|OK| FormatCSV[CSVフォーマット変換]
+    UnitCheck -->|時| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
+    QuerySilver --> AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
+
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
+    QueryGoldDay --> AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
+
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldWeek --> AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
+
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
+    QueryGoldMonth --> AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
+
+    AggregateSilver --> FormatCSV[CSVフォーマット変換]
+    AggregateDay --> FormatCSV
+    AggregateWeek --> FormatCSV
+    AggregateMonth --> FormatCSV
 
     FormatCSV --> Response[CSVダウンロードレスポンス]
 
@@ -984,7 +1178,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| CSVエクスポート | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` クエリパラメータ: `start_datetime, end_datetime, chart_config` |
+| CSVエクスポート | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | パスパラメータ: `gadget_uuid` クエリパラメータ: `display_unit, interval, base_datetime, chart_config` |
 
 #### バリデーション
 
@@ -992,9 +1186,10 @@ flowchart TD
 
 | 項目 | ルール | エラーメッセージ |
 |------|--------|-----------------|
-| 開始日時 | 日付形式 | 正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss） |
-| 終了日時 | 日付形式 | 正しい日付形式で入力してください（YYYY/MM/DD HH:mm:ss） |
-| 開始日時 | 開始日時 < 終了日時 | 終了日時は開始日時以降の日時を入力してください |
+| 表示単位 | 許容値（hour/day/week/month） | 表示単位が不正です |
+| 集計間隔（時単位のみ） | 許容値（1min, 2min, 3min, 5min, 10min, 15min） | 集計間隔が不正です |
+| 基準日時 | 形式（YYYY/MM/DD HH:mm:ss） | 日付形式が不正です |
+
 
 #### 処理詳細（サーバーサイド）
 
@@ -1026,18 +1221,49 @@ flowchart TD
 **④ CSVカラム定義**
 
 | 列番号 | 表示名 | 内容 | 形式 |
-|--------|-------|------|------|
+|--------|--------|-----|------|
 | 1 | デバイス名 | デバイス名 | |
-| 2 | 時刻 | 表示時間（グラフX軸） | YYYY/MM/DD HH:mm:ss |
-| 3 | 凡例名 | 左表示項目のセンサー値（グラフY軸左） | 数値（小数点2桁） |
-| 4 | 凡例名 | 右表示項目のセンサー値（グラフY軸右） | 数値（小数点2桁） |
+| 2 | 表示時間単位に応じた名称（時間 / 時間 / 曜日 / 日付） | 表示時間（グラフX軸） | 表示時間単位に応じた形式（YYYY/MM/DD HH:mm / YYYY/MM/DD HH:mm / YYYY/MM/DD(E) / YYYY/MM/DD） |
+| 3 | 凡例名 | センサー値1（グラフY軸） | 数値（小数点2桁） |
+| 4 | 凡例名 | センサー値2（グラフY軸） | 数値（小数点2桁） |
+| 5 | 凡例名 | センサー値3（グラフY軸） | 数値（小数点2桁） |
+| 6 | 凡例名 | センサー値4（グラフY軸） | 数値（小数点2桁） |
+| 7 | 凡例名 | センサー値5（グラフY軸） | 数値（小数点2桁） |
+
+**注:** 設定されていないセンサー値は非表示
 
 **CSVサンプル**
+
+- 時単位
 ```csv
-デバイス名,時刻,外気温度（℃）,第1冷凍 設定温度（℃）
-DEV-001,2026/02/01 10:00:00,25.1,5.1
-DEV-001,2026/02/01 10:10:00,25.2,5.2
-DEV-001,2026/02/01 10:20:00,25.3,5.3
+デバイス名,時間,外気温度（℃）,第1冷凍 設定温度（℃）,第1冷凍 庫内センサー温度（℃）,第1冷凍 庫内温度（℃）,第1冷凍 DF温度（℃）
+DEV-001,2026/02/05 10:10,25.50,5.00,6.00,7.00,8.00
+DEV-001,2026/02/05 10:20,25.51,5.01,6.01,7.01,8.01
+DEV-001,2026/02/05 10:30,25.52,5.02,6.02,7.02,8.02
+```
+
+- 日単位
+```csv
+デバイス名,時間,外気温度（℃）,第1冷凍 設定温度（℃）,第1冷凍 庫内センサー温度（℃）,第1冷凍 庫内温度（℃）,第1冷凍 DF温度（℃）
+DEV-001,2026/02/05 00:00,25.50,5.00,6.00,7.00,8.00
+DEV-001,2026/02/05 01:00,25.51,5.01,6.01,7.01,8.01
+DEV-001,2026/02/05 02:00,25.52,5.02,6.02,7.02,8.02
+```
+
+- 週単位
+```csv
+デバイス名,時間,外気温度（℃）,第1冷凍 設定温度（℃）,第1冷凍 庫内センサー温度（℃）,第1冷凍 庫内温度（℃）,第1冷凍 DF温度（℃）
+DEV-001,2026/02/01(日),25.50,5.00,6.00,7.00,8.00
+DEV-001,2026/02/02(月),25.51,5.01,6.01,7.01,8.01
+DEV-001,2026/02/03(火),25.52,5.02,6.02,7.02,8.02
+```
+
+- 月単位
+```csv
+デバイス名,時間,外気温度（℃）,第1冷凍 設定温度（℃）,第1冷凍 庫内センサー温度（℃）,第1冷凍 庫内温度（℃）,第1冷凍 DF温度（℃）
+DEV-001,2026/02/01,25.50,5.00,6.00,7.00,8.00
+DEV-001,2026/02/02,25.51,5.01,6.01,7.01,8.01
+DEV-001,2026/02/03,25.52,5.02,6.02,7.02,8.02
 ```
 
 ---
@@ -1048,7 +1274,7 @@ DEV-001,2026/02/01 10:20:00,25.3,5.3
 @customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
 @require_auth
 def gadget_csv_export(gadget_uuid):
-    """時系列グラフガジェット CSVエクスポート"""
+    """積み上げ棒グラフガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
 
@@ -1060,15 +1286,15 @@ def gadget_csv_export(gadget_uuid):
         abort(404)
 
     # リクエストパラメータ取得・バリデーション
-    start_datetime_str = request.args.get('start_datetime')
-    end_datetime_str = request.args.get('end_datetime')
+    display_unit = request.args.get('display_unit', 'hour')
+    interval = request.args.get('interval', '10min')
+    base_datetime_str = request.args.get('base_datetime')
 
-    if not validate_chart_params(start_datetime_str, end_datetime_str):
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
         abort(400)
 
     try:
-        start_datetime = datetime.strptime(start_datetime_str, '%Y/%m/%d %H:%M:%S')
-        end_datetime = datetime.strptime(end_datetime_str, '%Y/%m/%d %H:%M:%S')
+        base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
         # ② デバイスID決定
         data_source_config = json.loads(gadget.data_source_config)
@@ -1080,33 +1306,29 @@ def gadget_csv_export(gadget_uuid):
         chart_config = json.loads(gadget.chart_config)
 
         # ③ センサーデータ取得（最大10万件）
-        left_item = get_measurement_item(chart_config['primary_item_id'])
-        right_item = get_measurement_item(chart_config['secondary_item_id'])
-        left_column_name = left_item.silver_data_column_name
-        right_column_name = right_item.silver_data_column_name
-        left_label = left_item.display_name
-        right_label = right_item.display_name
-
-        rows = fetch_timeline_data(
+        rows = fetch_stacked_bar_chart_data(
             device_id=device_id,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-            primary_item_id=chart_config['primary_item_id'],
-            secondary_item_id=chart_config['secondary_item_id'],
+            display_unit=display_unit,
+            interval=interval,
+            base_datetime=base_datetime,
+            measurement_item_ids=chart_config['measurement_item_ids'],
+            summary_method_id=chart_config['summary_method_id'],
             limit=100000
+        )
+        chart_data = format_stacked_bar_chart_data(
+            rows, display_unit, measurement_items,
+            interval=interval,
+            summary_method_id=chart_config['summary_method_id']
         )
 
         # ④ CSV生成
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(['受信日時', 'デバイス名', left_label, right_label])
-        for row in rows:
-            writer.writerow([
-                row['event_timestamp'].strftime('%Y/%m/%d %H:%M:%S'),
-                row['device_name'],
-                row[left_column_name],
-                row[right_column_name]
-            ])
+        sensor_names = [s['name'] for s in chart_data['series']]
+        writer.writerow(['timestamp'] + sensor_names)
+        for i, label in enumerate(chart_data['labels']):
+            row = [label] + [s['values'][i] for s in chart_data['series']]
+            writer.writerow(row)
 
         # ⑤ CSVダウンロードレスポンス
         output.seek(0)
@@ -1118,7 +1340,7 @@ def gadget_csv_export(gadget_uuid):
         )
 
     except Exception as e:
-        logger.error(f'時系列グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'積み上げ棒グラフCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         abort(500)
 ```
 
@@ -1138,7 +1360,7 @@ def gadget_csv_export(gadget_uuid):
 ### 認証・認可実装
 
 **認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
+- Azure Easy Auth認証（Entra ID統合）（`X-MS-*` ヘッダーからユーザー情報・JWT取得）
 
 **認可ロジック:**
 
@@ -1192,17 +1414,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/timeline/register', methods=['POST'])
+@customer_dashboard_bp.route('/analysis/customer-dashboard/dashboards/register', methods=['POST'])
 @require_auth
-def gadget_timeline_register():
-    logger.info(f'時系列グラフガジェット登録開始: user_id={g.current_user.user_id}')
+def dashboard_register():
+    logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
 
     try:
         # ... 処理 ...
-        logger.info(f'時系列グラフガジェット登録成功: gadget_id={gadget.gadget_id}')
+        logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
         return response
     except Exception as e:
-        logger.error(f'時系列グラフガジェット登録エラー: error={str(e)}')
+        logger.error(f'ダッシュボード登録エラー: error={str(e)}')
         abort(500)
 ```
 

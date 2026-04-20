@@ -138,9 +138,13 @@
 **実行タイミング:** なし
 
 **データスコープ制限:**
-- **フィルタリングロジックは全ユーザーで共通、実質的なアクセス可能範囲に差分あり**
-- システム保守者・管理者: すべてのユーザーにアクセス可能
-- 販社ユーザ・サービス利用者: ログインユーザーの `organization_id` に紐づく全子組織でフィルタリング
+- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
+  - ユーザーの `organization_id` を親組織IDとして検索
+  - 下位組織リスト（`subsidiary_organization_id`）を取得
+  - そのリストに該当する組織のデータのみアクセス可能
+  - **ロールによる条件分岐は一切行わない**
+
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
 
 #### 処理詳細（サーバーサイド）
 
@@ -188,23 +192,23 @@ flowchart TD
     UnitCheck -->|時| SilverDataColumnNameQuery[シルバーデータカラム名取得<br>DB measurement_item_master]
     SilverDataColumnNameQuery --> CheckSilverDataColumnNameQuery{DBクエリ結果}
     CheckSilverDataColumnNameQuery -->|NG| Error500
-    CheckSilverDataColumnNameQuery -->|OK| QuerySilver[センサーデータ取得<br>OLTP DB クエリ<br>silver_sensor_data]
+    CheckSilverDataColumnNameQuery -->|OK| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
 
     QuerySilver --> CheckQuerySilver{DBクエリ結果}
     CheckQuerySilver -->|NG| Error500
     CheckQuerySilver -->|OK| AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
 
-    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_hourly_summary]
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
     QueryGoldDay --> CheckQueryGoldDay{DBクエリ結果}
     CheckQueryGoldDay -->|NG| Error500
     CheckQueryGoldDay -->|OK| AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
 
-    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_daily_summary]
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
     QueryGoldWeek --> CheckQueryGoldWeek{DBクエリ結果}
     CheckQueryGoldWeek -->|NG| Error500
     CheckQueryGoldWeek -->|OK| AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
 
-    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_daily_summary]
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
     QueryGoldMonth --> CheckQueryGoldMonth{DBクエリ結果}
     CheckQueryGoldMonth -->|NG| Error500
     CheckQueryGoldMonth -->|OK| AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
@@ -280,26 +284,6 @@ WHERE
 ```
 ※ `device_id` が `null` の場合はデバイス可変モード
 
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-def get_gadget_by_uuid_and_user(gadget_uuid, user_id):
-    """ガジェットをUUIDとユーザーIDで取得する（データスコープ制限込み）
-
-    v_dashboard_gadget_master_by_user に user_id を渡すことで、
-    ログインユーザーの所属組織に属するガジェットのみ取得できる。
-    """
-    return (
-        db.session.query(DashboardGadgetMasterByUser)
-        .filter(
-            DashboardGadgetMasterByUser.gadget_uuid == gadget_uuid,
-            DashboardGadgetMasterByUser.user_id == user_id,
-            DashboardGadgetMasterByUser.delete_flag == False,
-        )
-        .first()
-    )
-```
-
 ---
 
 **② デバイスID決定**
@@ -320,26 +304,16 @@ WHERE
   AND delete_flag = FALSE
 ```
 
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-def get_dashboard_user_setting(user_id):
-    """ユーザーIDでダッシュボードユーザー設定を取得する"""
-    if user_id is None:
-        return None
-    return db.session.query(DashboardUserSetting).filter_by(user_id=user_id).first()
-```
-
 ---
 
 **③ 表示単位別センサーデータ取得**
 
 | display_unit | 参照層 | テーブル | 集計粒度 |
 |-------------|-------|---------|--------|
-| hour | OLTP DB | silver_sensor_data | インターバル単位（1/2/3/5/10/15分） |
-| day | OLTP DB | gold_sensor_data_hourly_summary | 1時間単位（24本） |
-| week | OLTP DB | gold_sensor_data_daily_summary | 1日単位（7本、日曜〜土曜） |
-| month | OLTP DB | gold_sensor_data_daily_summary | 1日単位（月の全日） |
+| hour | シルバー層 | sensor_data_view | インターバル単位（1/2/3/5/10/15分） |
+| day | ゴールド層 | gold_sensor_data_hourly_summary | 1時間単位（24本） |
+| week | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（7本、日曜〜土曜） |
+| month | ゴールド層 | gold_sensor_data_daily_summary | 1日単位（月の全日） |
 
 **時間範囲の決定:**
 
@@ -350,7 +324,7 @@ def get_dashboard_user_setting(user_id):
 | week | base_datetime の週の日曜日 00:00:00 | base_datetime の週の土曜日 23:59:59 |
 | month | base_datetime の月の初日 00:00:00 | base_datetime の月の最終日 23:59:59 |
 
-**SQL詳細（display_unit=hour / OLTP DB）:**
+**SQL詳細（display_unit=hour / シルバー層）:**
 ```sql
 SELECT
   event_timestamp 
@@ -377,7 +351,7 @@ SELECT
   , defrost_heater_output_1
   , defrost_heater_output_2
 FROM
-  silver_sensor_data
+  iot_catalog.views.sensor_data_view
 WHERE
   device_id = :device_id
   AND event_timestamp BETWEEN :start_datetime AND :end_datetime
@@ -397,29 +371,29 @@ WHERE
 
 ※ インターバル単位のグループ化・集計・表示項目選択はPython側で実施する（下記④参照）
 
-**SQL詳細（display_unit=day / OLTP DB hourly）:**
+**SQL詳細（display_unit=day / ゴールド層 hourly）:**
 ```sql
 SELECT
-  HOUR(collection_datetime) AS collection_hour,
+  collection_hour,
   summary_value
 FROM
-  gold_sensor_data_hourly_summary
+  iot_catalog.gold.gold_sensor_data_hourly_summary
 WHERE
   device_id = :device_id
   AND summary_item = :measurement_item_id
   AND summary_method_id = :summary_method_id
-  AND DATE(collection_datetime) = :target_date
+  AND collection_date = :target_date
 ORDER BY
   collection_hour ASC
 ```
 
-**SQL詳細（display_unit=week または month / OLTP DB daily）:**
+**SQL詳細（display_unit=week または month / ゴールド層 daily）:**
 ```sql
 SELECT
   collection_date,
   summary_value
 FROM
-  gold_sensor_data_daily_summary
+  iot_catalog.gold.gold_sensor_data_daily_summary
 WHERE
   device_id = :device_id
   AND summary_item = :measurement_item_id
@@ -427,147 +401,6 @@ WHERE
   AND collection_date BETWEEN :start_date AND :end_date
 ORDER BY
   collection_date ASC
-```
-
-```python
-# services/customer_dashboard/bar_chart.py
-def fetch_bar_chart_data(device_id, display_unit, interval, base_datetime,
-                         measurement_item_id, summary_method_id, limit=100):
-    """表示単位に応じたセンサーデータを取得する
-
-    Args:
-        device_id (int): デバイスID
-        display_unit (str): 表示単位（hour/day/week/month）
-        interval (str): 集計時間幅（display_unit=hour のみ使用）
-        base_datetime (datetime): 基準日時
-        measurement_item_id (int): 表示項目ID
-        summary_method_id (int): 集約方法ID
-        limit (int): 最大取得件数（デフォルト100）
-
-    Returns:
-        list[dict]: クエリ結果行のリスト
-
-    Raises:
-        Exception: クエリ実行失敗時
-    """
-    try:
-        if display_unit == "hour":
-            start_datetime = base_datetime.replace(minute=0, second=0, microsecond=0)
-            end_datetime = start_datetime + timedelta(hours=1)
-            query = text("""
-                SELECT event_timestamp, external_temp, set_temp_freezer_1,
-                       internal_sensor_temp_freezer_1, internal_temp_freezer_1,
-                       df_temp_freezer_1, condensing_temp_freezer_1,
-                       adjusted_internal_temp_freezer_1, set_temp_freezer_2,
-                       internal_sensor_temp_freezer_2, internal_temp_freezer_2,
-                       df_temp_freezer_2, condensing_temp_freezer_2,
-                       adjusted_internal_temp_freezer_2, compressor_freezer_1,
-                       compressor_freezer_2, fan_motor_1, fan_motor_2, fan_motor_3,
-                       fan_motor_4, fan_motor_5, defrost_heater_output_1,
-                       defrost_heater_output_2
-                FROM silver_sensor_data
-                WHERE device_id = :device_id
-                  AND event_timestamp BETWEEN :start_datetime AND :end_datetime
-                ORDER BY event_timestamp ASC
-                LIMIT :limit
-            """)
-            result = db.session.execute(query, {
-                'device_id': device_id,
-                'start_datetime': start_datetime,
-                'end_datetime': end_datetime,
-                'limit': limit,
-            })
-            return [row._asdict() for row in result]
-
-        elif display_unit == "day":
-            target_date = base_datetime.date()
-            query = text("""
-                SELECT HOUR(collection_datetime) AS collection_hour, summary_value
-                FROM gold_sensor_data_hourly_summary
-                WHERE device_id = :device_id
-                  AND summary_item = :measurement_item_id
-                  AND summary_method_id = :summary_method_id
-                  AND DATE(collection_datetime) = :target_date
-                ORDER BY collection_hour ASC
-                LIMIT :limit
-            """)
-            result = db.session.execute(query, {
-                'device_id': device_id,
-                'measurement_item_id': measurement_item_id,
-                'summary_method_id': summary_method_id,
-                'target_date': target_date,
-                'limit': limit,
-            })
-            return [row._asdict() for row in result]
-
-        elif display_unit == "week":
-            # 当週の日曜〜土曜（weekday: 月=0, 日=6）
-            weekday = base_datetime.weekday()
-            days_since_sunday = (weekday + 1) % 7
-            start_date = (base_datetime - timedelta(days=days_since_sunday)).date()
-            end_date = start_date + timedelta(days=6)
-            query = text("""
-                SELECT collection_date, summary_value
-                FROM gold_sensor_data_daily_summary
-                WHERE device_id = :device_id
-                  AND summary_item = :measurement_item_id
-                  AND summary_method_id = :summary_method_id
-                  AND collection_date BETWEEN :start_date AND :end_date
-                ORDER BY collection_date ASC
-                LIMIT :limit
-            """)
-            result = db.session.execute(query, {
-                'device_id': device_id,
-                'measurement_item_id': measurement_item_id,
-                'summary_method_id': summary_method_id,
-                'start_date': start_date,
-                'end_date': end_date,
-                'limit': limit,
-            })
-            return [row._asdict() for row in result]
-
-        elif display_unit == "month":
-            import calendar
-            start_date = base_datetime.replace(day=1).date()
-            last_day = calendar.monthrange(base_datetime.year, base_datetime.month)[1]
-            end_date = base_datetime.replace(day=last_day).date()
-            query = text("""
-                SELECT collection_date, summary_value
-                FROM gold_sensor_data_daily_summary
-                WHERE device_id = :device_id
-                  AND summary_item = :measurement_item_id
-                  AND summary_method_id = :summary_method_id
-                  AND collection_date BETWEEN :start_date AND :end_date
-                ORDER BY collection_date ASC
-                LIMIT :limit
-            """)
-            result = db.session.execute(query, {
-                'device_id': device_id,
-                'measurement_item_id': measurement_item_id,
-                'summary_method_id': summary_method_id,
-                'start_date': start_date,
-                'end_date': end_date,
-                'limit': limit,
-            })
-            return [row._asdict() for row in result]
-
-        return []
-
-    except Exception as e:
-        logger.error(f"棒グラフデータ取得エラー: device_id={device_id}, error={str(e)}")
-        raise
-
-
-def get_measurement_item_column_name(measurement_item_id):
-    """測定項目のシルバー層カラム名を取得する
-
-    Returns:
-        str or None: silver_data_column_name。測定項目が存在しない場合は None
-    """
-    item = db.session.query(MeasurementItemMaster).filter_by(
-        measurement_item_id=measurement_item_id
-    ).first()
-    return item.silver_data_column_name if item else None
 ```
 
 ---
@@ -584,20 +417,18 @@ def get_measurement_item_column_name(measurement_item_id):
 | month | DD | 月初〜月末（目盛りはフロント側で奇数日のみ表示） |
 
 ```python
-# services/customer_dashboard/bar_chart.py
 INTERVAL_MINUTES = {
     '1min': 1, '2min': 2, '3min': 3,
     '5min': 5, '10min': 10, '15min': 15
 }
 
-def format_bar_chart_data(rows, display_unit, interval="10min", summary_method_id=1, column_name=None):
-    if not rows:
-        return {"labels": [], "values": []}
-
+def format_bar_chart_data(rows, display_unit, interval='10min', summary_method_id=1):
     labels, values = [], []
     if display_unit == 'hour':
-        # column_name は呼び出し元で measurement_item_master から取得して引数として渡す
-        interval_min = INTERVAL_MINUTES.get(interval, 10)
+        # 測定項目マスタから silver_data_column_name を事前に取得したうえで使用する
+        column_name = measurement_item['silver_data_column_name']
+
+        interval_min = INTERVAL_MINUTES.get(interval, 1)
         groups = {}
         for row in rows:
             dt = row['event_timestamp']
@@ -614,13 +445,9 @@ def format_bar_chart_data(rows, display_unit, interval="10min", summary_method_i
         for row in rows:
             labels.append(f"{row['collection_hour']:02d}:00")
             values.append(row['summary_value'])
-    elif display_unit == 'week':
+    elif display_unit in ('week', 'month'):
         for row in rows:
-            labels.append(row['collection_date'].strftime('%a'))
-            values.append(row['summary_value'])
-    elif display_unit == 'month':
-        for row in rows:
-            labels.append(row['collection_date'].strftime('%d'))
+            labels.append(row['collection_date'].strftime('%m/%d'))
             values.append(row['summary_value'])
     return {'labels': labels, 'values': values}
 ```
@@ -654,38 +481,20 @@ def format_bar_chart_data(rows, display_unit, interval="10min", summary_method_i
 **⑥ 実装例**
 
 ```python
-# services/customer_dashboard/bar_chart.py
-def validate_chart_params(display_unit, interval, base_datetime_str):
-    """チャートパラメータのバリデーション
-
-    Returns:
-        str | None: エラーメッセージ（正常時は None）
-    """
-    if display_unit not in _VALID_DISPLAY_UNITS:
-        return '表示単位が不正です'
-
-    if interval not in INTERVAL_MINUTES:
-        return '集計間隔が不正です'
-
-    if not base_datetime_str:
-        return '日付形式が不正です'
-
-    try:
-        datetime.strptime(base_datetime_str, "%Y/%m/%d %H:%M:%S")
-    except (ValueError, TypeError):
-        return '日付形式が不正です'
-
-    return None
-
-
-# views/analysis/customer_dashboard/bar_chart.py
-def handle_gadget_data(gadget_uuid):
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
+@require_auth
+def gadget_bar_chart_data(gadget_uuid):
     """棒グラフガジェットデータ取得（AJAX）"""
-    # ① ガジェット設定取得 & データスコープ制限チェック
-    # v_dashboard_gadget_master_by_user に user_id と gadget_uuid を渡してスコープ制限を自動適用
-    gadget = get_gadget_by_uuid_and_user(gadget_uuid, g.current_user.user_id)
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+
+    # ① ガジェット設定取得
+    gadget = get_gadget_by_uuid(gadget_uuid)
     if not gadget:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
+
+    # データスコープ制限チェック
+    if not check_gadget_access(gadget, accessible_org_ids):
+        return jsonify({'error': 'アクセス権限がありません'}), 404
 
     # リクエストパラメータ取得・バリデーション
     params = request.get_json() or {}
@@ -693,29 +502,20 @@ def handle_gadget_data(gadget_uuid):
     interval = params.get('interval', '10min')
     base_datetime_str = params.get('base_datetime')
 
-    error = validate_chart_params(display_unit, interval, base_datetime_str)
-    if error:
-        return jsonify({'error': error}), 400
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
+        return jsonify({'error': 'パラメータが不正です'}), 400
 
     try:
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
         # ② デバイスID決定
-        data_source_config = json.loads(gadget.data_source_config or '{}')
+        data_source_config = json.loads(gadget.data_source_config)
         device_id = data_source_config.get('device_id')
-        if device_id is None:
-            setting = get_dashboard_user_setting(g.current_user.user_id)
-            device_id = setting.device_id if setting else None
+        if not device_id:
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
+            device_id = user_setting.device_id if user_setting else None
 
-        chart_config = json.loads(gadget.chart_config or '{}')
-        measurement_item_id = chart_config.get('measurement_item_id', 1)
-        summary_method_id = chart_config.get('summary_method_id', 1)
-
-        column_name = None
-        if display_unit == 'hour':
-            column_name = get_measurement_item_column_name(measurement_item_id)
-            if column_name is None:
-                return jsonify({'error': '測定項目が見つかりません'}), 500
+        chart_config = json.loads(gadget.chart_config)
 
         # ③ 表示単位別センサーデータ取得
         rows = fetch_bar_chart_data(
@@ -723,24 +523,22 @@ def handle_gadget_data(gadget_uuid):
             display_unit=display_unit,
             interval=interval,
             base_datetime=base_datetime,
-            measurement_item_id=measurement_item_id,
-            summary_method_id=summary_method_id,
-            limit=100,
+            measurement_item_id=chart_config['measurement_item_id'],
+            summary_method_id=chart_config['summary_method_id']
         )
 
         # ④ データ整形
         chart_data = format_bar_chart_data(
-            rows, display_unit, interval, summary_method_id, column_name=column_name
+            rows, display_unit, interval, chart_config['summary_method_id']
         )
 
         return jsonify({
             'gadget_uuid': gadget_uuid,
             'chart_data': chart_data,
-            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
+            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         })
 
     except Exception as e:
-        g.last_exception_type = type(e).__name__
         logger.error(f'棒グラフデータ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
@@ -768,7 +566,7 @@ flowchart TD
 
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーモーダル表示]
-    CheckValidate -->|OK| Scope[データスコープ制限適用<br>各リソース用VIEWにuser_idを渡して<br>スコープ制限を自動適用]
+    CheckValidate -->|OK| Scope[データスコープ制限適用<br>organization_closureテーブルから<br>下位組織IDリスト取得]
     
     Scope --> UserSettingQuery[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
     UserSettingQuery --> CheckUserSettingQuery{DBクエリ結果}
@@ -848,12 +646,6 @@ WHERE
   AND delete_flag = FALSE
 ```
 
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-# get_dashboard_user_setting(user_id) → フロー1定義済み
-```
-
 ---
 
 **② ダッシュボード情報取得**
@@ -862,39 +654,15 @@ WHERE
 
 ```sql
 SELECT
-  d.dashboard_id,
-  d.dashboard_uuid,
-  d.dashboard_name
+  dashboard_id,
+  dashboard_uuid,
+  dashboard_name
 FROM
-  dashboard_master d
-  INNER JOIN user_master u
-    ON d.organization_id = u.organization_id
+  dashboard_master
 WHERE
-  d.dashboard_id = :dashboard_id
-  AND d.delete_flag = FALSE
-  AND u.user_id = :user_id
-  AND u.delete_flag = FALSE
-```
-
-**サービス関数実装例:**
-```python
-def get_dashboard_by_id(dashboard_id, user_id):
-    """ダッシュボードをIDとユーザーIDで取得する（データスコープ制限込み）
-
-    user_master と organization_id で JOIN し、ログインユーザーの所属組織に
-    属するダッシュボードのみ取得できる。
-    """
-    return (
-        db.session.query(DashboardMaster)
-        .join(UserMaster, DashboardMaster.organization_id == UserMaster.organization_id)
-        .filter(
-            DashboardMaster.dashboard_id == dashboard_id,
-            DashboardMaster.delete_flag == False,
-            UserMaster.user_id == user_id,
-            UserMaster.delete_flag == False,
-        )
-        .first()
-    )
+  dashboard_id = :dashboard_id
+  AND organization_id IN (:accessible_org_ids)
+  AND delete_flag = FALSE
 ```
 
 ---
@@ -915,21 +683,6 @@ WHERE
   AND delete_flag = FALSE
 ORDER BY
   display_order ASC
-```
-
-**サービス関数実装例:**
-```python
-def get_dashboard_groups(dashboard_id):
-    """ダッシュボードIDでグループ一覧を表示順で取得する"""
-    return (
-        db.session.query(DashboardGroupMaster)
-        .filter(
-            DashboardGroupMaster.dashboard_id == dashboard_id,
-            DashboardGroupMaster.delete_flag == False,
-        )
-        .order_by(DashboardGroupMaster.display_order.asc())
-        .all()
-    )
 ```
 
 ---
@@ -955,16 +708,16 @@ ORDER BY
 
 **⑤ 組織一覧取得**
 
-**使用テーブル:** v_organization_master_by_user
+**使用テーブル:** organization_master
 
 ```sql
 SELECT
   organization_id,
   organization_name
 FROM
-  v_organization_master_by_user
+  organization_master
 WHERE
-  user_id = :user_id
+  organization_id IN (:accessible_org_ids)
   AND delete_flag = FALSE
 ORDER BY
   organization_id ASC
@@ -974,17 +727,17 @@ ORDER BY
 
 **⑥ デバイス一覧取得（デバイス固定モード用）**
 
-**使用テーブル:** v_device_master_by_user
+**使用テーブル:** device_master
 
 ```sql
 SELECT
   device_id,
   device_name,
-  device_organization_id
+  organization_id
 FROM
-  v_device_master_by_user
+  device_master
 WHERE
-  user_id = :user_id
+  organization_id IN (:accessible_org_ids)
   AND delete_flag = FALSE
 ORDER BY
   device_id ASC
@@ -1008,154 +761,52 @@ ORDER BY
   summary_method_id ASC
 ```
 
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-def get_bar_chart_create_context(user_id):
-    """棒グラフ登録モーダル用データを取得する
-
-    Args:
-        user_id: ログインユーザーID（VIEWのスコープ制限に使用）
-
-    Returns:
-        dict: measurement_items, organizations, devices をキーに持つ dict
-    """
-    measurement_items = (
-        db.session.query(MeasurementItemMaster)
-        .filter(MeasurementItemMaster.delete_flag == False)
-        .order_by(MeasurementItemMaster.measurement_item_id.asc())
-        .all()
-    )
-    organizations = (
-        db.session.query(VOrganizationMasterByUser)
-        .filter(
-            VOrganizationMasterByUser.user_id == user_id,
-            VOrganizationMasterByUser.delete_flag == False,
-        )
-        .order_by(VOrganizationMasterByUser.organization_id.asc())
-        .all()
-    )
-    devices = (
-        db.session.query(VDeviceMasterByUser)
-        .filter(
-            VDeviceMasterByUser.user_id == user_id,
-            VDeviceMasterByUser.delete_flag == False,
-        )
-        .order_by(VDeviceMasterByUser.device_id.asc())
-        .all()
-    )
-    summary_methods = (
-        db.session.query(GoldSummaryMethodMaster)
-        .filter(GoldSummaryMethodMaster.delete_flag == False)
-        .order_by(GoldSummaryMethodMaster.summary_method_id.asc())
-        .all()
-    )
-    return {
-        'measurement_items': measurement_items,
-        'organizations': organizations,
-        'devices': devices,
-        'summary_methods': summary_methods,
-    }
-```
-
 ---
 
 **⑧ 実装例**
 
 ```python
-# forms/customer_dashboard/bar_chart.py
-class BarChartGadgetForm(FlaskForm):
-    """棒グラフガジェット登録フォーム"""
-
-    title = StringField(
-        'タイトル',
-        validators=[
-            DataRequired(message='タイトルを入力してください'),
-            Length(max=20, message='タイトルは20文字以内で入力してください'),
-        ]
-    )
-    device_mode = SelectField(
-        '表示デバイス',
-        choices=[('fixed', 'デバイス固定'), ('variable', 'デバイス可変')],
-        validators=[DataRequired(message='表示デバイスを選択してください')],
-    )
-    device_id = SelectField('デバイス', coerce=int, validators=[Optional()])
-    group_id = SelectField('グループ', coerce=int, validators=[DataRequired(message='グループを選択してください')])
-    summary_method_id = SelectField('集約方法', coerce=int, validators=[DataRequired(message='集約方法を選択してください')])
-    measurement_item_id = SelectField('表示項目', coerce=int, validators=[DataRequired(message='表示項目を選択してください')])
-    min_value = FloatField('最小値', validators=[Optional()])
-    max_value = FloatField('最大値', validators=[Optional()])
-
-    def validate(self, extra_validators=None):
-        result = super().validate(extra_validators)
-        if self.device_mode.data == 'fixed' and (self.device_id.data is None or self.device_id.data == 0):
-            self.device_id.errors.append('デバイスを選択してください')
-            result = False
-        return result
-
-    def validate_min_value(self, field):
-        from wtforms import ValidationError as WTFormsValidationError
-        if field.data is not None and self.max_value.data is not None:
-            if field.data >= self.max_value.data:
-                raise WTFormsValidationError('最小値は最大値より小さい値を入力してください')
-
-    def validate_max_value(self, field):
-        from wtforms import ValidationError as WTFormsValidationError
-        if field.data is not None and self.min_value.data is not None:
-            if field.data <= self.min_value.data:
-                raise WTFormsValidationError('最大値は最小値より大きい値を入力してください')
-
-    gadget_size = SelectField(
-        '部品サイズ',
-        choices=[('2x2', '2x2'), ('2x4', '2x4')],
-        validators=[DataRequired(message='部品サイズを選択してください')],
-    )
-
-
-# views/analysis/customer_dashboard/bar_chart.py
-def handle_gadget_create(gadget_type):
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/create', methods=['GET'])
+@require_auth
+def gadget_bar_chart_create():
     """棒グラフガジェット登録モーダル表示"""
-    user_id = g.current_user.user_id
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
     # ① ユーザー設定取得
-    setting = get_dashboard_user_setting(user_id)
-    if setting is None:
+    user_setting = get_dashboard_user_setting(g.current_user.user_id)
+    if not user_setting:
         abort(404)
 
-    # ② ダッシュボード情報取得（user_master JOIN でスコープ制限を適用）
-    dashboard = get_dashboard_by_id(setting.dashboard_id, user_id)
-    if dashboard is None:
+    # ② ダッシュボード情報取得
+    dashboard = get_dashboard_by_id(user_setting.dashboard_id, accessible_org_ids)
+    if not dashboard:
         abort(404)
 
     # ③ ダッシュボードグループ一覧取得
     groups = get_dashboard_groups(dashboard.dashboard_id)
 
-    # ④〜⑦ 表示項目・組織・デバイス・集約方法一覧取得（VIEWでスコープ制限を自動適用）
-    try:
-        context = get_bar_chart_create_context(user_id)
-    except Exception as e:
-        logger.error(f'棒グラフ登録モーダル表示エラー: {str(e)}')
-        abort(500)
+    # ④ 表示項目一覧取得
+    measurement_items = get_measurement_items()
+
+    # ⑤ 組織一覧取得
+    organizations = get_organizations(accessible_org_ids)
+
+    # ⑥ デバイス一覧取得
+    devices = get_all_devices_in_scope(accessible_org_ids)
+
+    # ⑦ 集約方法一覧取得
+    aggregation_methods = get_aggregation_methods()
 
     form = BarChartGadgetForm()
-    form.device_id.choices = [(0, '選択してください')] + [
-        (d.device_id, d.device_name) for d in context['devices']
-    ]
-    form.group_id.choices = [(0, '選択してください')] + [
-        (gr.dashboard_group_id, gr.dashboard_group_name) for gr in groups
-    ]
-    form.summary_method_id.choices = [(0, '選択してください')] + [
-        (sm.summary_method_id, sm.summary_method_name) for sm in context['summary_methods']
-    ]
-    form.measurement_item_id.choices = [(0, '選択してください')] + [
-        (m.measurement_item_id, m.display_name) for m in context['measurement_items']
-    ]
     return render_template(
-        'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
+        'customer_dashboard/modals/gadget_register/bar_chart.html',
         form=form,
-        gadget_type=gadget_type,
+        dashboard=dashboard,
         groups=groups,
-        **context,
+        measurement_items=measurement_items,
+        organizations=organizations,
+        devices=devices,
+        aggregation_methods=aggregation_methods
     )
 ```
 
@@ -1239,43 +890,19 @@ flowchart TD
 
 **① デバイス存在&データスコープチェック（デバイス固定モード時のみ）**
 
-**使用テーブル:** v_device_master_by_user
+**使用テーブル:** device_master
 
 ```sql
 SELECT
   device_id,
   device_name,
-  device_organization_id
+  organization_id
 FROM
-  v_device_master_by_user
+  device_master
 WHERE
   device_id = :device_id
-  AND user_id = :user_id
+  AND organization_id IN (:accessible_org_ids)
   AND delete_flag = FALSE
-```
-
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-def check_device_access(device_id, user_id):
-    """デバイスの存在とデータスコープをチェックする
-
-    Args:
-        device_id (int): デバイスID
-        user_id (int): ログインユーザーID
-
-    Returns:
-        device object or None: デバイスが存在しアクセス可能な場合はデバイス、それ以外は None
-    """
-    return (
-        db.session.query(VDeviceMasterByUser)
-        .filter(
-            VDeviceMasterByUser.device_id == device_id,
-            VDeviceMasterByUser.user_id == user_id,
-            VDeviceMasterByUser.delete_flag == False,
-        )
-        .first()
-    )
 ```
 
 ---
@@ -1350,150 +977,86 @@ INSERT INTO dashboard_gadget_master (
 )
 ```
 
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/bar_chart.py
-def register_bar_chart_gadget(params, current_user_id):
-    """棒グラフガジェットを登録する
-
-    Args:
-        params (dict): 登録パラメータ
-        current_user_id (int): 操作ユーザーID
-
-    Returns:
-        int: 登録されたガジェットの gadget_id
-
-    Raises:
-        ValidationError: バリデーションエラー時
-        NotFoundError: ガジェット種別が見つからない場合
-        Exception: DB エラー時
-    """
-    # バリデーション
-    validate_gadget_registration(params)
-
-    # デバイス固定モード
-    device_id = None
-    if params.get("device_mode") == "fixed":
-        device_id = params.get("device_id")
-
-    chart_config = json.dumps({
-        "measurement_item_id": params.get("measurement_item_id"),
-        "summary_method_id": params.get("summary_method_id"),
-        "min_value": params.get("min_value"),
-        "max_value": params.get("max_value"),
-    })
-    data_source_config = json.dumps({"device_id": device_id})
-
-    max_position_y = db.session.query(
-        func.max(DashboardGadgetMaster.position_y)
-    ).filter(
-        DashboardGadgetMaster.dashboard_group_id == params.get("group_id"),
-        DashboardGadgetMaster.delete_flag == False,
-    ).scalar() or 0
-
-    max_order = db.session.query(
-        func.max(DashboardGadgetMaster.display_order)
-    ).filter(
-        DashboardGadgetMaster.dashboard_group_id == params.get("group_id"),
-        DashboardGadgetMaster.delete_flag == False,
-    ).scalar() or 0
-
-    gadget_type = db.session.query(GadgetTypeMaster).filter_by(
-        gadget_type_name='棒グラフ', delete_flag=False
-    ).first()
-    if not gadget_type:
-        raise NotFoundError("ガジェット種別が見つかりません")
-
-    gadget = DashboardGadgetMaster(
-        gadget_uuid=str(uuid.uuid4()),
-        gadget_name=params.get("title"),
-        gadget_type_id=gadget_type.gadget_type_id,
-        dashboard_group_id=params.get("group_id"),
-        chart_config=chart_config,
-        data_source_config=data_source_config,
-        position_x=0,
-        position_y=max_position_y + 1,
-        gadget_size=GADGET_SIZE_TO_INT[params.get("gadget_size")],
-        display_order=max_order + 1,
-        creator=current_user_id,
-        modifier=current_user_id,
-    )
-
-    try:
-        db.session.add(gadget)
-        db.session.commit()
-        return gadget.gadget_id
-    except Exception as e:
-        db.session.rollback()
-        logger.error("棒グラフガジェット登録エラー", exc_info=True)
-        raise
-```
-
 ---
 
 **④ 実装例**
 
 ```python
-# views/analysis/customer_dashboard/bar_chart.py
-def handle_gadget_register(gadget_type):
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/bar-chart/register', methods=['POST'])
+@require_auth
+def gadget_bar_chart_register():
     """棒グラフガジェット登録実行"""
-    user_id = g.current_user.user_id
-
     form = BarChartGadgetForm()
-    # device_id / measurement_item_id / group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
-    submitted_device_id = request.form.get('device_id', type=int) or 0
-    form.device_id.choices = [(submitted_device_id, '')]
-    submitted_measurement_item_id = request.form.get('measurement_item_id', type=int) or 0
-    form.measurement_item_id.choices = [(submitted_measurement_item_id, '')]
-    submitted_group_id = request.form.get('group_id', type=int) or 0
-    submitted_summary_method_id = request.form.get('summary_method_id', type=int) or 0
-    form.group_id.choices = [(submitted_group_id, '')]
-    form.summary_method_id.choices = [(submitted_summary_method_id, '')]
-
     if not form.validate_on_submit():
-        try:
-            context = get_bar_chart_create_context(user_id)
-            setting = get_dashboard_user_setting(user_id)
-            groups = get_dashboard_groups(setting.dashboard_id) if setting else []
-        except Exception as e:
-            logger.error(f'棒グラフガジェット登録コンテキスト取得エラー: {str(e)}')
-            abort(500)
         return render_template(
-            'analysis/customer_dashboard/gadgets/modals/bar_chart.html',
-            form=form,
-            gadget_type=gadget_type,
-            groups=groups,
-            **context,
+            'customer_dashboard/modals/gadget_register/bar_chart.html',
+            form=form
         ), 400
 
-    # ① デバイス固定モードの場合: デバイス存在&データスコープチェック（VIEWでスコープ制限を自動適用）
-    if form.device_mode.data == 'fixed':
-        if check_device_access(form.device_id.data, user_id) is None:
-            abort(404)
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
-    params = {
-        'title': form.title.data,
-        'device_mode': form.device_mode.data,
-        'device_id': form.device_id.data,
-        'group_id': form.group_id.data,
-        'summary_method_id': form.summary_method_id.data,
-        'measurement_item_id': form.measurement_item_id.data,
-        'min_value': form.min_value.data,
-        'max_value': form.max_value.data,
-        'gadget_size': form.gadget_size.data,
-    }
+    # ① デバイス固定モードの場合: デバイス存在&データスコープチェック
+    device_id = None
+    if form.device_mode.data == 'fixed':
+        device = check_device_access(form.device_id.data, accessible_org_ids)
+        if not device:
+            abort(404)
+        device_id = form.device_id.data
 
     try:
-        # ②③ ガジェット登録（chart_config/data_source_config生成、DB登録）
-        register_bar_chart_gadget(
-            params=params,
-            current_user_id=g.current_user.user_id,
-        )
-        return jsonify({'message': 'ガジェットを登録しました'})
+        # ② chart_config / data_source_config 生成
+        chart_config = json.dumps({
+            'measurement_item_id': form.measurement_item_id.data,
+            'summary_method_id': form.summary_method_id.data,
+            'min_value': form.min_value.data,
+            'max_value': form.max_value.data
+        })
+        data_source_config = json.dumps({'device_id': device_id})
 
-    except NotFoundError:
-        abort(404)
+        # position_y と display_order を別々に取得する
+        max_position_y = db.session.query(
+            func.max(DashboardGadgetMaster.position_y)
+        ).filter(
+            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
+            DashboardGadgetMaster.delete_flag == False
+        ).scalar() or 0
+
+        max_order = db.session.query(
+            func.max(DashboardGadgetMaster.display_order)
+        ).filter(
+            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
+            DashboardGadgetMaster.delete_flag == False
+        ).scalar() or 0
+
+        # 棒グラフのgadget_type_idを事前に取得する
+        gadget_type = db.session.query(GadgetTypeMaster).filter_by(
+            gadget_type_name='棒グラフ',
+            delete_flag=False
+        ).first()
+        gadget_type_id = gadget_type.gadget_type_id
+
+        # ③ ガジェット登録
+        gadget = DashboardGadgetMaster(
+            gadget_uuid=str(uuid.uuid4()),
+            gadget_name=form.title.data,
+            gadget_type_id=gadget_type_id,
+            dashboard_group_id=form.group_id.data,
+            chart_config=chart_config,
+            data_source_config=data_source_config,
+            position_x=0,
+            position_y=max_position_y + 1,
+            gadget_size=form.gadget_size.data,
+            display_order=max_order + 1,
+            creator=g.current_user.user_id,
+            modifier=g.current_user.user_id
+        )
+        db.session.add(gadget)
+        db.session.commit()
+        modal('ガジェットを登録しました', 'success')
+        return redirect(url_for('customer_dashboard.customer_dashboard'))
+
     except Exception as e:
+        db.session.rollback()
         logger.error(f'棒グラフガジェット登録エラー: {str(e)}')
         abort(500)
 ```
@@ -1544,16 +1107,16 @@ flowchart TD
 
     GetUserSetting --> UnitCheck
 
-    UnitCheck -->|時| QuerySilver[センサーデータ取得<br>OLTP DB クエリ<br>silver_sensor_data]
+    UnitCheck -->|時| QuerySilver[センサーデータ取得<br>シルバー層クエリ<br>sensor_data_view]
     QuerySilver --> AggregateSilver[集計間隔で集約<br>1/2/3/5/10/15分]
 
-    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_hourly_summary]
+    UnitCheck -->|日| QueryGoldDay[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_hourly_summary]
     QueryGoldDay --> AggregateDay[1時間単位で24本取得<br>目盛り:2時間ごと]
 
-    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_daily_summary]
+    UnitCheck -->|週| QueryGoldWeek[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
     QueryGoldWeek --> AggregateWeek[1日単位で7本取得<br>日曜〜土曜]
 
-    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>OLTP DB クエリ<br>gold_sensor_data_daily_summary]
+    UnitCheck -->|月| QueryGoldMonth[センサーデータ取得<br>ゴールド層クエリ<br>gold_sensor_data_daily_summary]
     QueryGoldMonth --> AggregateMonth[1日単位で全日取得<br>目盛り:奇数日のみ]
 
     AggregateSilver --> FormatCSV[CSVフォーマット変換]
@@ -1616,79 +1179,63 @@ flowchart TD
 
 **④ CSVカラム定義**
 
-| カラム名 | 内容 | 形式 |
-|---------|------|------|
-| timestamp | 日時ラベル | 表示単位に応じた形式（HH:mm / HH:00 / MM/DD） |
-| value | センサー値 | float（小数点2桁） |
+| 列番号 | 表示名 | 内容 | 形式 |
+|--------|--------|-----|------|
+| 1 | デバイス名 | デバイス名 | |
+| 2 | 表示時間単位に応じた名称（時間 / 時間 / 曜日 / 日付） | 表示時間（グラフX軸） | 表示時間単位に応じた形式（YYYY/MM/DD HH:mm / YYYY/MM/DD HH:mm / YYYY/MM/DD(E) / YYYY/MM/DD） |
+| 3 | 凡例名 | センサー値（グラフY軸） | 数値（小数点2桁） |
+
+**CSVサンプル**
+
+- 時単位
+```csv
+デバイス名,時間,外気温度（℃）
+DEV-001,2026/02/05 10:10,25.50
+DEV-001,2026/02/05 10:20,25.51
+DEV-001,2026/02/05 10:30,25.52
+```
+
+- 日単位
+```csv
+デバイス名,時間,外気温度（℃）
+DEV-001,2026/02/05 00:00,25.50
+DEV-001,2026/02/05 01:00,25.51
+DEV-001,2026/02/05 02:00,25.52
+```
+
+- 週単位
+```csv
+デバイス名,曜日,外気温度（℃）
+DEV-001,2026/02/01(日),25.50
+DEV-001,2026/02/02(月),25.51
+DEV-001,2026/02/03(火),25.52
+```
+
+- 月単位
+```csv
+デバイス名,日付,外気温度（℃）
+DEV-001,2026/02/01,25.50
+DEV-001,2026/02/02,25.51
+DEV-001,2026/02/03,25.52
+```
 
 ---
 
 **⑤ 実装例**
 
 ```python
-# services/customer_dashboard/bar_chart.py
-def get_device_name_by_id(device_id):
-    """デバイスIDからデバイス名を取得する
-
-    Returns:
-        str: デバイス名。未登録または削除済みの場合は '--'
-    """
-    if device_id is None:
-        return '--'
-    device = db.session.query(DeviceMaster).filter_by(
-        device_id=device_id,
-        delete_flag=False,
-    ).first()
-    return device.device_name if device else '--'
-
-
-def get_measurement_item_legend_name(measurement_item_id):
-    """測定項目IDから凡例名（表示名＋単位）を取得する
-
-    Returns:
-        str: "表示名（単位）" 形式。未登録の場合は空文字
-    """
-    item = db.session.query(MeasurementItemMaster).filter_by(
-        measurement_item_id=measurement_item_id,
-    ).first()
-    if not item:
-        return ''
-    return f"{item.display_name}（{item.unit_name}）"
-
-
-def generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name):
-    """チャートデータから CSV 文字列を生成する
-
-    Args:
-        chart_data (dict): {"labels": [...], "values": [...]}
-        display_unit (str): 表示単位（hour/day/week/month）
-        base_datetime (datetime): 基準日時（日付補完に使用）
-        device_name (str): デバイス名（列1）
-        legend_name (str): 凡例名（列3ヘッダー、例: "外気温度（℃）"）
-
-    Returns:
-        str: CSV 文字列（BOM付き UTF-8）
-    """
-    output = io.StringIO()
-    writer = csv.writer(output)
-    time_col = _CSV_TIME_COL_HEADERS.get(display_unit, "時間")
-    writer.writerow(["デバイス名", time_col, legend_name])
-    for label, value in zip(chart_data["labels"], chart_data["values"]):
-        ts = _csv_timestamp(label, display_unit, base_datetime)
-        writer.writerow([device_name, ts, f"{value:.2f}"])
-    return '\ufeff' + output.getvalue()
-
-
-# views/analysis/customer_dashboard/bar_chart.py
-def handle_gadget_csv_export(gadget_uuid):
+@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
+@require_auth
+def gadget_csv_export(gadget_uuid):
     """棒グラフガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
 
-    # ① ガジェット設定取得 & データスコープ制限チェック
-    # v_dashboard_gadget_master_by_user に user_id と gadget_uuid を渡してスコープ制限を自動適用
-    gadget = get_gadget_by_uuid_and_user(gadget_uuid, g.current_user.user_id)
-    if not gadget:
+    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+
+    # ① ガジェット設定取得・スコープチェック
+    gadget = get_gadget_by_uuid(gadget_uuid)
+    if not gadget or not check_gadget_access(gadget, accessible_org_ids):
         abort(404)
 
     # リクエストパラメータ取得・バリデーション
@@ -1696,27 +1243,20 @@ def handle_gadget_csv_export(gadget_uuid):
     interval = request.args.get('interval', '10min')
     base_datetime_str = request.args.get('base_datetime')
 
-    if validate_chart_params(display_unit, interval, base_datetime_str):
+    if not validate_chart_params(display_unit, interval, base_datetime_str):
         abort(400)
 
     try:
-        # ② デバイスID決定
-        data_source_config = json.loads(gadget.data_source_config or '{}')
-        device_id = data_source_config.get('device_id')
-        if device_id is None:
-            setting = get_dashboard_user_setting(g.current_user.user_id)
-            device_id = setting.device_id if setting else None
-
-        chart_config = json.loads(gadget.chart_config or '{}')
-        measurement_item_id = chart_config.get('measurement_item_id', 1)
-        summary_method_id = chart_config.get('summary_method_id', 1)
         base_datetime = datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
 
-        column_name = None
-        if display_unit == 'hour':
-            column_name = get_measurement_item_column_name(measurement_item_id)
-            if column_name is None:
-                abort(500)
+        # ② デバイスID決定
+        data_source_config = json.loads(gadget.data_source_config)
+        device_id = data_source_config.get('device_id')
+        if not device_id:
+            user_setting = get_dashboard_user_setting(g.current_user.user_id)
+            device_id = user_setting.device_id if user_setting else None
+
+        chart_config = json.loads(gadget.chart_config)
 
         # ③ センサーデータ取得（最大10万件）
         rows = fetch_bar_chart_data(
@@ -1724,25 +1264,28 @@ def handle_gadget_csv_export(gadget_uuid):
             display_unit=display_unit,
             interval=interval,
             base_datetime=base_datetime,
-            measurement_item_id=measurement_item_id,
-            summary_method_id=summary_method_id,
-            limit=100_000,
+            measurement_item_id=chart_config['measurement_item_id'],
+            summary_method_id=chart_config['summary_method_id'],
+            limit=100000
         )
         chart_data = format_bar_chart_data(
-            rows, display_unit, interval, summary_method_id, column_name=column_name
+            rows, display_unit, interval, chart_config['summary_method_id']
         )
 
-        # ④ CSV生成（デバイス名、時間列名、凡例名を含む3カラム形式）
-        device_name = get_device_name_by_id(device_id)
-        legend_name = get_measurement_item_legend_name(measurement_item_id)
-        csv_content = generate_bar_chart_csv(chart_data, display_unit, base_datetime, device_name, legend_name)
+        # ④ CSV生成
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['timestamp', 'value'])
+        for label, value in zip(chart_data['labels'], chart_data['values']):
+            writer.writerow([label, value])
 
         # ⑤ CSVダウンロードレスポンス
+        output.seek(0)
         filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
         return Response(
-            csv_content,
+            output.getvalue(),
             mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment; filename={filename}'},
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
         )
 
     except Exception as e:
@@ -1766,55 +1309,37 @@ def handle_gadget_csv_export(gadget_uuid):
 ### 認証・認可実装
 
 **認証方式:**
-Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
+- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
 
 **認可ロジック:**
+
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 各リソース用VIEW（`v_dashboard_gadget_master_by_user` 等）に `user_id` を渡すことでスコープ制限を自動適用
-  - VIEWが内部でユーザーの所属組織（`user_master.organization_id`）と一致するデータのみ返す
+- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
+  - ユーザーの `organization_id` を親組織IDとして検索
+  - 下位組織リスト（`subsidiary_organization_id`）を取得
+  - そのリストに該当する組織のダッシュボード・ガジェットデータのみアクセス可能
   - **ロールによる条件分岐は一切行わない**
 
-**注**:
-- システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
-- センサーデータ（`silver_sensor_data` 等）はOLTP DBに格納されており、VIEWが存在しないため、データ取得の度にデバイスIDを条件として直接クエリする
+**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
 
 **実装例:**
 ```python
-# 組織一覧取得
-def get_organizations():
-    # v_organization_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
-    return (
-        db.session.query(OrganizationMasterByUser)
-        .filter(
-            OrganizationMasterByUser.user_id == g.current_user.user_id,
-            OrganizationMasterByUser.delete_flag == False,
-        )
-        .order_by(OrganizationMasterByUser.organization_id)
-        .all()
-    )
+def apply_dashboard_data_scope_filter(query, current_user):
+    """組織階層に基づいたダッシュボードデータのスコープ制限を適用"""
+    accessible_org_ids = db.session.query(
+        OrganizationClosure.subsidiary_organization_id
+    ).filter(
+        OrganizationClosure.parent_organization_id == current_user.organization_id
+    ).all()
 
-# シルバー層センサーデータ取得（OLTP DB / device_id で直接クエリ）
-def get_silver_sensor_data(device_id, start_datetime, end_datetime):
-    # device_id はガジェット設定またはユーザー設定から取得済みのため、直接条件に指定する
-    query = text("""
-        SELECT event_timestamp, external_temp, set_temp_freezer_1,
-               internal_sensor_temp_freezer_1, internal_temp_freezer_1,
-               df_temp_freezer_1, condensing_temp_freezer_1,
-               adjusted_internal_temp_freezer_1
-        FROM silver_sensor_data
-        WHERE device_id = :device_id
-          AND event_timestamp BETWEEN :start_datetime AND :end_datetime
-        ORDER BY event_timestamp ASC
-        LIMIT 100
-    """)
-    result = db.session.execute(query, {
-        'device_id': device_id,
-        'start_datetime': start_datetime,
-        'end_datetime': end_datetime,
-    })
-    return [row._asdict() for row in result]
+    org_ids = [org_id[0] for org_id in accessible_org_ids]
+
+    if not org_ids:
+        return query.filter(DashboardMaster.organization_id.in_([]))
+
+    return query.filter(DashboardMaster.organization_id.in_(org_ids))
 ```
 
 ### ログ出力ルール

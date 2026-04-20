@@ -224,11 +224,7 @@ WHERE
 **chart_config JSON スキーマ:**
 ```json
 {
-  "item_id_1": 1,
-  "item_id_2": 2,
-  "item_id_3": 3,
-  "item_id_4": 4,
-  "item_id_5": 5
+  "measurement_item_ids": [1, 2, 3]
 }
 ```
 
@@ -409,15 +405,13 @@ def gadget_circle_chart_data(gadget_uuid):
         # ④ 凡例名取得
         all_columns = get_column_definition()
 
-        # chart_config の item_id_1〜item_id_5 順に、有効な measurement_item のみ抽出
-        SLOT_KEYS = ["item_id_1", "item_id_2", "item_id_3", "item_id_4", "item_id_5"]
+        # chart_config の measurement_item_ids 順に、有効な measurement_item のみ抽出
         item_map = {col["measurement_item_id"]: col for col in all_columns}
 
         columns = [
             item_map[measurement_item_id]
-            for slot_key in SLOT_KEYS
-            if (measurement_item_id := chart_config.get(slot_key)) is not None
-            and measurement_item_id in item_map
+            for measurement_item_id in chart_config.get("measurement_item_ids", [])
+            if measurement_item_id in item_map
         ]
 
         # ⑤ データ整形
@@ -774,11 +768,7 @@ WHERE
 ```json
 // chart_config
 {
-  "item_id_1": 1,
-  "item_id_2": 2,
-  "item_id_3": 3,
-  "item_id_4": 4,
-  "item_id_5": 5
+  "measurement_item_ids": [1, 2, 3]
 }
 
 // data_source_config（デバイス固定モード）
@@ -869,11 +859,7 @@ def gadget_circle_chart_register():
     try:
         # ② chart_config / data_source_config 生成
         chart_config = json.dumps({
-            'item_id_1': form.items[0].data,
-            'item_id_2': form.items[1].data,
-            'item_id_3': form.items[2].data,
-            'item_id_4': form.items[3].data,
-            'item_id_5': form.items[4].data
+            'measurement_item_ids': form.items.data
         })
         data_source_config = json.dumps({'device_id': device_id})
 
