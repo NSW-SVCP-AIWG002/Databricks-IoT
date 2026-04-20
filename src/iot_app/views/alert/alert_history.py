@@ -7,6 +7,7 @@ from iot_app.common.cookie import (
     get_search_conditions_cookie,
     set_search_conditions_cookie,
 )
+from iot_app.common.logger import get_logger
 from iot_app.decorators.auth import require_role
 from iot_app.models.alert import AlertLevelMaster, AlertStatusMaster
 from iot_app.models.sort_item import SortItemMaster
@@ -16,6 +17,8 @@ from iot_app.services.alert_history_service import (
     search_alert_histories,
 )
 from iot_app.views.alert import alert_bp
+
+logger = get_logger(__name__)
 
 _ALL_ROLES = (
     'system_admin',
@@ -55,6 +58,7 @@ def _load_masters():
 def alert_history_list():
     """アラート履歴一覧 初期表示・ページング"""
     user_id = g.current_user.user_id
+    logger.info("アラート履歴一覧 処理開始 user_id=%s", user_id)
 
     if 'page' not in request.args:
         # 初期表示: デフォルト検索条件でCookieをリセット
@@ -67,7 +71,9 @@ def alert_history_list():
         save_cookie = False
 
     try:
+        logger.info("アラート履歴一覧 DB取得開始 user_id=%s", user_id)
         alert_histories, total = search_alert_histories(search_params, user_id)
+        logger.info("アラート履歴一覧 DB取得完了 user_id=%s 件数=%s", user_id, total)
     except Exception:
         abort(500)
 
@@ -88,6 +94,7 @@ def alert_history_list():
         response = clear_search_conditions_cookie(response, 'alert_history')
         response = set_search_conditions_cookie(response, 'alert_history', search_params)
 
+    logger.info("アラート履歴一覧 処理完了 user_id=%s", user_id)
     return response
 
 
@@ -96,6 +103,7 @@ def alert_history_list():
 def alert_history_search():
     """アラート履歴検索実行"""
     user_id = g.current_user.user_id
+    logger.info("アラート履歴検索 処理開始 user_id=%s", user_id)
 
     raw_level      = request.form.get('alert_level_id')
     raw_status     = request.form.get('alert_status_id')
@@ -117,7 +125,9 @@ def alert_history_search():
     }
 
     try:
+        logger.info("アラート履歴検索 DB取得開始 user_id=%s", user_id)
         alert_histories, total = search_alert_histories(search_params, user_id)
+        logger.info("アラート履歴検索 DB取得完了 user_id=%s 件数=%s", user_id, total)
     except Exception:
         abort(500)
 
@@ -137,6 +147,7 @@ def alert_history_search():
     response = clear_search_conditions_cookie(response, 'alert_history')
     response = set_search_conditions_cookie(response, 'alert_history', search_params)
 
+    logger.info("アラート履歴検索 処理完了 user_id=%s", user_id)
     return response
 
 
@@ -149,6 +160,7 @@ def alert_history_detail(alert_history_uuid):
     try:
         alert_history = get_alert_history_detail(alert_history_uuid, user_id)
     except Exception:
+        logger.error("アラート履歴詳細 取得エラー user_id=%s uuid=%s", user_id, alert_history_uuid, exc_info=True)
         abort(404)
 
     if alert_history is None:
