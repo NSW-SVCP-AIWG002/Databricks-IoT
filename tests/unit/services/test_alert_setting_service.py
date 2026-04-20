@@ -691,11 +691,11 @@ class TestAlertSettingServiceDelete:
         service.delete(alert_uuids=uuids, user_id=1)
         # Assert: update が delete_flag=True で呼ばれること
         update_call_kwargs = mock_q.update.call_args
-        if update_call_kwargs:
-            args, kwargs = update_call_kwargs
-            assert any(
-                "delete_flag" in str(a) for a in args
-            ) or mock_q.update.called
+        assert update_call_kwargs is not None
+        args, kwargs = update_call_kwargs
+        update_dict = args[0]
+        assert isinstance(update_dict, dict)
+        assert update_dict.get("delete_flag") is True
 
     # ----------------------------------------------------------------
     # 2.2 対象データ存在チェック
