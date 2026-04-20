@@ -1,7 +1,7 @@
 """
 デバイス台帳管理 - Model層 単体テスト
 
-対象ファイル: src/iot_app/models/device_stock.py
+対象ファイル: src/iot_app/models/device_inventory.py
 
 参照ドキュメント:
   - 機能設計書:       docs/03-features/flask-app/device-inventory/workflow-specification.md
