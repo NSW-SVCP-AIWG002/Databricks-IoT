@@ -1202,8 +1202,8 @@ class TestStoreMonitoringOrganizationAutocomplete:
     ):
         """1.3.1: データスコープフィルタ適用でアクセス不可組織が候補に含まれないこと
 
-        ワークフロー仕様書「データスコープ制限: get_accessible_organizations(current_user.organization_id)
-        の結果を search_organizations_by_name に渡す」に対応。
+        search_organizations_by_name は v_device_master_by_user VIEW に user_id を渡して
+        データスコープ制限を適用する。
         closure 未登録の org_inaccessible は候補に含まれないことを確認する。
         """
         # Act（qパラメータなし: 全アクセス可能組織を取得）
