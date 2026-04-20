@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     device_type_id              INT          NOT NULL,
     device_name                 VARCHAR(100) NOT NULL,
     device_model                VARCHAR(100) NOT NULL,
-    device_inventory_id         INT          NOT NULL,
+    device_inventory_id         INT          NULL,
     sim_id                      VARCHAR(100) NULL,
     mac_address                 VARCHAR(100) NULL,
     software_version            VARCHAR(100) NULL,

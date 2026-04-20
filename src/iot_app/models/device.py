@@ -30,7 +30,7 @@ class DeviceMaster(db.Model):
     device_type_id = db.Column(db.Integer, db.ForeignKey('device_type_master.device_type_id'), nullable=False)
     device_name = db.Column(db.String(100), nullable=False)
     device_model = db.Column(db.String(100), nullable=False)
-    device_inventory_id = db.Column(db.Integer, nullable=False)
+    device_inventory_id = db.Column(db.Integer, nullable=True)
     sim_id = db.Column(db.String(100), nullable=True)
     mac_address = db.Column(db.String(100), nullable=True, unique=True)
     software_version = db.Column(db.String(100), nullable=True)
