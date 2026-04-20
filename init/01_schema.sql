@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS mail_type_master (
 
 -- 4. 組織マスタ
 CREATE TABLE IF NOT EXISTS organization_master (
-    organization_id      INT          NOT NULL,
+    organization_id      INT          NOT NULL AUTO_INCREMENT,
     organization_name    VARCHAR(200) NOT NULL,
     organization_type_id INT          NOT NULL,
     address              VARCHAR(500) NOT NULL,
