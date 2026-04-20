@@ -14,12 +14,15 @@ import pytest
 from datetime import date, datetime
 from unittest.mock import MagicMock, Mock, patch
 
+MODULE = 'iot_app.services.mail_history_service'
+
 
 # ============================================================
 # ヘルパー
 # ============================================================
 
 def make_mail_type_mock(mail_type_id=1, mail_type_name='アラート通知', delete_flag=False):
+    """MailTypeMaster モックを生成するヘルパー"""
     m = Mock()
     m.mail_type_id = mail_type_id
     m.mail_type_name = mail_type_name
@@ -28,6 +31,7 @@ def make_mail_type_mock(mail_type_id=1, mail_type_name='アラート通知', del
 
 
 def make_mail_history_mock(**kwargs):
+    """MailHistory モックを生成するヘルパー"""
     m = Mock()
     m.mail_history_id = kwargs.get('mail_history_id', 1)
     m.mail_history_uuid = kwargs.get('mail_history_uuid', 'test-uuid-001')
@@ -42,13 +46,16 @@ def make_mail_history_mock(**kwargs):
 
 
 def make_sort_item_mock(sort_item_name='sent_at'):
+    """SortItemMaster モックを生成するヘルパー"""
     m = Mock()
     m.sort_item_name = sort_item_name
     return m
 
 
-def _make_query_chain(records, total):
-    """SQLAlchemy クエリチェーンのモックを生成"""
+def make_mock_query(records=None, total=0):
+    """SQLAlchemy クエリチェーンのモックを生成するヘルパー"""
+    if records is None:
+        records = []
     q = MagicMock()
     q.filter_by.return_value = q
     q.filter.return_value = q
@@ -67,118 +74,172 @@ def _make_query_chain(records, total):
 
 @pytest.mark.unit
 class TestGetMailTypeChoices:
-    """メール種別一覧取得"""
+    """get_mail_type_choices - メール種別一覧取得
+    観点: 2.1 正常系処理, 2.4 データフィルタリング
+    """
 
-    def test_returns_active_mail_types(self):
+    @patch(f'{MODULE}.MailTypeMaster')
+    def test_returns_active_mail_types(self, MockModel):
         """2.1.1: delete_flag=False のレコードのみ返す"""
-        # Arrange
+        # Arrange: delete_flag=False の2件を返すようにモック設定
         mock_types = [
             make_mail_type_mock(1, 'アラート通知'),
             make_mail_type_mock(2, '招待メール'),
         ]
-        with patch('iot_app.services.mail_history_service.MailTypeMaster') as MockModel:
-            MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = mock_types
-            from iot_app.services.mail_history_service import get_mail_type_choices
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = mock_types
+        from iot_app.services.mail_history_service import get_mail_type_choices
 
-            # Act
-            result = get_mail_type_choices()
+        # Act
+        result = get_mail_type_choices()
 
-            # Assert
-            assert result == mock_types
-            MockModel.query.filter_by.assert_called_once_with(delete_flag=False)
+        # Assert: 取得結果が設定したモックと一致すること
+        assert result == mock_types
+        # Assert: filter_by が delete_flag=False で呼ばれること
+        MockModel.query.filter_by.assert_called_once_with(delete_flag=False)
 
-    def test_returns_empty_list_when_no_types(self):
+    @patch(f'{MODULE}.MailTypeMaster')
+    def test_returns_empty_list_when_no_types(self, MockModel):
         """2.1.2: レコードが存在しない場合は空リストを返す"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailTypeMaster') as MockModel:
-            MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = []
-            from iot_app.services.mail_history_service import get_mail_type_choices
+        # Arrange: 全件削除済み（空リスト）
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.mail_history_service import get_mail_type_choices
 
-            # Act
-            result = get_mail_type_choices()
+        # Act
+        result = get_mail_type_choices()
 
-            # Assert
-            assert result == []
+        # Assert: 空リストが返ること
+        assert result == []
 
 
 # ============================================================
-# 2. get_sort_column
+# 2. get_mail_type_by_id
+# 観点: 2.1 正常系処理, 2.2 対象データ存在チェック
+# ============================================================
+
+@pytest.mark.unit
+class TestGetMailTypeById:
+    """get_mail_type_by_id - メール種別ID検索
+    観点: 2.1 正常系処理, 2.2 対象データ存在チェック
+    """
+
+    @patch(f'{MODULE}.MailTypeMaster')
+    def test_returns_record_when_found(self, MockModel):
+        """2.1.1: 指定IDのレコードが存在する場合は MailTypeMaster を返す"""
+        # Arrange: mail_type_id=1 に対応するレコードを設定
+        mock_type = make_mail_type_mock(1, 'アラート通知')
+        MockModel.query.get.return_value = mock_type
+        from iot_app.services.mail_history_service import get_mail_type_by_id
+
+        # Act
+        result = get_mail_type_by_id(1)
+
+        # Assert: 設定したモックレコードが返ること
+        assert result == mock_type
+        # Assert: query.get が指定のIDで呼ばれること
+        MockModel.query.get.assert_called_once_with(1)
+
+    @patch(f'{MODULE}.MailTypeMaster')
+    def test_returns_none_when_not_found(self, MockModel):
+        """2.2.2: 指定IDのレコードが存在しない場合は None を返す"""
+        # Arrange: DB に該当レコードなし
+        MockModel.query.get.return_value = None
+        from iot_app.services.mail_history_service import get_mail_type_by_id
+
+        # Act
+        result = get_mail_type_by_id(999)
+
+        # Assert: None が返ること
+        assert result is None
+
+
+# ============================================================
+# 3. get_sort_column
 # 観点: 2.1 正常系処理, 2.3 フォールバック動作
 # ============================================================
 
 @pytest.mark.unit
 class TestGetSortColumn:
-    """ソートカラム取得（ホワイトリスト検証）"""
+    """get_sort_column - ソートカラム取得（ホワイトリスト検証）
+    観点: 2.1 正常系処理, 2.3 フォールバック動作
+    """
 
-    def test_returns_db_value_when_found(self):
+    @patch(f'{MODULE}.SortItemMaster')
+    def test_returns_db_value_when_found(self, MockModel):
         """2.1.1: sort_item_master にレコードが存在する場合、DB値を返す"""
-        # Arrange
+        # Arrange: sort_item_name='sent_at' を返すモック設定
         mock_item = make_sort_item_mock('sent_at')
-        with patch('iot_app.services.mail_history_service.SortItemMaster') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = mock_item
-            from iot_app.services.mail_history_service import get_sort_column
+        MockModel.query.filter_by.return_value.first.return_value = mock_item
+        from iot_app.services.mail_history_service import get_sort_column
 
-            # Act
-            result = get_sort_column(3)
+        # Act
+        result = get_sort_column(3)
 
-            # Assert
-            assert result == 'sent_at'
+        # Assert: DB から取得した sort_item_name が返ること
+        assert result == 'sent_at'
 
-    def test_fallback_mail_type_when_db_miss(self):
-        """2.3.1: DB未登録のsort_id=1はフォールバック値 'mail_type' を返す"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.SortItemMaster') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_sort_column
+    @patch(f'{MODULE}.SortItemMaster')
+    def test_fallback_mail_type_when_db_miss(self, MockModel):
+        """2.3.1: DB未登録の sort_id=1 はフォールバック値 'mail_type' を返す"""
+        # Arrange: DB に該当レコードなし（None）
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_sort_column
 
-            # Act
-            result = get_sort_column(1)
+        # Act
+        result = get_sort_column(1)
 
-            # Assert
-            assert result == 'mail_type'
+        # Assert: フォールバック値 'mail_type' が返ること
+        assert result == 'mail_type'
 
-    def test_fallback_subject_when_db_miss(self):
-        """2.3.2: DB未登録のsort_id=2はフォールバック値 'subject' を返す"""
-        with patch('iot_app.services.mail_history_service.SortItemMaster') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_sort_column
+    @patch(f'{MODULE}.SortItemMaster')
+    def test_fallback_subject_when_db_miss(self, MockModel):
+        """2.3.2: DB未登録の sort_id=2 はフォールバック値 'subject' を返す"""
+        # Arrange: DB に該当レコードなし（None）
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_sort_column
 
-            result = get_sort_column(2)
+        # Act
+        result = get_sort_column(2)
 
-            assert result == 'subject'
+        # Assert: フォールバック値 'subject' が返ること
+        assert result == 'subject'
 
-    def test_fallback_sent_at_when_db_miss(self):
-        """2.3.3: DB未登録のsort_id=3はフォールバック値 'sent_at' を返す"""
-        with patch('iot_app.services.mail_history_service.SortItemMaster') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_sort_column
+    @patch(f'{MODULE}.SortItemMaster')
+    def test_fallback_sent_at_when_db_miss(self, MockModel):
+        """2.3.3: DB未登録の sort_id=3 はフォールバック値 'sent_at' を返す"""
+        # Arrange: DB に該当レコードなし（None）
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_sort_column
 
-            result = get_sort_column(3)
+        # Act
+        result = get_sort_column(3)
 
-            assert result == 'sent_at'
+        # Assert: フォールバック値 'sent_at' が返ること
+        assert result == 'sent_at'
 
-    def test_returns_none_for_unknown_sort_id(self):
-        """2.3.4: DB未登録かつフォールバックにも存在しないsort_idはNoneを返す"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.SortItemMaster') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_sort_column
+    @patch(f'{MODULE}.SortItemMaster')
+    def test_returns_none_for_unknown_sort_id(self, MockModel):
+        """2.3.4: DB未登録かつフォールバックにも存在しない sort_id は None を返す"""
+        # Arrange: DB に該当レコードなし（None）＆ フォールバック辞書にも未定義のID
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_sort_column
 
-            # Act
-            result = get_sort_column(999)
+        # Act
+        result = get_sort_column(999)
 
-            # Assert
-            assert result is None
+        # Assert: None が返ること
+        assert result is None
 
 
 # ============================================================
-# 3. get_default_date_range
+# 4. get_default_date_range
 # 観点: 2.1 正常系処理, 3.5 日付処理
 # ============================================================
 
 @pytest.mark.unit
 class TestGetDefaultDateRange:
-    """デフォルト日付範囲取得"""
+    """get_default_date_range - デフォルト日付範囲取得
+    観点: 2.1 正常系処理, 3.5 日付処理
+    """
 
     def test_start_is_7_days_before_end(self):
         """3.5.1: 開始日は終了日の7日前"""
@@ -186,321 +247,384 @@ class TestGetDefaultDateRange:
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
 
-        # Assert
+        # Assert: end - start が 7 日であること
         assert (end - start).days == 7
 
     def test_returns_date_objects(self):
         """3.5.2: 戻り値は date 型"""
+        # Arrange / Act
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
 
+        # Assert: start, end がともに date 型であること
         assert isinstance(start, date)
         assert isinstance(end, date)
 
     def test_start_before_end(self):
         """3.5.3: 開始日は終了日より前"""
+        # Arrange / Act
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
 
+        # Assert: start < end であること
         assert start < end
 
 
 # ============================================================
-# 4. get_mail_history_list
-# 観点: 2.1 正常系処理, 2.4 データフィルタリング, 3.3 ページネーション
+# 5. get_mail_history_list
+# 観点: 2.1 正常系処理, 2.4 データフィルタリング, 3.3 ページネーション, 3.4 ソート
 # ============================================================
 
 @pytest.mark.unit
 class TestGetMailHistoryList:
-    """メール通知履歴一覧取得"""
+    """get_mail_history_list - メール通知履歴一覧取得
+    観点: 2.1 正常系処理, 2.4 データフィルタリング, 3.3 ページネーション, 3.4 ソート
+    """
 
-    def test_returns_records_and_total(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_returns_records_and_total(self, MockModel):
         """2.1.1: 正常系 - レコードと総件数をタプルで返す"""
-        # Arrange
+        # Arrange: モックレコード1件、総件数1を設定
         mock_records = [make_mail_history_mock()]
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain(mock_records, 1)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        q = make_mock_query(mock_records, 1)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            records, total = get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        records, total = get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert
-            assert records == mock_records
-            assert total == 1
+        # Assert: 取得レコードと総件数がモック値と一致すること
+        assert records == mock_records
+        assert total == 1
 
-    def test_filters_by_organization_id(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_filters_by_organization_id(self, MockModel):
         """2.4.1: organization_id でデータスコープが制限される"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        # Arrange: organization_id=42 でクエリされることを検証するための設定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=42,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=42,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert
-            MockModel.query.filter_by.assert_called_once_with(organization_id=42)
+        # Assert: filter_by が organization_id=42 で呼ばれること
+        MockModel.query.filter_by.assert_called_once_with(organization_id=42)
 
-    def test_applies_mail_type_filter_when_specified(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_mail_type_filter_when_specified(self, MockModel):
         """2.4.2: mail_types が指定された場合、in_ フィルタが適用される"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        # Arrange: mail_types=[1, 2] を渡してフィルタが呼ばれることを検証
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[1, 2],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[1, 2],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert: mail_types フィルタとして filter が1回呼ばれる
-            assert q.filter.call_count == 1
+        # Assert: mail_types フィルタとして filter が1回呼ばれること
+        assert q.filter.call_count == 1
 
-    def test_applies_keyword_filter_when_specified(self):
+    @patch(f'{MODULE}.or_')
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_keyword_filter_when_specified(self, MockModel, mock_or):
         """2.4.3: keyword が指定された場合、件名・本文の OR フィルタが適用される"""
-        # Arrange
-        # or_() に渡すオペランドが MagicMock のため、sqlalchemy.or_ もモック化する
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel, \
-             patch('iot_app.services.mail_history_service.or_') as mock_or:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            mock_or.return_value = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        # Arrange: or_() に渡す MagicMock オペランドが SQLAlchemy で評価されないよう
+        #          or_ 自体もモック化する
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_or.return_value = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='テスト',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='テスト',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert: keyword フィルタとして filter が1回呼ばれ、or_ も呼ばれる
-            assert q.filter.call_count == 1
-            assert mock_or.called
+        # Assert: keyword フィルタとして filter が1回呼ばれること
+        assert q.filter.call_count == 1
+        # Assert: or_() が呼ばれること（件名・本文の OR 結合）
+        assert mock_or.called
 
-    def test_applies_date_range_filters_when_specified(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_date_range_filters_when_specified(self, MockModel):
         """2.4.4: 日付範囲が指定された場合、sent_at の開始・終了フィルタが各1回適用される"""
-        # Arrange
-        # MagicMock の比較演算子（>= / <=）が datetime と組み合わさるとエラーになるため
-        # sent_at 属性の __ge__ / __le__ を明示的に設定する
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            mock_sent_at = MagicMock()
-            mock_sent_at.__ge__ = Mock(return_value=MagicMock())
-            mock_sent_at.__le__ = Mock(return_value=MagicMock())
-            MockModel.sent_at = mock_sent_at
-            from iot_app.services.mail_history_service import get_mail_history_list
+        # Arrange: MagicMock の比較演算子（>= / <=）が datetime と組み合わさると
+        #          Python が逆側の比較メソッドにフォールバックしエラーになるため、
+        #          sent_at 属性の __ge__ / __le__ を明示的に設定する
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__ge__ = Mock(return_value=MagicMock())
+        mock_sent_at.__le__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=date(2026, 4, 1),
-                sent_at_end=date(2026, 4, 10),
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=date(2026, 4, 1),
+            sent_at_end=date(2026, 4, 10),
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert: 開始日・終了日フィルタで filter が2回呼ばれる
-            assert q.filter.call_count == 2
+        # Assert: 開始日・終了日フィルタで filter が2回（各1回）呼ばれること
+        assert q.filter.call_count == 2
 
-    def test_no_filter_when_all_conditions_empty(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_no_filter_when_all_conditions_empty(self, MockModel):
         """2.4.5: 全条件が空の場合、追加フィルタは適用されない"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        # Arrange: 検索条件をすべて空/None に設定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert
-            q.filter.assert_not_called()
+        # Assert: 追加の filter が1回も呼ばれないこと
+        q.filter.assert_not_called()
 
-    def test_pagination_offset_page1(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_pagination_offset_page1(self, MockModel):
         """3.3.1: page=1 の場合、offset=0 で取得する"""
         # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert
-            q.offset.assert_called_once_with(0)
+        # Assert: offset が 0 で呼ばれること（page=1 → offset=(1-1)*per_page=0）
+        q.offset.assert_called_once_with(0)
 
-    def test_pagination_offset_page3(self):
+    @patch(f'{MODULE}.MailHistory')
+    def test_pagination_offset_page3(self, MockModel):
         """3.3.2: page=3 の場合、offset=(3-1)*per_page で取得する"""
         # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import (
-                get_mail_history_list,
-                _DEFAULT_PER_PAGE,
-            )
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import (
+            get_mail_history_list,
+            _DEFAULT_PER_PAGE,
+        )
 
-            # Act
-            get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=3,
-            )
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=3,
+        )
 
-            # Assert
-            expected_offset = (3 - 1) * _DEFAULT_PER_PAGE
-            q.offset.assert_called_once_with(expected_offset)
+        # Assert: offset が (3-1)*_DEFAULT_PER_PAGE で呼ばれること
+        expected_offset = (3 - 1) * _DEFAULT_PER_PAGE
+        q.offset.assert_called_once_with(expected_offset)
 
-    def test_returns_empty_when_no_records(self):
-        """2.1.2: レコードが存在しない場合、空リストと0を返す"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            q = _make_query_chain([], 0)
-            MockModel.query.filter_by.return_value = q
-            MockModel.mail_history_id = MagicMock()
-            from iot_app.services.mail_history_service import get_mail_history_list
+    @patch(f'{MODULE}.MailHistory')
+    def test_returns_empty_when_no_records(self, MockModel):
+        """2.1.2: レコードが存在しない場合、空リストと 0 を返す"""
+        # Arrange: DB に該当レコードなし
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
 
-            # Act
-            records, total = get_mail_history_list(
-                organization_id=1,
-                mail_types=[],
-                keyword='',
-                sent_at_start=None,
-                sent_at_end=None,
-                sort_column='sent_at',
-                order='desc',
-                page=1,
-            )
+        # Act
+        records, total = get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
 
-            # Assert
-            assert records == []
-            assert total == 0
+        # Assert: 空リストと 0 が返ること
+        assert records == []
+        assert total == 0
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_sort_order_desc_uses_desc_method(self, MockModel):
+        """3.4.1: order='desc' のとき、ソートカラムの .desc() が呼ばれる"""
+        # Arrange: sort_column='sent_at', order='desc' を指定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        mock_sent_at_col = MagicMock()
+        MockModel.sent_at = mock_sent_at_col
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: sent_at カラムの .desc() が呼ばれること
+        mock_sent_at_col.desc.assert_called_once()
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_sort_order_asc_uses_asc_method(self, MockModel):
+        """3.4.2: order='asc' のとき、ソートカラムの .asc() が呼ばれる"""
+        # Arrange: sort_column='sent_at', order='asc' を指定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        mock_sent_at_col = MagicMock()
+        MockModel.sent_at = mock_sent_at_col
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='asc',
+            page=1,
+        )
+
+        # Assert: sent_at カラムの .asc() が呼ばれること
+        mock_sent_at_col.asc.assert_called_once()
 
 
 # ============================================================
-# 5. get_mail_history_detail
+# 6. get_mail_history_detail
 # 観点: 2.1 正常系処理, 2.2 対象データ存在チェック, 2.4 データフィルタリング
 # ============================================================
 
 @pytest.mark.unit
 class TestGetMailHistoryDetail:
-    """メール通知履歴詳細取得"""
+    """get_mail_history_detail - メール通知履歴詳細取得
+    観点: 2.1 正常系処理, 2.2 対象データ存在チェック, 2.4 データフィルタリング
+    """
 
-    def test_returns_record_when_found(self):
-        """2.1.1: 正常系 - 一致するUUIDと組織IDのレコードを返す"""
-        # Arrange
+    @patch(f'{MODULE}.MailHistory')
+    def test_returns_record_when_found(self, MockModel):
+        """2.1.1: 正常系 - 一致する UUID と組織 ID のレコードを返す"""
+        # Arrange: UUID='abc-123', organization_id=1 に一致するレコードを設定
         mock_history = make_mail_history_mock(mail_history_uuid='abc-123', organization_id=1)
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = mock_history
-            from iot_app.services.mail_history_service import get_mail_history_detail
+        MockModel.query.filter_by.return_value.first.return_value = mock_history
+        from iot_app.services.mail_history_service import get_mail_history_detail
 
-            # Act
-            result = get_mail_history_detail('abc-123', organization_id=1)
+        # Act
+        result = get_mail_history_detail('abc-123', organization_id=1)
 
-            # Assert
-            assert result == mock_history
-            MockModel.query.filter_by.assert_called_once_with(
-                mail_history_uuid='abc-123',
-                organization_id=1,
-            )
+        # Assert: 設定したモックレコードが返ること
+        assert result == mock_history
+        # Assert: filter_by が UUID と organization_id の両方で呼ばれること
+        MockModel.query.filter_by.assert_called_once_with(
+            mail_history_uuid='abc-123',
+            organization_id=1,
+        )
 
-    def test_returns_none_when_uuid_not_found(self):
-        """2.2.2: UUIDが存在しない場合はNoneを返す"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_mail_history_detail
+    @patch(f'{MODULE}.MailHistory')
+    def test_returns_none_when_uuid_not_found(self, MockModel):
+        """2.2.2: UUID が存在しない場合は None を返す"""
+        # Arrange: DB に該当レコードなし
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_mail_history_detail
 
-            # Act
-            result = get_mail_history_detail('no-such-uuid', organization_id=1)
+        # Act
+        result = get_mail_history_detail('no-such-uuid', organization_id=1)
 
-            # Assert
-            assert result is None
+        # Assert: None が返ること
+        assert result is None
 
-    def test_returns_none_when_wrong_organization(self):
-        """2.4.1: organization_id が一致しない場合はNoneを返す（データスコープ制限）"""
-        # Arrange
-        with patch('iot_app.services.mail_history_service.MailHistory') as MockModel:
-            MockModel.query.filter_by.return_value.first.return_value = None
-            from iot_app.services.mail_history_service import get_mail_history_detail
+    @patch(f'{MODULE}.MailHistory')
+    def test_returns_none_when_wrong_organization(self, MockModel):
+        """2.4.1: organization_id が一致しない場合は None を返す（データスコープ制限）"""
+        # Arrange: 異なる organization_id では該当レコードなし
+        MockModel.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.mail_history_service import get_mail_history_detail
 
-            # Act
-            result = get_mail_history_detail('abc-123', organization_id=999)
+        # Act
+        result = get_mail_history_detail('abc-123', organization_id=999)
 
-            # Assert
-            assert result is None
-            MockModel.query.filter_by.assert_called_once_with(
-                mail_history_uuid='abc-123',
-                organization_id=999,
-            )
+        # Assert: None が返ること
+        assert result is None
+        # Assert: filter_by が organization_id=999 で呼ばれること（スコープ制限確認）
+        MockModel.query.filter_by.assert_called_once_with(
+            mail_history_uuid='abc-123',
+            organization_id=999,
+        )
