@@ -1,5 +1,8 @@
 from enum import IntEnum
 
+# Databricks ワークスペースグループID（要設定）
+DATABRICKS_WORKSPACE_GROUP_ID = ""
+
 
 class UserType(IntEnum):
     """ユーザータイプID（user_type_master.user_type_id と対応）"""

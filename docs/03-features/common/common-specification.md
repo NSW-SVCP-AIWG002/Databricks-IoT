@@ -1622,6 +1622,9 @@ MASTER_DEFAULTS = {
         "locked": 0,
     },
 }
+
+# Databricks ワークスペースグループID（要設定）
+DATABRICKS_WORKSPACE_GROUP_ID = ""
 ```
 
 **Flaskでの読み込み実装例:**

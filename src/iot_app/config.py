@@ -15,6 +15,7 @@ class Config:
 
     # Databricks Configuration
     DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
+    DATABRICKS_SERVICE_PRINCIPAL_TOKEN = os.getenv("DATABRICKS_SERVICE_PRINCIPAL_TOKEN", "")
     DATABRICKS_SERVING_ENDPOINT_NAME = os.getenv(
         "DATABRICKS_SERVING_ENDPOINT_NAME", "ai_orchestrator"
     )

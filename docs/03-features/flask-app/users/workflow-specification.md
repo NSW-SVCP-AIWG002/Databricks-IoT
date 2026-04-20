@@ -205,7 +205,7 @@ flowchart TD
 ```python
 # views/admin/users.py
 @admin_bp.route('/users', methods=['GET'])
-@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def users_list():
     """初期表示・ページング（統合）"""
 
@@ -260,39 +260,12 @@ def users_list():
 
 **① 認証・認可チェック**
 
-リバースプロキシヘッダから認証情報を取得し、権限を確認します。
+認証はミドルウェア（`auth/middleware.py`）が `before_request` で全エンドポイントに適用済み。認可は `@require_role` デコレータで制御する。
 
 **処理内容:**
-- ヘッダ `X-Forwarded-User` からユーザーIDを取得
-- データベースから現在ユーザー情報を取得（ユーザー種別、組織ID）
+- `g.current_user` にログインユーザー情報がセット済み（ミドルウェア処理済み）
+- `@require_role` がユーザー種別に応じたアクセス制御を実施
 - 組織に応じてデータスコープを決定
-
-**変数・パラメータ:**
-- `current_user_id`: string - リバースプロキシヘッダから取得したユーザーID
-- `current_user`: User - データベースから取得したユーザーオブジェクト
-- `user_type_id`: int - ユーザー種別ID（user_type_masterへの外部キー）
-- `organization_id`: string - データスコープ制限用の組織ID
-
-**実装例:**
-```python
-from flask import request, abort, g
-from functools import wraps
-
-def require_auth(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user_id = request.headers.get('X-Forwarded-User')
-        if not user_id:
-            abort(401)
-
-        user = User.query.filter_by(user_id=user_id, delete_flag=FALSE).first()
-        if not user:
-            abort(403)
-
-        g.current_user = user
-        return f(*args, **kwargs)
-    return decorated_function
-```
 
 **② クエリパラメータ取得**
 
@@ -579,7 +552,7 @@ class UserSearchForm(FlaskForm):
 ```python
 # views/admin/users.py
 @admin_bp.route('/users', methods=['POST'])
-@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def search_users_view():
     form = UserSearchForm(request.form)
     if not form.validate():
@@ -765,7 +738,7 @@ def get_user_form_options(user_id: int, login_user_type_id: int) -> tuple[list, 
 ```python
 # views/admin/users.py
 @admin_bp.route('/users/create', methods=['GET'])
-@require_permission('user:write')
+@require_role('system_admin', 'management_admin', 'sales_company_user')
 def create_user_form():
     try:
         organizations, user_types, regions, _ = get_user_form_options(g.current_user.user_id, g.current_user.user_type_id)  # → user_service（sort_itemsは登録フォームでは不要）
@@ -815,24 +788,24 @@ flowchart TD
     CheckCreate -->|成功| CreateDatabricksUser[Databricks User作成<br>POST /api/2.0/preview/scim/v2/Users]
     CreateDatabricksUser --> CheckDatabricksUser{Databricks User作成<br>操作結果}
 
-    CheckDatabricksUser -->|失敗| DeleteRecord[作成したレコードを物理削除]
-    DeleteRecord --> Error500[500エラーページ表示]
+    CheckDatabricksUser -->|失敗| RollbackOLTP[OLTPロールバック<br>db.session.rollback]
+    RollbackOLTP --> Error500[500エラーページ表示]
     CheckDatabricksUser -->|成功| AddGroup[Databricksワークスペースグループへ追加<br>PATCH /api/2.0/preview/scim/v2/Groups]
     AddGroup --> CheckGroup{グループ追加<br>操作結果}
 
-    CheckGroup -->|失敗| CleenUpDU[作成したDatabricks Userの削除]
-    CleenUpDU --> DeleteRecord
+    CheckGroup -->|失敗| CleanupDatabricks[Databricks User削除<br>DELETE /api/2.0/preview/scim/v2/Users/id]
     CheckGroup -->|成功| InsertUC[UnityCatalog.<br>user_masterへ<br>ユーザー登録<br>INSERT INTO<br> user_master]
 
     InsertUC --> CheckUC{UnityCatalog<br>操作結果}
-    CheckUC -->|失敗| RollbackUC[ロールバック<br>UnityCatalog.<br>user_master]
+    CheckUC -->|失敗| CleanupDatabricks
     CheckUC --> |成功| ActivateUser[OLTP DB.user_master<br>ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
 
-　　RollbackUC --> CleenUpDG[Databricksワークスペースグループからユーザーを削除]
-
     ActivateUser --> CheckActivate{OLTP DB UPDATE<br>操作結果}
-    CheckActivate -->|失敗| RollbackDB[ロールバック<br>OLTP DB.<br>user_master]
+    CheckActivate -->|失敗| CleanupUC[UC user_master DELETE<br>DELETE FROM iot_catalog.oltp_db.user_master]
     CheckActivate --> |成功| CheckEnv{環境判定<br>requires_additional_setup?}
+
+    CleanupUC --> CleanupDatabricks
+    CleanupDatabricks --> RollbackOLTP
 
     CheckEnv -->|Azure/AWS| FlashCloud[フラッシュメッセージ設定<br>ユーザーを登録しました]
     CheckEnv -->|オンプレミス| InsertUserPw[user_password INSERT<br>password_hash = NULL]
@@ -847,9 +820,6 @@ flowchart TD
     FlashCloud --> Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_users]
     FlashOnprem --> Redirect
     FlashMailError --> Redirect
-
-    RollbackDB　--> RollbackUC
-    CleenUpDG --> CleenUpDU
 
 
     Redirect --> End([処理完了])
@@ -935,6 +905,41 @@ def _insert_unity_catalog_user(user_id: int, databricks_user_id: str, user_data:
     )
 
 
+def _rollback_create_user(
+    user_id: int | None,
+    databricks_user_id: str | None,
+    uc_inserted: bool,
+) -> None:
+    """登録失敗時の補償トランザクション（ベストエフォート）
+
+    db.session.rollback() 後に呼び出す。
+    OLTP は rollback() で自動巻き戻し済みのため、Databricks と UC のみ削除する。
+    UC INSERTが完了していない場合は UC DELETE は行わない。
+
+    Args:
+        user_id:             OLTP に INSERT したユーザーID（INSERT前に失敗した場合は None）
+        databricks_user_id:  Databricks に作成したユーザーID（作成前に失敗した場合は None）
+        uc_inserted:         UC user_master INSERT が完了済みかどうか
+    """
+    try:
+        if databricks_user_id:
+            scim_client = ScimClient()
+            scim_client.delete_user(databricks_user_id)
+    except Exception:
+        logger.error("登録ロールバック失敗: Databricks User削除", exc_info=True)
+
+    try:
+        if uc_inserted and user_id:
+            uc = UnityCatalogConnector()
+            uc.execute_dml(
+                "DELETE FROM iot_catalog.oltp_db.user_master WHERE user_id = :user_id",
+                {'user_id': user_id},
+                operation="UC user_master 登録ロールバック",
+            )
+    except Exception:
+        logger.error("登録ロールバック失敗: UC user_master DELETE", exc_info=True)
+
+
 def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
     """ユーザー登録（Sagaパターン）
 
@@ -951,6 +956,7 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
     """
     databricks_user_id = None
     user_id = None
+    uc_inserted = False
 
     try:
         # ① OLTP DB INSERT（delete_flag=TRUE）
@@ -982,11 +988,11 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
         )
 
         # ③ Databricksワークスペースグループへ追加
-        group_id = _get_group_id_by_user_type(user_data['user_type_id'])
-        scim_client.add_user_to_group(group_id, databricks_user_id)
+        scim_client.add_user_to_group(DATABRICKS_WORKSPACE_GROUP_ID, databricks_user_id)
 
         # ④ Unity Catalog user_master INSERT
         _insert_unity_catalog_user(user_id, databricks_user_id, user_data, creator_id)
+        uc_inserted = True
 
         # ⑤ OLTP DB UPDATE（活性化）
         user.databricks_user_id = databricks_user_id
@@ -1007,7 +1013,7 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
 
     except Exception:
         db.session.rollback()
-        _rollback_create_user(user_id, databricks_user_id)
+        _rollback_create_user(user_id, databricks_user_id, uc_inserted)
         raise
 
 
@@ -1015,7 +1021,7 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
 from iot_app.auth.middleware import auth_provider  # モジュールレベルのシングルトン
 
 @admin_bp.route('/users/register', methods=['POST'])
-@require_permission('user:write')
+@require_role('system_admin', 'management_admin', 'sales_company_user')
 def create_user_view():
     form = UserCreateForm(request.form)
     if not form.validate():
@@ -1150,7 +1156,7 @@ def get_user_by_databricks_id(databricks_user_id: str, login_user_id: int):
 
 # views/admin/users.py
 @admin_bp.route('/users/<databricks_user_id>/edit', methods=['GET'])
-@require_permission('user:write')
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def edit_user_form(databricks_user_id):
     try:
         user = get_user_by_databricks_id(databricks_user_id, g.current_user.user_id)  # → user_service
@@ -1274,6 +1280,19 @@ def _update_unity_catalog_user(user_id: int, user_data: dict, modifier_id: int) 
     )
 
 
+def _update_oltp_user(user_id: int, user_data: dict, modifier_id: int) -> None:
+    """OLTP user_master の更新可能項目を UPDATE する"""
+    user = User.query.get(user_id)
+    user.user_name                = user_data['user_name']
+    user.region_id                = user_data['region_id']
+    user.address                  = user_data['address']
+    user.status                   = user_data['status']
+    user.alert_notification_flag  = user_data['alert_notification_flag']
+    user.system_notification_flag = user_data['system_notification_flag']
+    user.modifier                 = modifier_id
+    db.session.flush()
+
+
 def _rollback_update_user(databricks_user_id: str, user_id: int) -> None:
     """Databricks/UC を元データで復元する（db.session.rollback() 後に呼ぶこと）
 
@@ -1345,7 +1364,7 @@ def update_user(user_id: int, databricks_user_id: str, user_data: dict, modifier
 
 # views/admin/users.py
 @admin_bp.route('/users/<databricks_user_id>/update', methods=['POST'])
-@require_permission('user:write')
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def update_user_view(databricks_user_id):
     form = UserUpdateForm(request.form)
     if not form.validate():
@@ -1429,7 +1448,7 @@ flowchart TD
 
 # views/admin/users.py
 @admin_bp.route('/users/<databricks_user_id>', methods=['GET'])
-@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def view_user_detail(databricks_user_id):
     try:
         user = get_user_by_databricks_id(databricks_user_id, g.current_user.user_id)  # → user_service（フロー5と共用）
@@ -1609,7 +1628,7 @@ def delete_user(user: UserMasterByUser, deleter_id: int) -> None:
 
 # views/admin/users.py
 @admin_bp.route('/users/delete', methods=['POST'])
-@require_permission('user:write')
+@require_role('system_admin', 'management_admin', 'sales_company_user')
 def delete_users_view():
     databricks_user_ids = request.form.getlist('databricks_user_ids')
     if not databricks_user_ids:
@@ -1726,7 +1745,7 @@ def generate_users_csv(users: list) -> bytes:
 
 # views/admin/users.py
 @admin_bp.route('/users/export', methods=['POST'])
-@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def export_users_csv_view():
     search_params = get_search_conditions_cookie('users') or get_default_search_params()
 
@@ -1771,6 +1790,125 @@ def export_users_csv_view():
 - **user_master.user_type_id**: INDEX - ユーザー種別による絞り込み高速化
 - **user_master.region_id**: INDEX - 地域による絞り込み高速化
 - **user_master.delete_flag**: INDEX - 論理削除フラグによるフィルタリング高速化
+
+---
+
+## ScimClient（Databricks SCIM APIクライアント）
+
+`databricks/scim_client.py` に定義するクラス。Databricks SCIM API（`/api/2.0/preview/scim/v2/`）を通じてユーザー・グループを管理する。
+
+**認証トークン:** サービスプリンシパルの管理者権限トークン（`DATABRICKS_SERVICE_PRINCIPAL_TOKEN` 環境変数）を使用。エンドユーザーのトークンは使用しない。
+
+**実装例:**
+
+```python
+# databricks/scim_client.py
+import requests
+from flask import current_app
+
+
+class ScimClient:
+    def __init__(self):
+        self.host  = current_app.config['DATABRICKS_HOST'].rstrip('/')
+        self.token = current_app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN']
+        self.headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Content-Type':  'application/json',
+        }
+
+    def create_user(self, email: str, display_name: str) -> str:
+        """Databricksユーザーを作成し、databricks_user_id を返す。
+
+        Args:
+            email:        メールアドレス（userName として登録）
+            display_name: 表示名
+
+        Returns:
+            str: 作成されたDatabricksユーザーID
+
+        Raises:
+            requests.HTTPError: API呼び出し失敗時
+        """
+        payload = {
+            'schemas':     ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            'userName':    email,
+            'displayName': display_name,
+        }
+        resp = requests.post(
+            f'{self.host}/api/2.0/preview/scim/v2/Users',
+            headers=self.headers,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()['id']
+
+    def update_user(self, databricks_user_id: str, display_name: str, status: int) -> None:
+        """Databricksユーザーの表示名・有効状態を更新する。
+
+        Args:
+            databricks_user_id: DatabricksユーザーID
+            display_name:       新しい表示名
+            status:             ユーザーステータス（1=有効, 0=無効）
+
+        Raises:
+            requests.HTTPError: API呼び出し失敗時
+        """
+        payload = {
+            'schemas': ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            'Operations': [
+                {'op': 'replace', 'path': 'displayName', 'value': display_name},
+                {'op': 'replace', 'path': 'active',      'value': status == 1},
+            ],
+        }
+        resp = requests.patch(
+            f'{self.host}/api/2.0/preview/scim/v2/Users/{databricks_user_id}',
+            headers=self.headers,
+            json=payload,
+        )
+        resp.raise_for_status()
+
+    def delete_user(self, databricks_user_id: str) -> None:
+        """Databricksユーザーを物理削除する。
+
+        Args:
+            databricks_user_id: DatabricksユーザーID
+
+        Raises:
+            requests.HTTPError: API呼び出し失敗時
+        """
+        resp = requests.delete(
+            f'{self.host}/api/2.0/preview/scim/v2/Users/{databricks_user_id}',
+            headers=self.headers,
+        )
+        resp.raise_for_status()
+
+    def add_user_to_group(self, group_id: str, databricks_user_id: str) -> None:
+        """指定グループにユーザーを追加する。
+
+        Args:
+            group_id:           DatabricksグループID（DATABRICKS_WORKSPACE_GROUP_ID）
+            databricks_user_id: DatabricksユーザーID
+
+        Raises:
+            requests.HTTPError: API呼び出し失敗時
+        """
+        payload = {
+            'schemas': ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            'Operations': [
+                {
+                    'op':    'add',
+                    'path':  'members',
+                    'value': [{'value': databricks_user_id}],
+                }
+            ],
+        }
+        resp = requests.patch(
+            f'{self.host}/api/2.0/preview/scim/v2/Groups/{group_id}',
+            headers=self.headers,
+            json=payload,
+        )
+        resp.raise_for_status()
+```
 
 ---
 
@@ -1878,7 +2016,7 @@ Databricks SCIM API操作が失敗
 ```python
 # 使用例: ユーザー一覧取得
 @admin_bp.route('/users', methods=['GET'])
-@require_auth
+@require_role('system_admin', 'management_admin', 'sales_company_user', 'service_company_user')
 def list_users():
     # v_user_master_by_user に login_user_id を渡すだけでスコープ制限が自動適用される
     users = db.session.query(UserMasterByUser).filter(
