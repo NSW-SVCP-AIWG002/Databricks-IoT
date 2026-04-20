@@ -15,7 +15,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- 2. ユーザー種別マスタ
 CREATE TABLE IF NOT EXISTS user_type_master (
-    user_type_id   INT          NOT NULL,
+    user_type_id   INT          NOT NULL AUTO_INCREMENT,
     user_type_name VARCHAR(20)  NOT NULL,
     create_date    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator        INT          NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS language_master (
 
 -- 5. 組織種別マスタ
 CREATE TABLE IF NOT EXISTS organization_type_master (
-    organization_type_id   INT          NOT NULL,
+    organization_type_id   INT          NOT NULL AUTO_INCREMENT,
     organization_type_name VARCHAR(50)  NOT NULL,
     create_date            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator                INT          NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS organization_type_master (
 
 -- 6. 契約状態マスタ
 CREATE TABLE IF NOT EXISTS contract_status_master (
-    contract_status_id   INT          NOT NULL,
+    contract_status_id   INT          NOT NULL AUTO_INCREMENT,
     contract_status_name VARCHAR(20)  NOT NULL,
     create_date          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator              INT          NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS contract_status_master (
 
 -- 17. 地域マスタ
 CREATE TABLE IF NOT EXISTS region_master (
-    region_id   INT          NOT NULL,
+    region_id   INT          NOT NULL AUTO_INCREMENT,
     region_name VARCHAR(50)  NOT NULL,
     time_zone   VARCHAR(64)  NOT NULL,
     delete_flag BOOLEAN      NOT NULL DEFAULT FALSE,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS region_master (
 
 -- 9. デバイス種別マスタ
 CREATE TABLE IF NOT EXISTS device_type_master (
-    device_type_id   INT          NOT NULL,
+    device_type_id   INT          NOT NULL AUTO_INCREMENT,
     device_type_name VARCHAR(100) NOT NULL,
     create_date      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator          INT          NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS device_type_master (
 
 -- 11. 在庫状況マスタ
 CREATE TABLE IF NOT EXISTS inventory_status_master (
-    inventory_status_id   INT          NOT NULL,
+    inventory_status_id   INT          NOT NULL AUTO_INCREMENT,
     inventory_status_name VARCHAR(100) NOT NULL,
     create_date           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     creator               INT          NOT NULL,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS alert_status_master (
 
 -- 19. メール種別マスタ
 CREATE TABLE IF NOT EXISTS mail_type_master (
-    mail_type_id   INT          NOT NULL,
+    mail_type_id   INT          NOT NULL AUTO_INCREMENT,
     mail_type_name VARCHAR(50)  NOT NULL,
     delete_flag    TINYINT      NOT NULL DEFAULT 0,
     create_date    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS organization_closure (
 
 -- 1. ユーザーマスタ
 CREATE TABLE IF NOT EXISTS user_master (
-    user_id                  INT          NOT NULL,
+    user_id                  INT          NOT NULL AUTO_INCREMENT,
     databricks_user_id       VARCHAR(36)  NOT NULL,
     user_name                VARCHAR(20)  NOT NULL,
     organization_id          INT          NOT NULL,
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS device_inventory_master (
 
 -- 8. デバイスマスタ
 CREATE TABLE IF NOT EXISTS device_master (
-    device_id                   INT          NOT NULL,
+    device_id                   INT          NOT NULL AUTO_INCREMENT,
     device_uuid                 VARCHAR(128) NOT NULL,
     organization_id             INT          NULL,
     device_type_id              INT          NOT NULL,
@@ -316,8 +316,8 @@ CREATE TABLE IF NOT EXISTS alert_setting_master (
 
 -- 16. デバイスステータス
 CREATE TABLE IF NOT EXISTS device_status_data (
-    device_id   VARCHAR(100) NOT NULL,
-    status      INT          NOT NULL DEFAULT 0,
+    device_id   INT NOT NULL AUTO_INCREMENT,
+    last_received_time      TIMESTAMP NULL,
     delete_flag BOOLEAN      NOT NULL DEFAULT FALSE,
     create_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS device_status_data (
 
 -- 15. ソート項目マスタ
 CREATE TABLE IF NOT EXISTS sort_item_master (
-    view_id        INT          NOT NULL,
+    view_id        INT          NOT NULL AUTO_INCREMENT,
     sort_item_id   INT          NOT NULL,
     sort_item_name VARCHAR(100) NOT NULL,
     sort_order     INT          NOT NULL,
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS sort_item_master (
 
 -- 18. メール送信履歴
 CREATE TABLE IF NOT EXISTS mail_history (
-    mail_history_id   INT          NOT NULL,
+    mail_history_id   INT          NOT NULL AUTO_INCREMENT,
     mail_history_uuid VARCHAR(32)  NOT NULL,
     mail_type         INT          NOT NULL,
     sender_email      VARCHAR(254) NOT NULL,
@@ -392,7 +392,7 @@ CREATE TABLE IF NOT EXISTS alert_history (
 
 -- 22. マスタ一覧
 CREATE TABLE IF NOT EXISTS master_list (
-    master_id    INT          NOT NULL,
+    master_id    INT          NOT NULL AUTO_INCREMENT,
     user_type_id INT          NOT NULL,
     master_name  VARCHAR(20)  NOT NULL,
     create_date  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
