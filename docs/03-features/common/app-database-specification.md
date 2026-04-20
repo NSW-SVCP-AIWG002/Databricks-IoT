@@ -56,8 +56,9 @@
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
     - [7. メール通知履歴一覧用VIEW (v\_mail\_history\_by\_user)](#7-メール通知履歴一覧用view-v_mail_history_by_user)
-    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#8-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
-    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#9-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
+    - [8. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#8-ダッシュボード一覧用view-v_dashboard_master_by_user)
+    - [9. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#9-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
+    - [10. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#10-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -590,7 +591,7 @@
 | --- | ----------------------- | ---------------------- | ----------- | -------- | --- | --- | ----------------- | ------------------------------------------------------------ |
 | 1   | measurement_item_id     | 測定項目ID             | INT         | NOT NULL | ○   | -   | AUTO_INCREMENT    | 自動採番、測定項目の一意識別子                               |
 | 2   | measurement_item_name   | 測定項目名             | VARCHAR(50) | NOT NULL | -   | -   | -                 | センサーで読み取る、機器に関する測定項目の名前               |
-| 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名           |
+| 3   | silver_data_column_name | シルバーデータカラム名 | VARCHAR(63) | NOT NULL | -   | -   | -                 | 対応するUnityCatalogのsilver_sensor_dataのカラム名           |
 | 4   | display_name            | 表示名                 | VARCHAR(50) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する名前 |
 | 5   | unit_name               | 単位                   | VARCHAR(10) | NOT NULL | -   | -   | -                 | 顧客作成ダッシュボード画面のガジェット登録画面で表示する単位 |
 | 6   | create_date             | 作成日時               | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                             |
@@ -1176,6 +1177,7 @@
 **インデックス:**
 
 - PRIMARY KEY: `dashboard_id`
+- UNIQUE: `dashboard_uuid`
 
 **ビジネスルール:**
 
@@ -1207,6 +1209,7 @@
 **インデックス:**
 
 - PRIMARY KEY: `dashboard_group_id`
+- UNIQUE: `dashboard_group_uuid`
 
 **ビジネスルール:**
 
@@ -1245,6 +1248,7 @@
 **インデックス:**
 
 - PRIMARY KEY: `gadget_id`
+- UNIQUE: `gadget_uuid`
 
 **ビジネスルール:**
 
@@ -1260,15 +1264,16 @@
 | --- | ------------------ | ---------------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------------- |
 | 1   | gadget_type_id     | ガジェット種別ID       | INT          | NOT NULL | ○   | ○   | -                 | ガジェット種別の一意識別子（主キー、AutoIncrement） |
 | 2   | gadget_type_name   | ガジェット種別名       | VARCHAR(20)  | NOT NULL | -   | -   | -                 | ガジェット種別名                                    |
-| 3   | data_source_type   | データソース種別       | INT          | NOT NULL | -   | -   | -                 | 0: 組織、1: デバイス                                |
-| 4   | gadget_image_path  | ガジェットイメージパス | VARCHAR(100) | NOT NULL | -   | -   | -                 | 画像パス（例: static\images\xxxxx.png）             |
-| 5   | gadget_description | ガジェット説明         | VARCHAR(500) | NOT NULL | -   | -   | -                 | ガジェットの説明文                                  |
-| 6   | display_order      | 表示順                 | INT          | NOT NULL | -   | -   | -                 | ガジェット種別の表示順                              |
-| 7   | create_date        | 作成日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
-| 8   | creator            | 作成者                 | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                          |
-| 9   | update_date        | 更新日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
-| 10  | modifier           | 更新者                 | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                          |
-| 11  | delete_flag        | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
+| 3   | gadget_type_slug   | ガジェット種別スラグ   | VARCHAR(50)  | NOT NULL | -   | -   | -                 | URLパラメータ用英字識別子（例: bar-chart, timeline） |
+| 4   | data_source_type   | データソース種別       | INT          | NOT NULL | -   | -   | -                 | 0: 組織、1: デバイス                                |
+| 5   | gadget_image_path  | ガジェットイメージパス | VARCHAR(100) | NOT NULL | -   | -   | -                 | 画像パス（例: static\images\xxxxx.png）             |
+| 6   | gadget_description | ガジェット説明         | VARCHAR(500) | NOT NULL | -   | -   | -                 | ガジェットの説明文                                  |
+| 7   | display_order      | 表示順                 | INT          | NOT NULL | -   | -   | -                 | ガジェット種別の表示順                              |
+| 8   | create_date        | 作成日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                    |
+| 9   | creator            | 作成者                 | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                          |
+| 10  | update_date        | 更新日時               | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                                |
+| 11  | modifier           | 更新者                 | INT          | NOT NULL | -   | -   | -                 | レコード更新者のユーザーID                          |
+| 12  | delete_flag        | 削除フラグ             | BOOLEAN      | NOT NULL | -   | -   | FALSE             | 論理削除状態：TRUE　その他の場合：FALSE             |
 
 **外部キー:**
 
@@ -2489,7 +2494,112 @@ def list_mail_history():
 
 ---
 
-### 8. ダッシュボードグループ一覧用VIEW (v_dashboard_group_master_by_user)
+### 8. ダッシュボード一覧用VIEW (v_dashboard_master_by_user)
+
+**概要:**
+
+ログインユーザーが参照可能な組織のダッシュボード情報を取得するためのVIEW。
+
+**目的:**
+
+- 顧客作成ダッシュボード画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織のダッシュボードのみを取得
+- user_masterテーブルを使用し、ログインユーザーの所属組織に属するダッシュボードのアクセス制御を自動適用
+
+**CREATE文:**
+
+```sql
+CREATE OR REPLACE VIEW v_dashboard_master_by_user AS
+SELECT
+    u.user_id,
+    u.user_name,
+    u.organization_id,
+    d.dashboard_id,
+    d.dashboard_uuid,
+    d.dashboard_name,
+    d.create_date,
+    d.creator,
+    d.update_date,
+    d.modifier,
+    d.delete_flag
+FROM
+    user_master u
+    INNER JOIN dashboard_master d
+        ON u.organization_id = d.organization_id
+WHERE
+    u.delete_flag = FALSE;
+```
+
+**カラム一覧:**
+
+| カラム物理名                | カラム論理名               | データ型     | 説明                                                        |
+| --------------------------- | -------------------------- | ------------ | ----------------------------------------------------------- |
+| user_id                     | ユーザーID                 | INT          | ログインユーザーのID                                        |
+| user_name                   | ユーザー名                 | VARCHAR(20)  | ログインユーザーの名前                                      |
+| organization_id             | 組織ID                     | INT          | ログインユーザーの所属組織ID                                |
+| dashboard_id                | ダッシュボードID            | INT          | ダッシュボードの一意識別子（主キー、AutoIncrement）          |
+| dashboard_uuid              | ダッシュボードUUID          | VARCHAR(36)  | ダッシュボードのUUID（URLパラメータ用）                     |
+| dashboard_name              | ダッシュボード名            | VARCHAR(50)  | ダッシュボード名                                           |
+| create_date                 | 作成日時                   | DATETIME     | レコード作成日時                                            |
+| creator                     | 作成者                     | INT          | レコード作成者のユーザーID                                  |
+| update_date                 | 更新日時                   | DATETIME     | レコード最終更新日時                                        |
+| modifier                    | 更新者                     | INT          | レコード更新者のユーザーID                                  |
+| delete_flag                 | 削除フラグ                 | BOOLEAN      | 論理削除状態                                                |
+
+**使用例（SQL）:**
+
+```sql
+-- ログインユーザーID=123が参照可能な全ダッシュボードグループを取得
+SELECT
+    dashboard_id,
+    dashboard_uuid,
+    dashboard_name
+FROM v_dashboard_master_by_user
+WHERE user_id = 123
+  AND delete_flag = FALSE
+ORDER BY dashboard_id;
+```
+
+**使用例（Flask）:**
+
+```python
+from flask import session
+from sqlalchemy import text
+
+@customer_dashboard_bp.route('', methods=['GET'])
+def customer_dashboard():
+    """ダッシュボード一覧表示"""
+
+    # セッションからログインユーザーIDを取得
+    user_id = session.get('user_id')
+
+    # VIEWを使用してデバイスを取得
+    query = text("""
+        SELECT
+            dashboard_id,
+            dashboard_uuid,
+            dashboard_name
+        FROM v_dashboard_master_by_user
+        WHERE user_id = :user_id
+        AND delete_flag = FALSE
+        ORDER BY dashboard_id;
+    """)
+
+    result = db.session.execute(query, {'user_id': user_id})
+    dashboards = result.fetchall()
+
+    return render_template('analysis/customer_dashboard/index.html', dashboards=dashboards)
+```
+
+**ビジネスルール:**
+
+- このVIEWは、ユーザーの所属組織に紐づくダッシュボードを返す
+- 論理削除されたダッシュボード（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
+- 論理削除されたユーザー（`u.delete_flag = TRUE`）はVIEW側で除外される
+- ユーザーが存在しない組織に所属している場合、結果は0件となる
+
+---
+
+### 9. ダッシュボードグループ一覧用VIEW (v_dashboard_group_master_by_user)
 
 **概要:**
 
@@ -2605,7 +2715,7 @@ def customer_dashboard():
 
 ---
 
-### 9. ガジェット一覧用VIEW (v_dashboard_gadget_master_by_user)
+### 10. ガジェット一覧用VIEW (v_dashboard_gadget_master_by_user)
 
 **概要:**
 

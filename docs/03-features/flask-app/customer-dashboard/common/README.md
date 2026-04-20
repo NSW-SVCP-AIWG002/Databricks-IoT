@@ -44,7 +44,7 @@
 - **2パターン固定サイズ**: ガジェットサイズは2×2（480×480px）と2×4（960×480px）の2パターン固定（リサイズ不可、登録時のみ選択）
 - **ドラッグ＆ドロップ配置**: ガジェットをドラッグ＆ドロップで自由に配置可能（リサイズ操作なし）
 - **自動更新**: 60秒間隔でのガジェット自動更新に対応
-- **CSVエクスポート**: ガジェットのグラフデータをCSVファイルとしてダウンロード可能
+- **CSVエクスポート**: ガジェットのグラフデータをCSVファイルとしてダウンロード可能（CSVエクスポート未対応のガジェットあり）
 - **データスコープ制限**: すべてのユーザーに所属組織配下のデータのみアクセス可能なフィルタが適用される
 
 **グラフ描画ライブラリ**
@@ -101,6 +101,7 @@
 | インデックス名 | カラム | 種別 | 目的 |
 |---------------|--------|-----|------|
 | PRIMARY | dashboard_id | 主キー | ダッシュボードの一意識別子 |
+| UNIQUE | dashboard_uuid | ユニーク | ダッシュボードのUUID（URLパラメータ用） |
 
 #### dashboard_group_master（ダッシュボードグループマスタ）
 
@@ -122,6 +123,7 @@
 | インデックス名 | カラム | 種別 | 目的 |
 |---------------|--------|-----|------|
 | PRIMARY | dashboard_group_id | 主キー | ダッシュボードグループの一意識別子 |
+| UNIQUE | dashboard_group_uuid | ユニーク | ダッシュボードグループのUUID（URLパラメータ用） |
 
 #### dashboard_gadget_master（ダッシュボードガジェットマスタ）
 
@@ -149,6 +151,7 @@
 | インデックス名 | カラム | 種別 | 目的 |
 |---------------|--------|-----|------|
 | PRIMARY | gadget_id | 主キー | ガジェットの一意識別子 |
+| UNIQUE | gadget_uuid | ユニーク | ガジェットのUUID（URLパラメータ用） |
 
 #### gadget_type_master（ガジェット種別マスタ）
 
@@ -156,8 +159,9 @@
 |----------|-------|---------|------|------|
 | gadget_type_id | ガジェット種別ID | INT | ○ | ガジェット種別の一意識別子（主キー、AutoIncrement） |
 | gadget_type_name | ガジェット種別名 | VARCHAR(20) | ○ | ガジェット種別名 |
+| gadget_type_slug | ガジェット種別スラグ | VARCHAR(50) | ○ | URLパラメータ用英字識別子（例: bar-chart, timeline） |
 | data_source_type | データソース種別 | INT | ○ | 0: 組織、1: デバイス |
-| gadget_image_path | ガジェットイメージパス | VARCHAR(100) | ○ | 画像パス（例: static\images\xxxxx.png） |
+| gadget_image_path | ガジェットイメージパス | VARCHAR(100) | ○ | 画像パス（例: static/images/xxxxx.png） |
 | gadget_description | ガジェット説明 | VARCHAR(500) | ○ | ガジェットの説明文 |
 | display_order | 表示順 | INT | ○ | ガジェット種別の表示順 |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
@@ -178,8 +182,8 @@
 |----------|-------|---------|------|------|
 | user_id | ユーザーID | INT | ○ | ユーザーの一意識別子（主キー、外部キー） |
 | dashboard_id | ダッシュボードID | INT | ○ | 選択中のダッシュボードID（外部キー） |
-| organization_id | 組織ID | INT | ○ | 選択中の組織ID（外部キー）、未選択の場合は0を登録 |
-| device_id | デバイスID | INT | ○ | 選択中のデバイスID（外部キー） 、未選択の場合は0を登録 |
+| organization_id | 組織ID | INT | - | 選択中の組織ID（外部キー）、未選択の場合はNULLを登録 |
+| device_id | デバイスID | INT | - | 選択中のデバイスID（外部キー） 、未選択の場合はNULLを登録 |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
 | creator | 作成者 | INT | ○ | レコード作成者のユーザーID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
@@ -196,9 +200,9 @@
 
 | カラム名 | 論理名 | データ型 | 必須 | 備考 |
 |----------|-------|---------|------|------|
-| summary_method_id | 集計方法ID | INT | ○ | 集約方法の一意識別子（主キー、AutoIncrement） |
-| summary_method_code | 集計方法コード | VARCHAR(20) | ○ | 集約方法コード |
-| summary_method_name | 集計方法名 | VARCHAR(30) | ○ | 集約方法名 |
+| summary_method_id | 集約方法ID | INT | ○ | 集約方法の一意識別子（主キー、AutoIncrement） |
+| summary_method_code | 集約方法コード | VARCHAR(20) | ○ | 集約方法コード |
+| summary_method_name | 集約方法名 | VARCHAR(30) | ○ | 集約方法名 |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
 | creator | 作成者 | INT | ○ | レコード作成者のユーザーID |
 | update_date | 更新日時 | DATETIME | ○ | レコード更新日時 |
@@ -209,7 +213,7 @@
 
 | インデックス名 | カラム | 種別 | 目的 |
 |---------------|--------|-----|------|
-| PRIMARY | summary_method_id | 集約方法ID | 集約方法の一意識別子 |
+| PRIMARY | summary_method_id | 主キー | 集約方法の一意識別子 |
 
 ---
 
@@ -220,28 +224,30 @@
 | 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 顧客作成ダッシュボード画面の初期表示 | HTML |
 | 2 | ダッシュボード管理画面 | `/analysis/customer-dashboard/dashboards` | GET | ダッシュボード管理画面表示 | HTML（モーダル） |
 | 3 | ダッシュボード登録画面 | `/analysis/customer-dashboard/dashboards/create` | GET | ダッシュボード登録画面表示 | HTML（モーダル） |
-| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | リダイレクト (302) |
+| 4 | ダッシュボード登録実行 | `/analysis/customer-dashboard/dashboards/register` | POST | ダッシュボード登録処理 | JSON (AJAX) |
 | 5 | ダッシュボードタイトル更新画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/edit` | GET | ダッシュボードタイトル更新画面表示 | HTML（モーダル） |
-| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | リダイレクト (302) |
+| 6 | ダッシュボードタイトル更新実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/update` | POST | ダッシュボードタイトル更新処理 | JSON (AJAX) |
 | 7 | ダッシュボード削除確認画面 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | GET | ダッシュボード削除確認画面表示 | HTML（モーダル） |
-| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | リダイレクト (302) |
+| 8 | ダッシュボード削除実行 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/delete` | POST | ダッシュボード削除処理 | JSON (AJAX) |
 | 9 | ダッシュボード表示切替 | `/analysis/customer-dashboard/dashboards/<dashboard_uuid>/switch` | POST | 表示するダッシュボードの切替 | リダイレクト (302) |
 | 10 | ダッシュボードグループ登録画面 | `/analysis/customer-dashboard/groups/create` | GET | ダッシュボードグループ登録画面表示 | HTML（モーダル） |
-| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | リダイレクト (302) |
+| 11 | ダッシュボードグループ登録実行 | `/analysis/customer-dashboard/groups/register` | POST | ダッシュボードグループ登録処理 | JSON (AJAX) |
 | 12 | ダッシュボードグループタイトル更新画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/edit` | GET | ダッシュボードグループタイトル更新画面表示 | HTML（モーダル） |
-| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | リダイレクト (302) |
+| 13 | ダッシュボードグループタイトル更新実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/update` | POST | ダッシュボードグループタイトル更新処理 | JSON (AJAX) |
 | 14 | ダッシュボードグループ削除確認画面 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | GET | ダッシュボードグループ削除確認画面表示 | HTML（モーダル） |
-| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | リダイレクト (302) |
+| 15 | ダッシュボードグループ削除実行 | `/analysis/customer-dashboard/groups/<dashboard_group_uuid>/delete` | POST | ダッシュボードグループ削除処理 | JSON (AJAX) |
 | 16 | ガジェット追加画面 | `/analysis/customer-dashboard/gadgets/add` | GET | ガジェット追加画面表示 | HTML（モーダル） |
 | 17 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/{gadget_type}/create` | GET | ガジェット登録画面表示、ガジェット毎にFlaskルートが異なる | HTML（モーダル） |
-| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理、ガジェット毎にFlaskルートが異なる | リダイレクト (302) |
+| 18 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/{gadget_type}/register` | POST | ガジェット登録処理、ガジェット毎にFlaskルートが異なる | JSON (AJAX) |
 | 19 | ガジェットタイトル更新画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/edit` | GET | ガジェットタイトル更新画面表示 | HTML（モーダル） |
-| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | リダイレクト (302) |
+| 20 | ガジェットタイトル更新実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/update` | POST | ガジェットタイトル更新処理 | JSON (AJAX) |
 | 21 | ガジェット削除確認画面 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | GET | ガジェット削除確認画面表示 | HTML（モーダル） |
-| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | リダイレクト (302) |
+| 22 | ガジェット削除実行 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/delete` | POST | ガジェット削除処理 | JSON (AJAX) |
 | 23 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) |
 | 24 | レイアウト保存 | `/analysis/customer-dashboard/layout/save` | POST | ガジェットのレイアウト設定保存 | JSON (AJAX) |
 | 25 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV |
+| 26 | デバイス一覧取得 | `/analysis/customer-dashboard/organizations/<org_id>/devices` | GET | 組織選択変更時のデバイス選択肢取得 | JSON (AJAX) |
+| 27 | データソース設定保存 | `/analysis/customer-dashboard/datasource/save` | POST | データソース選択状態を `dashboard_user_setting` に永続化 | JSON (AJAX) |
 
 ---
 
