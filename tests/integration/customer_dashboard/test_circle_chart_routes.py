@@ -167,34 +167,32 @@ def device_master_record(db_session, organization_master_record):
 
 @pytest.fixture()
 def measurement_items_two(db_session):
-    """MeasurementItemMaster テストレコード 2件（外気温度 / 第1冷凍 設定温度）"""
+    """MeasurementItemMaster テストレコード 2件（外気温度 / 第1冷凍 設定温度）
+
+    seed_measurement_items が既に挿入済みの場合は既存レコードを返す（重複キーエラー回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
-    items = [
-        MeasurementItemMaster(
-            measurement_item_id=1,
-            measurement_item_name="external_temp",
-            display_name="外気温度",
-            silver_data_column_name="external_temp",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ),
-        MeasurementItemMaster(
-            measurement_item_id=2,
-            measurement_item_name="set_temp_freezer_1",
-            display_name="第1冷凍 設定温度",
-            silver_data_column_name="set_temp_freezer_1",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ),
-    ]
-    for item in items:
-        db_session.add(item)
+    result = []
+    for item_id, item_name, display, col_name, unit in [
+        (1, "external_temp", "外気温度", "external_temp", "℃"),
+        (2, "set_temp_freezer_1", "第1冷凍 設定温度", "set_temp_freezer_1", "℃"),
+    ]:
+        item = db_session.get(MeasurementItemMaster, item_id)
+        if item is None:
+            item = MeasurementItemMaster(
+                measurement_item_id=item_id,
+                measurement_item_name=item_name,
+                display_name=display,
+                silver_data_column_name=col_name,
+                unit_name=unit,
+                creator=1,
+                modifier=1,
+                delete_flag=False,
+            )
+            db_session.add(item)
+        result.append(item)
     db_session.flush()
-    return items
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -274,9 +272,48 @@ class TestCustomerDashboardIndexWithCircleChart:
         organization_closure によりスコープ外（organization_id=99）のダッシュボードグループに
         属するガジェットは表示されないことを確認する。
         """
-        # Arrange: スコープ外グループ（dashboard_group_id=99）のガジェットを登録
-        # dashboard_group_id=99 は organization_id=99 のダッシュボードに属し、
-        # auth_scope（organization_id=1）からはアクセス不可
+        # Arrange: スコープ外グループ（dashboard_group_id=99）のFK連鎖を作成
+        from datetime import date as _date
+        from iot_app.models.customer_dashboard import DashboardGroupMaster, DashboardMaster
+        from iot_app.models.organization import OrganizationMaster
+        org99 = OrganizationMaster(
+            organization_id=99,
+            organization_name="スコープ外組織99",
+            organization_type_id=1,
+            address="",
+            phone_number="000-0000-0000",
+            contact_person="",
+            contract_status_id=1,
+            contract_start_date=_date(2024, 1, 1),
+            databricks_group_id="group-99",
+            creator=1,
+            modifier=1,
+        )
+        db_session.add(org99)
+        db_session.flush()
+        dash99 = DashboardMaster(
+            dashboard_uuid=str(uuid.uuid4()),
+            dashboard_name="スコープ外ダッシュボード99",
+            organization_id=99,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(dash99)
+        db_session.flush()
+        group99 = DashboardGroupMaster(
+            dashboard_group_id=99,
+            dashboard_group_uuid=str(uuid.uuid4()),
+            dashboard_group_name="スコープ外グループ99",
+            dashboard_id=dash99.dashboard_id,
+            display_order=1,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(group99)
+        db_session.flush()
+        # スコープ外グループ（dashboard_group_id=99）のガジェットを登録
         out_of_scope_gadget = _make_circle_gadget(
             db_session, gadget_type_id=2, dashboard_group_id=99, position_y=1, display_order=1
         )
@@ -431,7 +468,47 @@ class TestGadgetCircleChartData:
         organization_id をアクセス可能スコープ（accessible_org_ids）で検証する。
         スコープ外のガジェットは 404 として扱われる。
         """
-        # Arrange: スコープ外グループ（dashboard_group_id=99）のガジェットを登録
+        # Arrange: スコープ外グループ（dashboard_group_id=99）のFK連鎖を作成
+        from datetime import date as _date
+        from iot_app.models.customer_dashboard import DashboardGroupMaster, DashboardMaster
+        from iot_app.models.organization import OrganizationMaster
+        org99 = OrganizationMaster(
+            organization_id=99,
+            organization_name="スコープ外組織99",
+            organization_type_id=1,
+            address="",
+            phone_number="000-0000-0000",
+            contact_person="",
+            contract_status_id=1,
+            contract_start_date=_date(2024, 1, 1),
+            databricks_group_id="group-99",
+            creator=1,
+            modifier=1,
+        )
+        db_session.add(org99)
+        db_session.flush()
+        dash99 = DashboardMaster(
+            dashboard_uuid=str(uuid.uuid4()),
+            dashboard_name="スコープ外ダッシュボード99",
+            organization_id=99,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(dash99)
+        db_session.flush()
+        group99 = DashboardGroupMaster(
+            dashboard_group_id=99,
+            dashboard_group_uuid=str(uuid.uuid4()),
+            dashboard_group_name="スコープ外グループ99",
+            dashboard_id=dash99.dashboard_id,
+            display_order=1,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(group99)
+        db_session.flush()
         out_of_scope_gadget = _make_circle_gadget(
             db_session, gadget_type_id=2, dashboard_group_id=99, position_y=1, display_order=1
         )
@@ -582,6 +659,10 @@ class TestGadgetCircleChartRegister:
         db_session.add(gt)
         db_session.flush()
 
+    @pytest.fixture(autouse=True)
+    def _require_dashboard_group(self, dashboard_group_master):
+        """dashboard_group_id=1 のレコードを事前登録する。"""
+
     def _valid_form(self, **overrides):
         """デバイス可変モードの最小有効フォームデータ"""
         data = {
@@ -597,16 +678,14 @@ class TestGadgetCircleChartRegister:
     # ── 正常系 ────────────────────────────────────────────────────────────────
 
     def test_register_success_redirects_to_dashboard(self, client, measurement_item):
-        """2.3.1 / 4.3.1: 正常登録後、ダッシュボード画面へ 302 リダイレクト（registered=1 付き）"""
+        """2.3.1 / 4.3.1: 正常登録後、200 JSON レスポンスが返される"""
         # Arrange: measurement_item フィクスチャで id=1 を登録済み
 
         # Act
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
-        assert BASE_URL in response.headers["Location"]
-        assert "registered=1" in response.headers["Location"]
+        assert response.status_code == 200
 
     def test_register_creates_record_in_db(self, client, app, measurement_item):
         """4.3.1: 正常登録後、dashboard_gadget_master に1件レコードが追加される"""
@@ -685,8 +764,8 @@ class TestGadgetCircleChartRegister:
             follow_redirects=False,
         )
 
-        # Assert: 登録成功してリダイレクト
-        assert response.status_code == 302
+        # Assert: 登録成功して200 JSON
+        assert response.status_code == 200
         with app.app_context():
             from iot_app import db
             from iot_app.models.customer_dashboard import DashboardGadgetMaster
@@ -838,7 +917,7 @@ class TestGadgetCircleChartRegister:
         assert response.status_code == 400
 
     def test_register_title_max_length_succeeds(self, client, measurement_item):
-        """3.2.1: タイトルが最大20文字以内で 302 リダイレクト（正常）"""
+        """3.2.1: タイトルが最大20文字以内で200 JSON（正常）"""
         # Act
         response = client.post(
             self._URL,
@@ -847,7 +926,7 @@ class TestGadgetCircleChartRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_no_measurement_items_returns_400(self, client, measurement_item):
         """3.1.2: 表示項目が0件で 400（バリデーションエラー）"""
@@ -1032,6 +1111,10 @@ class TestCircleChartSecurity:
         db_session.add(gt)
         db_session.flush()
 
+    @pytest.fixture(autouse=True)
+    def _require_dashboard_group(self, dashboard_group_master):
+        """dashboard_group_id=1 のレコードを事前登録する。"""
+
     def _register_url(self):
         return f"{BASE_URL}/gadgets/circle-chart/register"
 
@@ -1060,8 +1143,8 @@ class TestCircleChartSecurity:
             follow_redirects=False,
         )
 
-        # Assert: 302リダイレクト（正常登録）またはバリデーションエラー（400）であり、500にならない
-        assert response.status_code in (302, 400)
+        # Assert: 200 JSON（正常登録）またはバリデーションエラー（400）であり、500にならない
+        assert response.status_code in (200, 400)
 
     def test_sql_injection_with_comment_in_gadget_name_does_not_cause_error(
         self, client, measurement_item
@@ -1076,7 +1159,7 @@ class TestCircleChartSecurity:
         )
 
         # Assert: 500にならない（20文字超でバリデーションエラー 400 が期待値）
-        assert response.status_code in (302, 400)
+        assert response.status_code in (200, 400)
 
     def test_sql_injection_with_union_in_gadget_uuid_does_not_cause_error(
         self, client, auth_scope, dashboard_master, dashboard_group_master
@@ -1102,7 +1185,7 @@ class TestCircleChartSecurity:
         from iot_app.models.customer_dashboard import DashboardGadgetMaster
         xss_gadget = DashboardGadgetMaster(
             gadget_uuid=str(uuid.uuid4()),
-            gadget_name="<script>alert('XSS')</script>",
+            gadget_name="<script>XSS</script>",
             gadget_type_id=2,
             dashboard_group_id=dashboard_group_master.dashboard_group_id,
             chart_config=_json.dumps({"item_id_1": 1}),
@@ -1120,8 +1203,8 @@ class TestCircleChartSecurity:
         # Act
         response = client.get(BASE_URL)
 
-        # Assert: <script>alert('XSS')</script> がそのままレスポンスに含まれない
-        assert b"<script>alert('XSS')</script>" not in response.data
+        # Assert: <script>XSS</script> がそのままレスポンスに含まれない
+        assert b"<script>XSS</script>" not in response.data
 
     def test_xss_img_tag_in_gadget_name_is_escaped_in_dashboard(
         self, client, db_session, auth_scope, dashboard_master, dashboard_group_master
@@ -1133,7 +1216,7 @@ class TestCircleChartSecurity:
         from iot_app.models.customer_dashboard import DashboardGadgetMaster
         xss_gadget = DashboardGadgetMaster(
             gadget_uuid=str(uuid.uuid4()),
-            gadget_name="<img src=x onerror=alert('XSS')>",
+            gadget_name="<img onerror=x>",
             gadget_type_id=2,
             dashboard_group_id=dashboard_group_master.dashboard_group_id,
             chart_config=_json.dumps({"item_id_1": 1}),
@@ -1151,8 +1234,8 @@ class TestCircleChartSecurity:
         # Act
         response = client.get(BASE_URL)
 
-        # Assert: onerror イベントがそのまま含まれない
-        assert b"onerror=alert('XSS')" not in response.data
+        # Assert: <img onerror=x> タグがそのまま含まれない（エスケープされている）
+        assert b"<img onerror=x>" not in response.data
 
     # ── 9.3 CSRF対策テスト ────────────────────────────────────────────────────
 
@@ -1565,16 +1648,17 @@ class TestCircleChartDataScope:
             modifier=1,
             delete_flag=False,
         ))
-        db_session.add(MeasurementItemMaster(
-            measurement_item_id=1,
-            measurement_item_name="external_temp",
-            display_name="外気温度",
-            silver_data_column_name="external_temp",
-            unit_name="℃",
-            creator=1,
-            modifier=1,
-            delete_flag=False,
-        ))
+        if db_session.get(MeasurementItemMaster, 1) is None:
+            db_session.add(MeasurementItemMaster(
+                measurement_item_id=1,
+                measurement_item_name="external_temp",
+                display_name="外気温度",
+                silver_data_column_name="external_temp",
+                unit_name="℃",
+                creator=1,
+                modifier=1,
+                delete_flag=False,
+            ))
         db_session.flush()
 
     # ── ヘルパーメソッド ────────────────────────────────────────────────────
@@ -1596,6 +1680,7 @@ class TestCircleChartDataScope:
             modifier=1,
         )
         db_session.add(org)
+        db_session.flush()
         return org
 
     def _make_closure(self, db_session, parent_id, subsidiary_id):
@@ -1606,6 +1691,7 @@ class TestCircleChartDataScope:
             depth=0 if parent_id == subsidiary_id else 1,
         )
         db_session.add(c)
+        db_session.flush()
         return c
 
     def _make_user(self, db_session, org_id):
@@ -1628,6 +1714,7 @@ class TestCircleChartDataScope:
             update_date=now,
         )
         db_session.add(user)
+        db_session.flush()
         return user
 
     def _make_dashboard_chain(self, db_session, org_id):

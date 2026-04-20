@@ -52,8 +52,8 @@
   grid-template-columns: auto auto;
   column-gap: var(--spacing-4);
   row-gap: var(--spacing-1);
-  padding: var(--spacing-2) var(--spacing-4);
-  border-top: 1px solid #eee;
+  padding: var(--spacing-1) var(--spacing-4);
+  border-top: var(--border-width) solid var(--color-border);
 }
 
 /* ラベル行・入力行：display: contents で子要素をグリッドアイテムに展開 */
@@ -127,10 +127,32 @@
 }
 
 /* エラーメッセージ領域 */
-.timeline__error {
+.timeline__error:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
   font-size: var(--font-size-sm);
-  color: var(--color-danger);
-  padding: 0 var(--spacing-4);
+  margin: 0 var(--spacing-4) var(--spacing-2);
+  background-color: var(--color-danger-light);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--border-radius-base);
+  color: var(--color-danger-dark);
+  padding: var(--spacing-1) var(--spacing-2);
+}
+
+.timeline__error:not(:empty)::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background-color: var(--color-danger);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
 }
 
 /* ツールバー内デバイス名（timeline固有） */
@@ -150,7 +172,7 @@
   margin-bottom: var(--spacing-4);
 }
 
-.gadget-register__title-row .form__input {
+.gadget-register__title-row .form-input {
   flex: 0 0 200px;
 }
 
@@ -207,7 +229,7 @@
   flex-direction: column;
 }
 
-.gadget-register__middle .form__group {
+.gadget-register__middle .form-group {
   display: flex;
   flex-direction: column;
 }
@@ -229,8 +251,8 @@
 .gadget-register__preview {
   width: 100%;
   height: 126px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -263,14 +285,14 @@
   margin-bottom:0;
 }
 
-.gadget-register__minmax-row .form__group {
+.gadget-register__minmax-row .form-group {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-1);
 }
 
-.gadget-register__minmax-row .form__label {
+.gadget-register__minmax-row .form-label {
   white-space: nowrap;
   margin-bottom: 0;
 }
@@ -297,15 +319,15 @@
 
 .timeline-register__device-mode-btn {
   padding: var(--spacing-1) var(--spacing-3);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
 }
 
 .timeline-register__device-mode-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -324,30 +346,29 @@
   min-width: 0;
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
 }
 
 .timeline-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 0;
 }
 
 .timeline-register__measurement-list thead {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--color-white);
   z-index: 1;
 }
 
 .timeline-register__measurement-list th,
 .timeline-register__measurement-list td {
-  border: 1px solid #ddd;
+  border: var(--border-width) solid var(--color-border);
 }
 
 /* 下部行（グループ選択・部品サイズ） */
-.form__row {
+.form-row {
   display: flex;
   gap: var(--spacing-6);
   align-items: center;
@@ -356,7 +377,7 @@
 
 
 
-.form__group--inline {
+.form-group--inline {
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
@@ -364,12 +385,12 @@
   flex-wrap: nowrap;
 }
 
-.form__group--inline .form__label {
+.form-group--inline .form-label {
   white-space: nowrap;
   margin-bottom: 0;
 }
 
-.form__group--half {
+.form-group--half {
   flex: 1;
 }
 
@@ -385,13 +406,13 @@
    最小値/最大値 バリデーションエラー折り返し [C]
    -------------------------------------------------------------------------- */
 
-.gadget-register__minmax-row .form__error {
+.gadget-register__minmax-row .form-error {
   flex-basis: 100%;
   margin-top: var(--spacing-1);
   min-height: 3em;
 }
 
-.form__error--reserved {
+.form-error--reserved {
   display: block;
   min-height: 1.4em;
 }

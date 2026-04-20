@@ -10,6 +10,15 @@ from flask_wtf import FlaskForm
 from wtforms import FloatField, IntegerField, RadioField, SelectField, StringField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 
+from iot_app.common.messages import (
+    err_max_greater_than_min,
+    err_max_length,
+    err_min_less_than_max,
+    err_numeric,
+    err_required,
+    err_select_required,
+)
+
 
 class _JaFloatField(FloatField):
     """日本語エラーメッセージ付き FloatField"""
@@ -36,8 +45,8 @@ class TimelineGadgetForm(FlaskForm):
     title = StringField(
         'タイトル',
         validators=[
-            DataRequired(message='タイトルを入力してください'),
-            Length(max=20, message='タイトルは20文字以内で入力してください'),
+            DataRequired(message=err_required('タイトル')),
+            Length(max=20, message=err_max_length('タイトル', 20)),
         ],
         default='時系列',
     )
@@ -46,7 +55,7 @@ class TimelineGadgetForm(FlaskForm):
         '表示デバイス選択',
         choices=[('fixed', 'デバイス固定'), ('variable', 'デバイス可変')],
         default='variable',
-        validators=[DataRequired(message='表示デバイス選択を選択してください')],
+        validators=[DataRequired(message=err_select_required('表示デバイス'))],
     )
 
     device_id = IntegerField(
@@ -58,53 +67,53 @@ class TimelineGadgetForm(FlaskForm):
         'グループ選択',
         coerce=int,
         choices=[],
-        validators=[DataRequired(message='グループを選択してください')],
+        validators=[DataRequired(message=err_select_required('グループ'))],
     )
 
     left_item_id = IntegerField(
         '左表示項目',
-        validators=[DataRequired(message='左表示項目を選択してください')],
+        validators=[DataRequired(message=err_select_required('左表示項目'))],
     )
 
     right_item_id = IntegerField(
         '右表示項目',
-        validators=[DataRequired(message='右表示項目を選択してください')],
+        validators=[DataRequired(message=err_select_required('右表示項目'))],
     )
 
     left_min_value = _JaFloatField(
         '左表示項目 最小値',
-        message='左表示項目の最小値は数値で入力してください',
+        message=err_numeric('左表示項目の最小値'),
         validators=[Optional()],
     )
 
     left_max_value = _JaFloatField(
         '左表示項目 最大値',
-        message='左表示項目の最大値は数値で入力してください',
+        message=err_numeric('左表示項目の最大値'),
         validators=[Optional()],
     )
 
     right_min_value = _JaFloatField(
         '右表示項目 最小値',
-        message='右表示項目の最小値は数値で入力してください',
+        message=err_numeric('右表示項目の最小値'),
         validators=[Optional()],
     )
 
     right_max_value = _JaFloatField(
         '右表示項目 最大値',
-        message='右表示項目の最大値は数値で入力してください',
+        message=err_numeric('右表示項目の最大値'),
         validators=[Optional()],
     )
 
     gadget_size = SelectField(
         '部品サイズ',
         choices=[('2x2', '2x2'), ('2x4', '2x4')],
-        validators=[DataRequired(message='部品サイズを選択してください')],
+        validators=[DataRequired(message=err_select_required('部品サイズ'))],
     )
 
     def validate(self, extra_validators=None):
         result = super().validate(extra_validators)
         if self.device_mode.data == 'fixed' and not self.device_id.data:
-            self.device_id.errors.append('デバイスを選択してください')
+            self.device_id.errors.append(err_select_required('デバイス'))
             result = False
         return result
 
@@ -112,22 +121,22 @@ class TimelineGadgetForm(FlaskForm):
         """左最小値 < 左最大値"""
         if field.data is not None and self.left_max_value.data is not None:
             if field.data >= self.left_max_value.data:
-                raise ValidationError('左表示項目の最小値は最大値より小さい値を入力してください')
+                raise ValidationError(err_min_less_than_max('左表示項目'))
 
     def validate_left_max_value(self, field):
         """左最大値 > 左最小値"""
         if field.data is not None and self.left_min_value.data is not None:
             if field.data <= self.left_min_value.data:
-                raise ValidationError('左表示項目の最大値は最小値より大きい値を入力してください')
+                raise ValidationError(err_max_greater_than_min('左表示項目'))
 
     def validate_right_min_value(self, field):
         """右最小値 < 右最大値"""
         if field.data is not None and self.right_max_value.data is not None:
             if field.data >= self.right_max_value.data:
-                raise ValidationError('右表示項目の最小値は最大値より小さい値を入力してください')
+                raise ValidationError(err_min_less_than_max('右表示項目'))
 
     def validate_right_max_value(self, field):
         """右最大値 > 右最小値"""
         if field.data is not None and self.right_min_value.data is not None:
             if field.data <= self.right_min_value.data:
-                raise ValidationError('右表示項目の最大値は最小値より大きい値を入力してください')
+                raise ValidationError(err_max_greater_than_min('右表示項目'))

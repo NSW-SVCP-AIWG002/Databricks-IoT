@@ -17,7 +17,9 @@
 
 import re
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
 from unittest.mock import Mock, MagicMock, patch
 
 from iot_app.services.industry_dashboard_service import (

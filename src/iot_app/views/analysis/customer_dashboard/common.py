@@ -2,7 +2,6 @@ from flask import abort, g, jsonify, redirect, render_template, request, url_for
 
 from iot_app import db
 from iot_app.common.logger import get_logger
-from iot_app.decorators.auth import require_auth
 from iot_app.forms.customer_dashboard.common import DashboardForm, DashboardGroupForm, GadgetForm
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster
 
@@ -40,6 +39,17 @@ from iot_app.services.customer_dashboard.common import (
     update_gadget_title,
     update_group_title,
     upsert_dashboard_user_setting,
+)
+from iot_app.common.messages import (
+    ERR_ACCESS_DENIED,
+    ERR_GADGET_NOT_AVAILABLE,
+    err_fetch_failed,
+    err_not_found,
+    err_save_failed,
+    msg_created,
+    msg_deleted,
+    msg_saved,
+    msg_updated,
 )
 from iot_app.views.analysis.customer_dashboard import customer_dashboard_bp
 
@@ -111,7 +121,6 @@ def _get_handler(gadget_name, handler_attr):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('', methods=['GET'])
-@require_auth
 def customer_dashboard():
     """顧客作成ダッシュボード初期表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -187,7 +196,6 @@ def customer_dashboard():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards', methods=['GET'])
-@require_auth
 def dashboard_management():
     """ダッシュボード管理モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -204,7 +212,6 @@ def dashboard_management():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/create', methods=['GET'])
-@require_auth
 def dashboard_create():
     """ダッシュボード登録モーダル表示"""
     form = DashboardForm()
@@ -219,7 +226,6 @@ def dashboard_create():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/register', methods=['POST'])
-@require_auth
 def dashboard_register():
     """ダッシュボード登録実行"""
     form = DashboardForm()
@@ -241,7 +247,7 @@ def dashboard_register():
         upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
         logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
-        return jsonify({'message': 'ダッシュボードを登録しました'})
+        return jsonify({'message': msg_created('ダッシュボード')})
 
     except Exception as e:
         db.session.rollback()
@@ -253,7 +259,6 @@ def dashboard_register():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/edit', methods=['GET'])
-@require_auth
 def dashboard_edit(dashboard_uuid):
     """ダッシュボードタイトル更新モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -275,7 +280,6 @@ def dashboard_edit(dashboard_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/update', methods=['POST'])
-@require_auth
 def dashboard_update(dashboard_uuid):
     """ダッシュボードタイトル更新実行"""
     try:
@@ -312,7 +316,7 @@ def dashboard_update(dashboard_uuid):
     try:
         update_dashboard_title(dashboard, form.dashboard_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ダッシュボードタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -324,7 +328,6 @@ def dashboard_update(dashboard_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/delete', methods=['GET'])
-@require_auth
 def dashboard_delete_confirm(dashboard_uuid):
     """ダッシュボード削除確認モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -343,7 +346,6 @@ def dashboard_delete_confirm(dashboard_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/delete', methods=['POST'])
-@require_auth
 def dashboard_delete(dashboard_uuid):
     """ダッシュボード削除実行"""
     try:
@@ -368,7 +370,7 @@ def dashboard_delete(dashboard_uuid):
     try:
         delete_dashboard_with_cascade(dashboard, accessible_org_ids, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードを削除しました'})
+        return jsonify({'message': msg_deleted('ダッシュボード')})
 
     except Exception as e:
         db.session.rollback()
@@ -380,7 +382,6 @@ def dashboard_delete(dashboard_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/dashboards/<string:dashboard_uuid>/switch', methods=['POST'])
-@require_auth
 def dashboard_switch(dashboard_uuid):
     """ダッシュボード表示切替"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -391,7 +392,7 @@ def dashboard_switch(dashboard_uuid):
     try:
         upsert_dashboard_user_setting(g.current_user.user_id, dashboard.dashboard_id)
         db.session.commit()
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
+        return jsonify({'message': 'ダッシュボードの表示を切り替えました'})
 
     except Exception as e:
         db.session.rollback()
@@ -403,7 +404,6 @@ def dashboard_switch(dashboard_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/create', methods=['GET'])
-@require_auth
 def group_create():
     """ダッシュボードグループ登録モーダル表示"""
     form = DashboardGroupForm()
@@ -419,7 +419,6 @@ def group_create():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/register', methods=['POST'])
-@require_auth
 def group_register():
     """ダッシュボードグループ登録実行"""
     form = DashboardGroupForm()
@@ -444,7 +443,7 @@ def group_register():
         )
         db.session.commit()
         logger.info(f'グループ登録成功: dashboard_id={dashboard.dashboard_id}')
-        return jsonify({'message': 'ダッシュボードグループを登録しました'})
+        return jsonify({'message': msg_created('ダッシュボードグループ')})
 
     except Exception as e:
         db.session.rollback()
@@ -456,7 +455,6 @@ def group_register():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/edit', methods=['GET'])
-@require_auth
 def group_edit(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -478,7 +476,6 @@ def group_edit(dashboard_group_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/update', methods=['POST'])
-@require_auth
 def group_update(dashboard_group_uuid):
     """ダッシュボードグループタイトル更新実行"""
     try:
@@ -515,7 +512,7 @@ def group_update(dashboard_group_uuid):
     try:
         update_group_title(group, form.dashboard_group_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードグループタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ダッシュボードグループタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -527,7 +524,6 @@ def group_update(dashboard_group_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/delete', methods=['GET'])
-@require_auth
 def group_delete_confirm(dashboard_group_uuid):
     """ダッシュボードグループ削除確認モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -546,7 +542,6 @@ def group_delete_confirm(dashboard_group_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/groups/<string:dashboard_group_uuid>/delete', methods=['POST'])
-@require_auth
 def group_delete(dashboard_group_uuid):
     """ダッシュボードグループ削除実行"""
     try:
@@ -571,7 +566,7 @@ def group_delete(dashboard_group_uuid):
     try:
         delete_group_with_cascade(group, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ダッシュボードグループを削除しました'})
+        return jsonify({'message': msg_deleted('ダッシュボードグループ')})
 
     except Exception as e:
         db.session.rollback()
@@ -583,7 +578,6 @@ def group_delete(dashboard_group_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/add', methods=['GET'])
-@require_auth
 def gadget_add():
     """ガジェット追加モーダル表示"""
     gadget_types = get_gadget_types()
@@ -599,13 +593,12 @@ def gadget_add():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_type>/create', methods=['GET'])
-@require_auth
 def gadget_create(gadget_type):
     """ガジェット登録モーダル表示（ガジェット種別ごとのハンドラーにディスパッチ）"""
     gadget_name = _SLUG_TO_NAME.get(gadget_type)
     if gadget_name is None:
         logger.info(f'未実装のガジェット種別が選択されました: gadget_type={gadget_type}')
-        return jsonify({'error': '追加予定のガジェットです'}), 404
+        return jsonify({'error': ERR_GADGET_NOT_AVAILABLE}), 404
     handler = _get_handler(gadget_name, 'handle_gadget_create')
     return handler(gadget_type)
 
@@ -615,7 +608,6 @@ def gadget_create(gadget_type):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_type>/register', methods=['POST'])
-@require_auth
 def gadget_register(gadget_type):
     """ガジェット登録実行（ガジェット種別ごとのハンドラーにディスパッチ）"""
     gadget_name = _SLUG_TO_NAME.get(gadget_type)
@@ -631,7 +623,6 @@ def gadget_register(gadget_type):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/edit', methods=['GET'])
-@require_auth
 def gadget_edit(gadget_uuid):
     """ガジェットタイトル更新モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -653,7 +644,6 @@ def gadget_edit(gadget_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/update', methods=['POST'])
-@require_auth
 def gadget_update(gadget_uuid):
     """ガジェットタイトル更新実行"""
     try:
@@ -690,7 +680,7 @@ def gadget_update(gadget_uuid):
     try:
         update_gadget_title(gadget, form.gadget_name.data, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ガジェットタイトルを更新しました'})
+        return jsonify({'message': msg_updated('ガジェットタイトル')})
 
     except Exception as e:
         db.session.rollback()
@@ -702,7 +692,6 @@ def gadget_update(gadget_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/delete', methods=['GET'])
-@require_auth
 def gadget_delete_confirm(gadget_uuid):
     """ガジェット削除確認モーダル表示"""
     accessible_org_ids = get_accessible_organizations(get_organization_id_by_user(g.current_user.user_id))
@@ -721,7 +710,6 @@ def gadget_delete_confirm(gadget_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/delete', methods=['POST'])
-@require_auth
 def gadget_delete(gadget_uuid):
     """ガジェット削除実行"""
     try:
@@ -746,7 +734,7 @@ def gadget_delete(gadget_uuid):
     try:
         delete_gadget(gadget, g.current_user.user_id)
         db.session.commit()
-        return jsonify({'message': 'ガジェットを削除しました'})
+        return jsonify({'message': msg_deleted('ガジェット')})
 
     except Exception as e:
         db.session.rollback()
@@ -758,7 +746,6 @@ def gadget_delete(gadget_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-@require_auth
 def gadget_data(gadget_uuid):
     """ガジェットデータ取得（AJAX）"""
     gadget_type = get_gadget_type(gadget_uuid)
@@ -772,7 +759,6 @@ def gadget_data(gadget_uuid):
 
 
 @customer_dashboard_bp.route('/gadgets/<string:gadget_uuid>', methods=['GET'])
-@require_auth
 def gadget_csv_export(gadget_uuid):
     """ガジェット CSVエクスポート"""
     gadget_type = get_gadget_type(gadget_uuid)
@@ -790,7 +776,6 @@ def gadget_csv_export(gadget_uuid):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/layout/save', methods=['POST'])
-@require_auth
 def layout_save():
     """レイアウト保存（AJAX）"""
     try:
@@ -800,12 +785,12 @@ def layout_save():
         save_layout(gadgets, g.current_user.user_id)
         db.session.commit()
         logger.info(f'レイアウト保存成功: user_id={g.current_user.user_id}')
-        return jsonify({'message': 'レイアウトを保存しました'}), 200
+        return jsonify({'message': msg_saved('レイアウト')}), 200
 
     except Exception as e:
         db.session.rollback()
         logger.error(f'レイアウト保存エラー: {str(e)}')
-        return jsonify({'error': 'レイアウトの保存に失敗しました'}), 500
+        return jsonify({'error': err_save_failed('レイアウト')}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -819,7 +804,6 @@ def layout_save():
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/organizations/<int:org_id>/devices', methods=['GET'])
-@require_auth
 def organization_devices(org_id):
     """デバイス一覧取得（AJAX）"""
     try:
@@ -833,7 +817,7 @@ def organization_devices(org_id):
 
     except Exception as e:
         logger.error(f'デバイス一覧取得エラー: {str(e)}')
-        return jsonify({'error': 'デバイス一覧の取得に失敗しました'}), 500
+        return jsonify({'error': err_fetch_failed('デバイス一覧')}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -841,7 +825,6 @@ def organization_devices(org_id):
 # ---------------------------------------------------------------------------
 
 @customer_dashboard_bp.route('/datasource/save', methods=['POST'])
-@require_auth
 def datasource_save():
     """データソース設定保存（AJAX）"""
     try:
@@ -860,4 +843,4 @@ def datasource_save():
     except Exception as e:
         db.session.rollback()
         logger.error(f'データソース設定保存エラー: {str(e)}')
-        return jsonify({'error': 'データソース設定の保存に失敗しました'}), 500
+        return jsonify({'error': err_save_failed('データソース設定')}), 500

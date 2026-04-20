@@ -33,12 +33,13 @@
 }
 
 .toast--error {
-  background-color: var(--color-danger);
-  color: var(--color-white);
+  background-color: var(--color-danger-light);
+  border: var(--border-width) solid var(--color-danger);
+  color: var(--color-danger-dark);
 }
 
 .toast--success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: var(--color-success-light);
+  border: var(--border-width) solid var(--color-success);
+  color: var(--color-success-dark);
 }

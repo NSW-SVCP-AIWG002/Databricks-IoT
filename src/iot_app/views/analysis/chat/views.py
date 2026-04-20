@@ -7,6 +7,15 @@ from flask import Blueprint, g, jsonify, render_template, request, session
 from markupsafe import escape
 
 # from iot_app.common.logger import get_logger
+from iot_app.common.messages import (
+    ERR_CHAT_CONNECTION,
+    ERR_CHAT_GENERATION,
+    ERR_CHAT_INVALID_THREAD_ID,
+    ERR_CHAT_NO_THREAD_ID,
+    ERR_CHAT_QUESTION_EMPTY,
+    ERR_CHAT_QUESTION_TOO_LONG,
+    ERR_CHAT_TIMEOUT,
+)
 from iot_app.config import config as app_config
 
 chat_bp = Blueprint('chat', __name__)
@@ -128,14 +137,14 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "VALIDATION_ERROR",
-            "error_message": "質問を入力してください",
+            "error_message": ERR_CHAT_QUESTION_EMPTY,
         }), 400
 
     if len(question) > 1000:
         return jsonify({
             "success": False,
             "error_code": "VALIDATION_ERROR",
-            "error_message": "質問は1000文字以内で入力してください",
+            "error_message": ERR_CHAT_QUESTION_TOO_LONG,
         }), 400
 
     # バリデーション: thread_id
@@ -143,7 +152,7 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "VALIDATION_ERROR",
-            "error_message": "thread_idが指定されていません",
+            "error_message": ERR_CHAT_NO_THREAD_ID,
         }), 400
 
     try:
@@ -152,7 +161,7 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "VALIDATION_ERROR",
-            "error_message": "無効なthread_idが指定されました",
+            "error_message": ERR_CHAT_INVALID_THREAD_ID,
         }), 400
 
     ## 正しいToken取得方法に修正
@@ -178,7 +187,7 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "GENIE_TIMEOUT",
-            "error_message": "回答の取得がタイムアウトしました。しばらく経ってから再度お試しください。",
+            "error_message": ERR_CHAT_TIMEOUT,
         }), 500
 
     except requests.exceptions.ConnectionError:
@@ -189,7 +198,7 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "NETWORK_ERROR",
-            "error_message": "接続エラーが発生しました。しばらく経ってから再度お試しください。",
+            "error_message": ERR_CHAT_CONNECTION,
         }), 500
 
     except Exception as e:
@@ -202,5 +211,5 @@ def send_question():
         return jsonify({
             "success": False,
             "error_code": "ORCHESTRATOR_ERROR",
-            "error_message": "回答の生成に失敗しました。しばらく経ってから再度お試しください。",
+            "error_message": ERR_CHAT_GENERATION,
         }), 500

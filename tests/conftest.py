@@ -2,7 +2,6 @@ import os
 import pytest
 
 os.environ["FLASK_ENV"] = "testing"
-os.environ["DATABASE_URL"] = "mysql+pymysql://user:password@db:3306/databricks_iot"
 
 from iot_app import create_app, db as _db
 

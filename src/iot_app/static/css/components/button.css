@@ -16,6 +16,7 @@
   transition: all var(--transition-base);
   outline: none;
   user-select: none;
+  white-space: nowrap;
 }
 
 .button:focus {
@@ -28,7 +29,7 @@
   color: var(--color-white);
 }
 
-.button--primary:hover {
+.button--primary:hover:not(:disabled) {
   background-color: var(--color-primary-hover);
 }
 

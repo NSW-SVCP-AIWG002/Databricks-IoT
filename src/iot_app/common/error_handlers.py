@@ -3,6 +3,7 @@ from urllib.parse import quote
 from flask import g, jsonify, redirect, render_template, request, session, url_for
 
 from iot_app.common.logger import get_logger
+from iot_app.common.messages import HTTP_4XX_CONTENT, HTTP_4XX_DEFAULT
 
 logger = get_logger(__name__)
 
@@ -24,15 +25,6 @@ def handle_401(e):
     return redirect(url_for("auth.login"))
 
 
-# (title, message, reason)
-_4XX_CONTENT = {
-    400: ('不正なリクエストです',   'リクエストの内容が正しくありません。',                                                              'Bad Request'),
-    403: ('アクセスできません',     'このアプリケーションへのアクセス権限がありません。\nシステム管理者にお問い合わせください。',          'Forbidden'),
-    404: ('ページが見つかりません', 'お探しのページは存在しないか、削除された可能性があります。',                                        'Not Found'),
-    409: ('競合が発生しました',     '他の操作と競合が発生しました。再度お試しください。',                                               'Conflict'),
-}
-
-
 def handle_4xx(e):
     """400系例外ハンドラー（401以外）
 
@@ -41,7 +33,7 @@ def handle_4xx(e):
     - URL直打ち（referrerなし）: 4xx.html エラーページ
     """
     logger.warning("Client Error", extra={"httpStatus": e.code})
-    title, message, reason = _4XX_CONTENT.get(e.code, ('エラー', 'エラーが発生しました。', 'Error'))
+    title, message, reason = HTTP_4XX_CONTENT.get(e.code, HTTP_4XX_DEFAULT)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'error': message}), e.code

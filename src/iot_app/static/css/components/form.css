@@ -36,6 +36,7 @@
   background-color: var(--color-white);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--border-radius-base);
+  box-sizing: border-box;
   outline: none;
   transition: all var(--transition-base);
 }
@@ -76,8 +77,31 @@
   align-items: center;
   gap: var(--spacing-1);
   font-size: var(--font-size-sm);
-  color: var(--color-danger);
   margin-top: var(--spacing-1);
+}
+
+/* 内容があるときのみ背景・ボーダーを表示（form-error--reserved の空span対策） */
+.form-error:not(:empty) {
+  background-color: var(--color-danger-light);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--border-radius-base);
+  color: var(--color-danger-dark);
+  padding: var(--spacing-1) var(--spacing-2);
+}
+
+.form-error:not(:empty)::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background-color: var(--color-danger);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
 }
 
 /* ヘルプテキスト */

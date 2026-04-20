@@ -17,15 +17,15 @@
 
     <!-- (1) タイトル行 -->
     <div class="gadget-register__title-row">
-      <label class="form__label form__label--required" for="gadget_name">タイトル</label>
-      {{ form.gadget_name(class="form__input", id="gadget_name", maxlength=20) }}
-      <span class="form__error form__error--reserved">{% if form.gadget_name.errors %}{{ form.gadget_name.errors[0] }}{% endif %}</span>
+      <label class="form-label" for="gadget_name">タイトル<span class="form-label__required">必須</span></label>
+      {{ form.gadget_name(class="form-input", id="gadget_name", maxlength=20) }}
+      <span class="form-error form-error--reserved">{% if form.gadget_name.errors %}{{ form.gadget_name.errors[0] }}{% endif %}</span>
     </div>
 
     <!-- (2) 上部行：デバイスモード選択 + 表示項目ラベル -->
     <div class="gadget-register__top-row">
       <div class="gadget-register__device-mode-area">
-        <label class="form__label">表示デバイス選択</label>
+        <label class="form-label">表示デバイス選択</label>
         <div class="circle-chart-register__device-mode-buttons">
           <button type="button"
                   class="button circle-chart-register__device-mode-btn{% if (form.device_mode.data or 'variable') == 'fixed' %} circle-chart-register__device-mode-btn--active{% endif %}"
@@ -37,8 +37,8 @@
         <input type="hidden" name="device_mode" id="device_mode" value="{{ form.device_mode.data or 'variable' }}">
       </div>
       <div class="gadget-register__measurement-title">
-        <label class="form__label form__label--required">表示項目選択</label>
-        <span class="form__error form__error--reserved">{% if form.measurement_item_ids.errors %}{{ form.measurement_item_ids.errors[0] }}{% endif %}</span>
+        <label class="form-label">表示項目選択<span class="form-label__required">必須</span></label>
+        <span class="form-error form-error--reserved">{% if form.measurement_item_ids.errors %}{{ form.measurement_item_ids.errors[0] }}{% endif %}</span>
       </div>
     </div>
 
@@ -72,18 +72,18 @@
         <div id="device-fixed-area"
              style="visibility: {% if (form.device_mode.data or 'variable') == 'fixed' %}visible{% else %}hidden{% endif %};">
           <p class="gadget-register__section-title">表示デバイス指定</p>
-          <div class="form__group">
-            <label class="form__label">組織フィルター</label>
-            <select class="form__select" id="organization-filter">
+          <div class="form-group">
+            <label class="form-label">組織フィルター</label>
+            <select class="form-select" id="organization-filter">
               <option value="">選択してください</option>
               {% for org in organizations %}
               <option value="{{ org.organization_id }}">{{ org.organization_name }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="form__group">
-            <label class="form__label form__label--required">デバイス選択</label>
-            <select class="form__select" name="device_id" id="device-select">
+          <div class="form-group">
+            <label class="form-label">デバイス選択<span class="form-label__required">必須</span></label>
+            <select class="form-select" name="device_id" id="device-select">
               <option value="">選択してください</option>
               {% for device in devices %}
               <option value="{{ device.device_id }}"
@@ -94,7 +94,7 @@
               </option>
               {% endfor %}
             </select>
-            <span class="form__error form__error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
+            <span class="form-error form-error--reserved">{% if form.device_id.errors %}{{ form.device_id.errors[0] }}{% endif %}</span>
           </div>
         </div>
       </div>
@@ -102,7 +102,7 @@
       <!-- 右カラム：表示項目選択 -->
       <div class="gadget-register__right">
         <div class="circle-chart-register__measurement-list">
-          <table class="table">
+          <table class="table table--fit">
             <thead>
               <tr>
                 <th>選択</th>
@@ -137,11 +137,11 @@
     </div>
 
     <!-- (7) グループ選択 -->
-    <div class="form__row">
-      <div class="form__group form__group--half">
-        <div class="form__group--inline">
-          <label class="form__label form__label--required" for="group_id">グループ選択</label>
-          <select class="form__select" name="group_id" id="group_id">
+    <div class="form-row">
+      <div class="form-group form-group--half">
+        <div class="form-group--inline">
+          <label class="form-label" for="group_id">グループ選択<span class="form-label__required">必須</span></label>
+          <select class="form-select" name="group_id" id="group_id">
             {% for gr in groups %}
             <option value="{{ gr.dashboard_group_id }}"
                     {% if form.group_id.data == gr.dashboard_group_id %}selected{% endif %}>
@@ -150,7 +150,7 @@
             {% endfor %}
           </select>
         </div>
-        <span class="form__error form__error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
+        <span class="form-error form-error--reserved">{% if form.group_id.errors %}{{ form.group_id.errors[0] }}{% endif %}</span>
       </div>
     </div>
 

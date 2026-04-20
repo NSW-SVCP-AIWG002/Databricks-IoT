@@ -54,7 +54,7 @@ const CustomerDashboard = (function () {
       if (!res.ok) {
         const data = await res.json();
         _closeModal();
-        Toast.show(data.error || 'エラーが発生しました', 'error');
+        Toast.show(data.error, 'error');
         return;
       }
       content.innerHTML = await res.text();
@@ -93,46 +93,8 @@ const CustomerDashboard = (function () {
     // 各ガジェット種別のバインド処理（各ガジェットJSが registerModalBinder で登録）
     _modalBinders.forEach(function (fn) { fn(container); });
 
-    // modal-form の AJAX 送信（common系モーダル共通）
-    const modalForm = container.querySelector('form.modal-form');
-    if (modalForm) {
-      modalForm.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const formData = new FormData(modalForm);
-        try {
-          const res = await fetch(modalForm.action, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          });
-          if (res.status >= 500) {
-            const html = await res.text();
-            document.documentElement.innerHTML = html;
-            return;
-          }
-          if (res.status === 400) {
-            // バリデーションエラー: モーダルHTML再描画
-            const html = await res.text();
-            const content = document.getElementById('ajax-modal-content');
-            content.innerHTML = html;
-            _bindModalEvents(content);
-            return;
-          }
-          if (!res.ok) {
-            const data = await res.json();
-            _closeModal();
-            Toast.show(data.error || 'エラーが発生しました', 'error');
-            return;
-          }
-          const data = await res.json();
-          _closeModal();
-          Toast.showAfterReload(data.message || '完了しました', 'success');
-          window.location.reload();
-        } catch (err) {
-          window.location.reload();
-        }
-      });
-    }
+    // modal-form の AJAX 送信（Modal.bindForm に委譲）
+    Modal.bindForm(container, { onClose: _closeModal, onRebind: _bindModalEvents });
   }
 
   /* =========================================================
@@ -169,7 +131,7 @@ const CustomerDashboard = (function () {
       deleteBtn.addEventListener('click', function () {
         const selected = container.querySelector('input[name="dashboard_uuid"]:checked');
         if (!selected) {
-          Toast.show('削除するダッシュボードを選択してください', 'error');
+          Toast.show(MESSAGES.ERR_SELECT_DASHBOARD_TO_DELETE, 'error');
           return;
         }
         const deleteUrl = selected.dataset.deleteUrl;
@@ -182,7 +144,7 @@ const CustomerDashboard = (function () {
       changeBtn.addEventListener('click', async function () {
         const selected = container.querySelector('input[name="dashboard_uuid"]:checked');
         if (!selected) {
-          Toast.show('切り替えるダッシュボードを選択してください', 'error');
+          Toast.show(MESSAGES.ERR_SELECT_DASHBOARD_TO_SWITCH, 'error');
           return;
         }
         const switchUrl = selected.dataset.switchUrl;
@@ -195,7 +157,7 @@ const CustomerDashboard = (function () {
           await fetch(switchUrl, { method: 'POST', body: formData, redirect: 'follow' });
           window.location.reload();
         } catch (err) {
-          Toast.show('ダッシュボードの切り替えに失敗しました', 'error');
+          Toast.show(MESSAGES.ERR_DASHBOARD_SWITCH_FAILED, 'error');
         }
       });
     }
@@ -481,12 +443,12 @@ const CustomerDashboard = (function () {
         });
         const data = await res.json();
         if (res.ok) {
-          Toast.show(data.message || 'レイアウトを保存しました', 'success');
+          Toast.show(data.message, 'success');
         } else {
-          Toast.show(data.error || 'レイアウトの保存に失敗しました', 'error');
+          Toast.show(data.error, 'error');
         }
       } catch (e) {
-        Toast.show('通信エラーが発生しました', 'error');
+        Toast.show(MESSAGES.ERR_NETWORK, 'error');
       }
     });
   }
@@ -624,10 +586,10 @@ const CustomerDashboard = (function () {
         applyBtn.addEventListener('click', function () {
           const start = document.getElementById('custom-start').value;
           const end = document.getElementById('custom-end').value;
-          if (!start) { Toast.show('開始日時を入力してください', 'error'); return; }
-          if (!end) { Toast.show('終了日時を入力してください', 'error'); return; }
+          if (!start) { Toast.show(MESSAGES.ERR_START_DATETIME_REQUIRED, 'error'); return; }
+          if (!end) { Toast.show(MESSAGES.ERR_END_DATETIME_REQUIRED, 'error'); return; }
           if (new Date(start) >= new Date(end)) {
-            Toast.show('開始日時は終了日時より前に設定してください', 'error');
+            Toast.show(MESSAGES.ERR_START_BEFORE_END, 'error');
             return;
           }
           customDropdown.hidden = true;

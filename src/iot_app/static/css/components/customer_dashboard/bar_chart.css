@@ -24,7 +24,7 @@
   align-items: center;
   gap: var(--spacing-3);
   padding: var(--spacing-2) var(--spacing-4);
-  border-top: 1px solid #eee;
+  border-top: var(--border-width) solid var(--color-border);
   font-size: var(--font-size-sm);
 }
 
@@ -46,8 +46,8 @@
 
 .bar-chart__unit-btn {
   padding: 2px var(--spacing-2);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
   border-radius: 2px;
@@ -55,7 +55,7 @@
 
 .bar-chart__unit-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -109,10 +109,32 @@
 }
 
 /* エラーメッセージ領域 */
-.bar-chart__error {
+.bar-chart__error:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
   font-size: var(--font-size-sm);
-  color: var(--color-danger);
-  padding: 0 var(--spacing-4);
+  margin: 0 var(--spacing-4) var(--spacing-2);
+  background-color: var(--color-danger-light);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--border-radius-base);
+  color: var(--color-danger-dark);
+  padding: var(--spacing-1) var(--spacing-2);
+}
+
+.bar-chart__error:not(:empty)::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background-color: var(--color-danger);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
 }
 
 /* ============================================================
@@ -156,7 +178,7 @@
   flex-direction: column;
 }
 
-.gadget-register__minmax .form__input {
+.gadget-register__minmax .form-input {
   width: 100%;
 }
 
@@ -172,7 +194,7 @@
   flex-direction: column;
 }
 
-.gadget-register__middle .form__group {
+.gadget-register__middle .form-group {
   display: flex;
   flex-direction: column;
 }
@@ -190,8 +212,8 @@
 .gadget-register__preview {
   width: 100%;
   height: 126px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -223,15 +245,15 @@
 
 .bar-chart-register__device-mode-btn {
   padding: var(--spacing-1) var(--spacing-3);
-  border: 1px solid #ccc;
-  background: #fff;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-white);
   cursor: pointer;
   font-size: var(--font-size-sm);
 }
 
 .bar-chart-register__device-mode-btn--active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--color-primary);
 }
 
@@ -256,26 +278,25 @@
 .bar-chart-register__measurement-list {
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
 }
 
 .bar-chart-register__measurement-list table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 0;
 }
 
 .bar-chart-register__measurement-list thead {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--color-white);
   z-index: 1;
 }
 
 .bar-chart-register__measurement-list th,
 .bar-chart-register__measurement-list td {
-  border: 1px solid #ddd;
+  border: var(--border-width) solid var(--color-border);
 }
 
 /* 表示デバイス指定セクション見出し */
@@ -286,7 +307,7 @@
 }
 
 /* フォーム行レイアウト */
-.form__row {
+.form-row {
   display: flex;
   gap: var(--spacing-4);
   align-items: flex-start;
@@ -294,7 +315,7 @@
 }
 
 /* インラインフォームグループ（ラベル＋コントロール同一行） */
-.form__group--inline {
+.form-group--inline {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -302,16 +323,16 @@
   margin-bottom: 0;
 }
 
-.form__group--inline .form__label {
+.form-group--inline .form-label {
   white-space: nowrap;
   margin-bottom: 0;
 }
 
-.form__group--half {
+.form-group--half {
   flex: 1;
 }
 
-.form__group--third {
+.form-group--third {
   flex: 1;
 }
 
@@ -322,7 +343,7 @@
 }
 
 /* 登録フォーム: 横並びグループ内のエラーメッセージを次行に折り返す */
-.form__group--inline .form__error {
+.form-group--inline .form-error {
   flex-basis: 100%;
   margin-top: var(--spacing-1);
 }
