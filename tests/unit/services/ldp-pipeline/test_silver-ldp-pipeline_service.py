@@ -43,22 +43,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../src/pipe
 import pymysql
 import pymysql.err
 
-from functions.device_id_extraction import (
+from pipeline.silver.functions.device_id_extraction import (
     extract_device_id_from_topic,
     extract_device_id_from_key,
     extract_device_id,
 )
-from functions.json_telemetry import (
+from pipeline.silver.functions.json_telemetry import (
     is_valid_json,
     parse_binary_telemetry,
     update_json_device_id,
     convert_to_json_with_device_id,
 )
-from functions.alert_judgment import (
+from pipeline.silver.functions.alert_judgment import (
     determine_update_pattern,
     should_enqueue_email,
 )
-from functions.mysql_connector import is_retryable_error, get_mysql_connection
+from pipeline.silver.functions.mysql_connector import is_retryable_error, get_mysql_connection
 
 
 # =============================================================================

@@ -3,6 +3,7 @@ services:
     image: mcr.microsoft.com/devcontainers/python:3.12
     volumes:
       - ..:/workspaces/Databricks-IoT:cached
+      - ~/.ssh:/home/vscode/.ssh:ro
     command: sleep infinity
     environment:
       - DATABASE_URL=mysql+pymysql://user:password@db:3306/databricks_iot
