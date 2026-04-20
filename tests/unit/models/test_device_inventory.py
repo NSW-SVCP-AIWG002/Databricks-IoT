@@ -365,14 +365,13 @@ class TestDeviceMasterDefaults:
 
         instance = DeviceMaster(
             device_uuid='DEV-UUID-001',
+            organization_id=1,
             device_type_id=1,
             device_name='センサーA',
             device_model='MODEL-X100',
             device_inventory_id=100,
-            organization_id=1,
-            mac_address='AA:BB:CC:DD:EE:FF',
             creator=1,
-            modifier=1,
+            modifier=1
         )
 
         # Assert: delete_flag のデフォルト値が False であること
@@ -385,40 +384,40 @@ class TestDeviceMasterDefaults:
 
         instance = DeviceMaster(
             device_uuid='DEV-UUID-002',
+            organization_id=1,
             device_type_id=1,
             device_name='センサーB',
             device_model='MODEL-X200',
             device_inventory_id=200,
-            organization_id=1,
-            mac_address='BB:CC:DD:EE:FF:AA',
             creator=1,
             modifier=1,
-            delete_flag=True,
+            delete_flag=True
         )
 
         # Assert: delete_flag が True であること
         assert instance.delete_flag is True
 
     def test_optional_fields_default_to_none(self):
-        """2.1.2: 任意フィールド（sim_id, software_version, device_location, certificate_expiration_date）
+        """2.1.2: 任意フィールド（sim_id, mac_address, software_version, device_location, certificate_expiration_date）
         を指定しない場合、None が設定される"""
         # Arrange / Act
         from iot_app.models.device import DeviceMaster
 
         instance = DeviceMaster(
             device_uuid='DEV-UUID-003',
+            organization_id=1,
             device_type_id=1,
             device_name='センサーC',
             device_model='MODEL-X300',
             device_inventory_id=300,
-            organization_id=1,
-            mac_address='CC:DD:EE:FF:AA:BB',
             creator=1,
-            modifier=1,
+            modifier=1
         )
 
         # Assert: sim_id のデフォルト値が None であること
         assert instance.sim_id is None
+        # Assert: mac_addressのデフォルト値が None であること
+        assert instance.mac_address is None
         # Assert: software_version のデフォルト値が None であること
         assert instance.software_version is None
         # Assert: device_location のデフォルト値が None であること
@@ -436,12 +435,11 @@ class TestDeviceMasterDefaults:
 
         instance = DeviceMaster(
             device_uuid=expected_uuid,
+            organization_id=1,
             device_type_id=1,
             device_name='テストデバイス',
             device_model='MODEL-TEST',
             device_inventory_id=1,
-            organization_id=1,
-            mac_address='DD:EE:FF:AA:BB:CC',
             creator=1,
             modifier=1,
         )
@@ -460,31 +458,28 @@ class TestDeviceMasterDefaults:
         device_model = 'MODEL-FULL'
         device_inventory_id = 500
         organization_id = 10
-        mac_address = 'EE:FF:AA:BB:CC:DD'
         creator = 99
         modifier = 99
 
         # Act
         instance = DeviceMaster(
             device_uuid=device_uuid,
+            organization_id=organization_id,
             device_type_id=device_type_id,
             device_name=device_name,
             device_model=device_model,
             device_inventory_id=device_inventory_id,
-            organization_id=organization_id,
-            mac_address=mac_address,
             creator=creator,
-            modifier=modifier,
+            modifier=modifier
         )
 
         # Assert: 各フィールドが期待値と一致すること
         assert instance.device_uuid == device_uuid
+        assert instance.organization_id == organization_id
         assert instance.device_type_id == device_type_id
         assert instance.device_name == device_name
         assert instance.device_model == device_model
         assert instance.device_inventory_id == device_inventory_id
-        assert instance.organization_id == organization_id
-        assert instance.mac_address == mac_address
         assert instance.creator == creator
         assert instance.modifier == modifier
         assert instance.delete_flag is False

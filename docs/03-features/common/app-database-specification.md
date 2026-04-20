@@ -407,7 +407,7 @@
 | --- | --------------------------- | ---------------------- | ------------ | -------- | --- | --- | ----------------- | --------------------------------------------- |
 | 1   | device_id                   | デバイスID             | INT          | NOT NULL | ○   | -   | -                 | デバイスの一意識別子                          |
 | 2   | device_uuid                 | デバイスUUID           | VARCHAR(128) | NOT NULL | ○   | -   | -                 | AzureIoTHub、AWSIoTCoreで管理されるデバイスID |
-| 3   | organization_id             | 組織ID                 | INT          | NULL     | -   | ○   | -                 | 所属組織ID（organization_master参照）         |
+| 3   | organization_id             | 組織ID                 | INT          | NOT NULL | -   | ○   | -                 | 所属組織ID（organization_master参照）         |
 | 4   | device_type_id              | デバイス種別ID         | INT          | NOT NULL | -   | ○   | -                 | デバイス種別ID（device_type_master参照）      |
 | 5   | device_name                 | デバイス名             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスの表示名                              |
 | 6   | device_model                | モデル情報             | VARCHAR(100) | NOT NULL | -   | -   | -                 | デバイスのモデル名・型番                      |
