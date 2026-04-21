@@ -188,6 +188,19 @@ class TestSearchUsers:
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
+    def test_conditions_are_and_combined(self, mock_db, _mock_uc):
+        """3.1.1.5: 複数条件は AND 結合（filter を連鎖呼び出し、OR は使わない）"""
+        mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
+                  'user_name': '田中', 'email_address': '@example', 'user_type_id': 2,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        # OR 結合なら filter 呼び出しは1回になるが、AND 連鎖なら複数回呼ばれる
+        assert mock_query.filter.call_count >= 2
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
     def test_scope_filter_applied_with_login_user_id(self, mock_db, mock_uc_model):
         """3.1.1.4: login_user_id によるスコープ制限が全件フィルタに含まれる"""
         self._make_query_mock(mock_db, mock_uc_model, total=3)
@@ -210,6 +223,18 @@ class TestSearchUsers:
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=1)
         mock_query.limit.return_value.offset.assert_called_once_with(40)
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_per_page_passed_to_limit(self, mock_db, _mock_uc):
+        """3.1.3.1: per_page の設定値が limit() に渡される"""
+        mock_query = self._make_query_mock(mock_db, _mock_uc, total=100)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 10, 'sort_by': 'user_name', 'order': 'asc',
+                  'user_name': '', 'email_address': '', 'user_type_id': None,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        mock_query.limit.assert_called_once_with(10)
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +282,7 @@ class TestGetUserByDatabricksId:
         mock_db.session.query.return_value.filter.return_value.first.return_value = None
         from iot_app.services.user_service import get_user_by_databricks_id
         get_user_by_databricks_id('uid-1', login_user_id=42)
-        mock_db.session.query.assert_called_once_with(mock_uc)
+        mock_db.session.query.assert_called_once_with(_mock_uc)
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +323,7 @@ class TestGetUserFormOptions:
         from iot_app.services.user_service import get_user_form_options
         get_user_form_options(user_id=1, login_user_type_id=2)
         # UserType に対して user_type_id > 2 のフィルタが適用される
-        assert mock_db.session.query.called
+        assert mock_db.session.query.return_value.filter.called
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +454,6 @@ class TestInsertUnityCatalogUser:
                        'alert_notification_flag': True, 'system_notification_flag': True},
             creator_id=10,
         )
-        _, kwargs = mock_conn.execute_dml.call_args
         params = mock_conn.execute_dml.call_args[0][1]
         assert params['user_id'] == 42
         assert params['databricks_user_id'] == 'uid-42'
@@ -667,6 +691,47 @@ class TestCreateUser:
         uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
         assert uc_inserted is True
 
+    @patch(f'{MODULE}._insert_unity_catalog_user')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_add_user_to_group_called_with_databricks_user_id(
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
+        """3.2.1.1: SCIM create_user 後に add_user_to_group が databricks_user_id で呼ばれる"""
+        mock_user_obj = MagicMock()
+        mock_user_cls.return_value = mock_user_obj
+        mock_scim = MagicMock()
+        mock_scim.create_user.return_value = 'new-uid'
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import create_user
+        create_user(self._make_form_data(), creator_id=1,
+                    auth_provider=self._make_auth_provider())
+        mock_scim.add_user_to_group.assert_called_once()
+        positional_args = mock_scim.add_user_to_group.call_args[0]
+        assert 'new-uid' in positional_args
+
+    @patch(f'{MODULE}._rollback_create_user')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_add_to_group_failure_triggers_rollback_with_uc_inserted_false(
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_rollback):
+        """2.3.2: add_user_to_group 失敗時に _rollback_create_user が uc_inserted=False で呼ばれる"""
+        mock_user_obj = MagicMock()
+        mock_user_cls.return_value = mock_user_obj
+        mock_scim = MagicMock()
+        mock_scim.create_user.return_value = 'new-uid'
+        mock_scim.add_user_to_group.side_effect = Exception('group error')
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import create_user
+        with pytest.raises(Exception):
+            create_user(self._make_form_data(), creator_id=1,
+                        auth_provider=self._make_auth_provider())
+        mock_rollback.assert_called_once()
+        args, kwargs = mock_rollback.call_args
+        uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
+        assert uc_inserted is False
+
 
 # ---------------------------------------------------------------------------
 # _update_oltp_user
@@ -728,6 +793,19 @@ class TestUpdateUnityCatalogUser:
             'status': 1, 'alert_notification_flag': True, 'system_notification_flag': False,
         }, modifier_id=99)
         mock_conn.execute_dml.assert_called_once()
+
+    @patch(f'{MODULE}.UnityCatalogConnector')
+    def test_user_id_passed_to_params(self, mock_conn_cls):
+        """3.3.2.2: 指定した user_id が execute_dml のパラメータに含まれる"""
+        mock_conn = MagicMock()
+        mock_conn_cls.return_value = mock_conn
+        from iot_app.services.user_service import _update_unity_catalog_user
+        _update_unity_catalog_user(user_id=55, user_data={
+            'user_name': '更新名', 'region_id': 1, 'address': '大阪府',
+            'status': 1, 'alert_notification_flag': True, 'system_notification_flag': True,
+        }, modifier_id=1)
+        params = mock_conn.execute_dml.call_args[0][1]
+        assert params['user_id'] == 55
 
 
 # ---------------------------------------------------------------------------
@@ -814,10 +892,10 @@ class TestUpdateUser:
         """3.3.1.1: Saga実行順は ①SCIM update → ②UC UPDATE → ③OLTP UPDATE"""
         call_order = []
         mock_scim = MagicMock()
-        mock_scim.update_user.side_effect = lambda *a, **kw: call_order.append('scim')
+        mock_scim.update_user.side_effect = lambda *_, **__: call_order.append('scim')
         mock_scim_cls.return_value = mock_scim
-        mock_update_uc.side_effect = lambda *a, **kw: call_order.append('uc')
-        mock_update_oltp.side_effect = lambda *a, **kw: call_order.append('oltp')
+        mock_update_uc.side_effect = lambda *_, **__: call_order.append('uc')
+        mock_update_oltp.side_effect = lambda *_, **__: call_order.append('oltp')
         from iot_app.services.user_service import update_user
         update_user(user_id=1, databricks_user_id='uid-1',
                     user_data=self._make_user_data(), modifier_id=1)
@@ -987,22 +1065,17 @@ class TestDeleteUser:
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.db')
     def test_saga_order_uc_then_oltp_then_scim(self, mock_db, mock_scim_cls, mock_delete_uc):
-        """3.4.1.1: Saga実行順は ①UC DELETE → ②OLTP 論理削除 → ③SCIM delete"""
+        """3.4.1.1: Saga実行順は ①UC DELETE → ②OLTP 論理削除（flush） → ③SCIM delete"""
         call_order = []
-        mock_delete_uc.side_effect = lambda *a, **kw: call_order.append('uc')
-        user = self._make_user_mock()
-        original_setattr = type(user).__setattr__
-        def track_delete_flag(self, name, value):
-            if name == 'delete_flag' and value is True:
-                call_order.append('oltp')
-            original_setattr(self, name, value)
+        mock_delete_uc.side_effect = lambda *_, **__: call_order.append('uc')
+        mock_db.session.flush.side_effect = lambda: call_order.append('oltp')
         mock_scim = MagicMock()
-        mock_scim.delete_user.side_effect = lambda *a, **kw: call_order.append('scim')
+        mock_scim.delete_user.side_effect = lambda *_, **__: call_order.append('scim')
         mock_scim_cls.return_value = mock_scim
+        user = self._make_user_mock()
         from iot_app.services.user_service import delete_user
         delete_user(user=user, deleter_id=99)
-        assert 'uc' in call_order
-        assert 'scim' in call_order
+        assert call_order == ['uc', 'oltp', 'scim']
 
     @patch(f'{MODULE}._rollback_delete_user')
     @patch(f'{MODULE}._delete_unity_catalog_user')
