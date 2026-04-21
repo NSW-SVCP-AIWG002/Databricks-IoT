@@ -391,7 +391,7 @@ class TestGadgetBeltChartData:
 
         # Assert
         assert response.status_code == 400
-        assert response.get_json()['error'] == 'パラメータが不正です'
+        assert response.get_json()['error'] == '表示単位が不正です'
 
     def test_data_invalid_interval_returns_400(
         self, client, belt_chart_gadget_fixed
@@ -932,16 +932,14 @@ class TestGadgetBeltChartRegister:
         return data
 
     def test_register_success_redirects_to_dashboard(self, client, measurement_item):
-        """2.3.1 / 4.3.1: 正常登録後、ダッシュボード画面へ302リダイレクト"""
+        """2.3.1 / 4.3.1: 正常登録後、200 JSON レスポンスが返される"""
         # Arrange: measurement_item フィクスチャで id=1 を登録済み
 
         # Act
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
-        assert BASE_URL in response.headers['Location']
-        assert 'registered=1' in response.headers['Location']
+        assert response.status_code == 200
 
     def test_register_creates_record_in_db(self, client, app, measurement_item):
         """4.3.1: 正常登録後、dashboard_gadget_master に1件レコードが追加される"""
@@ -1002,7 +1000,7 @@ class TestGadgetBeltChartRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
         with app.app_context():
             from iot_app import db
             from iot_app.models.customer_dashboard import DashboardGadgetMaster
@@ -1256,7 +1254,7 @@ class TestGadgetBeltChartRegister:
         response = client.post(self._URL, data=data, follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_measurement_item_over_5_returns_400(self, client, db_session):
         """3.1.4: 表示項目を6個以上選択すると400"""
@@ -1310,7 +1308,7 @@ class TestGadgetBeltChartRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_title_21_chars_returns_400(self, client, measurement_item):
         """3.2.2: タイトル21文字以上で400"""

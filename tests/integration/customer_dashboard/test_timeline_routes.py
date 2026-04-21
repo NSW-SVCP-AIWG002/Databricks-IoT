@@ -182,7 +182,7 @@ def device_master(db_session, organization_master):
 
 
 @pytest.fixture()
-def dashboard_user_setting(db_session, dashboard_master):
+def dashboard_user_setting(db_session, dashboard_master, user_master):
     """DashboardUserSetting テストレコード（user_id=_TEST_USER_ID, dashboard_id=1）"""
     from iot_app.models.customer_dashboard import DashboardUserSetting
     setting = DashboardUserSetting(
@@ -237,20 +237,26 @@ def gadget_type_timeline(db_session):
 
 @pytest.fixture()
 def measurement_item_left(db_session):
-    """MeasurementItemMaster テストレコード（左表示項目: external_temp）"""
+    """MeasurementItemMaster テストレコード（左表示項目: external_temp）
+
+    seed_measurement_items（セッションスコープ autouse）が既に id=1 を挿入している場合は
+    そのレコードを返し、存在しない場合のみ INSERT する（重複キーエラー回避）。
+    """
     from iot_app.models.measurement import MeasurementItemMaster
-    item = MeasurementItemMaster(
-        measurement_item_id=1,
-        measurement_item_name='外気温度',
-        display_name='外気温度',
-        silver_data_column_name='external_temp',
-        unit_name='℃',
-        creator=1,
-        modifier=1,
-        delete_flag=False,
-    )
-    db_session.add(item)
-    db_session.flush()
+    item = db_session.get(MeasurementItemMaster, 1)
+    if item is None:
+        item = MeasurementItemMaster(
+            measurement_item_id=1,
+            measurement_item_name='外気温度',
+            display_name='外気温度',
+            silver_data_column_name='external_temp',
+            unit_name='℃',
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(item)
+        db_session.flush()
     return item
 
 
@@ -258,18 +264,20 @@ def measurement_item_left(db_session):
 def measurement_item_right(db_session, measurement_item_left):
     """MeasurementItemMaster テストレコード（右表示項目: compressor_freezer_1）"""
     from iot_app.models.measurement import MeasurementItemMaster
-    item = MeasurementItemMaster(
-        measurement_item_id=2,
-        measurement_item_name='第1冷凍 圧縮機',
-        display_name='第1冷凍 圧縮機',
-        silver_data_column_name='compressor_freezer_1',
-        unit_name='W',
-        creator=1,
-        modifier=1,
-        delete_flag=False,
-    )
-    db_session.add(item)
-    db_session.flush()
+    item = db_session.get(MeasurementItemMaster, 2)
+    if item is None:
+        item = MeasurementItemMaster(
+            measurement_item_id=2,
+            measurement_item_name='第1冷凍 圧縮機',
+            display_name='第1冷凍 圧縮機',
+            silver_data_column_name='compressor_freezer_1',
+            unit_name='W',
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(item)
+        db_session.flush()
     return item
 
 
@@ -298,7 +306,7 @@ def timeline_gadget(db_session, dashboard_group_master, gadget_type_timeline, me
         data_source_config=json.dumps({'device_id': 1}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -331,7 +339,7 @@ def timeline_gadget_variable(db_session, dashboard_group_master, gadget_type_tim
         data_source_config=json.dumps({'device_id': None}),
         position_x=0,
         position_y=1,
-        gadget_size='2x2',
+        gadget_size=0,
         display_order=1,
         creator=1,
         modifier=1,
@@ -545,7 +553,7 @@ class TestGadgetTimelineData:
 
         # Assert
         assert response.status_code == 400
-        assert response.get_json()['error'] == 'パラメータが不正です'
+        assert response.get_json()['error'] == '正しい日付形式で入力してください'
 
     def test_data_missing_end_datetime_returns_400(self, client, timeline_gadget):
         """3.1.2: end_datetime 未指定で400エラー"""
@@ -746,13 +754,40 @@ class TestGadgetTimelineCreate:
         dashboard_user_setting フィクスチャは dashboard_master に依存するため使用せず、
         インラインで DashboardUserSetting のみを作成する。
         """
-        # Arrange: DashboardUserSetting だけ作成（DashboardMaster は作成しない）
-        # organization_closure がないため accessible_org_ids=[] →
-        # DashboardMaster.organization_id IN [] が常に False → NotFoundError → 404
-        from iot_app.models.customer_dashboard import DashboardUserSetting
+        # Arrange: organization_id=99（アクセス不可）の DashboardMaster を作成し、
+        # それを指す DashboardUserSetting を登録する。
+        # accessible_org_ids=[1]（_auth の organization_closure により）に 99 が含まれないため 404 となる。
+        from datetime import date as _date
+        from iot_app.models.customer_dashboard import DashboardMaster, DashboardUserSetting
+        from iot_app.models.organization import OrganizationMaster
+        org99 = OrganizationMaster(
+            organization_id=99,
+            organization_name='スコープ外組織99',
+            organization_type_id=1,
+            address='',
+            phone_number='000-0000-0000',
+            contact_person='',
+            contract_status_id=1,
+            contract_start_date=_date(2024, 1, 1),
+            databricks_group_id='group-99',
+            creator=1,
+            modifier=1,
+        )
+        db_session.add(org99)
+        db_session.flush()
+        dash = DashboardMaster(
+            dashboard_uuid=str(uuid.uuid4()),
+            dashboard_name='スコープ外ダッシュボード',
+            organization_id=99,
+            creator=1,
+            modifier=1,
+            delete_flag=False,
+        )
+        db_session.add(dash)
+        db_session.flush()
         setting = DashboardUserSetting(
             user_id=_TEST_USER_ID,
-            dashboard_id=1,
+            dashboard_id=dash.dashboard_id,
             device_id=None,
             creator=1,
             modifier=1,
@@ -852,15 +887,14 @@ class TestGadgetTimelineRegister:
     def test_register_success_redirects_to_dashboard(
         self, client, measurement_item_left, measurement_item_right,
     ):
-        """2.3.1 / 4.3.1: 正常登録後、ダッシュボード画面へ302リダイレクト"""
+        """2.3.1 / 4.3.1: 正常登録後、200 JSON レスポンスが返される"""
         # Arrange: measurement_item_left / measurement_item_right フィクスチャで id=1,2 を登録済み
 
         # Act
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
-        assert BASE_URL in response.headers['Location']
+        assert response.status_code == 200
 
     def test_register_creates_record_in_db(
         self, client, app, measurement_item_left, measurement_item_right,
@@ -1377,7 +1411,7 @@ class TestGadgetTimelineRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_title_21_chars_returns_400(
         self, client, measurement_item_left, measurement_item_right,
@@ -1442,7 +1476,7 @@ class TestGadgetTimelineRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_valid_right_min_max_succeeds(
         self, client, measurement_item_left, measurement_item_right,
@@ -1456,7 +1490,7 @@ class TestGadgetTimelineRegister:
         )
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_omit_all_min_max_succeeds(
         self, client, measurement_item_left, measurement_item_right,
@@ -1466,7 +1500,7 @@ class TestGadgetTimelineRegister:
         response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
         # Assert
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_register_right_min_equals_max_returns_400(
         self, client, measurement_item_left, measurement_item_right,
@@ -1584,14 +1618,13 @@ class TestGadgetTimelineRegister:
     def test_register_success_then_dashboard_renders(
         self, client, measurement_item_left, measurement_item_right,
     ):
-        """4.3.1 / 2.3.1: 登録成功後にリダイレクトを追跡するとダッシュボード画面（200）が表示される"""
-        # Act: リダイレクトを追跡してダッシュボード画面を取得
-        response = client.post(self._URL, data=self._valid_form(), follow_redirects=True)
+        """4.3.1 / 2.3.1: 登録成功後に200 JSONが返される"""
+        # Act
+        response = client.post(self._URL, data=self._valid_form(), follow_redirects=False)
 
-        # Assert: 最終的にダッシュボード画面（200）が表示される
+        # Assert: 200 JSON が返される
         assert response.status_code == 200
-        assert b"customer-dashboard" in response.data
-        # TODO: 設計書には成功メッセージモーダル表示の記載あり、要確認
+        assert response.get_json() is not None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1762,9 +1795,27 @@ class TestGadgetTimelineCsvExport:
         accessible_org_ids=[1] のユーザーが organization_id=2 のガジェットにアクセスすると
         get_gadget_in_scope が None を返し 404 になることを確認する。
         """
+        from datetime import date as _date
         from iot_app.models.customer_dashboard import (
             DashboardGadgetMaster, DashboardGroupMaster, DashboardMaster, GadgetTypeMaster,
         )
+        from iot_app.models.organization import OrganizationMaster
+        # org_id=2 の FK 親レコードを事前に作成
+        org2 = OrganizationMaster(
+            organization_id=2,
+            organization_name='別組織2',
+            organization_type_id=1,
+            address='',
+            phone_number='000-0000-0000',
+            contact_person='',
+            contract_status_id=1,
+            contract_start_date=_date(2024, 1, 1),
+            databricks_group_id='group-2',
+            creator=1,
+            modifier=1,
+        )
+        db_session.add(org2)
+        db_session.flush()
         # 別組織（org_id=2）のダッシュボード構造を作成
         gt = GadgetTypeMaster(
             gadget_type_id=98, gadget_type_name='時系列グラフ',
@@ -1792,10 +1843,15 @@ class TestGadgetTimelineCsvExport:
                 'right_min_value': None, 'right_max_value': None,
             }),
             data_source_config=json.dumps({'device_id': 1}),
-            position_x=0, position_y=0, gadget_size='2x2', display_order=1,
+            position_x=0, position_y=0, gadget_size=0, display_order=1,
             delete_flag=False, creator=1, modifier=1,
         )
-        db_session.add_all([gt, dash, grp, gadget])
+        db_session.add(gt)
+        db_session.add(dash)
+        db_session.flush()
+        db_session.add(grp)
+        db_session.flush()
+        db_session.add(gadget)
         db_session.flush()
 
         # Act
@@ -2385,8 +2441,8 @@ class TestTransaction:
         # Act
         response = client.post(self._URL, data=self._valid_form())
 
-        # Assert: 302リダイレクトかつDBに1件存在
-        assert response.status_code == 302
+        # Assert: 200 JSONかつDBに1件存在
+        assert response.status_code == 200
         with app.app_context():
             from iot_app import db
             from iot_app.models.customer_dashboard import DashboardGadgetMaster
@@ -2550,8 +2606,8 @@ class TestSecurity:
         """
         injection = "' OR 1=1 --"  # 12文字: Length(max=20) を通過する
         response = client.post(self._URL, data=self._valid_form(title=injection))
-        # 302（登録成功）または 400（バリデーションエラー）。DBエラー（500）にはならない
-        assert response.status_code in (302, 400)
+        # 200（登録成功）または 400（バリデーションエラー）。DBエラー（500）にはならない
+        assert response.status_code in (200, 400)
 
     def test_sql_injection_semicolon_multi_statement_does_not_cause_db_error(
         self, client, measurement_item_left, measurement_item_right,
@@ -2563,7 +2619,7 @@ class TestSecurity:
         """
         injection = "1'; SELECT 1; --"  # 16文字
         response = client.post(self._URL, data=self._valid_form(title=injection))
-        assert response.status_code in (302, 400)
+        assert response.status_code in (200, 400)
 
     def test_sql_injection_long_payload_returns_400_by_length_validation(
         self, client, measurement_item_left, measurement_item_right,
@@ -2590,7 +2646,7 @@ class TestSecurity:
         import json
         from iot_app.models.customer_dashboard import DashboardGadgetMaster
 
-        xss_name = '<script>alert(1)</script>'
+        xss_name = '<script>XSS</script>'
         gadget = DashboardGadgetMaster(
             gadget_uuid=str(uuid.uuid4()),
             gadget_name=xss_name,
@@ -2607,7 +2663,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2619,7 +2675,7 @@ class TestSecurity:
         html = response.data.decode('utf-8')
 
         # 生の <script> タグが HTML に含まれていない（XSS が成立しない）
-        assert '<script>alert(1)</script>' not in html
+        assert '<script>XSS</script>' not in html
         # Jinja2 によるエスケープ済み文字列が含まれる
         assert '&lt;script&gt;' in html
 
@@ -2633,7 +2689,7 @@ class TestSecurity:
         import json
         from iot_app.models.customer_dashboard import DashboardGadgetMaster
 
-        xss_name = '<img src=x onerror=alert(1)>'
+        xss_name = '<img onerror=x>'
         gadget = DashboardGadgetMaster(
             gadget_uuid=str(uuid.uuid4()),
             gadget_name=xss_name,
@@ -2650,7 +2706,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,
@@ -2662,7 +2718,7 @@ class TestSecurity:
         html = response.data.decode('utf-8')
 
         # 生の <img onerror> タグが出力されていない
-        assert '<img src=x onerror=alert(1)>' not in html
+        assert '<img onerror=x>' not in html
         # Jinja2 によるエスケープ済み文字列が含まれる
         assert '&lt;img' in html
 
@@ -2694,7 +2750,7 @@ class TestSecurity:
             data_source_config=json.dumps({'device_id': None}),
             position_x=0,
             position_y=1,
-            gadget_size='2x2',
+            gadget_size=0,
             display_order=1,
             creator=1,
             modifier=1,

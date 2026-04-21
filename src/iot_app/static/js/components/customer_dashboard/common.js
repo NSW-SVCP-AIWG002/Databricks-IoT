@@ -54,7 +54,7 @@ const CustomerDashboard = (function () {
       if (!res.ok) {
         const data = await res.json();
         _closeModal();
-        Toast.show(data.error || 'エラーが発生しました', 'error');
+        Toast.show(data.error, 'error');
         return;
       }
       content.innerHTML = await res.text();
@@ -131,7 +131,7 @@ const CustomerDashboard = (function () {
       deleteBtn.addEventListener('click', function () {
         const selected = container.querySelector('input[name="dashboard_uuid"]:checked');
         if (!selected) {
-          Toast.show('削除するダッシュボードを選択してください', 'error');
+          Toast.show(MESSAGES.ERR_SELECT_DASHBOARD_TO_DELETE, 'error');
           return;
         }
         const deleteUrl = selected.dataset.deleteUrl;
@@ -144,7 +144,7 @@ const CustomerDashboard = (function () {
       changeBtn.addEventListener('click', async function () {
         const selected = container.querySelector('input[name="dashboard_uuid"]:checked');
         if (!selected) {
-          Toast.show('切り替えるダッシュボードを選択してください', 'error');
+          Toast.show(MESSAGES.ERR_SELECT_DASHBOARD_TO_SWITCH, 'error');
           return;
         }
         const switchUrl = selected.dataset.switchUrl;
@@ -157,7 +157,7 @@ const CustomerDashboard = (function () {
           await fetch(switchUrl, { method: 'POST', body: formData, redirect: 'follow' });
           window.location.reload();
         } catch (err) {
-          Toast.show('ダッシュボードの切り替えに失敗しました', 'error');
+          Toast.show(MESSAGES.ERR_DASHBOARD_SWITCH_FAILED, 'error');
         }
       });
     }
@@ -443,12 +443,12 @@ const CustomerDashboard = (function () {
         });
         const data = await res.json();
         if (res.ok) {
-          Toast.show(data.message || 'レイアウトを保存しました', 'success');
+          Toast.show(data.message, 'success');
         } else {
-          Toast.show(data.error || 'レイアウトの保存に失敗しました', 'error');
+          Toast.show(data.error, 'error');
         }
       } catch (e) {
-        Toast.show('通信エラーが発生しました', 'error');
+        Toast.show(MESSAGES.ERR_NETWORK, 'error');
       }
     });
   }
@@ -586,10 +586,10 @@ const CustomerDashboard = (function () {
         applyBtn.addEventListener('click', function () {
           const start = document.getElementById('custom-start').value;
           const end = document.getElementById('custom-end').value;
-          if (!start) { Toast.show('開始日時を入力してください', 'error'); return; }
-          if (!end) { Toast.show('終了日時を入力してください', 'error'); return; }
+          if (!start) { Toast.show(MESSAGES.ERR_START_DATETIME_REQUIRED, 'error'); return; }
+          if (!end) { Toast.show(MESSAGES.ERR_END_DATETIME_REQUIRED, 'error'); return; }
           if (new Date(start) >= new Date(end)) {
-            Toast.show('開始日時は終了日時より前に設定してください', 'error');
+            Toast.show(MESSAGES.ERR_START_BEFORE_END, 'error');
             return;
           }
           customDropdown.hidden = true;
