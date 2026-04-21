@@ -162,7 +162,7 @@ def industry_test_data(app):
         AlertStatusMaster,
     )
     from iot_app.models.contract import ContractStatusMaster
-    from iot_app.models.device import DeviceMaster
+    from iot_app.models.device import DeviceMaster, DeviceTypeMaster
     from iot_app.models.measurement import MeasurementItemMaster, SilverSensorData
     from iot_app.models.organization import (
         OrganizationClosure,
@@ -287,10 +287,50 @@ def industry_test_data(app):
     _inv_row = db.session.execute(
         _text("SELECT device_inventory_id FROM device_inventory_master LIMIT 1")
     ).first()
-    assert _dtype_row, "device_type_master にレコードがありません"
-    assert _inv_row, "device_inventory_master にレコードがありません"
-    _dtype_id = _dtype_row[0]
-    _inv_id = _inv_row[0]
+    _created_device_inventory = False
+    if _inv_row is None:
+        _inv_status_row = db.session.execute(
+            _text("SELECT inventory_status_id FROM inventory_status_master LIMIT 1")
+        ).first()
+        assert _inv_status_row, "inventory_status_master にレコードがありません"
+        db.session.execute(
+            _text(
+                "INSERT INTO device_inventory_master "
+                "(device_inventory_uuid, inventory_status_id, device_model, mac_address, "
+                "purchase_date, manufacturer_warranty_end_date, inventory_location, creator, modifier) "
+                "VALUES (:uuid, :status, :model, :mac, NOW(), NOW(), :loc, :c, :m)"
+            ),
+            {
+                "uuid": str(uuid.uuid4()),
+                "status": _inv_status_row[0],
+                "model": "TEST-INV-MODEL",
+                "mac": f"00:00:00:{uid[:2]}:{uid[2:4]}:{uid[4:6]}",
+                "loc": "テスト在庫場所_結合テスト用",
+                "c": _C,
+                "m": _C,
+            },
+        )
+        _inv_id_row = db.session.execute(
+            _text("SELECT LAST_INSERT_ID()")
+        ).first()
+        _inv_id = _inv_id_row[0]
+        _created_device_inventory = True
+    else:
+        _inv_id = _inv_row[0]
+
+    _created_device_type = False
+    if _dtype_row is None:
+        _test_device_type = DeviceTypeMaster(
+            device_type_name="テストデバイス種別_結合テスト用",
+            creator=_C,
+            modifier=_C,
+        )
+        db.session.add(_test_device_type)
+        db.session.flush()
+        _dtype_id = _test_device_type.device_type_id
+        _created_device_type = True
+    else:
+        _dtype_id = _dtype_row[0]
 
     _insert_device_sql = _text(
         "INSERT INTO device_master "
@@ -468,6 +508,18 @@ def industry_test_data(app):
         _text("DELETE FROM device_master WHERE device_uuid IN :uuids"),
         {"uuids": (test_uuid, test_sub_uuid, test_inacc_uuid)},
     )
+
+    if _created_device_type:
+        db.session.execute(
+            _text("DELETE FROM device_type_master WHERE device_type_id = :did"),
+            {"did": _dtype_id},
+        )
+
+    if _created_device_inventory:
+        db.session.execute(
+            _text("DELETE FROM device_inventory_master WHERE device_inventory_id = :iid"),
+            {"iid": _inv_id},
+        )
 
     db.session.query(OrganizationClosure).filter(
         OrganizationClosure.parent_organization_id == org_accessible.organization_id
