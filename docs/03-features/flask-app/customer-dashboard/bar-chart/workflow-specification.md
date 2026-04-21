@@ -374,7 +374,7 @@ WHERE
 **SQL詳細（display_unit=day / ゴールド層 hourly）:**
 ```sql
 SELECT
-  HOUR(collection_datetime) AS collection_hour,
+  collection_hour,
   summary_value
 FROM
   iot_catalog.gold.gold_sensor_data_hourly_summary
@@ -382,7 +382,7 @@ WHERE
   device_id = :device_id
   AND summary_item = :measurement_item_id
   AND summary_method_id = :summary_method_id
-  AND DATE(collection_datetime) = :target_date
+  AND collection_date = :target_date
 ORDER BY
   collection_hour ASC
 ```
@@ -1179,10 +1179,45 @@ flowchart TD
 
 **④ CSVカラム定義**
 
-| カラム名 | 内容 | 形式 |
-|---------|------|------|
-| timestamp | 日時ラベル | 表示単位に応じた形式（HH:mm / HH:00 / MM/DD） |
-| value | センサー値 | float（小数点2桁） |
+| 列番号 | 表示名 | 内容 | 形式 |
+|--------|--------|-----|------|
+| 1 | デバイス名 | デバイス名 | |
+| 2 | 表示時間単位に応じた名称（時間 / 時間 / 曜日 / 日付） | 表示時間（グラフX軸） | 表示時間単位に応じた形式（YYYY/MM/DD HH:mm / YYYY/MM/DD HH:mm / YYYY/MM/DD(E) / YYYY/MM/DD） |
+| 3 | 凡例名 | センサー値（グラフY軸） | 数値（小数点2桁） |
+
+**CSVサンプル**
+
+- 時単位
+```csv
+デバイス名,時間,外気温度（℃）
+DEV-001,2026/02/05 10:10,25.50
+DEV-001,2026/02/05 10:20,25.51
+DEV-001,2026/02/05 10:30,25.52
+```
+
+- 日単位
+```csv
+デバイス名,時間,外気温度（℃）
+DEV-001,2026/02/05 00:00,25.50
+DEV-001,2026/02/05 01:00,25.51
+DEV-001,2026/02/05 02:00,25.52
+```
+
+- 週単位
+```csv
+デバイス名,曜日,外気温度（℃）
+DEV-001,2026/02/01(日),25.50
+DEV-001,2026/02/02(月),25.51
+DEV-001,2026/02/03(火),25.52
+```
+
+- 月単位
+```csv
+デバイス名,日付,外気温度（℃）
+DEV-001,2026/02/01,25.50
+DEV-001,2026/02/02,25.51
+DEV-001,2026/02/03,25.52
+```
 
 ---
 
