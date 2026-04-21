@@ -1242,7 +1242,10 @@ def handle_gadget_csv_export(gadget_uuid):
     try:
         data_source_config = json.loads(gadget.data_source_config or '{}')
         device_id = data_source_config.get('device_id')
-        if device_id is None:
+        if device_id is not None:
+            if check_device_access(device_id, g.current_user.user_id) is None:
+                return jsonify({'error': err_not_found('デバイス')}), 404
+        else:
             setting = get_dashboard_user_setting(g.current_user.user_id)
             device_id = setting.device_id if setting else None
         chart_config = json.loads(gadget.chart_config or '{}')

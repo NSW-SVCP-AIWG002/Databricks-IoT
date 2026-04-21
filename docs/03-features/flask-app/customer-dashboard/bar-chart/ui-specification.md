@@ -599,11 +599,15 @@
 - 概要: ガジェットを配置するダッシュボードグループを選択
 - 入力タイプ: セレクトボックス
 - データソース: dashboard_group_master（データスコープ制限あり）
+- 選択肢のソート順: dashboard_group_master.display_order の昇順
+- 初期値: 選択肢の先頭値
 
 **8: 集約方法**
 - 概要: 複数データの集約方法を選択
 - 入力タイプ: セレクトボックス
 - データソース: gold_summary_method_master（delete_flag = FALSE）
+- 選択肢のソート順: gold_summary_method_master.summary_method_id の昇順
+- 初期値: 選択肢の先頭値
 - 選択肢:
 
 | summary_method_id | summary_method_code | 集約方法名 |
@@ -644,6 +648,7 @@
 - 概要: ガジェットの表示サイズを選択
 - 入力タイプ: セレクトボックス
 - 必須: ○
+- 初期値: 0（2×2）
 - 選択肢:
 
 | 値 | ラベル | 説明 |
