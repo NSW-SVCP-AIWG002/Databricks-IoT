@@ -253,11 +253,17 @@ class TestAlertSettingServiceValidation:
 
     def test_max_length_alert_name_99_ok(self, service):
         """1.2.1: alert_name が 99文字（最大長-1）はバリデーション通過"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(alert_name="あ" * 99)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_max_length_alert_name_100_ok(self, service):
         """1.2.2: alert_name が 100文字ちょうどはバリデーション通過"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(alert_name="あ" * 100)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_max_length_alert_name_101_raises(self, service):
         """1.2.3: alert_name が 101文字の場合 ValidationError がスローされる"""
@@ -275,7 +281,10 @@ class TestAlertSettingServiceValidation:
 
     def test_threshold_occur_at_min_boundary_ok(self, service):
         """1.3.2: alert_conditions_threshold が最小値 -999999999999999 ちょうどはバリデーション通過"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(alert_conditions_threshold=-999_999_999_999_999)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_threshold_occur_below_min_raises(self, service):
         """1.3.1: alert_conditions_threshold が -999999999999999 未満の場合 ValidationError がスローされる"""
@@ -287,7 +296,10 @@ class TestAlertSettingServiceValidation:
 
     def test_threshold_occur_at_max_boundary_ok(self, service):
         """1.3.5: alert_conditions_threshold が最大値 999999999999999 ちょうどはバリデーション通過"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(alert_conditions_threshold=999_999_999_999_999)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_threshold_occur_above_max_raises(self, service):
         """1.3.6: alert_conditions_threshold が 999999999999999 超過の場合 ValidationError がスローされる"""
@@ -329,11 +341,17 @@ class TestAlertSettingServiceValidation:
 
     def test_judgment_time_valid_value_1_ok(self, service):
         """1.6.1: judgment_time = 1 は許容値"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(judgment_time=1)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_judgment_time_valid_value_60_ok(self, service):
         """1.6.1: judgment_time = 60 は許容値"""
-        # TODO: 実装完了後に検証（サービスが未実装のため現時点はスキップ）
+        # Arrange
+        data = make_valid_form_data(judgment_time=60)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_judgment_time_invalid_value_raises(self, service):
         """1.6.2: judgment_time が許容値以外（例: 7）の場合 ValidationError がスローされる"""
@@ -492,15 +510,6 @@ class TestAlertSettingServiceCreate:
     # ----------------------------------------------------------------
     # 3.2.2 登録結果
     # ----------------------------------------------------------------
-
-    def test_create_returns_new_alert_id(self, service, mock_session):
-        """3.2.2.1: 登録処理成功後、生成された alert_id が返却される"""
-        # Arrange
-        data = make_valid_form_data()
-        # Act
-        result = service.create(data)
-        # Assert - alert_id または alert_uuid が返却されることを期待
-        # TODO: 実装仕様に応じて検証（設計書上は alert_uuid 自動生成が明示されている）
 
     # ----------------------------------------------------------------
     # 2.3 副作用チェック
@@ -760,9 +769,10 @@ class TestAlertSettingServiceGet:
             service.get(alert_uuid="nonexistent-uuid", user_id=1)
 
     def test_get_deleted_alert_raises_not_found(self, service, mock_session):
-        """2.2.3: 論理削除済みデータは取得できず NotFoundError がスローされる"""
-        # Arrange: delete_flag=True のデータは VIEW で除外されるため None を返す
-        mock_session.query.return_value.filter.return_value.first.return_value = None
+        """2.2.3: 論理削除済みデータは存在しないものと同様に扱われ NotFoundError がスローされる"""
+        # Arrange: delete_flag=True のレコードをDBが返してきた場合、サービス層が存在しないものと同様に扱う
+        deleted_alert = make_alert_setting_mock(alert_uuid="deleted-uuid", delete_flag=True)
+        mock_session.query.return_value.filter.return_value.first.return_value = deleted_alert
         # Act & Assert
         with pytest.raises(Exception):
             service.get(alert_uuid="deleted-uuid", user_id=1)
@@ -887,9 +897,8 @@ class TestAlertSettingServiceExport:
         if isinstance(result, bytes):
             assert result[:3] == b"\xef\xbb\xbf"
         else:
-            # 文字列の場合は BOM 文字が先頭にある
-            # TODO: 設計書に応じてエンコード形式を確認
-            pass
+            assert isinstance(result, str)
+            assert result.startswith("\ufeff")
 
     def test_export_csv_contains_japanese_characters(self, service, mock_session):
         """3.5.3.2: 日本語を含むデータが文字化けなく出力される"""
@@ -924,21 +933,19 @@ class TestAlertSettingServiceExportPermission:
 
     def test_export_csv_forbidden_for_service_company_user(self, service, mock_session):
         """1.2.2: サービス利用者が CSVエクスポートを実行すると ForbiddenError がスローされる"""
-        # Arrange
-        # TODO: 設計書に記載なし（role の渡し方は実装仕様に依存）、要確認
-        # サービス利用者ロールを表すパラメータを想定
+        # Arrange: user_type_id=4（サービス利用者）を返すモック
+        mock_user = Mock()
+        mock_user.user_type_id = 4
+        mock_session.query.return_value.filter.return_value.first.return_value = mock_user
         # Act & Assert
         with pytest.raises(Exception):
-            service.export_csv(user_id=1, role="service_company_user")
+            service.export_csv(user_id=1)
 
     def test_export_csv_allowed_for_system_admin(self, service, mock_session):
         """1.2.1: システム保守者が CSVエクスポートを実行すると正常に処理される"""
-        # Arrange
-        mock_q = MagicMock()
-        mock_session.query.return_value = mock_q
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value = mock_q
-        mock_q.all.return_value = []
+        # Arrange: user_type_id=1（システム保守者）を返すモック
+        mock_user = Mock()
+        mock_user.user_type_id = 1
+        mock_session.query.return_value.filter.return_value.first.return_value = mock_user
         # Act & Assert（例外が発生しないこと）
-        # TODO: 設計書に記載なし（role の渡し方は実装仕様に依存）、要確認
-        service.export_csv(user_id=1, role="system_admin")
+        service.export_csv(user_id=1)
