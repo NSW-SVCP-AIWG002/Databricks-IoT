@@ -55,9 +55,9 @@
     - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
-    - [7. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#8-ダッシュボード一覧用view-v_dashboard_master_by_user)
-    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#9-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
-    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#10-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
+    - [7. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#7-ダッシュボード一覧用view-v_dashboard_master_by_user)
+    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#8-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
+    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#9-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -222,6 +222,7 @@
 - INDEX: `organization_id`
 - INDEX: `user_type_id`
 - INDEX: `language_code`
+- UNIQUE: `email_address`
 
 **ビジネスルール:**
 
@@ -885,7 +886,7 @@
 | #   | カラム物理名 | カラム論理名   | データ型    | NULL     | PK  | FK  | デフォルト値      | 説明                                    |
 | --- | ------------ | -------------- | ----------- | -------- | --- | --- | ----------------- | --------------------------------------- |
 | 1   | master_id    | マスタID       | INT         | NOT NULL | ○   | -   | -                 | マスタの一意識別子（主キー、AUTO_INCREMENT）            |
-| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | -   | -   | -                 | アクセス可能なユーザーID（主キー）      |
+| 2   | user_type_id | ユーザー種別ID | INT         | NOT NULL | ○   | -   | -                 | アクセス可能なユーザーID（主キー）      |
 | 2   | master_name  | マスタ名       | VARCHAR(20) | NOT NULL | -   | -   | -                 | マスタの名称                            |
 | 3   | create_date  | 作成日時       | DATETIME    | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                        |
 | 4   | creator      | 作成者         | INT         | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID              |
@@ -2732,6 +2733,7 @@ def customer_dashboard():
 CREATE INDEX IX_user_master_organization_id ON user_master(organization_id);
 CREATE INDEX IX_user_master_user_type_id ON user_master(user_type_id);
 CREATE INDEX IX_user_master_language_code ON user_master(language_code);
+CREATE UNIQUE INDEX UX_user_master_email_address ON user_master(email_address);
 
 -- 組織閉方テーブル
 CREATE INDEX IX_organization_closure_subsidiary_id ON organization_closure(subsidiary_organization_id);
@@ -2741,6 +2743,7 @@ CREATE UNIQUE INDEX UX_device_master_uuid ON device_master(device_uuid);
 CREATE INDEX IX_device_master_organization_id ON device_master(organization_id);
 CREATE INDEX IX_device_master_type_id ON device_master(device_type_id);
 CREATE UNIQUE INDEX UX_device_master_mac_address ON device_master(mac_address) WHERE mac_address IS NOT NULL;
+CREATE UNIQUE INDEX UX_device_master_device_uuid ON device_master(device_uuid);
 
 -- アラート設定マスタ
 CREATE UNIQUE INDEX UX_alert_setting_uuid ON alert_setting_master(alert_uuid);
@@ -2788,6 +2791,8 @@ CREATE INDEX IX_alert_setting_device_level ON alert_setting_master(device_id, al
 #### UNIQUE制約
 
 - `device_master.mac_address`: MACアドレスの重複を防止（NULL許可）
+- `device_master.device_uuid`: デバイスUUIDの重複を防止
+- `user_master.email_address`: メールアドレスの重複を防止
 
 #### CHECK制約
 
