@@ -214,9 +214,7 @@
 }
 
 .ah-detail__row {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: var(--spacing-4);
+  display: block;
   padding: var(--spacing-3) 0;
   border-bottom: var(--border-width) solid var(--color-border);
 }
@@ -226,12 +224,15 @@
 }
 
 .ah-detail__label {
+  display: block;
   font-weight: var(--font-weight-medium);
   color: var(--color-gray-700);
   font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-1);
 }
 
 .ah-detail__value {
+  display: block;
   color: var(--color-gray-900);
   font-size: var(--font-size-base);
   word-break: break-all;
