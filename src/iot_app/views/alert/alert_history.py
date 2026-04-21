@@ -1,4 +1,4 @@
-from flask import abort, g, make_response, render_template, request
+from flask import abort, g, make_response, redirect, render_template, request, url_for
 
 from iot_app import db
 from iot_app.common.constants import SORT_ORDER
@@ -101,7 +101,7 @@ def alert_history_list():
 @alert_bp.route('/alert/alert-history', methods=['POST'])
 @require_role(*_ALL_ROLES)
 def alert_history_search():
-    """アラート履歴検索実行"""
+    """アラート履歴検索実行（PRG: Cookie保存後GETへリダイレクト）"""
     user_id = g.current_user.user_id
     logger.info("アラート履歴検索 処理開始 user_id=%s", user_id)
 
@@ -124,30 +124,11 @@ def alert_history_search():
         'alert_status_id': int(raw_status) if raw_status else None,
     }
 
-    try:
-        logger.info("アラート履歴検索 DB取得開始 user_id=%s", user_id)
-        alert_histories, total = search_alert_histories(search_params, user_id)
-        logger.info("アラート履歴検索 DB取得完了 user_id=%s 件数=%s", user_id, total)
-    except Exception:
-        abort(500)
-
-    alert_levels, alert_statuses, sort_items = _load_masters()
-
-    response = make_response(render_template(
-        'alert/alert-history/list.html',
-        alert_histories=alert_histories,
-        total=total,
-        search_params=search_params,
-        alert_levels=alert_levels,
-        alert_statuses=alert_statuses,
-        sort_items=sort_items,
-        sort_orders=SORT_ORDER,
-    ))
-
+    response = make_response(redirect(url_for('alert.alert_history_list', page=1)))
     response = clear_search_conditions_cookie(response, 'alert_history')
     response = set_search_conditions_cookie(response, 'alert_history', search_params)
 
-    logger.info("アラート履歴検索 処理完了 user_id=%s", user_id)
+    logger.info("アラート履歴検索 処理完了（PRGリダイレクト） user_id=%s", user_id)
     return response
 
 

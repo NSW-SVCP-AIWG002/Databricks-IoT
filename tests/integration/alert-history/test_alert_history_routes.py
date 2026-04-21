@@ -35,7 +35,7 @@
   4.3〜4.6  登録・更新・削除・CSV（read-only機能のため対象外）
   6.x  外部API連携（Databricks連携なし）
   7.x  トランザクション（read-only機能のため対象外）
-  2.3  リダイレクトテスト（POST後は直接HTML返却のため対象外）
+  2.3  リダイレクトテスト（PRGパターンで302リダイレクト→GET。follow_redirects=Trueでリダイレクト後レスポンスを検証）
 """
 
 import uuid
@@ -84,6 +84,7 @@ def _add_extra_histories(alert_history_test_data, n):
 def _post_search(client, **kwargs):
     """アラート履歴検索 POST のヘルパー。
 
+    PRGパターンのため follow_redirects=True でリダイレクト後のGETレスポンスを返す。
     指定しないキーはデフォルト値（空文字）で埋める。
     """
     data = {
@@ -97,7 +98,7 @@ def _post_search(client, **kwargs):
         'sort_item_id':    kwargs.get('sort_item_id', '1'),
         'sort_order_id':   kwargs.get('sort_order_id', '2'),
     }
-    return client.post('/alert/alert-history', data=data)
+    return client.post('/alert/alert-history', data=data, follow_redirects=True)
 
 
 # ---------------------------------------------------------------------------
