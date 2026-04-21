@@ -272,6 +272,7 @@ class TestSearchDeviceInventories:
         assert q.filter.call_count > 0
         # Assert: 文字列パラメータによる検索が前方一致検索であること
         assert 'DEV-001%' in filter_args_str
+        assert '%DEV-001%' not in filter_args_str
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -309,6 +310,68 @@ class TestSearchDeviceInventories:
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMaster')
     @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_search_with_inventory_location_applies_partial_match_filter(
+        self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
+    ):
+        """3.1.1.1: inventory_location を指定した場合、like フィルタが適用される/部分一致検索（%value%）であること"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import search_device_inventories
+
+        q = make_mock_query()
+        mock_dim.query = q
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            inventory_location='倉庫A')     # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        filter_args_str = str(q.filter.call_args_list)
+
+        # Assert: filterメソッドが1回以上実行されること
+        assert q.filter.call_count > 0
+        # Assert: inventory_location の検索は部分一致（%value%）であること
+        assert '%倉庫A%' in filter_args_str
+        
+    @patch(f'{MODULE}.SortItemMaster')
+    @patch(f'{MODULE}.InventoryStatusMaster')
+    @patch(f'{MODULE}.DeviceTypeMaster')
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_search_with_inventory_location_applies_partial_match_filter(
+        self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
+    ):
+        """3.1.1.1: device_uuid、device_name、inventory_location を指定した場合、like フィルタが適用されること"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import search_device_inventories
+
+        q = make_mock_query()
+        mock_dim.query = q
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            device_uuid='VALID',
+            device_name='ゲート',
+            inventory_location='5階'
+            )     # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        filter_args_str = str(q.filter.call_args_list)
+
+        # Assert: filterメソッドが3回以上実行されること
+        assert q.filter.call_count > 2
+        # Assert: device_uuid の検索は前方一致（value%）であること
+        assert 'VALID%' in filter_args_str
+        assert '%VALID%' not in filter_args_str
+        # Assert: device_name の検索は部分一致（%value%）であること
+        assert '%ゲート%' not in filter_args_str
+        # Assert: inventory_location の検索は部分一致（%value%）であること
+        assert '%5階%' not in filter_args_str
+        
+    @patch(f'{MODULE}.SortItemMaster')
+    @patch(f'{MODULE}.InventoryStatusMaster')
+    @patch(f'{MODULE}.DeviceTypeMaster')
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
     def test_search_with_device_type_not_minus1_applies_filter(
         self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
     ):
@@ -332,33 +395,6 @@ class TestSearchDeviceInventories:
 
         # Assert: filterメソッドが1回以上実行されること
         assert q.filter.call_count > 0
-
-    @patch(f'{MODULE}.SortItemMaster')
-    @patch(f'{MODULE}.InventoryStatusMaster')
-    @patch(f'{MODULE}.DeviceTypeMaster')
-    @patch(f'{MODULE}.DeviceMaster')
-    @patch(f'{MODULE}.DeviceInventoryMaster')
-    def test_search_with_inventory_location_applies_partial_match_filter(
-        self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
-    ):
-        """3.1.1.1: inventory_location を指定した場合、like フィルタが適用される/部分一致検索（%value%）であること"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import search_device_inventories
-
-        q = make_mock_query()
-        mock_dim.query = q
-        mock_sim.query.filter_by.return_value.first.return_value = None
-        params = make_default_search_params(
-            inventory_location='倉庫A')     # ヘルパーの値を書き換えてパラメータ生成
-        inventories, total = search_device_inventories(
-            params)          # Act: SELECT実行
-        filter_args_str = str(q.filter.call_args_list)
-
-        # Assert: filterメソッドが1回以上実行されること
-        assert q.filter.call_count > 0
-        # Assert: inventory_location の検索は部分一致（%value%）であること
-        assert '%倉庫A%' in filter_args_str
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
