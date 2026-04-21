@@ -1533,11 +1533,12 @@ SELECT
     u.user_name,
     u.organization_id AS user_organization_id,
     d.device_id,
+    d.device_uuid,
     d.organization_id AS device_organization_id,
     d.device_type_id,
     d.device_name,
     d.device_model,
-    d.device_stock_id,
+    d.device_inventory_id,
     d.sim_id,
     d.mac_address,
     d.software_version,
@@ -1567,11 +1568,12 @@ WHERE
 | user_name                   | ユーザー名             | VARCHAR(20)  | ログインユーザーの名前                       |
 | user_organization_id        | ユーザー組織ID         | INT          | ログインユーザーの所属組織ID                 |
 | device_id                   | デバイスID             | VARCHAR(100) | デバイスの一意識別子                         |
+| device_uuid                 | デバイスUUID           | VARCHAR(36)  | デバイスのUUID                               |
 | device_organization_id      | デバイス組織ID         | INT          | デバイスが所属する組織ID                     |
 | device_type_id              | デバイス種別ID         | INT          | デバイス種別ID                               |
 | device_name                 | デバイス名             | VARCHAR(100) | デバイスの表示名                             |
 | device_model                | モデル情報             | VARCHAR(100) | デバイスのモデル名・型番                     |
-| device_stock_id             | デバイス在庫ID         | INT          | デバイス在庫ID                               |
+| device_inventory_id         | デバイス在庫ID         | INT          | デバイス在庫ID                               |
 | sim_id                      | SIMID                  | VARCHAR(100) | デバイスのSIM ID                             |
 | mac_address                 | MACアドレス            | VARCHAR(100) | デバイスのMACアドレス                        |
 | software_version            | ソフトウェアバージョン | VARCHAR(100) | デバイスのファームウェアバージョン           |
@@ -1935,7 +1937,7 @@ def list_organizations():
 **目的:**
 
 - デバイス在庫情報一覧画面でログインユーザーのuser_idをWHERE句に指定することで、そのユーザーが参照可能な組織配下のデバイス在庫情報のみを取得
-- device_stock_info_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
+- device_inventory_masterは組織IDを直接持たないため、device_masterを経由して組織階層の権限制御を適用
 
 **CREATE文:**
 
@@ -1945,14 +1947,16 @@ SELECT
     u.user_id,
     u.user_name,
     u.organization_id AS user_organization_id,
-    dsi.device_stock_id,
-    dsi.stock_status_id,
+    dsi.device_inventory_id,
+    dsi.device_inventory_uuid,
+    dsi.inventory_status_id,
+    dsi.device_model,
+    dsi.mac_address,
     dsi.purchase_date,
     dsi.estimated_ship_date,
     dsi.ship_date,
     dsi.manufacturer_warranty_end_date,
-    dsi.vendor_warranty_end_date,
-    dsi.stock_location,
+    dsi.inventory_location,
     dsi.create_date,
     dsi.creator,
     dsi.update_date,
@@ -1967,8 +1971,8 @@ FROM
         ON u.organization_id = oc.parent_organization_id
     INNER JOIN device_master d
         ON oc.subsidiary_organization_id = d.organization_id
-    INNER JOIN device_stock_info_master dsi
-        ON d.device_stock_id = dsi.device_stock_id;
+    INNER JOIN device_inventory_master dsi
+        ON d.device_inventory_id = dsi.device_inventory_id;
 ```
 
 **カラム一覧:**
@@ -1978,14 +1982,16 @@ FROM
 | user_id                        | ユーザーID         | INT          | ログインユーザーのID                         |
 | user_name                      | ユーザー名         | VARCHAR(20)  | ログインユーザーの名前                       |
 | user_organization_id           | ユーザー組織ID     | INT          | ログインユーザーの所属組織ID                 |
-| device_stock_id                | デバイス在庫ID     | INT          | デバイス在庫の一意識別子                     |
-| stock_status_id                | 在庫状況ID         | INT          | 在庫状況ID                                   |
+| device_inventory_id            | デバイス在庫ID     | INT          | デバイス在庫の一意識別子                     |
+| device_inventory_uuid          | デバイス在庫UUID   | VARCHAR(36)  | デバイス在庫のUUID                           |
+| inventory_status_id            | 在庫状況ID         | INT          | 在庫状況ID                                   |
+| device_model                   | モデル情報         | VARCHAR(100) | デバイスのモデル名・型番                     |
+| mac_address                    | MACアドレス        | VARCHAR(100) | デバイスのMACアドレス                        |
 | purchase_date                  | 購入日             | DATETIME     | デバイス購入日                               |
 | estimated_ship_date            | 出荷予定日         | DATETIME     | デバイス出荷予定日                           |
 | ship_date                      | 出荷日             | DATETIME     | デバイス出荷日                               |
 | manufacturer_warranty_end_date | メーカー保証終了日 | DATETIME     | メーカー保証の終了日                         |
-| vendor_warranty_end_date       | ベンダー保証終了日 | DATETIME     | ベンダー保証の終了日                         |
-| stock_location                 | 在庫場所           | VARCHAR(100) | 現在の在庫保管場所                           |
+| inventory_location             | 在庫場所           | VARCHAR(100) | 現在の在庫保管場所                           |
 | create_date                    | 作成日時           | DATETIME     | レコード作成日時                             |
 | creator                        | 作成者             | INT          | レコード作成者のユーザーID                   |
 | update_date                    | 更新日時           | DATETIME     | レコード最終更新日時                         |
@@ -2000,11 +2006,11 @@ FROM
 ```sql
 -- ログインユーザーID=123が参照可能な全デバイス在庫情報を取得
 SELECT
-    device_stock_id,
+    device_inventory_id,
     device_id,
-    stock_status_id,
+    inventory_status_id,
     purchase_date,
-    stock_location,
+    inventory_location,
     depth
 FROM v_device_stock_info_master_by_user
 WHERE user_id = 123
@@ -2035,13 +2041,12 @@ def list_device_stocks():
     # VIEWを使用してデバイス在庫情報を取得
     query = text("""
         SELECT
-            device_stock_id,
+            device_inventory_id,
             device_id,
-            stock_status_id,
+            inventory_status_id,
             purchase_date,
-            stock_location,
+            inventory_location,
             manufacturer_warranty_end_date,
-            vendor_warranty_end_date,
             depth
         FROM v_device_stock_info_master_by_user
         WHERE user_id = :user_id
@@ -2058,7 +2063,7 @@ def list_device_stocks():
 **ビジネスルール:**
 
 - このVIEWは、ログインユーザーの所属組織とその配下の全組織に紐づくデバイスの在庫情報を返す
-- device_stock_info_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
+- device_inventory_masterは組織IDを持たないため、device_masterを経由してアクセス制御を実現
 - `depth`カラムで組織階層の深さを確認可能（0=自組織のデバイス、1=直下の組織のデバイス、2以上=孫組織以降のデバイス）
 - 論理削除されたデバイス在庫情報（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
 
