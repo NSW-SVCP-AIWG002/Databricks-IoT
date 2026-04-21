@@ -5,9 +5,8 @@ autouse フィクスチャは親の tests/integration/conftest.py（inject_test_
 このファイルにはアラート履歴機能固有のフィクスチャのみを定義する。
 
 teardown 方針:
-  function スコープフィクスチャ: yield 後に db.session.rollback() でデータを巻き戻す。
-  Flask-SQLAlchemy のスコープドセッションは app コンテキスト内で共有されるため、
-  flush() で挿入したデータはテスト中に test_client 経由でも参照可能。
+  MySQL READ COMMITTED のためロールバック方式は使用しない。
+  function スコープフィクスチャ: yield 後に明示的 DELETE + commit でデータを削除する。
 """
 
 import uuid
@@ -37,8 +36,8 @@ from iot_app.models.organization import (
 def alert_history_test_data(app):
     """アラート履歴結合テスト用データフィクスチャ。
 
-    テスト用組織・デバイス・アラート設定・アラート履歴を flush で挿入し、
-    テスト完了後に db.session.rollback() でロールバックする。
+    テスト用組織・デバイス・アラート設定・アラート履歴を commit で挿入し、
+    テスト完了後に明示的 DELETE + commit でクリーンアップする。
 
     投入データ:
       org_accessible   : テスト対象ユーザー(user_id=1)がアクセス可能な組織
@@ -312,7 +311,7 @@ def alert_history_test_data(app):
         modifier=_C,
     )
     db.session.add_all([history_acc, history_sub, history_deleted, history_inacc])
-    db.session.flush()
+    db.session.commit()
 
     # inject_test_user の organization_id を org_accessible に override
     accessible_org_id = org_accessible.organization_id
@@ -355,10 +354,49 @@ def alert_history_test_data(app):
     }
 
     # ------------------------------------------------------------------ #
-    # teardown: ロールバックでテストデータを巻き戻す
+    # teardown: 明示的 DELETE + commit でテストデータを削除する
+    # MySQL READ COMMITTED のためロールバック方式は使用しない
     # ------------------------------------------------------------------ #
     funcs = app.before_request_funcs.get(None, [])
     if _override_org in funcs:
         funcs.remove(_override_org)
 
-    db.session.rollback()
+    alert_ids = [
+        alert_setting_acc.alert_id,
+        alert_setting_sub.alert_id,
+        alert_setting_inacc.alert_id,
+    ]
+    device_ids = [device_acc_id, device_sub_id, device_inacc_id]
+    org_ids = [
+        org_accessible.organization_id,
+        org_sub.organization_id,
+        org_inaccessible.organization_id,
+    ]
+
+    db.session.query(AlertHistory).filter(
+        AlertHistory.alert_id.in_(alert_ids)
+    ).delete(synchronize_session=False)
+
+    db.session.query(AlertSettingMaster).filter(
+        AlertSettingMaster.alert_id.in_(alert_ids)
+    ).delete(synchronize_session=False)
+
+    db.session.execute(
+        text("DELETE FROM device_master WHERE device_id IN :ids"),
+        {"ids": tuple(device_ids)},
+    )
+
+    db.session.query(OrganizationClosure).filter(
+        OrganizationClosure.subsidiary_organization_id.in_(org_ids)
+    ).delete(synchronize_session=False)
+
+    db.session.query(OrganizationMaster).filter(
+        OrganizationMaster.organization_id.in_(org_ids)
+    ).delete(synchronize_session=False)
+
+    if _created_measurement_item:
+        db.session.query(MeasurementItemMaster).filter(
+            MeasurementItemMaster.measurement_item_id == measurement_item.measurement_item_id
+        ).delete(synchronize_session=False)
+
+    db.session.commit()

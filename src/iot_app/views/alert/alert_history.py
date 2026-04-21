@@ -67,7 +67,7 @@ def alert_history_list():
     else:
         # ページング: Cookieから検索条件取得 → page のみ上書き
         search_params = get_search_conditions_cookie('alert_history') or get_default_search_params()
-        search_params['page'] = request.args.get('page', 1, type=int)
+        search_params['page'] = max(1, request.args.get('page', 1, type=int))
         save_cookie = False
 
     try:
