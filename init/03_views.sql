@@ -134,7 +134,7 @@ FROM
 -- 論理削除デバイス在庫情報（delete_flag = TRUE）はアプリケーション側でフィルタリング
 -- ============================================================
 
-CREATE OR REPLACE VIEW v_device_stock_info_master_by_user AS
+CREATE OR REPLACE VIEW v_device_inventory_master_by_user AS
 SELECT
     u.user_id,
     u.user_name,

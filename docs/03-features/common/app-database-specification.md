@@ -52,7 +52,7 @@
     - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
     - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
     - [3. 組織一覧用VIEW (v\_organization\_master\_by\_user)](#3-組織一覧用view-v_organization_master_by_user)
-    - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
+    - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_inventory_master_by_user)
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
     - [7. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#7-ダッシュボード一覧用view-v_dashboard_master_by_user)
@@ -1928,7 +1928,7 @@ def list_organizations():
 
 ---
 
-### 4. デバイス在庫情報一覧用VIEW (v_device_stock_info_master_by_user)
+### 4. デバイス在庫情報一覧用VIEW (v_device_inventory_master_by_user)
 
 **概要:**
 
@@ -1942,7 +1942,7 @@ def list_organizations():
 **CREATE文:**
 
 ```sql
-CREATE OR REPLACE VIEW v_device_stock_info_master_by_user AS
+CREATE OR REPLACE VIEW v_device_inventory_master_by_user AS
 SELECT
     u.user_id,
     u.user_name,
@@ -2012,14 +2012,14 @@ SELECT
     purchase_date,
     inventory_location,
     depth
-FROM v_device_stock_info_master_by_user
+FROM v_device_inventory_master_by_user
 WHERE user_id = 123
   AND delete_flag = FALSE
 ORDER BY purchase_date DESC;
 
 -- 保証期限が近いデバイス在庫を取得（30日以内）
 SELECT *
-FROM v_device_stock_info_master_by_user
+FROM v_device_inventory_master_by_user
 WHERE user_id = 123
   AND delete_flag = FALSE
   AND manufacturer_warranty_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY);
@@ -2048,7 +2048,7 @@ def list_device_stocks():
             inventory_location,
             manufacturer_warranty_end_date,
             depth
-        FROM v_device_stock_info_master_by_user
+        FROM v_device_inventory_master_by_user
         WHERE user_id = :user_id
           AND delete_flag = FALSE
         ORDER BY purchase_date DESC

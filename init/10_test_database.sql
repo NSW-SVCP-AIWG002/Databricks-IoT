@@ -165,7 +165,7 @@ FROM
     INNER JOIN organization_master o
         ON oc.subsidiary_organization_id = o.organization_id;
 
-CREATE OR REPLACE VIEW v_device_stock_info_master_by_user AS
+CREATE OR REPLACE VIEW v_device_inventory_master_by_user AS
 SELECT
     u.user_id,
     u.user_name,
