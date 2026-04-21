@@ -90,11 +90,11 @@
 |----|---------|---------------|---------|------|---------------|------|
 | 1 | CSVインポート画面 | `/transfer/csv-import` | GET | CSVインポート画面表示 | HTML（モーダル） | マスタ種別選択肢を含む |
 | 2 | CSVインポート実行 | `/transfer/csv-import` | POST | CSVファイルアップロード・インポート実行 | HTML（モーダル） | 処理中: 処理中モーダル表示、成功時: 成功モーダル表示、失敗時: エラーモーダル表示 |
-| 3 | デバイス一覧CSVエクスポート | `/admin/devices?export=csv` | GET | デバイス一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
-| 4 | ユーザー一覧CSVエクスポート | `/admin/users?export=csv` | GET | ユーザー一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
-| 5 | 組織一覧CSVエクスポート | `/admin/organizations?export=csv` | GET | 組織一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
-| 6 | アラート一覧マスタCSVエクスポート | `/alert/alert-setting?export=csv` | GET | アラート設定一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
-| 7 | デバイス在庫一覧CSVエクスポート | `/admin/device-inventory?export=csv` | GET | デバイス在庫一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 3 | デバイス一覧CSVエクスポート | `/admin/devices/export` | POST | デバイス一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 4 | ユーザー一覧CSVエクスポート | `/admin/users/export` | POST | ユーザー一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 5 | 組織一覧CSVエクスポート | `/admin/organizations/export` | POST | 組織一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 6 | アラート一覧マスタCSVエクスポート | `/alert/alert-setting/export` | POST | アラート設定一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
+| 7 | デバイス在庫一覧CSVエクスポート | `/admin/device-inventory/export` | POST | デバイス在庫一覧CSVエクスポート | text/csv | 現在の検索条件を適用 |
 
 **注:**
 - **レスポンス形式**:
@@ -113,11 +113,11 @@
 |-------------|---------|-------------|-----------|-----------|---------------|
 | CSVインポート画面表示 | URL直接アクセス | `GET /transfer/csv-import` | なし | HTML（CSVインポートモーダル） | エラーページ表示 |
 | インポート実行 | (7) インポート実行ボタン押下 | `POST /transfer/csv-import` | `master_type`, `csv_file` | HTML（成功モーダル） | エラーメッセージ表示 |
-| デバイスマスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/devices?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
-| ユーザーマスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/users?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
-| 組織マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/organizations?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
-| アラート設定マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /alert/alert-setting?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
-| デバイス在庫マスタエクスポート | 一覧画面のエクスポートボタン押下 | `GET /admin/device-inventory?export=csv` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| デバイスマスタエクスポート | 一覧画面のエクスポートボタン押下 | `POST /admin/devices/export` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| ユーザーマスタエクスポート | 一覧画面のエクスポートボタン押下 | `POST /admin/users/export` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| 組織マスタエクスポート | 一覧画面のエクスポートボタン押下 | `POST /admin/organizations/export` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| アラート設定マスタエクスポート | 一覧画面のエクスポートボタン押下 | `POST /alert/alert-setting/export` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
+| デバイス在庫マスタエクスポート | 一覧画面のエクスポートボタン押下 | `POST /admin/device-inventory/export` | 現在の検索条件 | CSV（ダウンロード） | エラーメッセージ表示 |
 
 ---
 
@@ -979,7 +979,7 @@ flowchart TD
     CheckPerm -->|権限なし| Error403[403エラーページ表示]
 
     CheckPerm -->|権限OK| GetParams[現在の絞り込み条件を取得<br>検索キーワード、フィルタ条件等]
-    GetParams --> AddExportParam[クエリパラメータに export=csv を追加<br>GET /admin/...?export=csv]
+    GetParams --> AddExportParam[クエリパラメータに export=csv を追加<br>GET /admin/.../export]
     AddExportParam --> Server[サーバーサイド処理開始]
 
     Server --> CheckExport{export<br>パラメータ}
@@ -1013,7 +1013,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 各マスタ一覧画面 | `GET /admin/devices?export=csv` 等 | クエリパラメータ: `export=csv` + 絞り込み条件 |
+| 各マスタ一覧画面 | `POST /admin/devices/export` 等 | クエリパラメータ: `export=csv` + 絞り込み条件 |
 
 #### バリデーション
 
@@ -1037,7 +1037,7 @@ flowchart TD
 ```python
 from flask import request, Response
 
-@devices_bp.route('/devices', methods=['GET'])
+@devices_bp.route('/devices', methods=['POST'])
 def list_devices():
     export_format = request.args.get('export')
 

@@ -280,11 +280,11 @@ D,DEV-003,温度センサー3号機,センサー,MODEL-A300,12345678901234567892
 |----|---------|---------------|---------|------|---------------|
 | 1 | CSVインポート画面 | `/transfer/csv-import` | GET | CSVインポート画面表示 | HTML（モーダル） |
 | 2 | CSVインポート実行 | `/transfer/csv-import` | POST | CSVファイルアップロード・インポート実行 | HTML（モーダル） |
-| 3 | デバイス一覧エクスポート | `/admin/devices?export=csv` | GET | デバイス一覧CSVエクスポート | CSV (ダウンロード) |
-| 4 | ユーザー一覧エクスポート | `/admin/users?export=csv` | GET | ユーザー一覧CSVエクスポート | CSV (ダウンロード) |
-| 5 | 組織一覧エクスポート | `/admin/organizations?export=csv` | GET | 組織一覧CSVエクスポート | CSV (ダウンロード) |
-| 6 | アラート設定一覧エクスポート | `/alert/alert-setting?export=csv` | GET | アラート設定一覧CSVエクスポート | CSV (ダウンロード) |
-| 7 | デバイス在庫一覧エクスポート | `/admin/device-inventory?export=csv` | GET | デバイス在庫一覧CSVエクスポート | CSV (ダウンロード) |
+| 3 | デバイス一覧エクスポート | `/admin/devices/export` | POST | デバイス一覧CSVエクスポート | CSV (ダウンロード) |
+| 4 | ユーザー一覧エクスポート | `/admin/users/export` | POST | ユーザー一覧CSVエクスポート | CSV (ダウンロード) |
+| 5 | 組織一覧エクスポート | `/admin/organizations/export` | POST | 組織一覧CSVエクスポート | CSV (ダウンロード) |
+| 6 | アラート設定一覧エクスポート | `/alert/alert-setting/export` | POST | アラート設定一覧CSVエクスポート | CSV (ダウンロード) |
+| 7 | デバイス在庫一覧エクスポート | `/admin/device-inventory/export` | POST | デバイス在庫一覧CSVエクスポート | CSV (ダウンロード) |
 
 ---
 
