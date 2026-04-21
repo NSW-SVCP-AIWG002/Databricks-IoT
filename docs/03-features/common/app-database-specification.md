@@ -55,9 +55,9 @@
     - [4. デバイス在庫情報一覧用VIEW (v\_device\_stock\_info\_master\_by\_user)](#4-デバイス在庫情報一覧用view-v_device_stock_info_master_by_user)
     - [5. アラート設定一覧用VIEW (v\_alert\_setting\_master\_by\_user)](#5-アラート設定一覧用view-v_alert_setting_master_by_user)
     - [6. アラート履歴一覧用VIEW (v\_alert\_history\_by\_user)](#6-アラート履歴一覧用view-v_alert_history_by_user)
-    - [7. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#8-ダッシュボード一覧用view-v_dashboard_master_by_user)
-    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#9-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
-    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#10-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
+    - [7. ダッシュボード一覧用VIEW (v\_dashboard\_master\_by\_user)](#7-ダッシュボード一覧用view-v_dashboard_master_by_user)
+    - [8. ダッシュボードグループ一覧用VIEW (v\_dashboard\_group\_master\_by\_user)](#8-ダッシュボードグループ一覧用view-v_dashboard_group_master_by_user)
+    - [9. ガジェット一覧用VIEW (v\_dashboard\_gadget\_master\_by\_user)](#9-ガジェット一覧用view-v_dashboard_gadget_master_by_user)
   - [インデックス設計](#インデックス設計)
     - [パフォーマンス最適化のための推奨インデックス](#パフォーマンス最適化のための推奨インデックス)
       - [検索頻度の高いカラムへのインデックス](#検索頻度の高いカラムへのインデックス)
@@ -2356,6 +2356,7 @@ def list_alert_history():
 - 論理削除されたアラート履歴（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
 - 論理削除されたデバイス（`d.delete_flag = TRUE`）およびアラート設定（`a.delete_flag = TRUE`）はVIEW側で除外される
 
+---
 
 ### 7. ダッシュボード一覧用VIEW (v_dashboard_master_by_user)
 
