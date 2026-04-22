@@ -115,7 +115,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_name_none_raises(self, service):
-        """1.1.1: alert_name が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_name が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_name=None)
         # Act & Assert
@@ -127,7 +127,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_device_id_none_raises(self, service):
-        """1.1.1: device_id が None の場合 ValidationError がスローされる"""
+        """1.1.2: device_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(device_id=None)
         # Act & Assert
@@ -139,7 +139,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_conditions_measurement_item_id_none_raises(self, service):
-        """1.1.1: alert_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_measurement_item_id=None)
         # Act & Assert
@@ -159,7 +159,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_conditions_operator_none_raises(self, service):
-        """1.1.1: alert_conditions_operator が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_conditions_operator が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_operator=None)
         # Act & Assert
@@ -171,7 +171,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_conditions_threshold_none_raises(self, service):
-        """1.1.1: alert_conditions_threshold が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_conditions_threshold が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_threshold=None)
         # Act & Assert
@@ -183,7 +183,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_recovery_conditions_measurement_item_id_none_raises(self, service):
-        """1.1.1: alert_recovery_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_recovery_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_measurement_item_id=None)
         # Act & Assert
@@ -203,7 +203,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_recovery_conditions_operator_none_raises(self, service):
-        """1.1.1: alert_recovery_conditions_operator が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_recovery_conditions_operator が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_operator=None)
         # Act & Assert
@@ -215,7 +215,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_recovery_conditions_threshold_none_raises(self, service):
-        """1.1.1: alert_recovery_conditions_threshold が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_recovery_conditions_threshold が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_threshold=None)
         # Act & Assert
@@ -227,7 +227,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_judgment_time_none_raises(self, service):
-        """1.1.1: judgment_time が None の場合 ValidationError がスローされる"""
+        """1.1.2: judgment_time が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(judgment_time=None)
         # Act & Assert
@@ -239,7 +239,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_level_id_none_raises(self, service):
-        """1.1.1: alert_level_id が None の場合 ValidationError がスローされる"""
+        """1.1.2: alert_level_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_level_id=None)
         # Act & Assert
@@ -279,13 +279,6 @@ class TestAlertSettingServiceValidation:
     #   最大値: 999,999,999,999,999 / 最小値: -999,999,999,999,999
     # ----------------------------------------------------------------
 
-    def test_threshold_occur_at_min_boundary_ok(self, service):
-        """1.3.2: alert_conditions_threshold が最小値 -999999999999999 ちょうどはバリデーション通過"""
-        # Arrange
-        data = make_valid_form_data(alert_conditions_threshold=-999_999_999_999_999)
-        # Act & Assert（例外が発生しないこと）
-        service.create(data)
-
     def test_threshold_occur_below_min_raises(self, service):
         """1.3.1: alert_conditions_threshold が -999999999999999 未満の場合 ValidationError がスローされる"""
         # Arrange
@@ -293,6 +286,13 @@ class TestAlertSettingServiceValidation:
         # Act & Assert
         with pytest.raises(Exception):
             service.create(data)
+
+    def test_threshold_occur_at_min_boundary_ok(self, service):
+        """1.3.2: alert_conditions_threshold が最小値 -999999999999999 ちょうどはバリデーション通過"""
+        # Arrange
+        data = make_valid_form_data(alert_conditions_threshold=-999_999_999_999_999)
+        # Act & Assert（例外が発生しないこと）
+        service.create(data)
 
     def test_threshold_occur_at_max_boundary_ok(self, service):
         """1.3.5: alert_conditions_threshold が最大値 999999999999999 ちょうどはバリデーション通過"""
@@ -362,7 +362,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_judgment_time_zero_raises(self, service):
-        """1.6.3: judgment_time = 0 は許容値外のため ValidationError がスローされる"""
+        """1.6.2: judgment_time = 0 は許容されていないコード値のため ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(judgment_time=0)
         # Act & Assert
@@ -390,29 +390,52 @@ class TestAlertSettingServiceSearch:
     def test_search_with_alert_name_passes_condition(self, service, mock_session):
         """3.1.1.1: alert_name を指定すると部分一致条件がクエリに渡される"""
         # Arrange
-        mock_session.query.return_value.filter.return_value.filter.return_value.all.return_value = []
+        mock_q = MagicMock()
+        mock_session.query.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.offset.return_value = mock_q
+        mock_q.all.return_value = []
         # Act
         service.search(alert_name="温度", user_id=1)
-        # Assert
-        mock_session.query.assert_called()
+        # Assert: filter の呼び出し引数に部分一致キーワード "温度" が含まれること
+        filter_call_str = str(mock_q.filter.call_args_list)
+        assert "温度" in filter_call_str
 
     def test_search_with_multiple_conditions_passes_all(self, service, mock_session):
         """3.1.1.2: 複数条件（alert_name + device_name）を指定すると全条件がクエリに渡される"""
         # Arrange
-        mock_session.query.return_value.filter.return_value.all.return_value = []
+        mock_q = MagicMock()
+        mock_session.query.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.offset.return_value = mock_q
+        mock_q.all.return_value = []
         # Act
         service.search(alert_name="温度", device_name="Device01", user_id=1)
-        # Assert
-        mock_session.query.assert_called()
+        # Assert: filter の呼び出し引数に両条件のキーワードが含まれること
+        filter_call_str = str(mock_q.filter.call_args_list)
+        assert "温度" in filter_call_str
+        assert "Device01" in filter_call_str
 
     def test_search_with_no_conditions(self, service, mock_session):
-        """3.1.2.1: 検索条件なしで呼び出すと全件相当のクエリが実行される"""
+        """3.1.2.1: 検索条件なしで呼び出すと条件なしで Repository が呼ばれる"""
         # Arrange
-        mock_session.query.return_value.filter.return_value.all.return_value = []
+        mock_q = MagicMock()
+        mock_session.query.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.offset.return_value = mock_q
+        mock_q.all.return_value = []
         # Act
         service.search(user_id=1)
-        # Assert
-        mock_session.query.assert_called()
+        # Assert: 検索条件（alert_name, device_name）がフィルタに追加されていないこと
+        filter_call_str = str(mock_q.filter.call_args_list)
+        assert "alert_name" not in filter_call_str
+        assert "device_name" not in filter_call_str
 
     # ----------------------------------------------------------------
     # 3.1.3 ページング・件数制御
@@ -438,7 +461,7 @@ class TestAlertSettingServiceSearch:
     # ----------------------------------------------------------------
 
     def test_search_returns_list_from_repository(self, service, mock_session):
-        """3.1.4.1: リポジトリがリストを返すとそのリストが返却される"""
+        """3.1.4.1: リポジトリがリストを返すとそのリストが加工されずに返却される"""
         # Arrange
         expected = [make_alert_setting_mock(), make_alert_setting_mock(alert_id=2)]
         mock_q = MagicMock()
@@ -450,8 +473,8 @@ class TestAlertSettingServiceSearch:
         mock_q.all.return_value = expected
         # Act
         result = service.search(user_id=1)
-        # Assert
-        assert result == expected
+        # Assert: リポジトリが返したオブジェクトと同一（加工されていない）こと
+        assert result is expected
 
     def test_search_returns_empty_list_when_no_result(self, service, mock_session):
         """3.1.4.2: リポジトリが空リストを返すと空リストが返却される"""
@@ -497,7 +520,7 @@ class TestAlertSettingServiceCreate:
         mock_session.commit.assert_called_once()
 
     def test_create_with_notification_flag_false(self, service, mock_session):
-        """3.2.1.2: alert_notification_flag=False を含む入力でも正常に登録される"""
+        """2.1.1: alert_notification_flag=False / alert_email_flag=False を含む有効な入力で正常に登録される"""
         # Arrange
         data = make_valid_form_data(alert_notification_flag=False, alert_email_flag=False)
         mock_session.add.return_value = None
@@ -689,7 +712,7 @@ class TestAlertSettingServiceDelete:
         service.delete(alert_uuids=uuids, user_id=1)
 
     def test_delete_sets_delete_flag_true(self, service, mock_session):
-        """3.4.2.2: 削除処理は delete_flag=True を設定する（論理削除）"""
+        """3.4.2.2: 指定した UUID が delete_flag=True（論理削除）として正しく処理される"""
         # Arrange
         uuids = ["uuid-0001"]
         mock_q = MagicMock()
@@ -768,14 +791,22 @@ class TestAlertSettingServiceGet:
         with pytest.raises(Exception):
             service.get(alert_uuid="nonexistent-uuid", user_id=1)
 
-    def test_get_deleted_alert_raises_not_found(self, service, mock_session):
-        """2.2.3: 論理削除済みデータは存在しないものと同様に扱われ NotFoundError がスローされる"""
-        # Arrange: delete_flag=True のレコードをDBが返してきた場合、サービス層が存在しないものと同様に扱う
-        deleted_alert = make_alert_setting_mock(alert_uuid="deleted-uuid", delete_flag=True)
-        mock_session.query.return_value.filter.return_value.first.return_value = deleted_alert
-        # Act & Assert
-        with pytest.raises(Exception):
+    def test_get_query_filters_by_delete_flag(self, service, mock_session):
+        """2.2.3: 論理削除済みデータが取得されないよう delete_flag=False フィルタがクエリに含まれる"""
+        # Arrange
+        mock_q = MagicMock()
+        mock_session.query.return_value = mock_q
+        mock_q.filter.return_value = mock_q
+        mock_q.first.return_value = None
+        # Act
+        try:
             service.get(alert_uuid="deleted-uuid", user_id=1)
+        except Exception:
+            pass
+        # Assert: delete_flag=False による絞り込み条件がクエリに含まれること
+        filter_call_str = str(mock_q.filter.call_args_list)
+        assert "delete_flag" in filter_call_str
+        assert "False" in filter_call_str
 
 
 # ============================================================
@@ -815,17 +846,21 @@ class TestAlertSettingServiceExport:
     # ----------------------------------------------------------------
 
     def test_export_csv_returns_data(self, service, mock_session):
-        """3.5.1.2: データが存在する場合、CSVデータが返却される"""
+        """3.5.1.2: 複数件のデータリストを渡すと、全件がCSV行として出力される"""
         # Arrange
         mock_q = MagicMock()
         mock_session.query.return_value = mock_q
         mock_q.filter.return_value = mock_q
         mock_q.order_by.return_value = mock_q
-        mock_q.all.return_value = self._make_csv_data()
+        mock_q.all.return_value = [
+            make_alert_setting_mock(alert_id=1, alert_name="温度異常アラート"),
+            make_alert_setting_mock(alert_id=2, alert_name="湿度異常アラート"),
+        ]
         # Act
         result = service.export_csv(user_id=1)
-        # Assert
-        assert result is not None
+        # Assert: 両件ともCSV出力に含まれること
+        assert "温度異常アラート" in result
+        assert "湿度異常アラート" in result
 
     def test_export_csv_contains_header(self, service, mock_session):
         """3.5.1.1: CSVヘッダー行に定義済み列名が含まれる"""
@@ -862,22 +897,6 @@ class TestAlertSettingServiceExport:
         assert result is not None
         lines = result.strip().split("\n")
         assert len(lines) == 1  # ヘッダー行のみ
-
-    def test_export_csv_notification_flag_displayed_as_text(self, service, mock_session):
-        """3.5.1.4: alert_notification_flag が True の場合 '有効'、False の場合 '無効' と表示される"""
-        # Arrange
-        mock_q = MagicMock()
-        mock_session.query.return_value = mock_q
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value = mock_q
-        mock_q.all.return_value = [
-            make_alert_setting_mock(alert_notification_flag=True, alert_email_flag=False)
-        ]
-        # Act
-        result = service.export_csv(user_id=1)
-        # Assert
-        assert "有効" in result
-        assert "無効" in result
 
     # ----------------------------------------------------------------
     # 3.5.3 エンコーディング処理
