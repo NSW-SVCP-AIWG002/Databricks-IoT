@@ -17,9 +17,9 @@ from wtforms.validators import Length, Optional
 
 from iot_app.common.logger import get_logger
 from iot_app.services.mail_history_service import (
-    _DEFAULT_PER_PAGE,
-    _DEFAULT_SORT_ID,
-    _DEFAULT_SORT_ORDER,
+    DEFAULT_PER_PAGE,
+    DEFAULT_SORT_ID,
+    DEFAULT_SORT_ORDER,
     get_default_date_range,
     get_mail_history_detail,
     get_mail_history_list,
@@ -75,6 +75,7 @@ def _set_cookie(response, params: dict) -> None:
         max_age=_COOKIE_MAX_AGE,
         httponly=True,
         samesite='Lax',
+        secure=True,
     )
 
 
@@ -86,8 +87,8 @@ def _init_params() -> dict:
         'keyword': '',
         'sent_at_start': start.isoformat(),
         'sent_at_end': end.isoformat(),
-        'sort_id': _DEFAULT_SORT_ID,
-        'order': _DEFAULT_SORT_ORDER,
+        'sort_id': DEFAULT_SORT_ID,
+        'order': DEFAULT_SORT_ORDER,
         'page': 1,
     }
 
@@ -96,9 +97,9 @@ def _resolve_sort(sort_id: int, order: str) -> tuple:
     """sort_id を検証してカラム名を返す。無効な場合はデフォルト値にフォールバック。"""
     column = get_sort_column(sort_id)
     if column is None:
-        column = get_sort_column(_DEFAULT_SORT_ID) or 'sent_at'
+        column = get_sort_column(DEFAULT_SORT_ID) or 'sent_at'
     if order not in ('asc', 'desc'):
-        order = _DEFAULT_SORT_ORDER
+        order = DEFAULT_SORT_ORDER
     return column, order
 
 
@@ -121,7 +122,7 @@ def _build_template_context(
     params,
 ) -> dict:
     """テンプレートに渡すコンテキスト辞書を構築する"""
-    total_pages = (total + _DEFAULT_PER_PAGE - 1) // _DEFAULT_PER_PAGE
+    total_pages = (total + DEFAULT_PER_PAGE - 1) // DEFAULT_PER_PAGE
     mail_type_map = {mt.mail_type_id: mt.mail_type_name for mt in mail_type_list}
     return dict(
         form=form,
@@ -132,7 +133,7 @@ def _build_template_context(
         total=total,
         page=page,
         total_pages=total_pages,
-        per_page=_DEFAULT_PER_PAGE,
+        per_page=DEFAULT_PER_PAGE,
         sort_id=sort_id,
         order=order,
         search_params=params,
@@ -157,16 +158,16 @@ def mail_history_list():
     elif has_sort:
         # ソート: Cookie の検索条件を保持してソート条件を更新
         params = _get_cookie() or _init_params()
-        params['sort_id'] = request.args.get('sort_id', _DEFAULT_SORT_ID, type=int)
-        params['order'] = request.args.get('order', _DEFAULT_SORT_ORDER)
+        params['sort_id'] = request.args.get('sort_id', DEFAULT_SORT_ID, type=int)
+        params['order'] = request.args.get('order', DEFAULT_SORT_ORDER)
         params['page'] = 1
     else:
         # ページング: Cookie の検索条件を保持してページを更新
         params = _get_cookie() or _init_params()
         params['page'] = max(1, request.args.get('page', 1, type=int))
 
-    sort_id = params.get('sort_id', _DEFAULT_SORT_ID)
-    order = params.get('order', _DEFAULT_SORT_ORDER)
+    sort_id = params.get('sort_id', DEFAULT_SORT_ID)
+    order = params.get('order', DEFAULT_SORT_ORDER)
     sort_column, order = _resolve_sort(sort_id, order)
     page = params.get('page', 1)
 
@@ -185,7 +186,7 @@ def mail_history_list():
             sort_column=sort_column,
             order=order,
             page=page,
-            per_page=_DEFAULT_PER_PAGE,
+            per_page=DEFAULT_PER_PAGE,
         )
         logger.info('メール通知履歴一覧取得成功', extra={'total': total, 'page': page})
     except Exception:
@@ -216,7 +217,7 @@ def mail_history_search():
     if not form.validate_on_submit():
         logger.warning('フォームバリデーションエラー')
         ctx = _build_template_context(
-            form, mail_type_list, [], 0, 1, _DEFAULT_SORT_ID, _DEFAULT_SORT_ORDER, {}
+            form, mail_type_list, [], 0, 1, DEFAULT_SORT_ID, DEFAULT_SORT_ORDER, {}
         )
         return make_response(
             render_template('notice/mail_history/list.html', **ctx), 422
@@ -234,12 +235,12 @@ def mail_history_search():
         'keyword': keyword,
         'sent_at_start': sent_at_start.isoformat() if sent_at_start else None,
         'sent_at_end': sent_at_end.isoformat() if sent_at_end else None,
-        'sort_id': _DEFAULT_SORT_ID,
-        'order': _DEFAULT_SORT_ORDER,
+        'sort_id': DEFAULT_SORT_ID,
+        'order': DEFAULT_SORT_ORDER,
         'page': 1,
     }
 
-    sort_column, order = _resolve_sort(_DEFAULT_SORT_ID, _DEFAULT_SORT_ORDER)
+    sort_column, order = _resolve_sort(DEFAULT_SORT_ID, DEFAULT_SORT_ORDER)
 
     try:
         records, total = get_mail_history_list(
@@ -251,7 +252,7 @@ def mail_history_search():
             sort_column=sort_column,
             order=order,
             page=1,
-            per_page=_DEFAULT_PER_PAGE,
+            per_page=DEFAULT_PER_PAGE,
         )
         logger.info('メール通知履歴検索成功', extra={'total': total})
     except Exception:
@@ -259,7 +260,7 @@ def mail_history_search():
         abort(500)
 
     ctx = _build_template_context(
-        form, mail_type_list, records, total, 1, _DEFAULT_SORT_ID, order, params
+        form, mail_type_list, records, total, 1, DEFAULT_SORT_ID, order, params
     )
     response = make_response(render_template('notice/mail_history/list.html', **ctx))
     _set_cookie(response, params)

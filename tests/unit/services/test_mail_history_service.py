@@ -122,12 +122,13 @@ class TestGetMailTypeById:
     観点: 2.1 正常系処理, 2.2 対象データ存在チェック
     """
 
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.MailTypeMaster')
-    def test_returns_record_when_found(self, MockModel):
+    def test_returns_record_when_found(self, MockModel, mock_db):
         """2.1.1: 指定IDのレコードが存在する場合は MailTypeMaster を返す"""
         # Arrange: mail_type_id=1 に対応するレコードを設定
         mock_type = make_mail_type_mock(1, 'アラート通知')
-        MockModel.query.get.return_value = mock_type
+        mock_db.session.get.return_value = mock_type
         from iot_app.services.mail_history_service import get_mail_type_by_id
 
         # Act
@@ -135,14 +136,15 @@ class TestGetMailTypeById:
 
         # Assert: 設定したモックレコードが返ること
         assert result == mock_type
-        # Assert: query.get が指定のIDで呼ばれること
-        MockModel.query.get.assert_called_once_with(1)
+        # Assert: db.session.get が正しい引数で呼ばれること
+        mock_db.session.get.assert_called_once_with(MockModel, 1)
 
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.MailTypeMaster')
-    def test_returns_none_when_not_found(self, MockModel):
+    def test_returns_none_when_not_found(self, MockModel, mock_db):
         """2.2.2: 指定IDのレコードが存在しない場合は None を返す"""
         # Arrange: DB に該当レコードなし
-        MockModel.query.get.return_value = None
+        mock_db.session.get.return_value = None
         from iot_app.services.mail_history_service import get_mail_type_by_id
 
         # Act
@@ -176,6 +178,12 @@ class TestGetSortColumn:
 
         # Assert: DB から取得した sort_item_name が返ること
         assert result == 'sent_at'
+        # Assert: filter_by が view_id=5, sort_item_id=3, delete_flag=False で呼ばれること
+        MockModel.query.filter_by.assert_called_once_with(
+            view_id=5,
+            sort_item_id=3,
+            delete_flag=False,
+        )
 
     @patch(f'{MODULE}.SortItemMaster')
     def test_fallback_mail_type_when_db_miss(self, MockModel):
@@ -238,11 +246,11 @@ class TestGetSortColumn:
 @pytest.mark.unit
 class TestGetDefaultDateRange:
     """get_default_date_range - デフォルト日付範囲取得
-    観点: 2.1 正常系処理, 3.5 日付処理
+    観点: 2.1 正常系処理, 機能固有: 日付範囲計算
     """
 
     def test_start_is_7_days_before_end(self):
-        """3.5.1: 開始日は終了日の7日前"""
+        """機能固有: 開始日は終了日の7日前"""
         # Arrange / Act
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
@@ -251,7 +259,7 @@ class TestGetDefaultDateRange:
         assert (end - start).days == 7
 
     def test_returns_date_objects(self):
-        """3.5.2: 戻り値は date 型"""
+        """機能固有: 戻り値は date 型"""
         # Arrange / Act
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
@@ -261,13 +269,29 @@ class TestGetDefaultDateRange:
         assert isinstance(end, date)
 
     def test_start_before_end(self):
-        """3.5.3: 開始日は終了日より前"""
+        """機能固有: 開始日は終了日より前"""
         # Arrange / Act
         from iot_app.services.mail_history_service import get_default_date_range
         start, end = get_default_date_range()
 
         # Assert: start < end であること
         assert start < end
+
+    def test_concrete_date_values(self):
+        """機能固有: 実行日基準の具体値検証（期待値も同じ計算式で動的に導出）"""
+        from datetime import timedelta
+        from iot_app.services.mail_history_service import get_default_date_range
+
+        # Arrange: 期待値を実行日基準で動的に算出
+        expected_start = date.today() - timedelta(days=7)
+        expected_end = date.today()
+
+        # Act
+        start, end = get_default_date_range()
+
+        # Assert
+        assert start == expected_start
+        assert end == expected_end
 
 
 # ============================================================
@@ -445,7 +469,10 @@ class TestGetMailHistoryList:
         q = make_mock_query([], 0)
         MockModel.query.filter_by.return_value = q
         MockModel.mail_history_id = MagicMock()
-        from iot_app.services.mail_history_service import get_mail_history_list
+        from iot_app.services.mail_history_service import (
+            get_mail_history_list,
+            DEFAULT_PER_PAGE,
+        )
 
         # Act
         get_mail_history_list(
@@ -461,6 +488,8 @@ class TestGetMailHistoryList:
 
         # Assert: offset が 0 で呼ばれること（page=1 → offset=(1-1)*per_page=0）
         q.offset.assert_called_once_with(0)
+        # Assert: limit が DEFAULT_PER_PAGE(25) で呼ばれること
+        q.limit.assert_called_once_with(DEFAULT_PER_PAGE)
 
     @patch(f'{MODULE}.MailHistory')
     def test_pagination_offset_page3(self, MockModel):
@@ -471,7 +500,7 @@ class TestGetMailHistoryList:
         MockModel.mail_history_id = MagicMock()
         from iot_app.services.mail_history_service import (
             get_mail_history_list,
-            _DEFAULT_PER_PAGE,
+            DEFAULT_PER_PAGE,
         )
 
         # Act
@@ -486,8 +515,8 @@ class TestGetMailHistoryList:
             page=3,
         )
 
-        # Assert: offset が (3-1)*_DEFAULT_PER_PAGE で呼ばれること
-        expected_offset = (3 - 1) * _DEFAULT_PER_PAGE
+        # Assert: offset が (3-1)*DEFAULT_PER_PAGE で呼ばれること
+        expected_offset = (3 - 1) * DEFAULT_PER_PAGE
         q.offset.assert_called_once_with(expected_offset)
 
     @patch(f'{MODULE}.MailHistory')
@@ -540,6 +569,8 @@ class TestGetMailHistoryList:
 
         # Assert: sent_at カラムの .desc() が呼ばれること
         mock_sent_at_col.desc.assert_called_once()
+        # Assert: 第2ソートキーとして mail_history_id.asc() が呼ばれること
+        MockModel.mail_history_id.asc.assert_called_once()
 
     @patch(f'{MODULE}.MailHistory')
     def test_sort_order_asc_uses_asc_method(self, MockModel):
@@ -566,6 +597,8 @@ class TestGetMailHistoryList:
 
         # Assert: sent_at カラムの .asc() が呼ばれること
         mock_sent_at_col.asc.assert_called_once()
+        # Assert: 第2ソートキーとして mail_history_id.asc() が呼ばれること
+        MockModel.mail_history_id.asc.assert_called_once()
 
 
 # ============================================================
