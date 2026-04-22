@@ -1,0 +1,14 @@
+from iot_app.models import alert  # noqa: F401
+from iot_app.models import contract  # noqa: F401
+from iot_app.models import customer_dashboard  # noqa: F401
+from iot_app.models import dashboard  # noqa: F401
+from iot_app.models import device  # noqa: F401
+from iot_app.models import device_inventory  # noqa: F401
+from iot_app.models import device_status  # noqa: F401
+from iot_app.models import language  # noqa: F401
+from iot_app.models import measurement  # noqa: F401
+from iot_app.models import notification  # noqa: F401
+from iot_app.models import organization  # noqa: F401
+from iot_app.models import region  # noqa: F401
+from iot_app.models import sort_item  # noqa: F401
+from iot_app.models import user  # noqa: F401
