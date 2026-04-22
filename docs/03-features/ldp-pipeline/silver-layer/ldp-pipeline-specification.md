@@ -208,7 +208,7 @@ flowchart TB
         end
 
         subgraph Step3["STEP 3: データエンリッチ"]
-            AddDeviceId[デバイスID付与] --> Enrich[組織ID付与]
+            AddDeviceId[デバイスID付与<br>device_id==device_uuidで照合] --> Enrich[組織ID付与]
             Enrich --> Meta[メタデータ付与]
         end
 
@@ -357,7 +357,9 @@ spark.readStream
 /<機器ID>/data/refrigerator
 ```
 
-例: `/12345/data/refrigerator` → デバイスID: `12345`
+例: `/12345/data/refrigerator` → デバイスID: `"12345"`、`/dev-001/data/refrigerator` → デバイスID: `"dev-001"`
+
+> **注意:** 機器IDは文字列であり、数値に限らない。スラッシュを含まない任意の文字列を許容する。
 
 ### value列のJSON構造（テレメトリデータ）
 
@@ -448,16 +450,17 @@ def extract_device_id_from_topic(topic: str) -> str:
     MQTT Topicから機器IDを抽出する
 
     Args:
-        topic: MQTT Topic文字列（例: "/12345/data/refrigerator"）
+        topic: MQTT Topic文字列（例: "/12345/data/refrigerator", "/dev-001/data/refrigerator"）
 
     Returns:
-        str: 機器ID。抽出失敗時はNone
+        str: 機器ID（文字列）。抽出失敗時はNone
     """
     if topic is None:
         return None
 
     # MQTT Topic形式: /<機器ID>/data/refrigerator
-    pattern = r'^/(\d+)/data/refrigerator$'
+    # 機器IDは文字列（数値に限らない）。スラッシュを含まない任意の文字列を許容する。
+    pattern = r'^/([^/]+)/data/refrigerator$'
     match = re.match(pattern, topic)
 
     if match:
@@ -481,17 +484,13 @@ def extract_device_id_from_key(message_key: str) -> str:
         message_key: Kafkaメッセージのkey（文字列）
 
     Returns:
-        str: デバイスID。抽出失敗時はNone
+        str: デバイスID（文字列）。抽出失敗時はNone
     """
     if message_key is None or message_key.strip() == "":
         return None
 
-    # keyは数値文字列であることを検証
-    try:
-        int(message_key.strip())
-        return message_key.strip()
-    except ValueError:
-        return None
+    # keyは文字列（数値に限らない）。空文字・空白のみの場合はNoneを返す。
+    return message_key.strip()
 
 # UDF登録
 extract_device_id_from_key_udf = F.udf(extract_device_id_from_key, StringType())
@@ -735,7 +734,7 @@ def update_json_device_id(json_str: str, override_device_id: str) -> str:
 
     try:
         data = json.loads(json_str)
-        data["device_id"] = int(override_device_id)  # int型に変換してdevice_idを上書き
+        data["device_id"] = str(override_device_id)  # str型に変換してdevice_idを上書き
         return json.dumps(data)
     except (json.JSONDecodeError, TypeError, ValueError):
         return json_str
@@ -887,11 +886,16 @@ sensor_schema = StructType([
 
 ### データエンリッチ処理
 
-データエンリッチ処理はデバイスマスタからデバイスID・組織IDを結合し、さらに組織マスタとの内部結合で未登録組織のレコードを除外することで達成する。
+データエンリッチ処理はセンサーデータの`device_id`（文字列）をデバイスマスタの`device_uuid`と照合し、システム内`device_id`（整数）・`organization_id`を取得する。さらに組織マスタとの内部結合で未登録組織のレコードを除外することで達成する。
 
 ```python
-# STEP 3: デバイスマスタ結合（organization_id付与）
-.join(F.broadcast(get_device_master()), "device_id", "left")
+# STEP 3: デバイスマスタ結合（device_id（整数）・organization_id付与）
+# センサーデータのdevice_id（文字列）とデバイスマスタのdevice_uuidで照合する
+.join(
+    F.broadcast(get_device_master()),
+    F.col("device_id") == F.col("device_uuid"),
+    "left"
+)
 
 # STEP 3.5: 組織マスタ存在チェック（organization_idが存在しないレコードは除外）
 .join(
@@ -906,7 +910,7 @@ sensor_schema = StructType([
 | 入力                   | 出力カラム        | 変換ロジック                                               |
 | ---------------------- | ----------------- | ---------------------------------------------------------- |
 | parsed.event_timestamp | event_timestamp   | to_timestamp()でTIMESTAMP型に変換                          |
-| parsed.device_id       | device_id         | IntegerType()で整数型として抽出                            |
+| parsed.device_id       | device_id         | デバイスマスタのdevice_uuidと照合し、マスタ側のdevice_id（整数）に置換 |
 | -                      | raw_json          | そのまま文字列型として抽出                                 |
 | 上記以外の項目         | external_tempなど | DOUBLE型として抽出                                         |
 

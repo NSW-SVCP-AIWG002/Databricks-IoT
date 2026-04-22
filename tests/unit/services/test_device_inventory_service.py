@@ -541,7 +541,7 @@ class TestSearchDeviceInventories:
         q = make_mock_query()
         # デバイス台帳マスタMock化
         mock_dim.query = q
-        # ソート項目マスタに対する.query.filter_by.return_value.firstの返り値をNoneに設定
+        # ソート項目マスタに対する.query.filter_by.firstの返り値をNoneに設定
         mock_sim.query.filter_by.return_value.first.return_value = None
         params = make_default_search_params(
             device_type_id=-1)          # ヘルパーの値を書き換えてパラメータ生成

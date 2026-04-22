@@ -20,21 +20,26 @@
       - [Flaskルート](#flaskルート-1)
       - [バリデーション](#バリデーション-1)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-1)
-    - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+    - [ページング](#ページング)
       - [処理フロー](#処理フロー-2)
       - [Flaskルート](#flaskルート-2)
+      - [処理詳細](#処理詳細)
+      - [UI状態](#ui状態)
+    - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
+      - [処理フロー](#処理フロー-3)
+      - [Flaskルート](#flaskルート-3)
       - [バリデーション](#バリデーション-2)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-2)
       - [エラーハンドリング](#エラーハンドリング)
     - [ガジェット登録](#ガジェット登録)
-      - [処理フロー](#処理フロー-3)
-      - [Flaskルート](#flaskルート-3)
+      - [処理フロー](#処理フロー-4)
+      - [Flaskルート](#flaskルート-4)
       - [バリデーション](#バリデーション-3)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-3)
       - [エラーハンドリング](#エラーハンドリング-1)
     - [CSVエクスポート](#csvエクスポート)
-      - [処理フロー](#処理フロー-4)
-      - [Flaskルート](#flaskルート-4)
+      - [処理フロー](#処理フロー-5)
+      - [Flaskルート](#flaskルート-5)
       - [バリデーション](#バリデーション-4)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-4)
       - [エラーハンドリング](#エラーハンドリング-2)
@@ -77,7 +82,7 @@
 | 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（顧客作成ダッシュボード画面に表ガジェットを埋め込み） | HTML | - |
 | 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | 非同期通信 |
 | 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/grid/create` | GET | 表ガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/grid/register` | POST | 表ガジェット登録処理 | リダイレクト (302) | 成功時: `/analysis/customer-dashboard` |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/grid/register` | POST | 表ガジェット登録処理 | JSON (AJAX) | - |
 | 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
@@ -98,17 +103,18 @@
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard`, `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | なし | HTML（顧客作成ダッシュボード画面に表ガジェットを埋め込み） | エラーページ表示 |
-| 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラーモーダル表示 |
+| 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラートースト表示 |
+| 更新ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラートースト表示 |
+| ページ番号ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid, page` | JSON（該当ページデータ） | エラートースト表示 |
+| CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid` | CSVダウンロード | エラートースト表示 |
 
 ### 表ガジェット登録モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard/gadgets/grid/create` | なし | HTML（モーダル） | エラーページ表示 |
-| 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラーモーダル表示 |
-| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/grid/register` | `title, group_id, gadget_size` | リダイレクト | エラーモーダル表示 |
+| 開始日時・終了日時選択 | デイトタイムピッカー選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid` | JSON | エラートースト表示 |
+| 登録ボタン押下 | ボタンクリック | `POST /analysis/customer-dashboard/gadgets/grid/register` | `title, group_id, gadget_size` | JSON (AJAX) | エラートースト表示 |
 
 ---
 
@@ -137,13 +143,11 @@
 **実行タイミング:** なし
 
 **データスコープ制限:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のデータのみアクセス可能
-  - **ロールによる条件分岐は一切行わない**
-
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織に所属しているため
+- ダッシュボードスコープ制限（全ユーザー共通）:
+  - ユーザーの所属組織に属するダッシュボードのみアクセス可能（v_dashboard_master_by_user による制御）
+  - 下位組織のダッシュボードはアクセス不可
+- 組織選択肢スコープ制限:
+  - v_organization_master_by_user による制御
 
 #### 処理詳細（サーバーサイド）
 
@@ -165,49 +169,48 @@
 
 ```mermaid
 flowchart TD
-    Start([ガジェットデータ取得リクエスト<br>AJAX]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| Error401[401エラーレスポンス]
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>ガジェットがアクセス可能な組織に属するか確認]
+    Start([ガジェットデータ取得リクエスト<br>AJAX]) --> Scope[データスコープ制限チェック<br>DB v_dashboard_gadget_master_by_user]
 
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーレスポンス]
-    CheckScope -->|スコープOK| Validate[バリデーション<br>リクエストパラメータ]
+    Scope --> CheckGetConfig{DBクエリ結果}
+    CheckGetConfig -->|成功| CheckConfig{データ存在?<br>※スコープ外も存在なしと同等}
+    CheckGetConfig -->|失敗| Error500[500エラーレスポンス]
+
+    CheckConfig -->|なし| Error404[404エラーレスポンス]
+    CheckConfig -->|あり| Validate[バリデーション<br>リクエストパラメータ]
 
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーレスポンス]
     CheckValidate -->|OK| DeviceQuery[選択中デバイス取得<br>DB dashboard_user_setting]
 
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
+    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>silver_sensor_data]
     CheckDeviceQuery -->|失敗| Error500
-    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>sensor_data_view]
 
     SilverQuery --> CheckSilverQuery{DBクエリ結果}
-    CheckSilverQuery -->|NG| Error500
     CheckSilverQuery -->|OK| ColumnNameQuery[テーブルカラム名取得<br>DB measurement_item_master]
+    CheckSilverQuery -->|NG| Error500
 
     ColumnNameQuery --> CheckColumnNameQuery{DBクエリ結果}
-    CheckColumnNameQuery -->|NG| Error500
     CheckColumnNameQuery -->|OK| Format[データ整形]
+    CheckColumnNameQuery -->|NG| Error500
 
     Format --> ReturnData[JSONデータ返却]
 
-    Error401 --> End([処理完了])
-    Error404 --> End
+    ReturnData --> End([処理完了])
     Error400 --> End
+    Error404 --> End
     Error500 --> End
-    ReturnData --> End
 ```
 
 #### Flaskルート
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` クエリパラメータ: `start_datetime, end_datetime, chart_config` |
+| ガジェットデータ取得 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` リクエストボディ（JSON）: `start_datetime, end_datetime, page`（pageは省略時1） |
 
 #### バリデーション
 
-**実行タイミング:** データスコープ制限チェック完了後
+**実行タイミング:** ガジェット設定取得後
 
 **バリデーションルール:**
 
@@ -219,7 +222,27 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
-**① 選択中デバイス取得**
+**① データスコープ制限チェック**
+
+**使用テーブル:** v_dashboard_gadget_master_by_user
+
+**SQL詳細:**
+```sql
+SELECT
+  gadget_id,
+  gadget_uuid,
+  gadget_type_id,
+  chart_config,
+  data_source_config
+FROM
+  v_dashboard_gadget_master_by_user
+WHERE
+  user_id = :current_user_id
+  AND gadget_uuid = :gadget_uuid
+  AND delete_flag = FALSE
+```
+
+**② 選択中デバイス取得**
 
 **使用テーブル:** dashboard_user_setting, device_master
 
@@ -242,40 +265,48 @@ WHERE
 
 ---
 
-**② センサーデータ取得**
+**③ センサーデータ取得**
 
-**使用テーブル:** sensor_data_view 
+**使用テーブル:** silver_sensor_data, user_master, organization_closure
 
 **SQL詳細:** 
 ```sql
 SELECT
-  event_timestamp 
-  , external_temp
-  , set_temp_freezer_1
-  , internal_sensor_temp_freezer_1
-  , internal_temp_freezer_1
-  , df_temp_freezer_1
-  , condensing_temp_freezer_1 
-  , adjusted_internal_temp_freezer_1
-  , set_temp_freezer_2
-  , internal_sensor_temp_freezer_2
-  , internal_temp_freezer_2
-  , df_temp_freezer_2
-  , condensing_temp_freezer_2
-  , adjusted_internal_temp_freezer_2
-  , compressor_freezer_1
-  , compressor_freezer_2
-  , fan_motor_1
-  , fan_motor_2
-  , fan_motor_3
-  , fan_motor_4
-  , fan_motor_5
-  , defrost_heater_output_1
-  , defrost_heater_output_2
+  event_timestamp, 
+  external_temp,
+  set_temp_freezer_1,
+  internal_sensor_temp_freezer_1,
+  internal_temp_freezer_1,
+  df_temp_freezer_1,
+  condensing_temp_freezer_1,
+  adjusted_internal_temp_freezer_1,
+  set_temp_freezer_2,
+  internal_sensor_temp_freezer_2,
+  internal_temp_freezer_2,
+  df_temp_freezer_2,
+  condensing_temp_freezer_2,
+  adjusted_internal_temp_freezer_2,
+  compressor_freezer_1,
+  compressor_freezer_2,
+  fan_motor_1,
+  fan_motor_2,
+  fan_motor_3,
+  fan_motor_4,
+  fan_motor_5,
+  defrost_heater_output_1,
+  defrost_heater_output_2
 FROM
-  iot_catalog.views.sensor_data_view
+  user_master u
+INNER JOIN
+  organization_closure oc
+  ON u.organization_id = oc.parent_organization_id
+INNER JOIN
+  silver_sensor_data s
+  ON oc.subsidiary_organization_id = s.organization_id
 WHERE
-  device_id = :device_id
+  u.user_id = :current_user_id
+  AND u.delete_flag = FALSE
+  AND device_id = :device_id
   AND event_timestamp BETWEEN :start_datetime AND :end_datetime
 ORDER BY
   event_timestamp ASC
@@ -283,7 +314,7 @@ ORDER BY
 
 ---
 
-**③ テーブルカラム名取得**
+**④ テーブルカラム名取得**
 
 **使用テーブル:** measurement_item_master
 
@@ -302,18 +333,19 @@ ORDER BY
 
 ---
 
-**④ データ整形**
+**⑤ データ整形**
 
 取得データをテーブル表示用に変換します。
 
 ```python
-def format_grid_data(rows, columns):
+# services/customer_dashboard/grid.py
+def format_grid_data(rows, columns, device_name):
     """センサーデータを行ベースのリストに変換"""
     grid_data = []
     for row in rows:
         row_data = {
             'event_timestamp': row['event_timestamp'].strftime('%Y/%m/%d %H:%M:%S'),
-            'device_name': row.get('device_name', '')
+            'device_name': device_name or ''
         }
         for col in columns:
             row_data[col.silver_data_column_name] = row.get(col.silver_data_column_name)
@@ -323,7 +355,7 @@ def format_grid_data(rows, columns):
 
 ---
 
-**⑤ レスポンス形式**
+**⑥ レスポンス形式**
 
 ```json
 {
@@ -366,26 +398,21 @@ def format_grid_data(rows, columns):
 
 ---
 
-**⑥ 実装例**
+**⑦ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>/data', methods=['POST'])
-@require_auth
-def gadget_grid_data(gadget_uuid):
+# views/analysis/customer_dashboard/grid.py
+def handle_gadget_data(gadget_uuid):
     """表ガジェットデータ取得（AJAX）"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
 
-    # データスコープ制限チェック
-    gadget = get_gadget_by_uuid(gadget_uuid)
-    if not gadget:
+    gadget = check_gadget_access(gadget_uuid, g.current_user.user_id)
+    if gadget is None:
         return jsonify({'error': '指定されたガジェットが見つかりません'}), 404
-    if not check_gadget_access(gadget, accessible_org_ids):
-        return jsonify({'error': 'アクセス権限がありません'}), 404
 
-    # リクエストパラメータ取得・バリデーション
     params = request.get_json() or {}
     start_datetime_str = params.get('start_datetime')
     end_datetime_str = params.get('end_datetime')
+    page = params.get('page', 1)
 
     if not validate_chart_params(start_datetime_str, end_datetime_str):
         return jsonify({'error': 'パラメータが不正です'}), 400
@@ -394,23 +421,27 @@ def gadget_grid_data(gadget_uuid):
         start_datetime = datetime.strptime(start_datetime_str, '%Y/%m/%d %H:%M:%S')
         end_datetime = datetime.strptime(end_datetime_str, '%Y/%m/%d %H:%M:%S')
 
-        # ① 選択中デバイス取得
         user_setting = get_dashboard_user_setting(g.current_user.user_id)
         device_id = user_setting.device_id if user_setting else None
         device_name = user_setting.device_name if user_setting else None
+        offset = calculate_page_offset(page, per_page=PER_PAGE)
 
-        # ② センサーデータ取得
         rows = fetch_grid_data(
             device_id=device_id,
             start_datetime=start_datetime,
-            end_datetime=end_datetime
+            end_datetime=end_datetime,
+            limit=PER_PAGE,
+            offset=offset,
         )
 
-        # ③ テーブルカラム名取得
         columns = get_column_definition()
+        grid_data = format_grid_data(rows, columns, device_name=device_name)
 
-        # ④ データ整形
-        grid_data = format_grid_data(rows, columns)
+        total_count = count_grid_data(
+            device_id=device_id,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+        )
 
         return jsonify({
             'gadget_uuid': gadget_uuid,
@@ -418,18 +449,127 @@ def gadget_grid_data(gadget_uuid):
                 {
                     'column_name': col.silver_data_column_name,
                     'display_name': col.display_name,
-                    'unit': col.unit_name
                 }
                 for col in columns
             ],
             'grid_data': grid_data,
-            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+            'total_count': total_count,
+            'page': page,
+            'per_page': PER_PAGE,
+            'updated_at': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
         })
 
     except Exception as e:
-        logger.error(f'表データ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        g.last_exception_type = type(e).__name__
+        logger.error(f'表データ取得エラー: gadget_uuid={gadget_uuid}, error={str(e)}', exc_info=True)
         return jsonify({'error': 'データの取得に失敗しました'}), 500
 ```
+
+---
+
+### ページング
+
+**トリガー:** (6.1) ページネーションのページ番号ボタンクリック
+
+**前提条件:**
+- ガジェットが表示されている
+- ガジェットデータ取得が完了している
+
+#### 処理フロー
+
+```mermaid
+flowchart TD
+    Start([ページ番号ボタンクリック]) --> SaveCookie[CookieにページConditions保存<br>start_datetime, end_datetime, page]
+    SaveCookie --> Ajax[AJAX POST<br>/analysis/customer-dashboard/gadgets/gadget_uuid/data<br>リクエストボディ: start_datetime, end_datetime, page]
+    Ajax --> Auth[認証チェック]
+    Auth --> CheckAuth{認証済み?}
+    CheckAuth -->|未認証| Error401[401エラーレスポンス]
+    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>DB v_dashboard_gadget_master_by_user]
+
+    Scope --> CheckScope{スコープOK?}
+    CheckScope -->|スコープ外| Error404[404エラーレスポンス]
+    CheckScope -->|スコープOK| CalcOffset[ページング計算<br>offset = page - 1 × 25<br>limit = 25]
+
+    CalcOffset --> DeviceQuery[選択中デバイス取得<br>DB dashboard_user_setting]
+    DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
+    CheckDeviceQuery -->|失敗| Error500[500エラーレスポンス]
+    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>silver_sensor_data<br>LIMIT 25 OFFSET offset]
+
+    SilverQuery --> CheckSilverQuery{DBクエリ結果}
+    CheckSilverQuery -->|失敗| Error500
+    CheckSilverQuery -->|OK| CountQuery[総件数取得<br>silver_sensor_data COUNT]
+
+    CountQuery --> CheckCountQuery{DBクエリ結果}
+    CheckCountQuery -->|失敗| Error500
+    CheckCountQuery -->|OK| Format[データ整形]
+
+    Format --> ReturnData[JSONデータ返却<br>grid_data, total_count, page, per_page]
+    ReturnData --> Render[テーブル再描画<br>該当ページのデータ行を表示]
+    Render --> UpdatePagination[ページネーションUI更新<br>選択ページをアクティブ状態に変更]
+
+    Error401 --> End([処理完了])
+    Error404 --> End
+    Error500 --> End
+    UpdatePagination --> End
+```
+
+#### Flaskルート
+
+| ルート | エンドポイント | 詳細 |
+|-------|---------------|------|
+| ガジェットデータ取得（ページング） | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | パスパラメータ: `gadget_uuid` リクエストボディ: `start_datetime, end_datetime, page`（pageは1以上の整数） |
+
+#### 処理詳細
+
+ページネーションのページ番号を選択するたびにサーバーへAJAXリクエストを送信し、該当ページのデータのみを取得して表示する。
+
+**Cookie管理:**
+- Cookieキー: `grid_gadget_search_params_{gadget_uuid}`
+- 保存内容: `start_datetime`, `end_datetime`, `page`
+- 保存タイミング: ページ番号ボタンクリック時（AJAXリクエスト送信前）
+- `max_age`: 86400秒（24時間）
+
+**ページング計算（サーバーサイド）:**
+```python
+PER_PAGE = 25
+page = params.get('page', 1, type=int)
+offset = (page - 1) * PER_PAGE
+
+# センサーデータ取得（ページ分のみ）
+rows = fetch_grid_data(
+    device_id=device_id,
+    start_datetime=start_datetime,
+    end_datetime=end_datetime,
+    limit=PER_PAGE,
+    offset=offset
+)
+
+# 総件数取得
+total_count = count_grid_data(
+    device_id=device_id,
+    start_datetime=start_datetime,
+    end_datetime=end_datetime
+)
+```
+
+**レスポンス形式（ページング時の追加フィールド）:**
+```json
+{
+  "gadget_uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "columns": [ ... ],
+  "grid_data": [ ... ],
+  "total_count": 250,
+  "page": 2,
+  "per_page": 25,
+  "updated_at": "2026/03/05 12:00:00"
+}
+```
+
+#### UI状態
+
+- 検索条件（開始日時・終了日時）: 保持
+- データテーブル: 選択ページのデータ行を表示（25件）
+- ページネーション: 選択ページをアクティブ状態
 
 ---
 
@@ -447,40 +587,29 @@ def gadget_grid_data(gadget_uuid):
 
 ```mermaid
 flowchart TD
-    Start([登録画面ボタンクリック]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
-    CheckAuth -->|認証OK| Validate[バリデーション<br>ガジェット種別]
+    Start([登録モーダル表示リクエスト]) --> Validate[バリデーション<br>ガジェット種別]
 
     Validate --> CheckValidate{バリデーションOK?}
-    CheckValidate -->|NG| Error400[400エラーモーダル表示]
-    CheckValidate -->|OK| Scope[データスコープ制限適用<br>organization_closureテーブルから<br>下位組織IDリスト取得]
-    
-    Scope --> UserSettingQuery[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
+    CheckValidate -->|NG| Error400[400エラーレスポンス]
+    CheckValidate -->|OK| UserSettingQuery[ダッシュボードユーザー設定取得<br>DB dashboard_user_setting]
+
     UserSettingQuery --> CheckUserSettingQuery{DBクエリ結果}
-    CheckUserSettingQuery -->|失敗| Error500[500エラーページ表示]
     CheckUserSettingQuery -->|成功| CheckUserSetting{ユーザー設定あり?}
+    CheckUserSettingQuery -->|失敗| Error500[500エラーレスポンス]
 
-    CheckUserSetting -->|なし| Error404[404エラーモーダル表示]
-    CheckUserSetting -->|あり| DashboardQuery[選択中ダッシュボード情報取得<br>DB dashboard_master]
-
-    DashboardQuery --> CheckDashboardQuery{DBクエリ結果}
-    CheckDashboardQuery -->|失敗| Error500
-    CheckDashboardQuery -->|成功| CheckDashboard{ダッシュボードあり?}
-
-    CheckDashboard -->|なし| Error404[404エラーモーダル表示]
-    CheckDashboard -->|あり| GroupQuery[ダッシュボードグループ一覧取得<br>DB dashboard_group_master]
+    CheckUserSetting -->|なし| Error404[404エラーレスポンス]
+    CheckUserSetting -->|あり| GroupQuery[ダッシュボードグループ一覧取得（スコープ制限適用）<br>DB v_dashboard_group_master_by_user]
 
     GroupQuery --> CheckGroupQuery{DBクエリ結果}
+    CheckGroupQuery -->|成功| CheckGroup{データ存在?<br>※スコープ外も存在なしと同等}
     CheckGroupQuery -->|失敗| Error500
-    CheckGroupQuery -->|成功| Template[表ガジェット登録モーダル表示]
 
-    Template --> Response[HTMLレスポンス返却]
+    CheckGroup -->|なし| Error404
+    CheckGroup -->|あり| Response[表グラフガジェット登録モーダル<br>HTMLレスポンス返却]
 
-    LoginRedirect --> End([処理完了])
-    Error400 --> End
+    Error400 --> End([処理完了])
     Error404 --> End
-    Error500 --> End   
+    Error500 --> End
     Response --> End
 ```
 
@@ -520,28 +649,9 @@ WHERE
 
 ---
 
-**② ダッシュボード情報取得**
+**② ダッシュボードグループ一覧取得**
 
-**使用テーブル:** dashboard_master
-
-```sql
-SELECT
-  dashboard_id,
-  dashboard_uuid,
-  dashboard_name
-FROM
-  dashboard_master
-WHERE
-  dashboard_id = :dashboard_id
-  AND organization_id IN (:accessible_org_ids)
-  AND delete_flag = FALSE
-```
-
----
-
-**③ ダッシュボードグループ一覧取得**
-
-**使用テーブル:** dashboard_group_master
+**使用テーブル:** v_dashboard_group_master_by_user
 
 ```sql
 SELECT
@@ -549,9 +659,10 @@ SELECT
   dashboard_group_uuid,
   dashboard_group_name
 FROM
-  dashboard_group_master
+  v_dashboard_group_master_by_user
 WHERE
-  dashboard_id = :dashboard_id
+  user_id = :current_user_id
+  AND dashboard_id = :dashboard_id
   AND delete_flag = FALSE
 ORDER BY
   display_order ASC
@@ -559,34 +670,36 @@ ORDER BY
 
 ---
 
-**④ 実装例**
+**③ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/grid/create', methods=['GET'])
-@require_auth
-def gadget_grid_create():
+# views/analysis/customer_dashboard/grid.py
+def handle_gadget_create(gadget_type):
     """表ガジェット登録モーダル表示"""
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # ① ユーザー設定取得
-    user_setting = get_dashboard_user_setting(g.current_user.user_id)
-    if not user_setting:
+    setting = get_dashboard_user_setting(g.current_user.user_id)
+    if setting is None:
         abort(404)
 
-    # ② ダッシュボード情報取得
-    dashboard = get_dashboard_by_id(user_setting.dashboard_id, accessible_org_ids)
-    if not dashboard:
-        abort(404)
-
-    # ③ ダッシュボードグループ一覧取得
-    groups = get_dashboard_groups(dashboard.dashboard_id)
+    try:
+        groups = get_dashboard_groups(setting.dashboard_id)
+        if not groups:
+            abort(404)
+    except Exception as e:
+        g.last_exception_type = type(e).__name__
+        logger.error(f'表ガジェット登録モーダル表示エラー: {str(e)}')
+        abort(500)
 
     form = GridGadgetForm()
+    form.group_id.choices = [(0, '選択してください')] + [
+        (gr.dashboard_group_id, gr.dashboard_group_name) for gr in groups
+    ]
+    form.gadget_name.data = '表'
+
     return render_template(
-        'customer_dashboard/modals/gadget_register/grid.html',
+        'analysis/customer_dashboard/gadgets/modals/grid.html',
         form=form,
-        dashboard=dashboard,
-        groups=groups
+        gadget_type=gadget_type,
+        groups=groups,
     )
 ```
 
@@ -594,9 +707,8 @@ def gadget_grid_create():
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
-| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | ダッシュボードが見つかりません |
+| 400 | バリデーションエラー | フォーム再表示 | バリデーションエラーメッセージ |
+| 404 | リソース不存在 | 404エラートースト表示 | ダッシュボードが見つかりません |
 | 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
 
 ---
@@ -611,25 +723,19 @@ def gadget_grid_create():
 
 ```mermaid
 flowchart TD
-    Start([登録ボタンクリック]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
-    CheckAuth -->|認証OK| Validate[バリデーション]
+    Start([登録リクエスト]) --> Validate[バリデーション]
 
     Validate --> CheckValidate{バリデーションOK?}
-    CheckValidate -->|NG| Error400[400エラーモーダル表示]
+    CheckValidate -->|NG| Error400[400エラーレスポンス]
     CheckValidate -->|OK| Insert[ガジェット登録<br> DB dashboard_gadget_master INSERT]
 
     Insert --> CheckInsert{DB操作結果}
-    CheckInsert -->|失敗| Error500[500エラーページ表示]
+    CheckInsert -->|失敗| Error500[500エラーレスポンス]
     CheckInsert -->|成功| Commit[トランザクションコミット]
 
-    Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
-    Redirect --> 200OK[成功モーダル表示]
+    Commit --> 200OK[成功メッセージ返却]
 
-    LoginRedirect --> End([処理完了])
-    Error400 --> End
-    Error404 --> End
+    Error400 --> End([処理完了])
     Error500 --> End
     200OK --> End
 ```
@@ -703,79 +809,53 @@ INSERT INTO dashboard_gadget_master (
 **② 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/grid/register', methods=['POST'])
-@require_auth
-def gadget_grid_register():
+# views/analysis/customer_dashboard/grid.py
+def handle_gadget_register(gadget_type):
     """表ガジェット登録実行"""
+    logger.info(f'表ガジェット登録開始: user_id={g.current_user.user_id}')
     form = GridGadgetForm()
+
+    submitted_group_id = request.form.get('group_id', type=int) or 0
+    form.group_id.choices = [(submitted_group_id, '')]
+
     if not form.validate_on_submit():
+        try:
+            setting = get_dashboard_user_setting(g.current_user.user_id)
+            groups = get_dashboard_groups(setting.dashboard_id)
+        except Exception as e:
+            g.last_exception_type = type(e).__name__
+            logger.error(f'表ガジェット登録コンテキスト取得エラー: {str(e)}')
+            abort(500)
         return render_template(
-            'customer_dashboard/modals/gadget_register/grid.html',
-            form=form
+            'analysis/customer_dashboard/gadgets/modals/grid.html',
+            form=form,
+            gadget_type=gadget_type,
+            groups=groups,
         ), 400
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
+    params = {
+        'title': form.gadget_name.data,
+        'group_id': form.group_id.data,
+        'gadget_size': form.gadget_size.data,
+    }
 
     try:
-        # ② chart_config / data_source_config 生成
-        chart_config = json.dumps({})
-        data_source_config = json.dumps({'device_id': ''})
-
-        # position_y と display_order を別々に取得する
-        max_position_y = db.session.query(
-            func.max(DashboardGadgetMaster.position_y)
-        ).filter(
-            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar() or 0
-
-        max_order = db.session.query(
-            func.max(DashboardGadgetMaster.display_order)
-        ).filter(
-            DashboardGadgetMaster.dashboard_group_id == form.group_id.data,
-            DashboardGadgetMaster.delete_flag == False
-        ).scalar() or 0
-
-        # 表のgadget_type_idを事前に取得する
-        gadget_type = db.session.query(GadgetTypeMaster).filter_by(
-            gadget_type_name='表',
-            delete_flag=False
-        ).first()
-        gadget_type_id = gadget_type.gadget_type_id
-
-        # ③ ガジェット登録
-        gadget = DashboardGadgetMaster(
-            gadget_uuid=str(uuid.uuid4()),
-            gadget_name=form.title.data,
-            gadget_type_id=gadget_type_id,
-            dashboard_group_id=form.group_id.data,
-            chart_config=chart_config,
-            data_source_config=data_source_config,
-            position_x=0,
-            position_y=max_position_y + 1,
-            gadget_size=form.gadget_size.data,
-            display_order=max_order + 1,
-            creator=g.current_user.user_id,
-            modifier=g.current_user.user_id
-        )
-        db.session.add(gadget)
-        db.session.commit()
-        modal('ガジェットを登録しました', 'success')
-        return redirect(url_for('customer_dashboard.customer_dashboard'))
-
+        register_grid_gadget(params=params, current_user_id=g.current_user.user_id)
+        logger.info(f'表ガジェット登録成功: user_id={g.current_user.user_id}')
+        return jsonify({'message': msg_created('ガジェット')})
     except Exception as e:
-        db.session.rollback()
-        logger.error(f'表ガジェット登録エラー: {str(e)}')
+        g.last_exception_type = type(e).__name__
+        logger.error(f'表ガジェット登録エラー: {str(e)}', exc_info=True)
         abort(500)
+
 ```
 
 #### エラーハンドリング
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
-| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
+| 400 | バリデーションエラー | フォーム再表示 | バリデーションエラーメッセージ |
+| 404 | リソース不存在 | 404エラートースト表示 | 指定されたデバイスが見つかりません |
 | 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
 
 ---
@@ -792,38 +872,37 @@ def gadget_grid_register():
 
 ```mermaid
 flowchart TD
-    Start([CSVエクスポートボタンクリック]) --> Auth[認証チェック]
-    Auth --> CheckAuth{認証済み?}
-    CheckAuth -->|未認証| LoginRedirect[ログイン画面へリダイレクト]
-    CheckAuth -->|認証OK| Scope[データスコープ制限チェック<br>ガジェットがアクセス可能な組織に属するか確認]
+    Start([CSVエクスポートリクエスト]) --> Scope[データスコープ制限チェック<br>DB v_dashboard_gadget_master_by_user]
 
-    Scope --> CheckScope{スコープOK?}
-    CheckScope -->|スコープ外| Error404[404エラーモーダル表示]
-    CheckScope -->|スコープOK| Validate[バリデーション<br>リクエストパラメータ]
+    Scope --> CheckGetConfig{DBクエリ結果}
+    CheckGetConfig -->|成功| CheckConfig{データ存在?<br>※スコープ外も存在なしと同等}
+    CheckGetConfig -->|失敗| Error500[500エラーレスポンス]
+
+    CheckConfig -->|なし| Error404[404エラーレスポンス]
+    CheckConfig -->|あり| Validate[バリデーション<br>リクエストパラメータ]
 
     Validate --> CheckValidate{バリデーションOK?}
-    CheckValidate -->|NG| Error400[400エラーモーダル表示]
+    CheckValidate -->|NG| Error400[400エラーレスポンス]
     CheckValidate -->|OK| DeviceQuery[選択中デバイス取得<br>DB dashboard_user_setting]
 
     DeviceQuery --> CheckDeviceQuery{DBクエリ結果}
-    CheckDeviceQuery -->|失敗| Error500[500エラーモーダル表示]
-    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>sensor_data_view]
+    CheckDeviceQuery -->|成功| SilverQuery[センサーデータ取得<br>silver_sensor_data]
+    CheckDeviceQuery -->|失敗| Error500
 
     SilverQuery --> CheckSilverQuery{DBクエリ結果}
-    CheckSilverQuery -->|NG| Error500
     CheckSilverQuery -->|OK| ColumnNameQuery[テーブルカラム名取得<br>DB measurement_item_master]
+    CheckSilverQuery -->|NG| Error500
 
     ColumnNameQuery --> CheckColumnNameQuery{DBクエリ結果}
-    CheckColumnNameQuery -->|NG| Error500
     CheckColumnNameQuery -->|OK| FormatCSV[CSVフォーマット変換]
+    CheckColumnNameQuery -->|NG| Error500
 
     FormatCSV --> Response[CSVダウンロードレスポンス]
 
-    LoginRedirect --> End([処理完了])
-    Error404 --> End
+    Response --> End([処理完了])
     Error400 --> End
+    Error404 --> End
     Error500 --> End
-    Response --> End
 ```
 
 #### Flaskルート
@@ -846,13 +925,13 @@ flowchart TD
 
 **① 選択中デバイス取得**
 
-[ガジェットデータ取得 ①](#ガジェットデータ取得) と同様のSQL（dashboard_user_setting, device_master）を実行します。
+[ガジェットデータ取得 ①](#ガジェットデータ取得) と同様のSQL（v_dashboard_gadget_master_by_user）を実行します。
 
 ---
 
 **② センサーデータ取得**
 
-[ガジェットデータ取得 ①](#ガジェットデータ取得) と同様のSQL（sensor_data_view）を実行します。
+[ガジェットデータ取得 ①](#ガジェットデータ取得) と同様のSQL（silver_sensor_data）を実行します。
 
 **グラフ表示との差異:**
 
@@ -878,21 +957,16 @@ measurement_item_master から取得した display_name をヘッダーとし、
 **⑤ 実装例**
 
 ```python
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/<string:gadget_uuid>', methods=['GET'])
-@require_auth
-def gadget_csv_export(gadget_uuid):
+# views/analysis/customer_dashboard/grid.py
+def handle_gadget_csv_export(gadget_uuid):
     """表ガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
 
-    accessible_org_ids = get_accessible_organizations(g.current_user.organization_id)
-
-    # データスコープ制限チェック
-    gadget = get_gadget_by_uuid(gadget_uuid)
-    if not gadget or not check_gadget_access(gadget, accessible_org_ids):
+    gadget = check_gadget_access(gadget_uuid, g.current_user.user_id)
+    if gadget is None:
         abort(404)
 
-    # リクエストパラメータ取得・バリデーション
     start_datetime_str = request.args.get('start_datetime')
     end_datetime_str = request.args.get('end_datetime')
 
@@ -903,48 +977,31 @@ def gadget_csv_export(gadget_uuid):
         start_datetime = datetime.strptime(start_datetime_str, '%Y/%m/%d %H:%M:%S')
         end_datetime = datetime.strptime(end_datetime_str, '%Y/%m/%d %H:%M:%S')
 
-        # ① 選択中デバイス取得
         user_setting = get_dashboard_user_setting(g.current_user.user_id)
         device_id = user_setting.device_id if user_setting else None
 
-        # ② センサーデータ取得（最大10万件）
         rows = fetch_grid_data(
             device_id=device_id,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            limit=100000
+            limit=100_000,
+            offset=0,
         )
 
-        # ③ テーブルカラム名取得
         columns = get_column_definition()
-
-        # ④ データ整形
         grid_data = format_grid_data(rows, columns)
+        csv_content = generate_grid_csv(grid_data, columns)
 
-        # ⑤ CSV生成
-        output = io.StringIO()
-        writer = csv.writer(output)
-        headers = ['受信日時', 'デバイス名称'] + [col.display_name for col in columns]
-        writer.writerow(headers)
-
-        for row_data in grid_data:
-            row_values = [
-                row_data.get('event_timestamp', ''),
-                row_data.get('device_name', '')
-            ] + [row_data.get(col.silver_data_column_name, '') for col in columns]
-            writer.writerow(row_values)
-
-        # ⑥ CSVダウンロードレスポンス
-        output.seek(0)
         filename = f"sensor_data_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
         return Response(
-            output.getvalue(),
+            csv_content,
             mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment; filename={filename}'}
+            headers={'Content-Disposition': f'attachment; filename={filename}'},
         )
 
     except Exception as e:
-        logger.error(f'表ガジェットCSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        g.last_exception_type = type(e).__name__
+        logger.error(f'表CSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}', exc_info=True)
         abort(500)
 ```
 
@@ -952,9 +1009,8 @@ def gadget_csv_export(gadget_uuid):
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
-| 400 | バリデーションエラー | フォーム再表示（エラーモーダル表示） | バリデーションエラーメッセージ |
-| 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
+| 400 | バリデーションエラー | フォーム再表示 | バリデーションエラーメッセージ |
+| 404 | リソース不存在 | 404エラートースト表示 | 指定されたデバイスが見つかりません |
 | 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
 
 ---
@@ -964,37 +1020,37 @@ def gadget_csv_export(gadget_uuid):
 ### 認証・認可実装
 
 **認証方式:**
-- Databricksリバースプロキシヘッダ認証（`X-Forwarded-User`）
+- Azure環境: Easy Auth認証（Entra ID統合）（`X-MS-*` ヘッダーからユーザー情報・JWT取得）
+- AWS環境: ALB + Cognito認証（`X-Amzn-Oidc-*` ヘッダーからユーザー情報・JWT取得）
+- オンプレミス環境: 自前認証（Flask IdP）（Flaskセッションからユーザー情報取得、JWT再発行）
 
 **認可ロジック:**
 
 組織階層に基づいて、ユーザーがアクセスできるデータを制限します。
 
 **処理内容:**
-- **全ユーザー共通**: 組織階層（`organization_closure`）でフィルタ
-  - ユーザーの `organization_id` を親組織IDとして検索
-  - 下位組織リスト（`subsidiary_organization_id`）を取得
-  - そのリストに該当する組織のダッシュボード・ガジェットデータのみアクセス可能
-  - **ロールによる条件分岐は一切行わない**
-
-**注**: システム保守者・管理者が全データにアクセスできるのは、ルート組織（すべての組織を子組織に持つ）に所属しているため
+- 組織・デバイス等の一覧取得VIEW（v_organization_master_by_user 等）:
+  - VIEWが内部で organization_closure を参照し、アクセス可能な組織配下のデータのみ返す
+- ダッシュボード用VIEW（v_dashboard_master_by_user 等）:
+  - user_master.organization_id = dashboard_master.organization_id の直接JOINでスコープ制限を適用
+  - ユーザーの所属組織のダッシュボードのみアクセス可能（下位組織のダッシュボードは対象外）
+- センサーデータ（silver_sensor_data 等）:
+  - VIEWを使用せず、データ取得処理の度に organization_closure を参照し、アクセス可能な組織配下のデータのみ返す（組織・デバイス等の一覧取得VIEWと内部処理は同じ）
 
 **実装例:**
 ```python
-def apply_dashboard_data_scope_filter(query, current_user):
-    """組織階層に基づいたダッシュボードデータのスコープ制限を適用"""
-    accessible_org_ids = db.session.query(
-        OrganizationClosure.subsidiary_organization_id
-    ).filter(
-        OrganizationClosure.parent_organization_id == current_user.organization_id
-    ).all()
-
-    org_ids = [org_id[0] for org_id in accessible_org_ids]
-
-    if not org_ids:
-        return query.filter(DashboardMaster.organization_id.in_([]))
-
-    return query.filter(DashboardMaster.organization_id.in_(org_ids))
+# 組織一覧取得
+def get_organizations():
+    # v_organization_master_by_user に user_id を渡すだけでスコープ制限が自動適用される
+    return (
+        db.session.query(VOrganizationMasterByUser)
+        .filter(
+            VOrganizationMasterByUser.user_id == g.current_user.user_id,
+            VOrganizationMasterByUser.delete_flag == False,
+        )
+        .order_by(VOrganizationMasterByUser.organization_id)
+        .all()
+    )
 ```
 
 ### ログ出力ルール
@@ -1018,17 +1074,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@customer_dashboard_bp.route('/analysis/customer-dashboard/gadgets/grid/register', methods=['POST'])
+@customer_dashboard_bp.route('/dashboards/register', methods=['POST'])
 @require_auth
-def gadget_grid_register():
-    logger.info(f'表ガジェット登録開始: user_id={g.current_user.user_id}')
+def dashboard_register():
+    logger.info(f'ダッシュボード登録開始: user_id={g.current_user.user_id}')
 
     try:
         # ... 処理 ...
-        logger.info(f'表ガジェット登録成功: gadget_id={gadget.gadget_id}')
+        logger.info(f'ダッシュボード登録成功: dashboard_id={dashboard.dashboard_id}')
         return response
     except Exception as e:
-        logger.error(f'表ガジェット登録エラー: error={str(e)}')
+        logger.error(f'ダッシュボード登録エラー: error={str(e)}')
         abort(500)
 ```
 

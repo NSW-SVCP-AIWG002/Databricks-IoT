@@ -11,14 +11,14 @@ import builtins
 builtins.dbutils = dbutils  # noqa: F821
 builtins.spark = spark      # noqa: F821
 
-from functions.mysql_connector import get_mysql_connection
+from .functions.mysql_connector import get_mysql_connection
 
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     DoubleType, IntegerType, StringType, StructField, StructType,
 )
 
-from functions.alert_judgment import (
+from .functions.alert_judgment import (
     check_alerts_with_duration,
     enqueue_email_notification,
     evaluate_threshold,
@@ -28,11 +28,11 @@ from functions.alert_judgment import (
     update_alert_history_on_recovery,
     update_device_status,
 )
-from functions.constants import PIPELINE_TRIGGER_INTERVAL, TOPIC_NAME
-from functions.device_id_extraction import (
+from .functions.constants import PIPELINE_TRIGGER_INTERVAL, TOPIC_NAME
+from .functions.device_id_extraction import (
     extract_device_id_udf,
 )
-from functions.json_telemetry import convert_to_json_with_device_id_udf
+from .functions.json_telemetry import convert_to_json_with_device_id_udf
 
 print("[INIT] インポート完了")
 
@@ -104,6 +104,10 @@ kafka_options = {
     "startingOffsets": "earliest",
     # "startingOffsets": "latest",
     "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",       # 30秒（デフォルト600秒を短縮）
+    "kafka.heartbeat.interval.ms": "10000",    # 10秒（session.timeout の1/3以下）
+    "kafka.request.timeout.ms": "60000",       # 60秒
+    "kafka.max.poll.interval.ms": "600000",    # 10分（foreachBatch の処理時間上限）
 }
 
 # =============================================================================
