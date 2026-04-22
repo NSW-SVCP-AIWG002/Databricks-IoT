@@ -79,13 +79,11 @@
 | ------ | --------------------- | ---------------------------------- | -------------------------------------- |
 | 200    | OK                    | 正常処理（画面表示成功）           | `render_template()`                    |
 | 302    | Found                 | リダイレクト（処理成功後）         | `redirect()`                           |
-| 400    | Bad Request           | リクエスト不正（パラメータエラー） | `render_template()` with error modal   |
-| 401    | Unauthorized          | 認証エラー                         | Databricksが自動処理                   |
-| 403    | Forbidden             | 権限不足                           | `render_template()` with error modal   |
-| 404    | Not Found             | リソース未検出                     | `render_template()` with error modal   |
-| 500    | Internal Server Error | サーバーエラー                     | `render_template('errors/500.html')`   |
-
-**注:** Flask SSRでは、エラー時もHTMLページを返却します（JSONレスポンスは使用しません）。
+| 400    | Bad Request           | リクエスト不正（バリデーションエラー） | フォーム項目下にエラーメッセージ表示（フォームのない画面は toast 表示） |
+| 401    | Unauthorized          | 認証エラー                             | Databricksが自動処理                   |
+| 403    | Forbidden             | 権限不足                               | toast 表示                             |
+| 404    | Not Found             | リソース未検出                         | toast 表示                             |
+| 500    | Internal Server Error | サーバーエラー                         | `render_template('errors/500.html')`   |
 
 ---
 
@@ -96,9 +94,9 @@
 | コード             | 説明                 | HTTPステータス | 表示方法                             |
 | ------------------ | -------------------- | -------------- | ------------------------------------ |
 | AUTH_FAILED        | 認証失敗             | 401            | ログイン画面へリダイレクト |
-| PERMISSION_DENIED  | 権限不足             | 403            | エラーメッセージモーダル表示                     |
-| RESOURCE_NOT_FOUND | リソース不在         | 404            | エラーメッセージモーダル表示         |
-| INVALID_PARAMETER  | パラメータ不正       | 400            | エラーメッセージモーダル表示             |
+| PERMISSION_DENIED  | 権限不足             | 403            | toast 表示                          |
+| RESOURCE_NOT_FOUND | リソース不在         | 404            | toast 表示                          |
+| INVALID_PARAMETER  | パラメータ不正       | 400            | フォーム項目下表示（フォームなければ toast 表示）|
 | INTERNAL_ERROR     | サーバーエラー       | 500            | エラーページ表示（errors/500.html）                  |
 | EXTERNAL_API_ERROR | 外部API連携エラー    | 500           | エラーページ表示（errors/500.html）                  |
 | DATABASE_ERROR     | データベースエラー   | 500            | エラーページ表示（errors/500.html）                  |
@@ -106,43 +104,28 @@
 **Flask実装例:**
 
 ```python
-# パラメータ不正エラー
-if not valid_parameter:
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'パラメータが不正です'}), 400
-# パラメータ不正エラー
-if not valid_parameter:
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'パラメータが不正です'}), 400
+from iot_app.common.messages import ERR_ACCESS_DENIED, err_not_found
 
-# リソース不在エラー
+# バリデーションエラー（フォームあり → フォーム項目下に表示）
+if not form.validate_on_submit():
+    # WTForms が各フィールドに errors を付与 → テンプレート側で項目下に表示
+    return render_template('users/form.html', form=form), 422
+
+# リソース不在エラー（toast 表示）
 user = User.query.get(user_id)
 if not user:
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': '指定されたユーザーが見つかりません'}), 404
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': '指定されたユーザーが見つかりません'}), 404
+    return jsonify({'error': err_not_found('ユーザー')}), 404
 
-# 権限エラー
+# 権限エラー（toast 表示）
 if not current_user.has_permission('user:delete'):
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'この操作を実行する権限がありません'}), 403
-    # エラーメッセージモーダルを表示
-    return render_template('users/list.html',
-                         error_modal={'message': 'この操作を実行する権限がありません'}), 403
+    return jsonify({'error': ERR_ACCESS_DENIED}), 403
 
-# データベースエラー（例外ハンドラで処理）
+# データベースエラー（エラーページ）
 try:
     db.session.commit()
 except Exception as e:
     db.session.rollback()
     logger.error(f"Database error: {e}")
-    # エラーページを表示
     return render_template('errors/500.html'), 500
 ```
 
@@ -156,10 +139,10 @@ except Exception as e:
 
 | エラー分類           | 説明                           | 対応方針                     | HTTPステータス | トランザクション       |
 | -------------------- | ------------------------------ | ---------------------------- | -------------- | ---------------------- |
-| パラメータ不正       | 入力パラメータの形式・値が不正 | エラーメッセージモーダル表示 | 400            | 開始前                 |
-| 認証エラー           | 認証失敗                       | Databricksログイン画面へ     | 401            | 開始前                 |
-| 認可エラー           | 権限不足                       | エラーメッセージモーダル表示 | 403            | 開始前                 |
-| リソース不在エラー   | 対象データが存在しない         | エラーメッセージモーダル表示 | 404            | 読み取りのみ           |
+| パラメータ不正       | 入力パラメータの形式・値が不正 | フォーム項目下表示（フォームなければ toast 表示） | 400            | 開始前                 |
+| 認証エラー           | 認証失敗                       | Databricksログイン画面へ                          | 401            | 開始前                 |
+| 認可エラー           | 権限不足                       | toast 表示                                        | 403            | 開始前                 |
+| リソース不在エラー   | 対象データが存在しない         | toast 表示                                        | 404            | 読み取りのみ           |
 | データベースエラー   | DB接続失敗、SQL実行失敗        | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
 | 外部API連携エラー    | 外部サービスとの連携失敗       | エラーページ表示（errors/500.html） | 500            | 開始後（ロールバック） |
 
@@ -598,9 +581,8 @@ def require_role(*roles):
         def decorated_function(*args, **kwargs):
             current_user = get_current_user()
             if current_user.role not in roles:
-                # エラーメッセージモーダルを表示
-                return render_template(request.endpoint.replace('.', '/') + '.html',
-                                     error_modal={'message': 'この操作を実行する権限がありません'}), 403
+                # toast 表示
+                return jsonify({'error': ERR_ACCESS_DENIED}), 403
             return f(*args, **kwargs)
         return decorated_function
     return decorator
