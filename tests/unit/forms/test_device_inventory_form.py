@@ -902,14 +902,21 @@ class TestDeviceInventoryCreateFormDateRelations:
         """
         # Arrange / Act
         from iot_app.forms.device_inventory import DeviceInventoryCreateForm
-
+        from wtforms.validators import Optional
+        
         validators = DeviceInventoryCreateForm.estimated_ship_date.kwargs.get(
             'validators', [])
 
         # Assert: Optional と DateAfterPurchase 相当のバリデーターが含まれること
         # （date_after_purchase_validator は内部 closure なので callable 存在で確認）
-        assert len(
-            validators) >= 2, 'Expected at least Optional and date_after_purchase_validator'
+        assert any(isinstance(v, Optional) for v in validators)
+        # Assert: date_after_purchase_validator バリデータが設定されていること
+        assert any(
+            callable(v) and 'date_after_purchase_validator' in getattr(
+                v, '__qualname__', '')
+            for v in validators
+        )
+        assert len(validators) == 2, 'Expected at least Optional and date_after_purchase_validator'
 
     def test_ship_date_has_date_after_purchase_validator(self):
         """1.4.1, 1.6.2: ship_date に date_after_purchase_validator が設定されている
@@ -919,12 +926,19 @@ class TestDeviceInventoryCreateFormDateRelations:
         """
         # Arrange / Act
         from iot_app.forms.device_inventory import DeviceInventoryCreateForm
+        from wtforms.validators import Optional
 
         validators = DeviceInventoryCreateForm.ship_date.kwargs.get(
             'validators', [])
 
-        assert len(
-            validators) >= 2, 'Expected at least Optional and date_after_purchase_validator'
+        # Assert: Optional と DateAfterPurchase 相当のバリデーターが含まれること
+        assert any(isinstance(v, Optional) for v in validators)
+        assert any(
+            callable(v) and 'date_after_purchase_validator' in getattr(
+                v, '__qualname__', '')
+            for v in validators
+        )
+        assert len(validators) == 2, 'Expected at least Optional and date_after_purchase_validator'
 
     def test_manufacturer_warranty_end_date_has_date_after_purchase_validator(self):
         """1.1.3, 1.4.1, 1.6.2: manufacturer_warranty_end_date に date_after_purchase_validator が設定されている
@@ -942,8 +956,13 @@ class TestDeviceInventoryCreateFormDateRelations:
 
         # Assert: DataRequired が含まれること（必須項目）
         assert any(isinstance(v, DataRequired) for v in validators)
-        # Assert: 相関バリデーター（callable）も含まれること
-        assert len(validators) >= 2
+        # Assert: date_after_purchase_validator バリデータが設定されていること
+        assert any(
+            callable(v) and 'date_after_purchase_validator' in getattr(
+                v, '__qualname__', '')
+            for v in validators
+        )
+        assert len(validators) == 2
 
 
 # ============================================================
