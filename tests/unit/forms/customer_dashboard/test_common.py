@@ -128,6 +128,24 @@ class TestDashboardGroupForm:
             assert not form.validate()
             assert 'dashboard_group_name' in form.errors
 
+    def test_valid_when_dashboard_uuid_provided(self, app):
+        """dashboard_uuid あり: バリデーション通過"""
+        with app.test_request_context():
+            form = DashboardGroupForm(data={
+                'dashboard_uuid': 'test-dashboard-uuid-001',
+                'dashboard_group_name': 'テストグループ',
+            })
+            assert form.validate()
+
+    def test_valid_when_dashboard_uuid_empty(self, app):
+        """dashboard_uuid 空: HiddenField はバリデーターなしのためバリデーション通過"""
+        with app.test_request_context():
+            form = DashboardGroupForm(data={
+                'dashboard_uuid': '',
+                'dashboard_group_name': 'テストグループ',
+            })
+            assert form.validate()
+
 
 # ---------------------------------------------------------------------------
 # GadgetForm

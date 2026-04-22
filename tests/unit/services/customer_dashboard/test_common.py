@@ -10,119 +10,6 @@ MODULE = 'iot_app.services.customer_dashboard.common'
 
 
 # ---------------------------------------------------------------------------
-# get_organization_id_by_user
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetOrganizationIdByUser:
-    """ユーザーIDから所属組織IDを取得する
-
-    NOTE: get_accessible_organizations が不要になった際は呼び出し元ごと削除する。
-    """
-
-    @patch(f'{MODULE}.db')
-    def test_returns_organization_id(self, mock_db):
-        """ユーザーが存在する場合: organization_id を返す"""
-        # Arrange
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 5
-        from iot_app.services.customer_dashboard.common import get_organization_id_by_user
-
-        # Act
-        result = get_organization_id_by_user(1)
-
-        # Assert
-        assert result == 5
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db):
-        """ユーザーが存在しない場合: None を返す"""
-        # Arrange
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
-        from iot_app.services.customer_dashboard.common import get_organization_id_by_user
-
-        # Act
-        result = get_organization_id_by_user(999)
-
-        # Assert
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# get_accessible_organizations
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetAccessibleOrganizations:
-    """観点: 3.1.1（フィルタ条件）, 3.1.4（件数）
-
-    使用ルート:
-        GET  /analysis/customer-dashboard（初期表示）
-        GET  /analysis/customer-dashboard/dashboards（管理モーダル）
-        POST /analysis/customer-dashboard/dashboards/<uuid>/switch
-        POST /analysis/customer-dashboard/dashboards/<uuid>/update
-        POST /analysis/customer-dashboard/dashboards/<uuid>/delete
-        POST /analysis/customer-dashboard/groups/register
-        POST /analysis/customer-dashboard/groups/<uuid>/update
-        POST /analysis/customer-dashboard/groups/<uuid>/delete
-        POST /analysis/customer-dashboard/gadgets/<uuid>/update
-        POST /analysis/customer-dashboard/gadgets/<uuid>/delete
-
-    ワークフロー仕様書 § ダッシュボード初期表示 ② データスコープ制限の適用
-    organization_closure テーブルから subsidiary_organization_id を取得する
-    """
-
-    @patch(f'{MODULE}.db')
-    def test_returns_org_id_list(self, mock_db):
-        """3.1.4.1 データあり: 下位組織IDリストを返す"""
-        # Arrange
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [
-            (10,), (20,), (30,)
-        ]
-        from iot_app.services.customer_dashboard.common import get_accessible_organizations
-
-        # Act
-        result = get_accessible_organizations(1)
-
-        # Assert
-        assert result == [10, 20, 30]
-
-    @patch(f'{MODULE}.db')
-    def test_returns_empty_list_when_no_children(self, mock_db):
-        """3.1.4.2 データなし: 空リストを返す"""
-        # Arrange
-        mock_db.session.query.return_value.filter.return_value.all.return_value = []
-        from iot_app.services.customer_dashboard.common import get_accessible_organizations
-
-        # Act
-        result = get_accessible_organizations(999)
-
-        # Assert
-        assert result == []
-
-    @patch(f'{MODULE}.db')
-    def test_filters_by_parent_organization_id(self, mock_db):
-        """3.1.1.1 フィルタ条件: parent_organization_id で絞り込む"""
-        # Arrange
-        from iot_app.services.customer_dashboard.common import (
-            get_accessible_organizations,
-        )
-        from iot_app.models.organization import OrganizationClosure
-
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [
-            (5,)
-        ]
-
-        # Act
-        get_accessible_organizations(3)
-
-        # Assert
-        mock_db.session.query.assert_called_once_with(OrganizationClosure.subsidiary_organization_id)
-        filter_expr = mock_db.session.query.return_value.filter.call_args[0][0]
-        assert filter_expr.left == OrganizationClosure.parent_organization_id
-        assert filter_expr.right.value == 3
-
-
-# ---------------------------------------------------------------------------
 # get_dashboard_user_setting
 # ---------------------------------------------------------------------------
 
@@ -178,7 +65,7 @@ class TestGetDashboardById:
         GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ④ ダッシュボード情報取得
-    dashboard_id に一致する dashboard_master レコードを返す（PKルックアップ、スコープ制限なし）
+    dashboard_id に一致する v_dashboard_master_by_user レコードを返す（PKルックアップ）
     """
 
     @patch(f'{MODULE}.db')
@@ -276,7 +163,7 @@ class TestGetDashboards:
         GET  /analysis/customer-dashboard/dashboards（管理モーダル）
 
     ワークフロー仕様書 § ダッシュボード管理モーダル表示 ① ダッシュボード一覧取得
-    accessible_org_ids でスコープ制限し dashboard_id 昇順に返す
+    v_dashboard_master_by_user に user_id を渡してスコープ制限し、dashboard_id 昇順に返す
     """
 
     @patch(f'{MODULE}.db')
@@ -294,7 +181,7 @@ class TestGetDashboards:
         from iot_app.services.customer_dashboard.common import get_dashboards
 
         # Act
-        result = get_dashboards([1, 2, 3])
+        result = get_dashboards(1)
 
         # Assert
         assert result == [mock_dash1, mock_dash2]
@@ -312,27 +199,14 @@ class TestGetDashboards:
         from iot_app.services.customer_dashboard.common import get_dashboards
 
         # Act
-        result = get_dashboards([1])
+        result = get_dashboards(1)
 
         # Assert
         assert result == []
 
     @patch(f'{MODULE}.db')
-    def test_returns_empty_when_accessible_org_ids_empty(self, mock_db):
-        """3.1.1.1 accessible_org_ids が空: ダッシュボードなし"""
-        # Arrange
-        from iot_app.services.customer_dashboard.common import get_dashboards
-
-        # Act
-        result = get_dashboards([])
-
-        # Assert
-        assert result == []
-        mock_db.session.query.assert_not_called()
-
-    @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+    def test_filters_by_user_id(self, mock_db):
+        """3.1.1.1 user_id で v_dashboard_master_by_user を絞り込む"""
         # Arrange
         (
             mock_db.session.query.return_value
@@ -341,16 +215,19 @@ class TestGetDashboards:
             .all.return_value
         ) = []
         from iot_app.services.customer_dashboard.common import get_dashboards
-        from iot_app.models.customer_dashboard import DashboardMaster
+        from iot_app.models.customer_dashboard import VDashboardMasterByUser
 
         # Act
-        get_dashboards([1, 2])
+        get_dashboards(1)
 
         # Assert
+        mock_db.session.query.assert_called_once_with(VDashboardMasterByUser)
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == DashboardMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VDashboardMasterByUser.user_id
+        )
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +243,7 @@ class TestGetFirstDashboard:
         POST /analysis/customer-dashboard/dashboards/<uuid>/delete（削除後の次ダッシュボード取得）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ④
-    ユーザー設定なし時に dashboard_id 昇順の先頭ダッシュボードを返す
+    v_dashboard_master_by_user に user_id を渡してアクセス可能な先頭ダッシュボードを返す
     """
 
     @patch(f'{MODULE}.db')
@@ -383,7 +260,7 @@ class TestGetFirstDashboard:
         from iot_app.services.customer_dashboard.common import get_first_dashboard
 
         # Act
-        result = get_first_dashboard([1, 2])
+        result = get_first_dashboard(1)
 
         # Assert
         assert result is mock_dash
@@ -401,7 +278,7 @@ class TestGetFirstDashboard:
         from iot_app.services.customer_dashboard.common import get_first_dashboard
 
         # Act
-        result = get_first_dashboard([1])
+        result = get_first_dashboard(1)
 
         # Assert
         assert result is None
@@ -421,15 +298,15 @@ class TestGetFirstDashboard:
         from iot_app.services.customer_dashboard.common import get_first_dashboard
 
         # Act
-        result = get_first_dashboard([1, 2], exclude_id=3)
+        result = get_first_dashboard(1, exclude_id=3)
 
         # Assert
         assert result is mock_dash
         assert mock_db.session.query.return_value.filter.return_value.filter.called
 
     @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+    def test_filters_by_user_id(self, mock_db):
+        """3.1.1.1 user_id で v_dashboard_master_by_user を絞り込む"""
         # Arrange
         (
             mock_db.session.query.return_value
@@ -438,166 +315,82 @@ class TestGetFirstDashboard:
             .first.return_value
         ) = None
         from iot_app.services.customer_dashboard.common import get_first_dashboard
-        from iot_app.models.customer_dashboard import DashboardMaster
+        from iot_app.models.customer_dashboard import VDashboardMasterByUser
 
         # Act
-        get_first_dashboard([1, 2])
+        get_first_dashboard(1)
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == DashboardMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VDashboardMasterByUser.user_id
+        )
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
-# get_active_dashboard
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetActiveDashboard:
-    """観点: 2.2.1/2.2.2/2.2.3（ユーザー設定の有無・ダッシュボードの有無）
-
-    使用ルート:
-        GET  /analysis/customer-dashboard（初期表示）
-
-    ワークフロー仕様書 § ダッシュボード初期表示 アクティブダッシュボード決定
-    ユーザー設定あり→設定値を返す、なし→先頭ダッシュボードを返す、どちらもなし→None
-    """
-
-    @patch(f'{MODULE}.get_first_dashboard')
-    def test_returns_dashboard_id_from_user_setting_when_exists(self, mock_get_first):
-        """2.2.1 ユーザー設定にdashboard_idがある場合: 設定値を返す"""
-        # Arrange
-        mock_setting = MagicMock()
-        mock_setting.dashboard_id = 5
-        from iot_app.services.customer_dashboard.common import get_active_dashboard
-
-        # Act
-        result = get_active_dashboard(mock_setting, accessible_org_ids=[1, 2])
-
-        # Assert
-        assert result == 5
-        mock_get_first.assert_not_called()
-
-    @patch(f'{MODULE}.get_first_dashboard')
-    def test_returns_first_dashboard_when_no_user_setting(self, mock_get_first):
-        """2.2.2 ユーザー設定なし: 先頭ダッシュボードのIDを返す"""
-        # Arrange
-        mock_first = MagicMock()
-        mock_first.dashboard_id = 3
-        mock_get_first.return_value = mock_first
-        from iot_app.services.customer_dashboard.common import get_active_dashboard
-
-        # Act
-        result = get_active_dashboard(None, accessible_org_ids=[1, 2])
-
-        # Assert
-        assert result == 3
-        mock_get_first.assert_called_once_with([1, 2])
-
-    @patch(f'{MODULE}.get_first_dashboard')
-    def test_returns_none_when_no_dashboards_exist(self, mock_get_first):
-        """2.2.3 ユーザー設定なし・ダッシュボードなし: None を返す"""
-        # Arrange
-        mock_get_first.return_value = None
-        from iot_app.services.customer_dashboard.common import get_active_dashboard
-
-        # Act
-        result = get_active_dashboard(None, accessible_org_ids=[1, 2])
-
-        # Assert
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# check_dashboard_access
+# get_dashboard_by_uuid
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestCheckDashboardAccess:
-    """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
+class TestGetDashboardByUuid:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
 
     使用ルート:
         POST /analysis/customer-dashboard/dashboards/<uuid>/switch（スコープチェック）
         POST /analysis/customer-dashboard/dashboards/<uuid>/update（スコープチェック）
         POST /analysis/customer-dashboard/dashboards/<uuid>/delete（スコープチェック）
-        POST /analysis/customer-dashboard/groups/register（スコープチェック）
 
-    ワークフロー仕様書 § ダッシュボード表示切替 データスコープ制限チェック
-    dashboard_uuid と accessible_org_ids が一致するレコードを返す
+    ワークフロー仕様書 § ダッシュボード表示切替
+    v_dashboard_master_by_user に user_id と dashboard_uuid を渡してスコープ制限・存在確認を行う
     """
 
     @patch(f'{MODULE}.db')
-    def test_returns_dashboard_when_accessible(self, mock_db):
-        """2.2.1 / 1.2.1 スコープ内ダッシュボード: レコードを返す"""
+    def test_returns_dashboard_when_found(self, mock_db):
+        """2.2.1 user_id とスコープが一致するダッシュボード: レコードを返す"""
         # Arrange
         mock_dash = MagicMock()
         mock_db.session.query.return_value.filter.return_value.first.return_value = mock_dash
-        from iot_app.services.customer_dashboard.common import check_dashboard_access
+        from iot_app.services.customer_dashboard.common import get_dashboard_by_uuid
 
         # Act
-        result = check_dashboard_access('dash-uuid-001', [1, 2])
+        result = get_dashboard_by_uuid('dash-uuid-001', 1)
 
         # Assert
         assert result is mock_dash
 
     @patch(f'{MODULE}.db')
     def test_returns_none_when_not_found(self, mock_db):
-        """2.2.2 ダッシュボードが存在しない場合: None を返す"""
+        """2.2.2 ダッシュボードが存在しない場合（スコープ外含む）: None を返す"""
         # Arrange
         mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_dashboard_access
+        from iot_app.services.customer_dashboard.common import get_dashboard_by_uuid
 
         # Act
-        result = check_dashboard_access('no-such-uuid', [1, 2])
+        result = get_dashboard_by_uuid('no-such-uuid', 1)
 
         # Assert
         assert result is None
 
     @patch(f'{MODULE}.db')
-    def test_returns_none_when_out_of_scope(self, mock_db):
-        """1.2.2 アクセス可能スコープ外（organization_id 不一致）: None を返す"""
+    def test_filters_by_user_id(self, mock_db):
+        """3.1.1.1 user_id で v_dashboard_master_by_user を絞り込む"""
         # Arrange
         mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_dashboard_access
+        from iot_app.services.customer_dashboard.common import get_dashboard_by_uuid
+        from iot_app.models.customer_dashboard import VDashboardMasterByUser
 
         # Act
-        result = check_dashboard_access('dash-uuid-001', [99])
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_logically_deleted(self, mock_db):
-        """2.2.3 論理削除済み（delete_flag=True）: None を返す"""
-        # Arrange
-        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_dashboard_access
-
-        # Act
-        result = check_dashboard_access('deleted-dash-uuid', [1])
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
-        # Arrange
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_dashboard_access
-        from iot_app.models.customer_dashboard import DashboardMaster
-
-        # Act
-        check_dashboard_access('dash-uuid-001', [1, 2])
+        get_dashboard_by_uuid('dash-uuid-001', 1)
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == DashboardMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VDashboardMasterByUser.user_id
+        )
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
@@ -619,10 +412,11 @@ class TestCreateDashboard:
     def test_adds_dashboard_to_session(self, mock_db):
         """3.2.1.1 ダッシュボードを db.session.add する"""
         # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 1
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
+        create_dashboard('テストダッシュボード', user_id=1)
 
         # Assert
         mock_db.session.add.assert_called_once()
@@ -631,10 +425,11 @@ class TestCreateDashboard:
     def test_sets_uuid_automatically(self, mock_db):
         """3.2.2.1 dashboard_uuid が自動生成される（UUID形式・36文字）"""
         # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 1
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
+        create_dashboard('テストダッシュボード', user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
@@ -645,15 +440,30 @@ class TestCreateDashboard:
     def test_sets_creator_and_modifier(self, mock_db):
         """3.2.2.1 creator / modifier にログインユーザーIDが設定される"""
         # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 1
         from iot_app.services.customer_dashboard.common import create_dashboard
 
         # Act
-        create_dashboard('テストダッシュボード', organization_id=1, user_id=1)
+        create_dashboard('テストダッシュボード', user_id=1)
         added_obj = mock_db.session.add.call_args[0][0]
 
         # Assert
         assert added_obj.creator == 1
         assert added_obj.modifier == 1
+
+    @patch(f'{MODULE}.db')
+    def test_sets_organization_id_from_user(self, mock_db):
+        """3.2.2.1 organization_id がユーザーの所属組織IDから自動設定される"""
+        # Arrange
+        mock_db.session.query.return_value.filter.return_value.scalar.return_value = 5
+        from iot_app.services.customer_dashboard.common import create_dashboard
+
+        # Act
+        create_dashboard('テストダッシュボード', user_id=1)
+        added_obj = mock_db.session.add.call_args[0][0]
+
+        # Assert
+        assert added_obj.organization_id == 5
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +478,7 @@ class TestUpdateDashboardTitle:
         POST /analysis/customer-dashboard/dashboards/<uuid>/update
 
     ワークフロー仕様書 § ダッシュボードタイトル更新
-    ダッシュボード名と modifier を更新する（楽観ロック検証はView層で実施）
+    ダッシュボード名と modifier を更新する
     """
 
     def test_updates_dashboard_name(self):
@@ -772,12 +582,12 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
+        delete_dashboard_with_cascade(mock_dashboard, user_id=1)
 
         # Assert
         mock_del_gadgets.assert_called_once_with(dashboard_id=1, modifier=1)
         mock_del_groups.assert_called_once_with(dashboard_id=1, modifier=1)
-        mock_get_first.assert_called_once_with([1], exclude_id=1)
+        mock_get_first.assert_called_once_with(1, exclude_id=1)
 
     @patch(f'{MODULE}.delete_gadgets_by_dashboard')
     @patch(f'{MODULE}.delete_groups_by_dashboard')
@@ -795,12 +605,12 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
+        delete_dashboard_with_cascade(mock_dashboard, user_id=1)
 
         # Assert
         assert mock_dashboard.delete_flag is True
         assert mock_dashboard.modifier == 1
-        mock_get_first.assert_called_once_with([1], exclude_id=1)
+        mock_get_first.assert_called_once_with(1, exclude_id=1)
 
     @patch(f'{MODULE}.delete_gadgets_by_dashboard')
     @patch(f'{MODULE}.delete_groups_by_dashboard')
@@ -820,10 +630,10 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
+        delete_dashboard_with_cascade(mock_dashboard, user_id=1)
 
         # Assert
-        mock_get_first.assert_called_once_with([1], exclude_id=1)
+        mock_get_first.assert_called_once_with(1, exclude_id=1)
         mock_upsert.assert_called_once_with(1, 2)
         mock_del_setting.assert_not_called()
 
@@ -843,10 +653,10 @@ class TestDeleteDashboardWithCascade:
         from iot_app.services.customer_dashboard.common import delete_dashboard_with_cascade
 
         # Act
-        delete_dashboard_with_cascade(mock_dashboard, accessible_org_ids=[1], user_id=1)
+        delete_dashboard_with_cascade(mock_dashboard, user_id=1)
 
         # Assert
-        mock_get_first.assert_called_once_with([1], exclude_id=1)
+        mock_get_first.assert_called_once_with(1, exclude_id=1)
         mock_del_setting.assert_called_once_with(user_id=1, modifier=1)
         mock_upsert.assert_not_called()
 
@@ -1013,90 +823,66 @@ class TestCreateDashboardGroup:
 
 
 # ---------------------------------------------------------------------------
-# check_group_access
+# get_group_by_uuid
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestCheckGroupAccess:
-    """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
+class TestGetGroupByUuid:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
 
     使用ルート:
         POST /analysis/customer-dashboard/groups/<uuid>/update（スコープチェック）
         POST /analysis/customer-dashboard/groups/<uuid>/delete（スコープチェック）
 
-    ワークフロー仕様書 § ダッシュボードグループタイトル更新 ③ データスコープ制限チェック
-    dashboard_group_uuid と accessible_org_ids が一致するレコードを返す
+    ワークフロー仕様書 § ダッシュボードグループタイトル更新 スコープチェック
+    v_dashboard_group_master_by_user に user_id と dashboard_group_uuid を渡してスコープ制限・存在確認を行う
     """
 
     @patch(f'{MODULE}.db')
-    def test_returns_group_when_accessible(self, mock_db):
-        """2.2.1 / 1.2.1 スコープ内グループ: レコードを返す"""
+    def test_returns_group_when_found(self, mock_db):
+        """2.2.1 user_id とスコープが一致するグループ: レコードを返す"""
         # Arrange
         mock_group = MagicMock()
-        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = mock_group
-        from iot_app.services.customer_dashboard.common import check_group_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_group
+        from iot_app.services.customer_dashboard.common import get_group_by_uuid
 
         # Act
-        result = check_group_access('group-uuid-001', [1, 2])
+        result = get_group_by_uuid('group-uuid-001', 1)
 
         # Assert
         assert result is mock_group
 
     @patch(f'{MODULE}.db')
     def test_returns_none_when_not_found(self, mock_db):
-        """2.2.2 グループが存在しない場合: None を返す"""
+        """2.2.2 グループが存在しない場合（スコープ外含む）: None を返す"""
         # Arrange
-        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_group_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_group_by_uuid
 
         # Act
-        result = check_group_access('no-such-uuid', [1, 2])
+        result = get_group_by_uuid('no-such-uuid', 1)
 
         # Assert
         assert result is None
 
     @patch(f'{MODULE}.db')
-    def test_returns_none_when_out_of_scope(self, mock_db):
-        """1.2.2 アクセス可能スコープ外（organization_id 不一致）: None を返す"""
+    def test_filters_by_user_id(self, mock_db):
+        """3.1.1.1 user_id で v_dashboard_group_master_by_user を絞り込む"""
         # Arrange
-        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_group_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_group_by_uuid
+        from iot_app.models.customer_dashboard import VDashboardGroupMasterByUser
 
         # Act
-        result = check_group_access('group-uuid-001', [99])
+        get_group_by_uuid('group-uuid-001', 1)
 
         # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_logically_deleted(self, mock_db):
-        """2.2.3 論理削除済み（delete_flag=True）: None を返す"""
-        # Arrange
-        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_group_access
-
-        # Act
-        result = check_group_access('deleted-group-uuid', [1])
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む（JOIN経由）"""
-        # Arrange
-        mock_db.session.query.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_group_access
-        from iot_app.models.customer_dashboard import DashboardMaster
-
-        # Act
-        check_group_access('group-uuid-001', [1, 2])
-
-        # Assert
-        filter_args = mock_db.session.query.return_value.join.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == DashboardMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VDashboardGroupMasterByUser.user_id
+        )
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1111,7 +897,7 @@ class TestUpdateGroupTitle:
         POST /analysis/customer-dashboard/groups/<uuid>/update
 
     ワークフロー仕様書 § グループタイトル更新
-    グループ名と modifier を更新する（楽観ロック検証はView層で実施）
+    グループ名と modifier を更新する
     """
 
     def test_updates_group_name(self):
@@ -1188,6 +974,77 @@ class TestGetGadgetsByGroups:
 
 
 # ---------------------------------------------------------------------------
+# get_gadget_type
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetGadgetType:
+    """gadget_uuid から gadget_type_name を返す
+
+    使用ルート:
+        POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
+        GET  /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_gadget_type_name(self, mock_db):
+        """2.3.1 gadget_uuid が存在する場合: gadget_type_name を返す"""
+        # Arrange
+        mock_row = MagicMock()
+        mock_row.gadget_type_name = 'timeline'
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = mock_row
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('test-uuid-1234')
+
+        # Assert
+        assert result == 'timeline'
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """2.3.2 gadget_uuid が存在しない場合: None を返す"""
+        # Arrange
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('non-existent-uuid')
+
+        # Assert
+        assert result is None
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_logically_deleted(self, mock_db):
+        """2.3.3 delete_flag=True のガジェットのみ存在する場合: None を返す"""
+        # Arrange
+        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
+        (
+            mock_db.session.query.return_value
+            .join.return_value
+            .filter.return_value
+            .first.return_value
+        ) = None
+        from iot_app.services.customer_dashboard.common import get_gadget_type
+
+        # Act
+        result = get_gadget_type('deleted-uuid-5678')
+
+        # Assert
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
 # get_gadget_types
 # ---------------------------------------------------------------------------
 
@@ -1241,105 +1098,66 @@ class TestGetGadgetTypes:
 
 
 # ---------------------------------------------------------------------------
-# check_gadget_access
+# get_gadget_by_uuid
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestCheckGadgetAccess:
-    """観点: 2.2.1/2.2.2/2.2.3（存在チェック）, 1.2.1/1.2.2（スコープ制限）
+class TestGetGadgetByUuid:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
 
     使用ルート:
         POST /analysis/customer-dashboard/gadgets/<uuid>/update（スコープチェック）
         POST /analysis/customer-dashboard/gadgets/<uuid>/delete（スコープチェック）
 
     ワークフロー仕様書 § ガジェット削除 / ガジェットタイトル更新 スコープチェック
-    gadget_uuid → group → dashboard → organization の間接参照でスコープを確認する
-
-    TODO: check_gadget_access() の JOIN クエリ実装方針（Q4）は設計書に未記載。
-          ガジェット→グループ→ダッシュボード→組織の間接参照方式について要確認。
+    v_dashboard_gadget_master_by_user に user_id と gadget_uuid を渡してスコープ制限・存在確認を行う
     """
 
     @patch(f'{MODULE}.db')
-    def test_returns_gadget_when_accessible(self, mock_db):
-        """2.2.1 / 1.2.1 スコープ内ガジェット: レコードを返す"""
+    def test_returns_gadget_when_found(self, mock_db):
+        """2.2.1 user_id とスコープが一致するガジェット: レコードを返す"""
         # Arrange
         mock_gadget = MagicMock()
-        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = mock_gadget
-        from iot_app.services.customer_dashboard.common import check_gadget_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_gadget
+        from iot_app.services.customer_dashboard.common import get_gadget_by_uuid
 
         # Act
-        result = check_gadget_access('gadget-uuid-001', [1, 2])
+        result = get_gadget_by_uuid('gadget-uuid-001', 1)
 
         # Assert
         assert result is mock_gadget
 
     @patch(f'{MODULE}.db')
     def test_returns_none_when_not_found(self, mock_db):
-        """2.2.2 ガジェットが存在しない場合: None を返す"""
+        """2.2.2 ガジェットが存在しない場合（スコープ外含む）: None を返す"""
         # Arrange
-        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_gadget_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_gadget_by_uuid
 
         # Act
-        result = check_gadget_access('no-such-uuid', [1, 2])
+        result = get_gadget_by_uuid('no-such-uuid', 1)
 
         # Assert
         assert result is None
 
     @patch(f'{MODULE}.db')
-    def test_returns_none_when_out_of_scope(self, mock_db):
-        """1.2.2 アクセス可能スコープ外（organization_id 不一致）: None を返す"""
+    def test_filters_by_user_id(self, mock_db):
+        """3.1.1.1 user_id で v_dashboard_gadget_master_by_user を絞り込む"""
         # Arrange
-        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_gadget_access
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.customer_dashboard.common import get_gadget_by_uuid
+        from iot_app.models.customer_dashboard import VDashboardGadgetMasterByUser
 
         # Act
-        result = check_gadget_access('gadget-uuid-001', [99])
+        get_gadget_by_uuid('gadget-uuid-001', 1)
 
         # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_logically_deleted(self, mock_db):
-        """2.2.3 論理削除済み（delete_flag=True）: None を返す"""
-        # Arrange
-        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
-        mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import check_gadget_access
-
-        # Act
-        result = check_gadget_access('deleted-gadget-uuid', [1])
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む（JOIN経由）"""
-        # Arrange
-        (
-            mock_db.session.query.return_value
-            .join.return_value
-            .join.return_value
-            .filter.return_value
-            .first.return_value
-        ) = None
-        from iot_app.services.customer_dashboard.common import check_gadget_access
-        from iot_app.models.customer_dashboard import DashboardMaster
-
-        # Act
-        check_gadget_access('gadget-uuid-001', [1, 2])
-
-        # Assert
-        filter_args = (
-            mock_db.session.query.return_value
-            .join.return_value
-            .join.return_value
-            .filter.call_args[0]
+        filter_args = mock_db.session.query.return_value.filter.call_args[0]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VDashboardGadgetMasterByUser.user_id
         )
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == DashboardMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1354,7 +1172,7 @@ class TestUpdateGadgetTitle:
         POST /analysis/customer-dashboard/gadgets/<uuid>/update
 
     ワークフロー仕様書 § ガジェットタイトル更新
-    ガジェット名と modifier を更新する（楽観ロック検証はView層で実施）
+    ガジェット名と modifier を更新する
     """
 
     def test_updates_gadget_name(self):
@@ -1459,7 +1277,6 @@ class TestSaveLayout:
         assert mock_gadget.position_y == 1
         assert mock_gadget.display_order == 0
         assert mock_gadget.modifier == 1
-        # TODO: freezegun導入後に update_date を検証する
 
     @patch(f'{MODULE}.db')
     def test_does_not_change_gadget_size(self, mock_db):
@@ -1564,11 +1381,10 @@ class TestDeleteGadgetsByDashboard:
 
         # Assert
         assert mock_gadget.modifier == 1
-        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
     def test_does_nothing_when_no_gadgets(self, mock_db):
-        """3.1.4.2 ガジェットなし: commitのみ呼ばれる"""
+        """3.1.4.2 ガジェットなし: DB更新のみ（commit はビュー層で実施）"""
         # Arrange
         (
             mock_db.session.query.return_value
@@ -1581,8 +1397,7 @@ class TestDeleteGadgetsByDashboard:
         # Act
         delete_gadgets_by_dashboard(dashboard_id=1, modifier=1)
 
-        # Assert
-        mock_db.session.commit.assert_called_once()
+        # Assert（例外が発生しないこと）
 
 
 # ---------------------------------------------------------------------------
@@ -1637,11 +1452,10 @@ class TestDeleteGroupsByDashboard:
 
         # Assert
         assert mock_group.modifier == 1
-        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
     def test_does_nothing_when_no_groups(self, mock_db):
-        """3.1.4.2 グループなし: commitのみ呼ばれる"""
+        """3.1.4.2 グループなし: DB更新のみ（commit はビュー層で実施）"""
         # Arrange
         (
             mock_db.session.query.return_value
@@ -1653,8 +1467,7 @@ class TestDeleteGroupsByDashboard:
         # Act
         delete_groups_by_dashboard(dashboard_id=1, modifier=1)
 
-        # Assert
-        mock_db.session.commit.assert_called_once()
+        # Assert（例外が発生しないこと）
 
 
 # ---------------------------------------------------------------------------
@@ -1709,11 +1522,10 @@ class TestDeleteGadgetsByGroup:
 
         # Assert
         assert mock_gadget.modifier == 1
-        mock_db.session.commit.assert_called_once()
 
     @patch(f'{MODULE}.db')
     def test_does_nothing_when_no_gadgets(self, mock_db):
-        """3.1.4.2 ガジェットなし: commitのみ呼ばれる"""
+        """3.1.4.2 ガジェットなし: DB更新のみ（commit はビュー層で実施）"""
         # Arrange
         (
             mock_db.session.query.return_value
@@ -1725,8 +1537,7 @@ class TestDeleteGadgetsByGroup:
         # Act
         delete_gadgets_by_group(group_id=10, modifier=1)
 
-        # Assert
-        mock_db.session.commit.assert_called_once()
+        # Assert（例外が発生しないこと）
 
 
 # ---------------------------------------------------------------------------
@@ -1855,7 +1666,7 @@ class TestUpdateDatasourceSetting:
 
     ワークフロー仕様書 § データソース選択 No.27
     dashboard_user_setting の organization_id / device_id を更新する。
-    None の場合は 0 に正規化する（DB設計: 未選択=0）。
+    None の場合は NULL で保持する（未選択はNULLで保存）。
     """
 
     @patch(f'{MODULE}.db')
@@ -1928,13 +1739,15 @@ class TestGetOrganizations:
         GET  /analysis/customer-dashboard（初期表示）
 
     ワークフロー仕様書 § ダッシュボード初期表示 ⑦ 組織選択肢取得
-    accessible_org_ids に含まれる organization_master レコードを返す（プルダウン用）
+    v_organization_master_by_user に g.current_user.user_id を渡してアクセス可能な組織一覧を返す（プルダウン用）
     """
 
+    @patch(f'{MODULE}.g')
     @patch(f'{MODULE}.db')
-    def test_returns_organizations_in_scope(self, mock_db):
-        """3.1.4.1 accessible_org_ids に一致する組織リストを返す"""
+    def test_returns_organizations_in_scope(self, mock_db, mock_g):
+        """3.1.4.1 アクセス可能スコープ内の組織リストを返す"""
         # Arrange
+        mock_g.current_user.user_id = 1
         mock_org1 = MagicMock()
         mock_org2 = MagicMock()
         mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
@@ -1943,40 +1756,46 @@ class TestGetOrganizations:
         from iot_app.services.customer_dashboard.common import get_organizations
 
         # Act
-        result = get_organizations([1, 2])
+        result = get_organizations()
 
         # Assert
         assert result == [mock_org1, mock_org2]
 
+    @patch(f'{MODULE}.g')
     @patch(f'{MODULE}.db')
-    def test_returns_empty_list_when_no_orgs(self, mock_db):
-        """2.2.2 accessible_org_ids に一致する組織が存在しない場合: 空リストを返す"""
+    def test_returns_empty_list_when_no_orgs(self, mock_db, mock_g):
+        """2.2.2 アクセス可能スコープ内に組織が存在しない場合: 空リストを返す"""
         # Arrange
+        mock_g.current_user.user_id = 1
         mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
         from iot_app.services.customer_dashboard.common import get_organizations
 
         # Act
-        result = get_organizations([])
+        result = get_organizations()
 
         # Assert
         assert result == []
 
+    @patch(f'{MODULE}.g')
     @patch(f'{MODULE}.db')
-    def test_filters_by_accessible_org_ids(self, mock_db):
-        """3.1.1.1 accessible_org_ids で organization_id を絞り込む"""
+    def test_filters_by_user_id(self, mock_db, mock_g):
+        """3.1.1.1 g.current_user.user_id で v_organization_master_by_user を絞り込む"""
         # Arrange
+        mock_g.current_user.user_id = 1
         mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
         from iot_app.services.customer_dashboard.common import get_organizations
-        from iot_app.models.organization import OrganizationMaster
+        from iot_app.models.customer_dashboard import VOrganizationMasterByUser
 
         # Act
-        get_organizations([1, 2])
+        get_organizations()
 
         # Assert
         filter_args = mock_db.session.query.return_value.filter.call_args[0]
-        in_expr = next(f for f in filter_args if hasattr(f, 'right') and getattr(f.right, 'expanding', False))
-        assert in_expr.left == OrganizationMaster.organization_id
-        assert in_expr.right.value == [1, 2]
+        user_id_expr = next(
+            f for f in filter_args
+            if hasattr(f, 'left') and f.left == VOrganizationMasterByUser.user_id
+        )
+        assert user_id_expr.right.value == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1992,7 +1811,7 @@ class TestGetDevices:
 
     ワークフロー仕様書 § ダッシュボード初期表示 ⑧ デバイス選択肢取得
     organization_id に紐づく device_master レコードを返す（プルダウン用）
-    ユーザー設定の organization_id が 0 以外の場合のみ呼ばれる
+    ユーザー設定の organization_id が NULL でない場合のみ呼ばれる
     """
 
     @patch(f'{MODULE}.db')
@@ -2027,214 +1846,44 @@ class TestGetDevices:
 
 
 # ---------------------------------------------------------------------------
-# get_dashboard_update_date / get_group_update_date / get_gadget_update_date
+# get_gadget_type_id_by_slug
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestGetDashboardUpdateDate:
-    """楽観ロック用: ダッシュボードの update_date を返す"""
-
-    @patch(f'{MODULE}.db')
-    def test_returns_update_date(self, mock_db):
-        """update_date が返る"""
-        from datetime import datetime
-        expected = datetime(2024, 1, 1, 12, 0, 0)
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
-        from iot_app.services.customer_dashboard.common import get_dashboard_update_date
-
-        result = get_dashboard_update_date('test-uuid')
-
-        assert result == expected
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db):
-        """存在しない UUID の場合: None を返す"""
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
-        from iot_app.services.customer_dashboard.common import get_dashboard_update_date
-
-        result = get_dashboard_update_date('nonexistent-uuid')
-
-        assert result is None
-
-
-@pytest.mark.unit
-class TestGetGroupUpdateDate:
-    """楽観ロック用: グループの update_date を返す"""
-
-    @patch(f'{MODULE}.db')
-    def test_returns_update_date(self, mock_db):
-        """update_date が返る"""
-        from datetime import datetime
-        expected = datetime(2024, 6, 1, 0, 0, 0)
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
-        from iot_app.services.customer_dashboard.common import get_group_update_date
-
-        result = get_group_update_date('test-group-uuid')
-
-        assert result == expected
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db):
-        """存在しない UUID の場合: None を返す"""
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
-        from iot_app.services.customer_dashboard.common import get_group_update_date
-
-        result = get_group_update_date('nonexistent-uuid')
-
-        assert result is None
-
-
-@pytest.mark.unit
-class TestGetGadgetUpdateDate:
-    """楽観ロック用: ガジェットの update_date を返す"""
-
-    @patch(f'{MODULE}.db')
-    def test_returns_update_date(self, mock_db):
-        """update_date が返る"""
-        from datetime import datetime
-        expected = datetime(2024, 12, 31, 23, 59, 59)
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = expected
-        from iot_app.services.customer_dashboard.common import get_gadget_update_date
-
-        result = get_gadget_update_date('test-gadget-uuid')
-
-        assert result == expected
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db):
-        """存在しない UUID の場合: None を返す"""
-        mock_db.session.query.return_value.filter.return_value.scalar.return_value = None
-        from iot_app.services.customer_dashboard.common import get_gadget_update_date
-
-        result = get_gadget_update_date('nonexistent-uuid')
-
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# get_gadget_type_id_by_name
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetGadgetTypeIdByName:
-    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）, 2.2.3（論理削除済み）
+class TestGetGadgetTypeIdBySlug:
+    """観点: 2.2.1（存在あり）, 2.2.2（存在なし）
 
     使用ルート:
         GET  /analysis/customer-dashboard（初期表示: gadget_type_ids 構築）
 
-    ガジェット種別名から gadget_type_id を返す。
+    ガジェット種別スラッグ（gadget_type_slug）から gadget_type_id を返す。
     delete_flag=False のレコードのみ対象とする。
     """
 
     @patch(f'{MODULE}.db')
     def test_returns_gadget_type_id_when_found(self, mock_db):
-        """2.2.1 ガジェット種別名が存在する場合: gadget_type_id を返す"""
+        """2.2.1 ガジェット種別スラッグが存在する場合: gadget_type_id を返す"""
         # Arrange
         mock_result = MagicMock()
         mock_result.gadget_type_id = 6
         mock_db.session.query.return_value.filter_by.return_value.first.return_value = mock_result
-        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
+        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_slug
 
         # Act
-        result = get_gadget_type_id_by_name('棒グラフ')
+        result = get_gadget_type_id_by_slug('bar-chart')
 
         # Assert
         assert result == 6
 
     @patch(f'{MODULE}.db')
     def test_returns_none_when_not_found(self, mock_db):
-        """2.2.2 ガジェット種別名が存在しない場合: None を返す"""
+        """2.2.2 ガジェット種別スラッグが存在しない場合: None を返す"""
         # Arrange
         mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
+        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_slug
 
         # Act
-        result = get_gadget_type_id_by_name('存在しない種別')
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_logically_deleted(self, mock_db):
-        """2.2.3 delete_flag=True のレコードのみ存在する場合: None を返す"""
-        # Arrange
-        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
-        mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
-        from iot_app.services.customer_dashboard.common import get_gadget_type_id_by_name
-
-        # Act
-        result = get_gadget_type_id_by_name('棒グラフ')
-
-        # Assert
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# get_gadget_type
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetGadgetType:
-    """gadget_uuid から gadget_type_name を返す
-
-    使用ルート:
-        POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data
-        GET  /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv
-    """
-
-    @patch(f'{MODULE}.db')
-    def test_returns_gadget_type_name(self, mock_db):
-        """2.3.1 gadget_uuid が存在する場合: gadget_type_name を返す"""
-        # Arrange
-        mock_row = MagicMock()
-        mock_row.gadget_type_name = 'timeline'
-        (
-            mock_db.session.query.return_value
-            .join.return_value
-            .filter.return_value
-            .first.return_value
-        ) = mock_row
-        from iot_app.services.customer_dashboard.common import get_gadget_type
-
-        # Act
-        result = get_gadget_type('test-uuid-1234')
-
-        # Assert
-        assert result == 'timeline'
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db):
-        """2.3.2 gadget_uuid が存在しない場合: None を返す"""
-        # Arrange
-        (
-            mock_db.session.query.return_value
-            .join.return_value
-            .filter.return_value
-            .first.return_value
-        ) = None
-        from iot_app.services.customer_dashboard.common import get_gadget_type
-
-        # Act
-        result = get_gadget_type('non-existent-uuid')
-
-        # Assert
-        assert result is None
-
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_logically_deleted(self, mock_db):
-        """2.3.3 delete_flag=True のガジェットのみ存在する場合: None を返す"""
-        # Arrange
-        # delete_flag=False フィルタにより論理削除済みレコードはヒットしない
-        (
-            mock_db.session.query.return_value
-            .join.return_value
-            .filter.return_value
-            .first.return_value
-        ) = None
-        from iot_app.services.customer_dashboard.common import get_gadget_type
-
-        # Act
-        result = get_gadget_type('deleted-uuid-5678')
+        result = get_gadget_type_id_by_slug('no-such-slug')
 
         # Assert
         assert result is None

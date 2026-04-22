@@ -1,12 +1,11 @@
 """
 顧客作成ダッシュボード - モデル単体テスト（DB非依存）
-対象: src/iot_app/models/customer_dashboard.py（予定）
+対象: src/iot_app/models/customer_dashboard.py
 
 テスト観点: モデルのプロパティ・デフォルト値・インスタンス生成（DB操作は対象外）
 """
 
 import pytest
-from unittest.mock import MagicMock
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +247,7 @@ class TestGadgetTypeMaster:
 
         gadget_type = GadgetTypeMaster(
             gadget_type_name='棒グラフ',
+            gadget_type_slug='bar-chart',
             data_source_type=0,
             gadget_image_path='static/images/bar_chart.png',
             gadget_description='棒グラフガジェット',
@@ -258,6 +258,7 @@ class TestGadgetTypeMaster:
 
         # Assert
         assert gadget_type.gadget_type_name == '棒グラフ'
+        assert gadget_type.gadget_type_slug == 'bar-chart'
         assert gadget_type.data_source_type == 0
         assert gadget_type.display_order == 1
 
@@ -268,6 +269,7 @@ class TestGadgetTypeMaster:
 
         gadget_type = GadgetTypeMaster(
             gadget_type_name='棒グラフ',
+            gadget_type_slug='bar-chart',
             data_source_type=0,
             gadget_image_path='static/images/bar_chart.png',
             gadget_description='棒グラフガジェット',
@@ -289,7 +291,7 @@ class TestDashboardUserSetting:
     """観点: モデル定義（カラム・organization_id/device_id の未選択デフォルト値）
 
     README データモデル § dashboard_user_setting
-    organization_id / device_id: 未選択の場合は 0 を登録
+    organization_id / device_id: 未選択の場合は NULL (None) で保存
     """
 
     def test_instantiate_with_required_fields(self):
@@ -326,3 +328,108 @@ class TestDashboardUserSetting:
 
         # Assert
         assert setting.delete_flag is False
+
+
+# ---------------------------------------------------------------------------
+# VDashboardMasterByUser
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestVDashboardMasterByUser:
+    """観点: VIEWモデル定義（カラム属性確認）
+
+    v_dashboard_master_by_user VIEW
+    user_id, dashboard_id, dashboard_uuid, dashboard_name, creator, delete_flag
+    """
+
+    def test_has_expected_columns(self):
+        """VIEWモデルに必要なカラム属性が定義されている"""
+        from iot_app.models.customer_dashboard import VDashboardMasterByUser
+
+        assert hasattr(VDashboardMasterByUser, 'user_id')
+        assert hasattr(VDashboardMasterByUser, 'dashboard_id')
+        assert hasattr(VDashboardMasterByUser, 'dashboard_uuid')
+        assert hasattr(VDashboardMasterByUser, 'dashboard_name')
+        assert hasattr(VDashboardMasterByUser, 'creator')
+        assert hasattr(VDashboardMasterByUser, 'delete_flag')
+
+
+# ---------------------------------------------------------------------------
+# VDashboardGroupMasterByUser
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestVDashboardGroupMasterByUser:
+    """観点: VIEWモデル定義（カラム属性確認）
+
+    v_dashboard_group_master_by_user VIEW
+    user_id, dashboard_group_id, dashboard_group_uuid, dashboard_group_name, dashboard_id, display_order, creator, delete_flag
+    """
+
+    def test_has_expected_columns(self):
+        """VIEWモデルに必要なカラム属性が定義されている"""
+        from iot_app.models.customer_dashboard import VDashboardGroupMasterByUser
+
+        assert hasattr(VDashboardGroupMasterByUser, 'user_id')
+        assert hasattr(VDashboardGroupMasterByUser, 'dashboard_group_id')
+        assert hasattr(VDashboardGroupMasterByUser, 'dashboard_group_uuid')
+        assert hasattr(VDashboardGroupMasterByUser, 'dashboard_group_name')
+        assert hasattr(VDashboardGroupMasterByUser, 'dashboard_id')
+        assert hasattr(VDashboardGroupMasterByUser, 'display_order')
+        assert hasattr(VDashboardGroupMasterByUser, 'creator')
+        assert hasattr(VDashboardGroupMasterByUser, 'delete_flag')
+
+
+# ---------------------------------------------------------------------------
+# VDashboardGadgetMasterByUser
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestVDashboardGadgetMasterByUser:
+    """観点: VIEWモデル定義（カラム属性確認）
+
+    v_dashboard_gadget_master_by_user VIEW
+    user_id, gadget_id, gadget_uuid, gadget_name, dashboard_group_id, 
+    gadget_type_id, chart_config, data_source_config, position_x, position_y, 
+    gadget_size, display_order, creator, delete_flag
+    """
+
+    def test_has_expected_columns(self):
+        """VIEWモデルに必要なカラム属性が定義されている"""
+        from iot_app.models.customer_dashboard import VDashboardGadgetMasterByUser
+
+        assert hasattr(VDashboardGadgetMasterByUser, 'user_id')
+        assert hasattr(VDashboardGadgetMasterByUser, 'gadget_id')
+        assert hasattr(VDashboardGadgetMasterByUser, 'gadget_uuid')
+        assert hasattr(VDashboardGadgetMasterByUser, 'gadget_name')
+        assert hasattr(VDashboardGadgetMasterByUser, 'dashboard_group_id')
+        assert hasattr(VDashboardGadgetMasterByUser, 'gadget_type_id')
+        assert hasattr(VDashboardGadgetMasterByUser, 'chart_config')
+        assert hasattr(VDashboardGadgetMasterByUser, 'data_source_config')
+        assert hasattr(VDashboardGadgetMasterByUser, 'position_x')
+        assert hasattr(VDashboardGadgetMasterByUser, 'position_y')
+        assert hasattr(VDashboardGadgetMasterByUser, 'gadget_size')
+        assert hasattr(VDashboardGadgetMasterByUser, 'display_order')
+        assert hasattr(VDashboardGadgetMasterByUser, 'creator')
+        assert hasattr(VDashboardGadgetMasterByUser, 'delete_flag')
+
+
+# ---------------------------------------------------------------------------
+# VOrganizationMasterByUser
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestVOrganizationMasterByUser:
+    """観点: VIEWモデル定義（カラム属性確認）
+
+    v_organization_master_by_user VIEW
+    user_id, organization_id, organization_name
+    """
+
+    def test_has_expected_columns(self):
+        """VIEWモデルに必要なカラム属性が定義されている"""
+        from iot_app.models.customer_dashboard import VOrganizationMasterByUser
+
+        assert hasattr(VOrganizationMasterByUser, 'user_id')
+        assert hasattr(VOrganizationMasterByUser, 'organization_id')
+        assert hasattr(VOrganizationMasterByUser, 'organization_name')
