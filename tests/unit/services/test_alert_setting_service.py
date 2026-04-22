@@ -115,7 +115,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_name_none_raises(self, service):
-        """1.1.2: alert_name が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_name が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_name=None)
         # Act & Assert
@@ -127,7 +127,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_device_id_none_raises(self, service):
-        """1.1.2: device_id が None の場合 ValidationError がスローされる"""
+        """1.1.1: device_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(device_id=None)
         # Act & Assert
@@ -139,7 +139,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_conditions_measurement_item_id_none_raises(self, service):
-        """1.1.2: alert_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_measurement_item_id=None)
         # Act & Assert
@@ -159,7 +159,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_conditions_operator_none_raises(self, service):
-        """1.1.2: alert_conditions_operator が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_conditions_operator が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_operator=None)
         # Act & Assert
@@ -171,7 +171,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_conditions_threshold_none_raises(self, service):
-        """1.1.2: alert_conditions_threshold が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_conditions_threshold が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_conditions_threshold=None)
         # Act & Assert
@@ -183,7 +183,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_recovery_conditions_measurement_item_id_none_raises(self, service):
-        """1.1.2: alert_recovery_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_recovery_conditions_measurement_item_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_measurement_item_id=None)
         # Act & Assert
@@ -203,7 +203,7 @@ class TestAlertSettingServiceValidation:
             service.create(data)
 
     def test_required_alert_recovery_conditions_operator_none_raises(self, service):
-        """1.1.2: alert_recovery_conditions_operator が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_recovery_conditions_operator が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_operator=None)
         # Act & Assert
@@ -215,7 +215,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_recovery_conditions_threshold_none_raises(self, service):
-        """1.1.2: alert_recovery_conditions_threshold が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_recovery_conditions_threshold が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_recovery_conditions_threshold=None)
         # Act & Assert
@@ -227,7 +227,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_judgment_time_none_raises(self, service):
-        """1.1.2: judgment_time が None の場合 ValidationError がスローされる"""
+        """1.1.1: judgment_time が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(judgment_time=None)
         # Act & Assert
@@ -239,7 +239,7 @@ class TestAlertSettingServiceValidation:
     # ----------------------------------------------------------------
 
     def test_required_alert_level_id_none_raises(self, service):
-        """1.1.2: alert_level_id が None の場合 ValidationError がスローされる"""
+        """1.1.1: alert_level_id が None の場合 ValidationError がスローされる"""
         # Arrange
         data = make_valid_form_data(alert_level_id=None)
         # Act & Assert
