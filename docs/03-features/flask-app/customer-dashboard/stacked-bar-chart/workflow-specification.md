@@ -1324,7 +1324,9 @@ def handle_gadget_csv_export(gadget_uuid):
 ### 認証・認可実装
 
 **認証方式:**
-- Azure Easy Auth認証（Entra ID統合）（`X-MS-*` ヘッダーからユーザー情報・JWT取得）
+- Azure環境: Easy Auth認証（Entra ID統合）（`X-MS-*` ヘッダーからユーザー情報・JWT取得）
+- AWS環境: ALB + Cognito認証（`X-Amzn-Oidc-*` ヘッダーからユーザー情報・JWT取得）
+- オンプレミス環境: 自前認証（Flask IdP）（Flaskセッションからユーザー情報取得、JWT再発行）
 
 **認可ロジック:**
 
