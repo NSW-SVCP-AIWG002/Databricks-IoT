@@ -795,6 +795,14 @@ for uc_columns in unique_column_sets:
                     'message': 'UNIQUE制約がDBの既存データと重複しています'
                 })
 
+# データスコープ制限: organization_closure から全ユーザー共通でアクセス可能な組織IDを事前取得
+# ロールによる条件分岐は行わない（システム保守者・管理者はルート組織所属のため全データにアクセス可能）
+accessible_org_ids = {str(org_id) for (org_id,) in db.session.query(
+    OrganizationClosure.subsidiary_organization_id
+).filter(
+    OrganizationClosure.parent_organization_id == current_user.organization_id
+).all()}
+
 # 各行のバリデーション
 for index, row in df.iterrows():
     row_num = index + 2  # ヘッダー行を考慮（Excel行番号）
@@ -818,14 +826,14 @@ for index, row in df.iterrows():
                 'message': 'デバイスIDの形式が正しくありません（例: DEV-00001）'
             })
 
-    # データスコープ制限チェック
-    if master_type == 'devices':
-        if str(row['組織ID']) != current_user.organization_id:
-            errors.append({
-                'row': row_num,
-                'column': '組織ID',
-                'message': '他組織のデータは登録できません'
-            })
+    # データスコープ制限チェック（organization_closure ベース・全ユーザー共通・ロール分岐なし）
+    org_id_col = '組織ID' if '組織ID' in row.index else '所属組織ID'
+    if org_id_col in row.index and str(row[org_id_col]) not in accessible_org_ids:
+        errors.append({
+            'row': row_num,
+            'column': org_id_col,
+            'message': 'アクセス権限のない組織のデータは登録できません'
+        })
 
 # エラーがある場合は処理中断
 if errors:
@@ -1316,6 +1324,7 @@ from wtforms import SelectField, FileField
 from wtforms.validators import DataRequired
 from flask_wtf.file import FileAllowed, FileSize
 from sqlalchemy import create_engine, inspect
+from iot_app.models.organization import OrganizationClosure
 
 class CSVImportForm(FlaskForm):
     master_type = SelectField('マスタ種別', validators=[DataRequired()], choices=[])
@@ -1351,6 +1360,14 @@ def validate_csv_format(df, master_type, current_user):
         })
         return errors
 
+    # データスコープ制限: organization_closure から全ユーザー共通でアクセス可能な組織IDを事前取得
+    # ロールによる条件分岐は行わない（システム保守者・管理者はルート組織所属のため全データにアクセス可能）
+    accessible_org_ids = {str(org_id) for (org_id,) in db.session.query(
+        OrganizationClosure.subsidiary_organization_id
+    ).filter(
+        OrganizationClosure.parent_organization_id == current_user.organization_id
+    ).all()}
+
     # 各行のバリデーション
     for index, row in df.iterrows():
         row_num = index + 2  # ヘッダー行を考慮
@@ -1374,14 +1391,14 @@ def validate_csv_format(df, master_type, current_user):
                     'message': 'デバイスIDの形式が正しくありません（例: DEV-00001）'
                 })
 
-        # データスコープ制限チェック
-        if master_type == 'devices':
-            if str(row['組織ID']) != current_user.organization_id:
-                errors.append({
-                    'row': row_num,
-                    'column': '組織ID',
-                    'message': '他組織のデータは登録できません'
-                })
+        # データスコープ制限チェック（organization_closure ベース・全ユーザー共通・ロール分岐なし）
+        org_id_col = '組織ID' if '組織ID' in row.index else '所属組織ID'
+        if org_id_col in row.index and str(row[org_id_col]) not in accessible_org_ids:
+            errors.append({
+                'row': row_num,
+                'column': org_id_col,
+                'message': 'アクセス権限のない組織のデータは登録できません'
+            })
 
     return errors
 ```
