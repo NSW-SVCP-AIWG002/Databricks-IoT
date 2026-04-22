@@ -158,11 +158,7 @@ flowchart TD
     CheckGetConfig -->|失敗| Error500[500エラーレスポンス]
 
     CheckConfig -->|なし| Error404[404エラーレスポンス]
-    CheckConfig -->|あり| Validate[バリデーション<br>リクエストパラメータ]
-
-    Validate --> CheckValidate{バリデーションOK?}
-    CheckValidate -->|NG| Error400[400エラーレスポンス]
-    CheckValidate -->|OK| CheckDeviceId[データソース設定に<br>デバイスIDが設定されているかを確認]
+    CheckConfig -->|あり| CheckDeviceId[データソース設定に<br>デバイスIDが設定されているかを確認]
 
     CheckDeviceId --> ExistDeviceId{デバイスID設定あり?}
     ExistDeviceId -->|設定あり| ValidDeviceId{デバイスID有効?}
@@ -184,7 +180,6 @@ flowchart TD
     Format --> ReturnData[JSONデータ返却]
 
     ReturnData --> End([処理完了])
-    Error400 --> End
     Error404 --> End
     Error500 --> End
 ```
