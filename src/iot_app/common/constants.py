@@ -1,5 +1,8 @@
 from enum import IntEnum
 
+# ページネーション最大件数
+ITEM_PER_PAGE = 25
+
 # Databricks ワークスペースグループID（要設定）
 DATABRICKS_WORKSPACE_GROUP_ID = ""
 

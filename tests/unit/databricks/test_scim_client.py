@@ -40,11 +40,11 @@ class TestScimClientCreateUser:
             client.create_user('u@u.com', display_name='ユーザー')
         assert mock_requests.post.called
         call_url = mock_requests.post.call_args[0][0]
-        assert 'Users' in call_url or 'users' in call_url.lower()
+        assert call_url.endswith('/scim/v2/Users')
 
     @patch(f'{MODULE}.requests')
     def test_create_user_request_contains_email_and_display_name(self, mock_requests, app):
-        """3.2.1.1: リクエストボディに userName（email）と displayName が含まれる"""
+        """3.2.1.1: リクエストボディが SCIM スキーマと完全一致する"""
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_response.json.return_value = {'id': 'uid', 'userName': 't@e.com'}
@@ -57,9 +57,27 @@ class TestScimClientCreateUser:
             client.create_user('t@e.com', display_name='テスト名')
         call_kwargs = mock_requests.post.call_args[1]
         body = call_kwargs.get('json', {})
-        body_str = str(body)
-        assert 't@e.com' in body_str
-        assert 'テスト名' in body_str
+        assert body == {
+            'schemas': ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            'userName': 't@e.com',
+            'displayName': 'テスト名',
+        }
+
+    @patch(f'{MODULE}.requests')
+    def test_create_user_sends_auth_headers(self, mock_requests, app):
+        """3.2.1.1: リクエストに認証ヘッダが付与されること"""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {'id': 'uid', 'userName': 'a@a.com'}
+        mock_requests.post.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            client.create_user('a@a.com', display_name='A')
+            call_kwargs = mock_requests.post.call_args[1]
+            assert call_kwargs.get('headers') == client.headers
 
     @patch(f'{MODULE}.requests')
     def test_create_user_raises_on_api_error(self, mock_requests, app):
@@ -75,6 +93,36 @@ class TestScimClientCreateUser:
             client = ScimClient()
             with pytest.raises(Exception):
                 client.create_user('bad@bad.com', display_name='エラー')
+
+    @patch(f'{MODULE}.requests')
+    def test_create_user_raises_on_5xx_error(self, mock_requests, app):
+        """1.3.1: API エラー（5xx）時に例外が伝播する"""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.raise_for_status.side_effect = Exception('Internal Server Error')
+        mock_requests.post.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            with pytest.raises(Exception):
+                client.create_user('test@example.com', display_name='テスト')
+
+    @patch(f'{MODULE}.requests')
+    def test_create_user_raises_on_missing_id_in_response(self, mock_requests, app):
+        """3.2.2.1: レスポンスに id キーが存在しない場合に例外が発生する"""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {'userName': 'test@example.com'}
+        mock_requests.post.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            with pytest.raises(Exception):
+                client.create_user('test@example.com', display_name='テスト')
 
 
 @pytest.mark.unit
@@ -120,6 +168,25 @@ class TestScimClientUpdateUser:
         assert active_op['value'] is False
 
     @patch(f'{MODULE}.requests')
+    def test_update_user_payload_contains_active_true_when_active(self, mock_requests, app):
+        """3.3.1.1: status=1 のとき Operations 内の active が True になる"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_requests.patch.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            client.update_user('uid-1', display_name='名前', status=1)
+        call_kwargs = mock_requests.patch.call_args[1]
+        body = call_kwargs.get('json', {})
+        operations = body.get('Operations', [])
+        active_op = next((op for op in operations if op.get('path') == 'active'), None)
+        assert active_op is not None
+        assert active_op['value'] is True
+
+    @patch(f'{MODULE}.requests')
     def test_update_user_raises_on_api_error(self, mock_requests, app):
         """1.3.1: API エラー（4xx）時に例外が伝播する"""
         mock_response = MagicMock()
@@ -133,6 +200,21 @@ class TestScimClientUpdateUser:
             client = ScimClient()
             with pytest.raises(Exception):
                 client.update_user('bad-uid', display_name='名前', status=1)
+
+    @patch(f'{MODULE}.requests')
+    def test_update_user_sends_auth_headers(self, mock_requests, app):
+        """3.3.1.1: リクエストに認証ヘッダが付与されること"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_requests.patch.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            client.update_user('uid-1', display_name='名前', status=1)
+            call_kwargs = mock_requests.patch.call_args[1]
+            assert call_kwargs.get('headers') == client.headers
 
 
 @pytest.mark.unit
@@ -185,6 +267,21 @@ class TestScimClientDeleteUser:
             with pytest.raises(Exception):
                 client.delete_user('nonexistent-uid')
 
+    @patch(f'{MODULE}.requests')
+    def test_delete_user_sends_auth_headers(self, mock_requests, app):
+        """3.4.1.1: リクエストに認証ヘッダが付与されること"""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_requests.delete.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            client.delete_user('uid-to-delete')
+            call_kwargs = mock_requests.delete.call_args[1]
+            assert call_kwargs.get('headers') == client.headers
+
 
 @pytest.mark.unit
 class TestScimClientAddUserToGroup:
@@ -207,7 +304,7 @@ class TestScimClientAddUserToGroup:
             client.add_user_to_group('group-gid', 'user-uid')
         assert mock_requests.patch.called
         call_url = mock_requests.patch.call_args[0][0]
-        assert 'Groups' in call_url or 'groups' in call_url.lower()
+        assert call_url.endswith('/scim/v2/Groups/group-gid')
 
     @patch(f'{MODULE}.requests')
     def test_add_user_to_group_url_contains_group_id(self, mock_requests, app):
@@ -226,7 +323,7 @@ class TestScimClientAddUserToGroup:
 
     @patch(f'{MODULE}.requests')
     def test_add_user_to_group_request_body_contains_user_id(self, mock_requests, app):
-        """3.2.1.1: リクエストボディに追加するユーザーの ID が含まれる"""
+        """3.2.1.1: リクエストボディが SCIM スキーマと完全一致する"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_requests.patch.return_value = mock_response
@@ -237,8 +334,11 @@ class TestScimClientAddUserToGroup:
             client = ScimClient()
             client.add_user_to_group('group-gid', 'user-uid-123')
         call_kwargs = mock_requests.patch.call_args[1]
-        body_str = str(call_kwargs.get('json', {}))
-        assert 'user-uid-123' in body_str
+        body = call_kwargs.get('json', {})
+        assert body == {
+            'schemas': ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            'Operations': [{'op': 'add', 'value': {'members': [{'value': 'user-uid-123'}]}}],
+        }
 
     @patch(f'{MODULE}.requests')
     def test_add_user_to_group_raises_on_api_error(self, mock_requests, app):
@@ -254,3 +354,18 @@ class TestScimClientAddUserToGroup:
             client = ScimClient()
             with pytest.raises(Exception):
                 client.add_user_to_group('group-gid', 'user-uid')
+
+    @patch(f'{MODULE}.requests')
+    def test_add_user_to_group_sends_auth_headers(self, mock_requests, app):
+        """3.2.1.1: リクエストに認証ヘッダが付与されること"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_requests.patch.return_value = mock_response
+        app.config['DATABRICKS_HOST'] = 'https://test.azuredatabricks.net'
+        app.config['DATABRICKS_SERVICE_PRINCIPAL_TOKEN'] = 'test-token'
+        with app.app_context():
+            from iot_app.databricks.scim_client import ScimClient
+            client = ScimClient()
+            client.add_user_to_group('group-gid', 'user-uid')
+            call_kwargs = mock_requests.patch.call_args[1]
+            assert call_kwargs.get('headers') == client.headers

@@ -47,11 +47,18 @@ class TestUserCreateForm:
             assert not form.validate()
             assert 'user_name' in form.errors
 
-    def test_user_name_max_length_passes(self, app):
+    def test_user_name_max_length_boundary(self, app):
         """1.2.2: user_name が 20 文字（最大長ちょうど）はバリデーション通過"""
         with app.test_request_context():
             from iot_app.forms.user import UserCreateForm
             form = UserCreateForm(data=self._valid_data(user_name='あ' * 20))
+            assert form.validate()
+
+    def test_user_name_max_length_within_limit(self, app):
+        """1.2.1: user_name が 19 文字（最大長-1）はバリデーション通過"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserCreateForm
+            form = UserCreateForm(data=self._valid_data(user_name='あ' * 19))
             assert form.validate()
 
     # --- email_address ---
@@ -76,22 +83,49 @@ class TestUserCreateForm:
         """1.2.3: email_address が 255 文字（最大長+1）の場合バリデーションエラー"""
         with app.test_request_context():
             from iot_app.forms.user import UserCreateForm
-            long_local = 'a' * 244
+            long_local = 'a' * 243
             form = UserCreateForm(data=self._valid_data(
-                email_address=f'{long_local}@example.com'  # 244+1+11=256文字
+                email_address=f'{long_local}@example.com'  # 243+1+11=255文字
             ))
             assert not form.validate()
             assert 'email_address' in form.errors
 
-    def test_email_max_length_passes(self, app):
+    def test_email_max_length_boundary(self, app):
         """1.2.2: email_address が 254 文字（最大長ちょうど）はバリデーション通過"""
         with app.test_request_context():
             from iot_app.forms.user import UserCreateForm
-            local = 'a' * 243
+            local = 'a' * 242
             form = UserCreateForm(data=self._valid_data(
-                email_address=f'{local}@example.com'  # 243+1+10=254文字
+                email_address=f'{local}@example.com'  # 242+1+11=254文字
             ))
             assert form.validate()
+
+            
+    def test_email_max_length_within_limit(self, app):
+        """1.2.1: email_address が 253 文字（最大長-1）はバリデーション通過"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserCreateForm
+            local = 'a' * 241
+            form = UserCreateForm(data=self._valid_data(
+                email_address=f'{local}@example.com'  # 241+1+11=253文字
+            ))
+            assert form.validate()
+
+    def test_email_no_domain_fails(self, app):
+        """1.5.3: email_address がドメインなし（user@）の場合バリデーションエラー"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserCreateForm
+            form = UserCreateForm(data=self._valid_data(email_address='user@'))
+            assert not form.validate()
+            assert 'email_address' in form.errors
+
+    def test_email_no_local_part_fails(self, app):
+        """1.5.4: email_address がローカル部なし（@example.com）の場合バリデーションエラー"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserCreateForm
+            form = UserCreateForm(data=self._valid_data(email_address='@example.com'))
+            assert not form.validate()
+            assert 'email_address' in form.errors
 
     # --- address ---
 
@@ -103,11 +137,18 @@ class TestUserCreateForm:
             assert not form.validate()
             assert 'address' in form.errors
 
-    def test_address_max_length_passes(self, app):
+    def test_address_max_length_boundary(self, app):
         """1.2.2: address が 500 文字（最大長ちょうど）はバリデーション通過"""
         with app.test_request_context():
             from iot_app.forms.user import UserCreateForm
             form = UserCreateForm(data=self._valid_data(address='あ' * 500))
+            assert form.validate()
+
+    def test_address_max_length_within_limit(self, app):
+        """1.2.1: address が 499 文字（最大長-1）はバリデーション通過"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserCreateForm
+            form = UserCreateForm(data=self._valid_data(address='あ' * 499))
             assert form.validate()
 
     def test_address_empty_passes(self, app):
@@ -195,11 +236,18 @@ class TestUserUpdateForm:
             assert not form.validate()
             assert 'user_name' in form.errors
 
-    def test_user_name_max_length_passes(self, app):
+    def test_user_name_max_length_boundary(self, app):
         """1.2.2: user_name が 20 文字（最大長ちょうど）はバリデーション通過"""
         with app.test_request_context():
             from iot_app.forms.user import UserUpdateForm
             form = UserUpdateForm(data=self._valid_data(user_name='あ' * 20))
+            assert form.validate()
+
+    def test_user_name_max_length_within_limit(self, app):
+        """1.2.1: user_name が 19 文字（最大長-1）はバリデーション通過"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserUpdateForm
+            form = UserUpdateForm(data=self._valid_data(user_name='あ' * 19))
             assert form.validate()
 
     # --- address ---
@@ -212,11 +260,18 @@ class TestUserUpdateForm:
             assert not form.validate()
             assert 'address' in form.errors
 
-    def test_address_max_length_passes(self, app):
+    def test_address_max_length_boundary(self, app):
         """1.2.2: address が 500 文字（最大長ちょうど）はバリデーション通過"""
         with app.test_request_context():
             from iot_app.forms.user import UserUpdateForm
             form = UserUpdateForm(data=self._valid_data(address='あ' * 500))
+            assert form.validate()
+
+    def test_address_max_length_within_limit(self, app):
+        """1.2.2: address が 499 文字（最大長-1）はバリデーション通過"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserUpdateForm
+            form = UserUpdateForm(data=self._valid_data(address='あ' * 499))
             assert form.validate()
 
     def test_address_empty_passes(self, app):
@@ -243,3 +298,12 @@ class TestUserUpdateForm:
             form = UserUpdateForm(data=self._valid_data(status=None))
             assert not form.validate()
             assert 'status' in form.errors
+
+    def test_field_not_present(self, app):
+        """2.1.1: UserUpdateForm に email_address、organization_id、user_type_id フィールドが存在しない（更新不可項目）"""
+        with app.test_request_context():
+            from iot_app.forms.user import UserUpdateForm
+            form = UserUpdateForm(data=self._valid_data())
+            assert 'email_address' not in form._fields
+            assert 'organization_id' not in form._fields
+            assert 'user_type_id' not in form._fields

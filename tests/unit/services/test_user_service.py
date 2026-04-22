@@ -5,53 +5,6 @@ MODULE = 'iot_app.services.user_service'
 
 
 # ---------------------------------------------------------------------------
-# check_email_duplicate
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestCheckEmailDuplicate:
-    """check_email_duplicate のテスト
-    観点: 3.1.1 検索条件指定, 3.1.4 検索結果戻り値ハンドリング, 2.2 対象データ存在チェック
-    """
-
-    @patch(f'{MODULE}.User')
-    def test_returns_true_when_duplicate_exists(self, mock_user):
-        """3.1.4.1: 該当ユーザーが存在する場合 True を返す"""
-        mock_user.query.filter_by.return_value.first.return_value = MagicMock()
-        from iot_app.services.user_service import check_email_duplicate
-        result = check_email_duplicate('dup@example.com')
-        assert result is True
-
-    @patch(f'{MODULE}.User')
-    def test_returns_false_when_no_duplicate(self, mock_user):
-        """3.1.4.2: 該当ユーザーが存在しない場合 False を返す"""
-        mock_user.query.filter_by.return_value.first.return_value = None
-        from iot_app.services.user_service import check_email_duplicate
-        result = check_email_duplicate('new@example.com')
-        assert result is False
-
-    @patch(f'{MODULE}.User')
-    def test_email_condition_passed_to_query(self, mock_user):
-        """3.1.1.1: email_address 条件がクエリに渡される"""
-        mock_user.query.filter_by.return_value.first.return_value = None
-        from iot_app.services.user_service import check_email_duplicate
-        check_email_duplicate('test@example.com')
-        mock_user.query.filter_by.assert_called_once_with(
-            email_address='test@example.com',
-            delete_flag=False,
-        )
-
-    @patch(f'{MODULE}.User')
-    def test_excludes_logical_deleted_users(self, mock_user):
-        """2.2.3: 論理削除済みユーザーは除外する（delete_flag=False フィルタ）"""
-        mock_user.query.filter_by.return_value.first.return_value = None
-        from iot_app.services.user_service import check_email_duplicate
-        check_email_duplicate('any@example.com')
-        _, kwargs = mock_user.query.filter_by.call_args
-        assert kwargs.get('delete_flag') is False
-
-
-# ---------------------------------------------------------------------------
 # get_default_search_params
 # ---------------------------------------------------------------------------
 
@@ -61,42 +14,36 @@ class TestGetDefaultSearchParams:
     観点: 2.1 正常系処理, 3.1.2 検索条件未指定（全件相当）
     """
 
-    def test_returns_dict_with_all_required_keys(self):
-        """2.1.1: 検索パラメータの全キーが含まれる"""
+    def test_default_pagination(self):
+        """2.1.1: page=1, per_page=ITEM_PER_PAGE がデフォルト"""
         from iot_app.services.user_service import get_default_search_params
-        result = get_default_search_params()
-        for key in ('page', 'per_page', 'sort_by', 'order', 'user_name',
-                    'email_address', 'user_type_id', 'organization_id', 'region_id', 'status'):
-            assert key in result
+        from iot_app.common.constants import ITEM_PER_PAGE
+        params = get_default_search_params()
+        assert params['page'] == 1
+        assert params['per_page'] == ITEM_PER_PAGE
 
-    def test_user_name_and_email_default_to_empty_string(self):
+    def test_default_text_filters(self):
         """3.1.2.1: user_name, email_address のデフォルトは空文字（条件なし相当）"""
         from iot_app.services.user_service import get_default_search_params
-        result = get_default_search_params()
-        assert result['user_name'] == ''
-        assert result['email_address'] == ''
+        params = get_default_search_params()
+        assert params['user_name'] == ''
+        assert params['email_address'] == ''
 
-    def test_filter_ids_default_to_none(self):
+    def test_default_id_filters(self):
         """3.1.2.1: user_type_id / organization_id / region_id / status のデフォルトは None"""
         from iot_app.services.user_service import get_default_search_params
-        result = get_default_search_params()
-        assert result['user_type_id'] is None
-        assert result['organization_id'] is None
-        assert result['region_id'] is None
-        assert result['status'] is None
+        params = get_default_search_params()
+        assert params['user_type_id'] is None
+        assert params['organization_id'] is None
+        assert params['region_id'] is None
+        assert params['status'] is None
 
-    def test_sort_defaults_to_user_name_asc(self):
+    def test_default_sort(self):
         """2.1.1: sort_by='user_name', order='asc' がデフォルト"""
         from iot_app.services.user_service import get_default_search_params
-        result = get_default_search_params()
-        assert result['sort_by'] == 'user_name'
-        assert result['order'] == 'asc'
-
-    def test_page_defaults_to_one(self):
-        """2.1.1: page のデフォルトは 1"""
-        from iot_app.services.user_service import get_default_search_params
-        result = get_default_search_params()
-        assert result['page'] == 1
+        params = get_default_search_params()
+        assert params['sort_by'] == 'user_name'
+        assert params['order'] == 'asc'
 
 
 # ---------------------------------------------------------------------------
@@ -149,29 +96,47 @@ class TestSearchUsers:
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
-    def test_user_name_filter_applied(self, mock_db, _mock_uc):
-        """3.1.1.1: user_name 条件が指定された場合フィルタが適用される"""
+    def test_text_filter_applied(self, mock_db, _mock_uc):
+        """3.1.1.1: テキスト条件が指定された場合、部分一致フィルタが適用される"""
         mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
         from iot_app.services.user_service import search_users
         params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
                   'user_name': '田中', 'email_address': '', 'user_type_id': None,
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=1)
-        # user_name フィルタが追加される（filter が複数回呼ばれる）
+        filter_args_str = str(mock_query.filter.call_args_list)
         assert mock_query.filter.called
+        assert '%田中%' in filter_args_str
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_id_filter_applied(self, mock_db, _mock_uc):
+        """3.1.1.1: IDフィルタ条件が指定された場合、完全一致フィルタが適用される"""
+        mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
+                  'user_name': '', 'email_address': '', 'user_type_id': 2,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        filter_args_str = str(mock_query.filter.call_args_list)
+        assert mock_query.filter.called
+        assert 'user_type_id' in filter_args_str
+        assert '2' in filter_args_str
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
     def test_multiple_conditions_applied(self, mock_db, _mock_uc):
-        """3.1.1.2: 複数条件（user_name + email）が指定された場合に両方適用される"""
+        """3.1.1.2: 複数条件（user_name + email）が指定された場合に両方の部分一致フィルタが適用される"""
         mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
         from iot_app.services.user_service import search_users
         params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
                   'user_name': '田中', 'email_address': '@example', 'user_type_id': None,
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=1)
-        # 複数の filter が呼ばれる
+        filter_args_str = str(mock_query.filter.call_args_list)
         assert mock_query.filter.call_count >= 2
+        assert '%田中%' in filter_args_str
+        assert '%@example%' in filter_args_str
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
@@ -183,7 +148,6 @@ class TestSearchUsers:
                   'user_name': '', 'email_address': '', 'user_type_id': None,
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=1)
-        # 条件なしの場合、filter はスコープ制限のみ
         assert mock_query.filter.call_count == 0
 
     @patch(f'{MODULE}.UserMasterByUser')
@@ -196,7 +160,6 @@ class TestSearchUsers:
                   'user_name': '田中', 'email_address': '@example', 'user_type_id': 2,
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=1)
-        # OR 結合なら filter 呼び出しは1回になるが、AND 連鎖なら複数回呼ばれる
         assert mock_query.filter.call_count >= 2
 
     @patch(f'{MODULE}.UserMasterByUser')
@@ -209,7 +172,6 @@ class TestSearchUsers:
                   'user_name': '', 'email_address': '', 'user_type_id': None,
                   'organization_id': None, 'region_id': None, 'status': None}
         search_users(params, user_id=99)
-        # db.session.query(UserMasterByUser).filter(login_user_id==99, ...) が呼ばれる
         mock_db.session.query.assert_called_once_with(mock_uc_model)
 
     @patch(f'{MODULE}.UserMasterByUser')
@@ -236,53 +198,29 @@ class TestSearchUsers:
         search_users(params, user_id=1)
         mock_query.limit.assert_called_once_with(10)
 
-
-# ---------------------------------------------------------------------------
-# get_user_by_databricks_id
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestGetUserByDatabricksId:
-    """get_user_by_databricks_id のテスト
-    観点: 2.2 対象データ存在チェック, 3.1.1 検索条件指定
-    """
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_sort_asc_applied_to_query(self, mock_db, mock_uc):
+        """3.1.1.1: order='asc' のとき query.order_by に .asc() が適用される"""
+        self._make_query_mock(mock_db, mock_uc, total=1)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
+                  'user_name': '', 'email_address': '', 'user_type_id': None,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        mock_uc.user_name.asc.assert_called()
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
-    def test_returns_user_when_found(self, mock_db, _mock_uc):
-        """2.2.1: 対象IDが存在する場合ユーザーオブジェクトを返す"""
-        mock_user = MagicMock()
-        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_user
-        from iot_app.services.user_service import get_user_by_databricks_id
-        result = get_user_by_databricks_id('uid-1', login_user_id=1)
-        assert result is mock_user
-
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_returns_none_when_not_found(self, mock_db, _mock_uc):
-        """2.2.2: 対象IDが存在しない場合 None を返す"""
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.user_service import get_user_by_databricks_id
-        result = get_user_by_databricks_id('nonexistent', login_user_id=1)
-        assert result is None
-
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_delete_flag_false_filter_applied(self, mock_db, _mock_uc):
-        """2.2.3: 論理削除済み（delete_flag=True）ユーザーは除外される"""
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.user_service import get_user_by_databricks_id
-        get_user_by_databricks_id('uid-1', login_user_id=1)
-        mock_db.session.query.return_value.filter.assert_called_once()
-
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_scope_filter_applied(self, mock_db, _mock_uc):
-        """3.1.1.1: login_user_id によるスコープ制限がフィルタに含まれる"""
-        mock_db.session.query.return_value.filter.return_value.first.return_value = None
-        from iot_app.services.user_service import get_user_by_databricks_id
-        get_user_by_databricks_id('uid-1', login_user_id=42)
-        mock_db.session.query.assert_called_once_with(_mock_uc)
+    def test_sort_desc_applied_to_query(self, mock_db, mock_uc):
+        """3.1.1.1: order='desc' のとき query.order_by に .desc() が適用される"""
+        self._make_query_mock(mock_db, mock_uc, total=1)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'desc',
+                  'user_name': '', 'email_address': '', 'user_type_id': None,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        mock_uc.user_name.desc.assert_called()
 
 
 # ---------------------------------------------------------------------------
@@ -322,96 +260,54 @@ class TestGetUserFormOptions:
         mock_db.session.query.return_value = mock_q
         from iot_app.services.user_service import get_user_form_options
         get_user_form_options(user_id=1, login_user_type_id=2)
-        # UserType に対して user_type_id > 2 のフィルタが適用される
         assert mock_db.session.query.return_value.filter.called
 
 
 # ---------------------------------------------------------------------------
-# get_all_users_for_export
+# check_email_duplicate
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestGetAllUsersForExport:
-    """get_all_users_for_export のテスト
-    観点: 3.1.1 検索条件指定, 3.1.2 検索条件未指定, 3.1.4 戻り値ハンドリング, 2.2 存在チェック
+class TestCheckEmailDuplicate:
+    """check_email_duplicate のテスト
+    観点: 3.1.1 検索条件指定, 3.1.4 検索結果戻り値ハンドリング, 2.2 対象データ存在チェック
     """
 
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_returns_list_of_matching_users(self, mock_db, _mock_uc):
-        """3.1.4.1: 検索条件に合うユーザーリストを返す"""
-        mock_users = [MagicMock(), MagicMock()]
-        mock_q = MagicMock()
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value.all.return_value = mock_users
-        mock_db.session.query.return_value.filter.return_value = mock_q
-        from iot_app.services.user_service import get_all_users_for_export
-        result = get_all_users_for_export({'user_name': '', 'email_address': '',
-                                           'user_type_id': None, 'organization_id': None,
-                                           'region_id': None, 'status': None,
-                                           'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
-        assert result == mock_users
+    @patch(f'{MODULE}.User')
+    def test_returns_true_when_duplicate_exists(self, mock_user):
+        """3.1.4.1: 該当ユーザーが存在する場合 True を返す"""
+        mock_user.query.filter_by.return_value.first.return_value = MagicMock()
+        from iot_app.services.user_service import check_email_duplicate
+        result = check_email_duplicate('dup@example.com')
+        assert result is True
 
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_returns_empty_list_when_no_results(self, mock_db, _mock_uc):
-        """3.1.4.2: 該当なしの場合、空リストを返す"""
-        mock_q = MagicMock()
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value.all.return_value = []
-        mock_db.session.query.return_value.filter.return_value = mock_q
-        from iot_app.services.user_service import get_all_users_for_export
-        result = get_all_users_for_export({'user_name': 'notexist', 'email_address': '',
-                                           'user_type_id': None, 'organization_id': None,
-                                           'region_id': None, 'status': None,
-                                           'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
-        assert result == []
+    @patch(f'{MODULE}.User')
+    def test_returns_false_when_no_duplicate(self, mock_user):
+        """3.1.4.2: 該当ユーザーが存在しない場合 False を返す"""
+        mock_user.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.user_service import check_email_duplicate
+        result = check_email_duplicate('new@example.com')
+        assert result is False
 
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_delete_flag_false_filter_applied(self, mock_db, _mock_uc):
-        """2.2.3: 論理削除済みユーザーを除外する（delete_flag=False）"""
-        mock_q = MagicMock()
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value.all.return_value = []
-        mock_db.session.query.return_value.filter.return_value = mock_q
-        from iot_app.services.user_service import get_all_users_for_export
-        get_all_users_for_export({'user_name': '', 'email_address': '',
-                                  'user_type_id': None, 'organization_id': None,
-                                  'region_id': None, 'status': None,
-                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
-        mock_db.session.query.return_value.filter.assert_called_once()
+    @patch(f'{MODULE}.User')
+    def test_email_condition_passed_to_query(self, mock_user):
+        """3.1.1.1: email_address 条件がクエリに渡される"""
+        mock_user.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.user_service import check_email_duplicate
+        check_email_duplicate('test@example.com')
+        mock_user.query.filter_by.assert_called_once_with(
+            email_address='test@example.com',
+            delete_flag=False,
+        )
 
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_user_name_filter_applied(self, mock_db, _mock_uc):
-        """3.1.1.1: user_name 条件が指定された場合フィルタが追加される"""
-        mock_q = MagicMock()
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value.all.return_value = []
-        mock_db.session.query.return_value.filter.return_value = mock_q
-        from iot_app.services.user_service import get_all_users_for_export
-        get_all_users_for_export({'user_name': '田中', 'email_address': '',
-                                  'user_type_id': None, 'organization_id': None,
-                                  'region_id': None, 'status': None,
-                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
-        assert mock_q.filter.called
-
-    @patch(f'{MODULE}.UserMasterByUser')
-    @patch(f'{MODULE}.db')
-    def test_none_condition_not_filtered(self, mock_db, _mock_uc):
-        """3.1.1.3: user_type_id=None のとき user_type_id フィルタは追加されない"""
-        mock_q = MagicMock()
-        mock_q.filter.return_value = mock_q
-        mock_q.order_by.return_value.all.return_value = []
-        mock_db.session.query.return_value.filter.return_value = mock_q
-        from iot_app.services.user_service import get_all_users_for_export
-        get_all_users_for_export({'user_name': '', 'email_address': '',
-                                  'user_type_id': None, 'organization_id': None,
-                                  'region_id': None, 'status': None,
-                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
-        # 追加フィルタなし（filter は0回）
-        assert mock_q.filter.call_count == 0
+    @patch(f'{MODULE}.User')
+    def test_excludes_logical_deleted_users(self, mock_user):
+        """2.2.3: 論理削除済みユーザーは除外する（delete_flag=False フィルタ）"""
+        mock_user.query.filter_by.return_value.first.return_value = None
+        from iot_app.services.user_service import check_email_duplicate
+        check_email_duplicate('any@example.com')
+        _, kwargs = mock_user.query.filter_by.call_args
+        assert kwargs.get('delete_flag') is False
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +353,16 @@ class TestInsertUnityCatalogUser:
         params = mock_conn.execute_dml.call_args[0][1]
         assert params['user_id'] == 42
         assert params['databricks_user_id'] == 'uid-42'
+        assert params['creator_id'] == 10
+        assert params['user_name'] == 'テスト'
+        assert params['organization_id'] == 1
+        assert params['email_address'] == 't@e.com'
+        assert params['user_type_id'] == 2
+        assert params['region_id'] == 1
+        assert params['address'] == '東京都'
+        assert params['status'] == 1
+        assert params['alert_notification_flag'] is True
+        assert params['system_notification_flag'] is True
 
 
 # ---------------------------------------------------------------------------
@@ -516,7 +422,6 @@ class TestRollbackCreateUser:
         mock_scim.delete_user.side_effect = Exception('SCIM error')
         mock_scim_cls.return_value = mock_scim
         from iot_app.services.user_service import _rollback_create_user
-        # 例外が発生しないことを確認
         _rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)
 
     @patch(f'{MODULE}.UnityCatalogConnector')
@@ -541,10 +446,8 @@ class TestCreateUser:
     観点: 2.1 正常系処理, 2.3 副作用チェック, 3.2 登録機能, 1.3 エラーハンドリング
     """
 
-    def _make_auth_provider(self, requires_additional_setup=False):
-        auth_provider = MagicMock()
-        auth_provider.requires_additional_setup.return_value = requires_additional_setup
-        return auth_provider
+    def _make_auth_provider(self):
+        return MagicMock()
 
     def _make_form_data(self):
         return {
@@ -563,26 +466,27 @@ class TestCreateUser:
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_success_commits_and_returns_result_dict(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
-        """2.1.1/3.2.2.1: 正常終了時に commit が呼ばれ結果 dict が返る"""
-        mock_user_obj = MagicMock()
-        mock_user_cls.return_value = mock_user_obj
+    def test_saga_order_oltp_insert_scim_uc_activate_commit(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
+        """3.2.1.1 / 2.1.1: Saga実行順 ①OLTP flush → ②SCIM create → ③グループ追加 → ④UC INSERT → ⑤活性化 flush → commit"""
+        call_order = []
+        mock_db.session.flush.side_effect = lambda: call_order.append('flush')
+        mock_db.session.commit.side_effect = lambda: call_order.append('commit')
         mock_scim = MagicMock()
-        mock_scim.create_user.return_value = 'new-uid'
+        mock_scim.create_user.side_effect = lambda **kw: (call_order.append('scim_create'), 'new-uid')[1]
+        mock_scim.add_user_to_group.side_effect = lambda *_: call_order.append('add_to_group')
         mock_scim_cls.return_value = mock_scim
+        mock_uc_insert.side_effect = lambda *_, **__: call_order.append('uc')
+        mock_user_cls.return_value = MagicMock()
         from iot_app.services.user_service import create_user
-        result = create_user(self._make_form_data(), creator_id=1,
-                             auth_provider=self._make_auth_provider())
-        mock_db.session.commit.assert_called_once()
-        assert 'invite_sent' in result
-        assert 'invite_failed' in result
+        create_user(self._make_form_data(), creator_id=1, auth_provider=self._make_auth_provider())
+        assert call_order == ['flush', 'scim_create', 'add_to_group', 'uc', 'flush', 'commit']
 
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
     def test_initial_oltp_insert_has_delete_flag_true(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
-        """3.2.1.1: 最初の OLTP INSERT 時は delete_flag=True（仮登録状態）"""
+        """3.2.1.1: 仮登録ステップで User が delete_flag=True で生成され session.add() に渡される"""
         created_users = []
         mock_user_cls.side_effect = lambda **kwargs: (created_users.append(kwargs), MagicMock())[1]
         mock_scim = MagicMock()
@@ -593,13 +497,44 @@ class TestCreateUser:
                     auth_provider=self._make_auth_provider())
         assert len(created_users) > 0
         assert created_users[0].get('delete_flag') is True
+        mock_db.session.add.assert_called_once()
 
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_activation_sets_delete_flag_false(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
-        """3.2.1.1: UC INSERT 後の活性化ステップで delete_flag=False に更新される"""
+    def test_initial_oltp_insert_fields_passed_correctly(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
+        """3.2.1.1: User() コンストラクタに user_data・固定値・creator_id が正しく渡される"""
+        created_users = []
+        mock_user_cls.side_effect = lambda **kwargs: (created_users.append(kwargs), MagicMock())[1]
+        mock_scim = MagicMock()
+        mock_scim.create_user.return_value = 'new-uid'
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import create_user
+        create_user(self._make_form_data(), creator_id=1,
+                    auth_provider=self._make_auth_provider())
+        assert len(created_users) > 0
+        kwargs = created_users[0]
+        assert kwargs.get('databricks_user_id') == ''
+        assert kwargs.get('user_name') == 'テストユーザー'
+        assert kwargs.get('email_address') == 'test@example.com'
+        assert kwargs.get('user_type_id') == 2
+        assert kwargs.get('organization_id') == 1
+        assert kwargs.get('language_code') == 'ja'
+        assert kwargs.get('region_id') == 1
+        assert kwargs.get('address') == '東京都'
+        assert kwargs.get('status') == 1
+        assert kwargs.get('alert_notification_flag') is True
+        assert kwargs.get('system_notification_flag') is True
+        assert kwargs.get('creator') == 1
+        assert kwargs.get('modifier') == 1
+
+    @patch(f'{MODULE}._insert_unity_catalog_user')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_activation_updates_databricks_id_and_delete_flag(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
+        """3.2.1.1: UC INSERT 後の活性化ステップで databricks_user_id と delete_flag=False が更新される"""
         mock_user_obj = MagicMock()
         mock_user_obj.delete_flag = True
         mock_user_cls.return_value = mock_user_obj
@@ -609,6 +544,7 @@ class TestCreateUser:
         from iot_app.services.user_service import create_user
         create_user(self._make_form_data(), creator_id=1,
                     auth_provider=self._make_auth_provider())
+        assert mock_user_obj.databricks_user_id == 'new-uid'
         assert mock_user_obj.delete_flag is False
 
     @patch(f'{MODULE}._insert_unity_catalog_user')
@@ -732,6 +668,24 @@ class TestCreateUser:
         uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
         assert uc_inserted is False
 
+    @patch(f'{MODULE}.check_email_duplicate')
+    @patch(f'{MODULE}._insert_unity_catalog_user')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_check_email_duplicate_called_with_email(
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert, mock_check):
+        """3.2.1.1: create_user 実行時に check_email_duplicate が email_address で呼ばれる"""
+        mock_check.return_value = False
+        mock_user_cls.return_value = MagicMock()
+        mock_scim = MagicMock()
+        mock_scim.create_user.return_value = 'new-uid'
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import create_user
+        form_data = self._make_form_data()
+        create_user(form_data, creator_id=1, auth_provider=self._make_auth_provider())
+        mock_check.assert_called_once_with(form_data['email_address'])
+
 
 # ---------------------------------------------------------------------------
 # _update_oltp_user
@@ -756,7 +710,11 @@ class TestUpdateOltpUser:
         }, modifier_id=99)
         assert mock_user.user_name == '更新後名前'
         assert mock_user.region_id == 2
+        assert mock_user.address == '大阪府'
         assert mock_user.status == 0
+        assert mock_user.alert_notification_flag is False
+        assert mock_user.system_notification_flag is True
+        assert mock_user.modifier == 99
 
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
@@ -795,8 +753,8 @@ class TestUpdateUnityCatalogUser:
         mock_conn.execute_dml.assert_called_once()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
-    def test_user_id_passed_to_params(self, mock_conn_cls):
-        """3.3.2.2: 指定した user_id が execute_dml のパラメータに含まれる"""
+    def test_all_fields_passed_in_params(self, mock_conn_cls):
+        """3.3.2.2: 全更新対象フィールドが execute_dml のパラメータに含まれる"""
         mock_conn = MagicMock()
         mock_conn_cls.return_value = mock_conn
         from iot_app.services.user_service import _update_unity_catalog_user
@@ -806,6 +764,13 @@ class TestUpdateUnityCatalogUser:
         }, modifier_id=1)
         params = mock_conn.execute_dml.call_args[0][1]
         assert params['user_id'] == 55
+        assert params['user_name'] == '更新名'
+        assert params['region_id'] == 1
+        assert params['address'] == '大阪府'
+        assert params['status'] == 1
+        assert params['alert_notification_flag'] is True
+        assert params['system_notification_flag'] is True
+        assert params['modifier_id'] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -833,6 +798,37 @@ class TestRollbackUpdateUser:
         _rollback_update_user(databricks_user_id='uid-1', user_id=1)
         mock_scim.update_user.assert_called_once()
         mock_conn.execute_dml.assert_called_once()
+
+    @patch(f'{MODULE}.UnityCatalogConnector')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    def test_all_fields_restored_to_scim_and_uc(self, mock_user_cls, mock_scim_cls, mock_conn_cls):
+        """2.3.2: SCIMとUCに元データの全フィールドが正しく渡される"""
+        mock_original = MagicMock()
+        mock_original.user_name = '元の名前'
+        mock_original.region_id = 3
+        mock_original.address = '京都府'
+        mock_original.status = 0
+        mock_original.alert_notification_flag = False
+        mock_original.system_notification_flag = True
+        mock_original.modifier = 77
+        mock_user_cls.query.get.return_value = mock_original
+        mock_scim = MagicMock()
+        mock_scim_cls.return_value = mock_scim
+        mock_conn = MagicMock()
+        mock_conn_cls.return_value = mock_conn
+        from iot_app.services.user_service import _rollback_update_user
+        _rollback_update_user(databricks_user_id='uid-1', user_id=10)
+        mock_scim.update_user.assert_called_once_with('uid-1', '元の名前', 0)
+        params = mock_conn.execute_dml.call_args[0][1]
+        assert params['user_id'] == 10
+        assert params['user_name'] == '元の名前'
+        assert params['region_id'] == 3
+        assert params['address'] == '京都府'
+        assert params['status'] == 0
+        assert params['alert_notification_flag'] is False
+        assert params['system_notification_flag'] is True
+        assert params['modifier'] == 77
 
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
@@ -945,6 +941,68 @@ class TestUpdateUser:
                         user_data=self._make_user_data(), modifier_id=1)
         mock_rollback.assert_called_once()
 
+    @patch(f'{MODULE}.check_email_duplicate')
+    @patch(f'{MODULE}._update_unity_catalog_user')
+    @patch(f'{MODULE}._update_oltp_user')
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.db')
+    def test_check_email_duplicate_not_called(
+            self, mock_db, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_check):
+        """2.3.2: update_user は email を変更しないため check_email_duplicate を呼ばない"""
+        mock_scim_cls.return_value = MagicMock()
+        from iot_app.services.user_service import update_user
+        update_user(user_id=1, databricks_user_id='uid-1',
+                    user_data=self._make_user_data(), modifier_id=1)
+        mock_check.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# get_user_by_databricks_id
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetUserByDatabricksId:
+    """get_user_by_databricks_id のテスト
+    観点: 2.2 対象データ存在チェック, 3.1.1 検索条件指定
+    """
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_returns_user_when_found(self, mock_db, _mock_uc):
+        """2.2.1: 対象IDが存在する場合ユーザーオブジェクトを返す"""
+        mock_user = MagicMock()
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_user
+        from iot_app.services.user_service import get_user_by_databricks_id
+        result = get_user_by_databricks_id('uid-1', login_user_id=1)
+        assert result is mock_user
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db, _mock_uc):
+        """2.2.2: 対象IDが存在しない場合 None を返す"""
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.user_service import get_user_by_databricks_id
+        result = get_user_by_databricks_id('nonexistent', login_user_id=1)
+        assert result is None
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_delete_flag_false_filter_applied(self, mock_db, _mock_uc):
+        """2.2.3: 論理削除済み（delete_flag=True）ユーザーは除外される"""
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.user_service import get_user_by_databricks_id
+        get_user_by_databricks_id('uid-1', login_user_id=1)
+        mock_db.session.query.return_value.filter.assert_called_once()
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_scope_filter_applied(self, mock_db, _mock_uc):
+        """3.1.1.1: login_user_id によるスコープ制限がフィルタに含まれる"""
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+        from iot_app.services.user_service import get_user_by_databricks_id
+        get_user_by_databricks_id('uid-1', login_user_id=42)
+        mock_db.session.query.assert_called_once_with(_mock_uc)
+
 
 # ---------------------------------------------------------------------------
 # _delete_unity_catalog_user
@@ -997,6 +1055,48 @@ class TestRollbackDeleteUser:
         from iot_app.services.user_service import _rollback_delete_user
         _rollback_delete_user(user_id=1)
         mock_conn.execute_dml.assert_called_once()
+
+    @patch(f'{MODULE}.UnityCatalogConnector')
+    @patch(f'{MODULE}.User')
+    def test_all_fields_passed_from_oltp_user(self, mock_user_cls, mock_conn_cls):
+        """2.3.2: OLTPの元データ全フィールドが execute_dml のパラメータに含まれる"""
+        mock_original = MagicMock()
+        mock_original.user_id = 1
+        mock_original.databricks_user_id = 'uid-1'
+        mock_original.user_name = 'テストユーザー'
+        mock_original.organization_id = 1
+        mock_original.email_address = 'test@example.com'
+        mock_original.user_type_id = 2
+        mock_original.language_code = 'ja'
+        mock_original.region_id = 1
+        mock_original.address = '東京都'
+        mock_original.status = 1
+        mock_original.alert_notification_flag = True
+        mock_original.system_notification_flag = True
+        mock_original.create_date = '2024-01-01'
+        mock_original.creator = 99
+        mock_original.modifier = 88
+        mock_user_cls.query.get.return_value = mock_original
+        mock_conn = MagicMock()
+        mock_conn_cls.return_value = mock_conn
+        from iot_app.services.user_service import _rollback_delete_user
+        _rollback_delete_user(user_id=1)
+        params = mock_conn.execute_dml.call_args[0][1]
+        assert params['user_id'] == 1
+        assert params['databricks_user_id'] == 'uid-1'
+        assert params['user_name'] == 'テストユーザー'
+        assert params['organization_id'] == 1
+        assert params['email_address'] == 'test@example.com'
+        assert params['user_type_id'] == 2
+        assert params['language_code'] == 'ja'
+        assert params['region_id'] == 1
+        assert params['address'] == '東京都'
+        assert params['status'] == 1
+        assert params['alert_notification_flag'] is True
+        assert params['system_notification_flag'] is True
+        assert params['create_date'] == '2024-01-01'
+        assert params['creator'] == 99
+        assert params['modifier'] == 88
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.User')
@@ -1122,6 +1222,93 @@ class TestDeleteUser:
 
 
 # ---------------------------------------------------------------------------
+# get_all_users_for_export
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetAllUsersForExport:
+    """get_all_users_for_export のテスト
+    観点: 3.1.1 検索条件指定, 3.1.2 検索条件未指定, 3.1.4 戻り値ハンドリング, 2.2 存在チェック
+    """
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_returns_list_of_matching_users(self, mock_db, _mock_uc):
+        """3.1.4.1: 検索条件に合うユーザーリストを返す"""
+        mock_users = [MagicMock(), MagicMock()]
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = mock_users
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        result = get_all_users_for_export({'user_name': '', 'email_address': '',
+                                           'user_type_id': None, 'organization_id': None,
+                                           'region_id': None, 'status': None,
+                                           'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        assert result == mock_users
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_returns_empty_list_when_no_results(self, mock_db, _mock_uc):
+        """3.1.4.2: 該当なしの場合、空リストを返す"""
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        result = get_all_users_for_export({'user_name': 'notexist', 'email_address': '',
+                                           'user_type_id': None, 'organization_id': None,
+                                           'region_id': None, 'status': None,
+                                           'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        assert result == []
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_delete_flag_false_filter_applied(self, mock_db, _mock_uc):
+        """2.2.3: 論理削除済みユーザーを除外する（delete_flag=False）"""
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        get_all_users_for_export({'user_name': '', 'email_address': '',
+                                  'user_type_id': None, 'organization_id': None,
+                                  'region_id': None, 'status': None,
+                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        mock_db.session.query.return_value.filter.assert_called_once()
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_user_name_filter_applied(self, mock_db, _mock_uc):
+        """3.1.1.1: user_name 条件が指定された場合フィルタが追加される"""
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        get_all_users_for_export({'user_name': '田中', 'email_address': '',
+                                  'user_type_id': None, 'organization_id': None,
+                                  'region_id': None, 'status': None,
+                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        assert mock_q.filter.called
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_none_condition_not_filtered(self, mock_db, _mock_uc):
+        """3.1.1.3: user_type_id=None のとき user_type_id フィルタは追加されない"""
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        get_all_users_for_export({'user_name': '', 'email_address': '',
+                                  'user_type_id': None, 'organization_id': None,
+                                  'region_id': None, 'status': None,
+                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        assert mock_q.filter.call_count == 0
+
+
+# ---------------------------------------------------------------------------
 # generate_users_csv
 # ---------------------------------------------------------------------------
 
@@ -1148,13 +1335,18 @@ class TestGenerateUsersCsv:
         return user
 
     def test_header_row_contains_defined_columns(self):
-        """3.5.1.1: 定義済み列名（ユーザーID, ユーザー名, メールアドレス等）がヘッダーに含まれる"""
+        """3.5.1.1: 定義済み全8列名がヘッダーに含まれる"""
         from iot_app.services.user_service import generate_users_csv
         result = generate_users_csv([])
         text = result.decode('utf-8-sig')
         assert 'ユーザーID' in text
         assert 'ユーザー名' in text
         assert 'メールアドレス' in text
+        assert '所属組織ID' in text
+        assert '所属組織名' in text
+        assert 'ユーザー種別' in text
+        assert '地域' in text
+        assert '住所' in text
 
     def test_empty_users_returns_header_only(self):
         """3.5.1.3: 空リストの場合ヘッダー行のみ出力される"""
@@ -1174,7 +1366,7 @@ class TestGenerateUsersCsv:
         assert len(lines) == 3  # ヘッダー + 2行
 
     def test_column_order_matches_specification(self):
-        """3.5.1.4: 列順序が設計書通り（ユーザーID, ユーザー名, メールアドレス, ユーザー種別, 所属組織ID, 所属組織名, 作成日時）"""
+        """3.5.1.4: 列順序が設計書通り（全8列）"""
         from iot_app.services.user_service import generate_users_csv
         result = generate_users_csv([])
         text = result.decode('utf-8-sig')
@@ -1183,6 +1375,11 @@ class TestGenerateUsersCsv:
         assert columns[0] == 'ユーザーID'
         assert columns[1] == 'ユーザー名'
         assert columns[2] == 'メールアドレス'
+        assert columns[3] == '所属組織ID'
+        assert columns[4] == '所属組織名'
+        assert columns[5] == 'ユーザー種別'
+        assert columns[6] == '地域'
+        assert columns[7] == '住所'
 
     def test_comma_in_field_quoted(self):
         """3.5.2.1: フィールド値にカンマが含まれる場合ダブルクォートで囲まれる"""
@@ -1230,3 +1427,15 @@ class TestGenerateUsersCsv:
         text = result.decode('utf-8-sig')
         assert '山田太郎' in text
         assert '東京営業所' in text
+
+    def test_none_relationship_outputs_empty_string(self):
+        """3.5.1.6: organization が None のとき所属組織名列が空文字で出力される"""
+        import csv, io
+        from iot_app.services.user_service import generate_users_csv
+        user = self._make_user()
+        user.organization = None
+        result = generate_users_csv([user])
+        text = result.decode('utf-8-sig')
+        reader = csv.reader(io.StringIO(text))
+        rows = list(reader)
+        assert rows[1][5] == ''  # 所属組織名は5列目（0-indexed）

@@ -1002,12 +1002,15 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
         db.session.commit()
 
         # ⑥ オンプレミス環境：招待処理
+        # オンプレ環境対応は凍結中、実装不要
         if auth_provider.requires_additional_setup():
             try:
                 _send_invite(user)
                 return {'invite_sent': True, 'invite_failed': False}
             except Exception:
                 return {'invite_sent': False, 'invite_failed': True}
+        # ここまで実装不要
+
 
         return {'invite_sent': False, 'invite_failed': False}
 
@@ -1052,10 +1055,13 @@ def create_user_view():
     except Exception:
         abort(500)
 
+    # オンプレ環境対応は凍結中、実装不要
     if result['invite_failed']:
         flash('ユーザーを登録しましたが、招待メール送信に失敗しました', 'warning')
     elif result['invite_sent']:
         flash('ユーザーを登録し、招待メールを送信しました', 'success')
+    # ここまで実装不要
+
     else:
         flash('ユーザーを登録しました', 'success')
 
@@ -1728,17 +1734,18 @@ def generate_users_csv(users: list) -> bytes:
     """
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ユーザーID', 'ユーザー名', 'メールアドレス', 'ユーザー種別',
-                     '所属組織ID', '所属組織名', '作成日時'])
+    writer.writerow(['ユーザーID', 'ユーザー名', 'メールアドレス', '所属組織ID', '所属組織名', 'ユーザー種別', 
+                     '地域', '住所'])
     for user in users:
         writer.writerow([
             user.user_id,
             user.user_name,
             user.email_address,
-            user.user_type.user_type_name if user.user_type else '',
             user.organization_id,
             user.organization.organization_name if user.organization else '',
-            user.create_date.strftime('%Y-%m-%d %H:%M:%S') if user.create_date else '',
+            user.user_type.user_type_name if user.user_type else '',
+
+            
         ])
     return output.getvalue().encode('utf-8-sig')
 
