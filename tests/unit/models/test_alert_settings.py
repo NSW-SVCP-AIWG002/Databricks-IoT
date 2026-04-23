@@ -9,6 +9,7 @@
   - 単体テスト観点表: docs/05-testing/unit-test/unit-test-perspectives.md
   - 実装ガイド:       docs/05-testing/unit-test/unit-test-guide.md
 """
+# 観点: unit-test-perspectives.md > 1.1.2 最大文字列長チェック
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -21,7 +22,7 @@ from unittest.mock import MagicMock, patch
 @pytest.mark.unit
 class TestAlertSettingMaster:
     """AlertSettingMaster モデルのカラム定義テスト
-    観点: モデルのプロパティ・制約定義（DB非依存）
+    観点: モデルのプロパティ・制約定義（DB非依存）、1.1.2 最大文字列長チェック
 
     出典: src/iot_app/models/alert.py, workflow-specification.md > 入力検証
     """
@@ -65,7 +66,7 @@ class TestAlertSettingMaster:
         assert col.nullable is False
 
     def test_alert_name_max_length_is_100(self):
-        """alert_name の最大文字列長が 100 である（UI仕様書 (4.2) と一致）"""
+        """1.1.2: alert_name の最大文字列長が 100 である（UI仕様書 (4.2) と一致）"""
         # Arrange
         from iot_app.models.alert import AlertSettingMaster
         col = AlertSettingMaster.__table__.columns["alert_name"]
@@ -243,7 +244,7 @@ class TestAlertSettingMaster:
 @pytest.mark.unit
 class TestAlertLevelMaster:
     """AlertLevelMaster モデルのカラム定義テスト
-    観点: モデルのプロパティ・制約定義（DB非依存）
+    観点: モデルのプロパティ・制約定義（DB非依存）、1.1.2 最大文字列長チェック
     """
 
     def test_tablename_is_alert_level_master(self):
@@ -262,7 +263,7 @@ class TestAlertLevelMaster:
         assert col.primary_key is True
 
     def test_alert_level_name_max_length_is_100(self):
-        """alert_level_name の最大文字列長が 100 である"""
+        """1.1.2: alert_level_name の最大文字列長が 100 である"""
         # Arrange
         from iot_app.models.alert import AlertLevelMaster
         col = AlertLevelMaster.__table__.columns["alert_level_name"]
