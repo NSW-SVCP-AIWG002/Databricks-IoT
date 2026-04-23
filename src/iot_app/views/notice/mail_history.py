@@ -7,7 +7,6 @@
   GET  /notice/mail-history/<mail_history_uuid>   詳細モーダル（パーシャル）
 """
 
-import json
 from datetime import date
 
 from flask import abort, g, make_response, render_template, request
@@ -15,6 +14,7 @@ from flask_wtf import FlaskForm
 from wtforms import DateField, SelectMultipleField, StringField
 from wtforms.validators import Length, Optional
 
+from iot_app.common.cookie import get_search_conditions_cookie, set_search_conditions_cookie
 from iot_app.common.logger import get_logger
 from iot_app.services.mail_history_service import (
     DEFAULT_PER_PAGE,
@@ -30,9 +30,6 @@ from iot_app.services.mail_history_service import (
 from iot_app.views.notice import notice_bp
 
 logger = get_logger(__name__)
-
-_COOKIE_NAME = 'mail_history_search'
-_COOKIE_MAX_AGE = 86400
 
 # メール種別ID → バッジCSSクラスのマッピング
 _MAIL_TYPE_BADGE_CLASS: dict[int, str] = {
@@ -56,27 +53,6 @@ class MailHistorySearchForm(FlaskForm):
     )
     sent_at_start = DateField('送信日時（開始）', validators=[Optional()])
     sent_at_end = DateField('送信日時（終了）', validators=[Optional()])
-
-
-def _get_cookie() -> dict:
-    raw = request.cookies.get(_COOKIE_NAME)
-    if raw:
-        try:
-            return json.loads(raw)
-        except (ValueError, TypeError):
-            pass
-    return {}
-
-
-def _set_cookie(response, params: dict) -> None:
-    response.set_cookie(
-        _COOKIE_NAME,
-        json.dumps(params),
-        max_age=_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite='Lax',
-        secure=True,
-    )
 
 
 def _init_params() -> dict:
@@ -157,13 +133,13 @@ def mail_history_list():
         params = _init_params()
     elif has_sort:
         # ソート: Cookie の検索条件を保持してソート条件を更新
-        params = _get_cookie() or _init_params()
+        params = get_search_conditions_cookie('mail_history') or _init_params()
         params['sort_id'] = request.args.get('sort_id', DEFAULT_SORT_ID, type=int)
         params['order'] = request.args.get('order', DEFAULT_SORT_ORDER)
         params['page'] = 1
     else:
         # ページング: Cookie の検索条件を保持してページを更新
-        params = _get_cookie() or _init_params()
+        params = get_search_conditions_cookie('mail_history') or _init_params()
         params['page'] = max(1, request.args.get('page', 1, type=int))
 
     sort_id = params.get('sort_id', DEFAULT_SORT_ID)
@@ -201,7 +177,7 @@ def mail_history_list():
 
     ctx = _build_template_context(form, mail_type_list, records, total, page, sort_id, order, params)
     response = make_response(render_template('notice/mail_history/list.html', **ctx))
-    _set_cookie(response, params)
+    set_search_conditions_cookie(response, 'mail_history', params)
     return response
 
 
@@ -263,7 +239,7 @@ def mail_history_search():
         form, mail_type_list, records, total, 1, DEFAULT_SORT_ID, order, params
     )
     response = make_response(render_template('notice/mail_history/list.html', **ctx))
-    _set_cookie(response, params)
+    set_search_conditions_cookie(response, 'mail_history', params)
     return response
 
 
