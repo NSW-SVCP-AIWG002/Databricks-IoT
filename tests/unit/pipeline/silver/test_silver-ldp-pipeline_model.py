@@ -5,7 +5,7 @@
     pipeline.silver.functions.alert_judgment  (MEASUREMENT_COLUMN_MAP, ALERT_STATUS_*)
     pipeline.silver.functions.constants       (BINARY_DATA_SIZE, BINARY_STRUCT_FORMAT,
                                                SENSOR_FIELDS, OLTP_MAX_RETRIES,
-                                               sensor_schema)
+                                               SENSOR_SCHEMA)
 
 設計書: docs/03-features/ldp-pipeline/silver-layer/ldp-pipeline-specification.md
 観点表: docs/05-testing/unit-test/unit-test-perspectives.md

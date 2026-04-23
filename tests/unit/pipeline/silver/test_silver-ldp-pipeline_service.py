@@ -1714,7 +1714,66 @@ class TestEnqueueEmailNotification:
         enqueue_email_notification(mock_batch_df, 0, MagicMock())
         # Assert
         mock_get_conn.assert_not_called()
-        
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_queue_records_inserted_with_all_fields(self, mock_get_conn):
+        """2.1.1 / CL-1-1: キューレコードが存在する場合、email_notification_queue に全フィールドが INSERT される
+
+        実行内容: queue_list に1件のレコードを返すモックで enqueue_email_notification を実行
+        想定結果:
+            - INSERT INTO email_notification_queue が1回呼ばれる
+            - device_id・organization_id・alert_id・recipient_email・status・retry_count が
+              正しいパラメータで渡される（設計書 §メール送信キュー登録処理 の13フィールド）
+            - conn.commit() が1回呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import enqueue_email_notification
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.isEmpty.return_value = False
+        queue_record = _MockRow(
+            device_id=1001,
+            organization_id=10,
+            alert_id=5,
+            recipient_email="test@example.com",
+            subject="[アラート] テスト",
+            body="本文",
+            alert_detail_json='{"alert_id": 5}',
+            status="PENDING",
+            retry_count=0,
+            error_message=None,
+            event_timestamp="2026-01-23T10:00:00",
+            queued_time="2026-01-23T10:00:01",
+            processed_time=None,
+        )
+        (
+            mock_batch_df.filter.return_value
+            .join.return_value
+            .join.return_value
+            .join.return_value
+            .select.return_value
+            .collect.return_value
+        ) = [queue_record]
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        enqueue_email_notification(mock_batch_df, 0, MagicMock())
+        # Assert
+        assert mock_cursor.execute.call_count == 1
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "INSERT INTO email_notification_queue" in sql_executed
+        params = mock_cursor.execute.call_args_list[0][0][1]
+        assert params[0] == 1001, f"device_id が 1001 でない: {params[0]}"
+        assert params[1] == 10, f"organization_id が 10 でない: {params[1]}"
+        assert params[2] == 5, f"alert_id が 5 でない: {params[2]}"
+        assert params[3] == "test@example.com", f"recipient_email が一致しない: {params[3]}"
+        assert params[7] == "PENDING", f"status が 'PENDING' でない: {params[7]}"
+        assert params[8] == 0, f"retry_count が 0 でない: {params[8]}"
+        mock_conn.commit.assert_called_once()
+
 # ===========================================================================
 # STEP 5b: デバイスステータス更新
 # 設計書: § 外部連携仕様 > デバイスステータス更新処理
@@ -1776,6 +1835,9 @@ class TestUpdateDeviceStatus:
         sql_executed = mock_cursor.execute.call_args_list[0][0][0]
         assert "INSERT INTO device_status_data" in sql_executed
         assert "ON DUPLICATE KEY UPDATE" in sql_executed
+        params = mock_cursor.execute.call_args_list[0][0][1]
+        assert params[0] == 1001, f"device_id が 1001 でない: {params[0]}"
+        assert params[1] == "2026-01-23T09:00:00", f"last_received_time が一致しない: {params[1]}"
         mock_conn.commit.assert_called_once()
 
     @patch("functions.alert_judgment.get_mysql_connection")
@@ -1900,6 +1962,12 @@ class TestInsertAlertHistory:
         )
         insert_sql = mock_cursor.execute.call_args_list[0][0][0]
         assert "INSERT INTO alert_history" in insert_sql
+        # Assert: INSERT の全パラメータ（alert_id, abnormal_start_time, ALERT_STATUS_FIRING, current_sensor_value）
+        insert_params = mock_cursor.execute.call_args_list[0][0][1]
+        assert insert_params[0] == 5, f"alert_id が 5 でない: {insert_params[0]}"
+        assert insert_params[1] == "2026-01-23T08:00:00", f"abnormal_start_time が一致しない: {insert_params[1]}"
+        assert insert_params[2] == 1, f"ALERT_STATUS_FIRING が 1 でない: {insert_params[2]}"
+        assert insert_params[3] == -30.0, f"current_sensor_value が -30.0 でない: {insert_params[3]}"
         # Assert: UPDATE に lastrowid=9999 が含まれる
         update_params = mock_cursor.execute.call_args_list[1][0][1]
         assert update_params[0] == 9999, (
