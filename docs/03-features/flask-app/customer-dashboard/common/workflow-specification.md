@@ -1544,6 +1544,7 @@ flowchart TD
     200OK --> End([処理完了])
     Error400 --> End
     Error403 --> End
+    Error404 --> End
     Error500 --> End
 ```
 

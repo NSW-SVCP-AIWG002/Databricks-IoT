@@ -129,7 +129,7 @@ class TestDashboardGroupForm:
             assert 'dashboard_group_name' in form.errors
 
     def test_valid_when_dashboard_uuid_provided(self, app):
-        """dashboard_uuid あり: バリデーション通過"""
+        """1.1.1.3 dashboard_uuid あり: HiddenField は任意値でバリデーション通過"""
         with app.test_request_context():
             form = DashboardGroupForm(data={
                 'dashboard_uuid': 'test-dashboard-uuid-001',
@@ -138,7 +138,7 @@ class TestDashboardGroupForm:
             assert form.validate()
 
     def test_valid_when_dashboard_uuid_empty(self, app):
-        """dashboard_uuid 空: HiddenField はバリデーターなしのためバリデーション通過"""
+        """1.2.4 dashboard_uuid 空文字: HiddenField はバリデーターなしのためバリデーション通過"""
         with app.test_request_context():
             form = DashboardGroupForm(data={
                 'dashboard_uuid': '',

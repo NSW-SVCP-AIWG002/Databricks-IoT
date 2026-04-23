@@ -177,6 +177,12 @@ class TestDashboardGadgetMaster:
         # Assert
         assert gadget.gadget_uuid == 'gadget-uuid-001'
         assert gadget.gadget_name == 'テストガジェット'
+        assert gadget.dashboard_group_id == 1
+        assert gadget.gadget_type_id == 1
+        assert gadget.position_x == 0
+        assert gadget.position_y == 0
+        assert gadget.gadget_size == 0
+        assert gadget.display_order == 0
 
     def test_delete_flag_default_is_false(self):
         """delete_flag のデフォルト値は False"""
@@ -260,6 +266,8 @@ class TestGadgetTypeMaster:
         assert gadget_type.gadget_type_name == '棒グラフ'
         assert gadget_type.gadget_type_slug == 'bar-chart'
         assert gadget_type.data_source_type == 0
+        assert gadget_type.gadget_image_path == 'static/images/bar_chart.png'
+        assert gadget_type.gadget_description == '棒グラフガジェット'
         assert gadget_type.display_order == 1
 
     def test_delete_flag_default_is_false(self):
@@ -311,6 +319,8 @@ class TestDashboardUserSetting:
         # Assert
         assert setting.user_id == 1
         assert setting.dashboard_id == 1
+        assert setting.organization_id is None
+        assert setting.device_id is None
 
     def test_delete_flag_default_is_false(self):
         """delete_flag のデフォルト値は False"""
