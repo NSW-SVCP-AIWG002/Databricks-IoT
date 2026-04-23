@@ -2,7 +2,7 @@
 
 **対象ファイル:** `tests/unit/services/test_user_service.py`
 **対象モジュール:** `iot_app.services.user_service`
-**テスト総数:** 87件
+**テスト総数:** 90件
 
 ---
 
@@ -37,6 +37,7 @@
 | 14 | 3.1.3.1 per_page が limit に渡される | `per_page=10` の params で `search_users(params, user_id=1)` を呼ぶ | `mock_query.limit` が `10` で1回呼ばれること |
 | 15 | 3.1.1.1 検索条件指定（ソート昇順） | `sort_by='user_name', order='asc'` の params で `search_users(params, user_id=1)` を呼ぶ | `mock_query.order_by` が呼ばれ、`.asc()` が適用されること |
 | 16 | 3.1.1.1 検索条件指定（ソート降順） | `sort_by='user_name', order='desc'` の params で `search_users(params, user_id=1)` を呼ぶ | `mock_query.order_by` が呼ばれ、`.desc()` が適用されること |
+| 17 | 3.1.1.2 全フィルター条件同時指定 | `user_name='田中'`, `email_address='@example'`, `user_type_id=2`, `organization_id=1`, `region_id=2`, `status=1` を含む params で `search_users(params, user_id=1)` を呼ぶ | `mock_query.filter` が6回以上呼ばれ、フィルタ条件文字列に `'%田中%'`, `'%@example%'`, `'user_type_id'`, `'organization_id'`, `'region_id'`, `'status'` が含まれること |
 
 ---
 
@@ -46,8 +47,8 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 17 | 2.1.1 / 3.1.4.1 正常系：4タプル返却 | `db.session.query()` が空リストを返すモックを設定し、`get_user_form_options(user_id=1, login_user_type_id=2)` を呼ぶ | 戻り値が長さ4のタプル（organizations, user_types, regions, sort_items）であること |
-| 18 | 3.1.1.1 検索条件指定（下位ロールのみ） | `db.session.query()` が空リストを返すモックを設定し、`get_user_form_options(user_id=1, login_user_type_id=2)` を呼ぶ | `db.session.query().filter` が呼ばれること（UserType に対して user_type_id > 2 のフィルタ） |
+| 18 | 2.1.1 / 3.1.4.1 正常系：4タプル返却 | `db.session.query()` が空リストを返すモックを設定し、`get_user_form_options(user_id=1, login_user_type_id=2)` を呼ぶ | 戻り値が長さ4のタプル（organizations, user_types, regions, sort_items）であること |
+| 19 | 3.1.1.1 検索条件指定（下位ロールのみ） | `db.session.query()` が空リストを返すモックを設定し、`get_user_form_options(user_id=1, login_user_type_id=2)` を呼ぶ | `db.session.query().filter` が呼ばれること（UserType に対して user_type_id > 2 のフィルタ） |
 
 ---
 
@@ -57,10 +58,10 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 19 | 3.1.4.1 検索結果戻り値（存在あり） | `User.query.filter_by().first()` が MagicMock を返すよう設定し、`check_email_duplicate('dup@example.com')` を呼ぶ | 戻り値が `True` であること |
-| 20 | 3.1.4.2 検索結果戻り値（存在なし） | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('new@example.com')` を呼ぶ | 戻り値が `False` であること |
-| 21 | 3.1.1.1 検索条件指定（email_address） | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('test@example.com')` を呼ぶ | `filter_by` が `email_address='test@example.com', delete_flag=False` で1回呼ばれること |
-| 22 | 2.2.3 論理削除済み除外 | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('any@example.com')` を呼ぶ | `filter_by` の引数に `delete_flag=False` が含まれること |
+| 20 | 3.1.4.1 検索結果戻り値（存在あり） | `User.query.filter_by().first()` が MagicMock を返すよう設定し、`check_email_duplicate('dup@example.com')` を呼ぶ | 戻り値が `True` であること |
+| 21 | 3.1.4.2 検索結果戻り値（存在なし） | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('new@example.com')` を呼ぶ | 戻り値が `False` であること |
+| 22 | 3.1.1.1 検索条件指定（email_address） | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('test@example.com')` を呼ぶ | `filter_by` が `email_address='test@example.com', delete_flag=False` で1回呼ばれること |
+| 23 | 2.2.3 論理削除済み除外 | `User.query.filter_by().first()` が `None` を返すよう設定し、`check_email_duplicate('any@example.com')` を呼ぶ | `filter_by` の引数に `delete_flag=False` が含まれること |
 
 ---
 
@@ -70,8 +71,8 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 23 | 3.2.1.1 登録処理呼び出し（1回） | `UnityCatalogConnector` をモック化し、`_insert_unity_catalog_user(user_id=1, databricks_user_id='uid-1', user_data={...}, creator_id=99)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 24 | 3.2.1.1 登録処理呼び出し（全フィールド含む） | `UnityCatalogConnector` をモック化し、`_insert_unity_catalog_user(user_id=42, databricks_user_id='uid-42', user_data={...}, creator_id=10)` を呼ぶ | `execute_dml` のパラメータに全登録対象フィールド（直接引数：`user_id`, `databricks_user_id`, `creator_id`、user_data写し：`user_name`, `organization_id`, `email_address`, `user_type_id`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`）が含まれること |
+| 24 | 3.2.1.1 登録処理呼び出し（1回） | `UnityCatalogConnector` をモック化し、`_insert_unity_catalog_user(user_id=1, databricks_user_id='uid-1', user_data={...}, creator_id=99)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
+| 25 | 3.2.1.1 登録処理呼び出し（全フィールド含む） | `UnityCatalogConnector` をモック化し、`_insert_unity_catalog_user(user_id=42, databricks_user_id='uid-42', user_data={...}, creator_id=10)` を呼ぶ | `execute_dml` のパラメータに全登録対象フィールド（直接引数：`user_id`, `databricks_user_id`, `creator_id`、user_data写し：`user_name`, `organization_id`, `email_address`, `user_type_id`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`）が含まれること |
 
 ---
 
@@ -81,12 +82,12 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 25 | 2.3.2 副作用チェック（SCIM 削除実行） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が `'uid-1'` で1回呼ばれること |
-| 26 | 2.3.2 副作用チェック（SCIM 削除スキップ） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id=None, uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が呼ばれないこと |
-| 27 | 2.3.2 副作用チェック（UC 削除実行） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 28 | 2.3.2 副作用チェック（UC 削除スキップ） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_conn.execute_dml` が呼ばれないこと |
-| 29 | 1.3.1 エラーハンドリング（SCIM例外抑制） | `ScimClient.delete_user` が例外を投げるよう設定し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
-| 30 | 1.3.1 エラーハンドリング（UC例外抑制） | `UnityCatalogConnector.execute_dml` が例外を投げるよう設定し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 26 | 2.3.2 副作用チェック（SCIM 削除実行） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が `'uid-1'` で1回呼ばれること |
+| 27 | 2.3.2 副作用チェック（SCIM 削除スキップ） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id=None, uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が呼ばれないこと |
+| 28 | 2.3.2 副作用チェック（UC 削除実行） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
+| 29 | 2.3.2 副作用チェック（UC 削除スキップ） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_conn.execute_dml` が呼ばれないこと |
+| 30 | 1.3.1 エラーハンドリング（SCIM例外抑制） | `ScimClient.delete_user` が例外を投げるよう設定し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 31 | 1.3.1 エラーハンドリング（UC例外抑制） | `UnityCatalogConnector.execute_dml` が例外を投げるよう設定し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
 
 ---
 
@@ -96,17 +97,17 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 31 | 3.2.1.1 / 2.1.1 登録処理呼び出し（Saga実行順） | call_order リストで各ステップの呼び出し順を記録し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 呼び出し順が `['flush', 'scim_create', 'add_to_group', 'uc', 'flush', 'commit']` であること（①OLTP flush → ②SCIM create → ③グループ追加 → ④UC INSERT → ⑤活性化 flush → commit） |
-| 32 | 3.2.1.1 登録処理呼び出し（仮登録ステップ） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時の引数に `delete_flag=True` が含まれること（仮登録状態）かつ `db.session.add` が1回呼ばれること |
-| 33 | 3.2.1.1 登録処理呼び出し（User コンストラクタ引数・全件） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時に全登録対象項目（固定値・user_data写し・creator_id写し）がコンストラクタ引数に含まれること（delete_flag は No.32 でカバー） |
-| 34 | 3.2.1.1 登録処理呼び出し（活性化 databricks_user_id・delete_flag更新） | `User` モックが `delete_flag=True` 状態で返るよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 活性化ステップで `mock_user_obj.databricks_user_id` が `'new-uid'` に、`mock_user_obj.delete_flag` が `False` に更新されること |
-| 35 | 3.2.1.1 登録処理呼び出し（SCIM email・name） | `ScimClient` をモック化し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.create_user` が `email=form_data['email_address'], display_name=form_data['user_name']` で1回呼ばれること |
-| 36 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.create_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、例外が伝播すること |
-| 37 | 2.3.2 副作用チェック（UC INSERT失敗→uc_inserted=False） | `_insert_unity_catalog_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=False` で呼ばれること |
-| 38 | 2.3.2 副作用チェック（commit失敗→uc_inserted=True） | `db.session.commit` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=True` で呼ばれること |
-| 39 | 3.2.1.1 登録処理呼び出し（グループ追加） | `ScimClient.create_user` が `'new-uid'` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.add_user_to_group` が1回呼ばれ、位置引数に `'new-uid'` が含まれること |
-| 40 | 2.3.2 副作用チェック（グループ追加失敗→uc_inserted=False） | `ScimClient.add_user_to_group` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、`uc_inserted=False` であること |
-| 41 | 3.2.1.1 登録処理呼び出し（重複チェック呼び出し） | `check_email_duplicate` をモック化して `False` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `check_email_duplicate` が `form_data['email_address']` を引数として1回呼ばれること |
+| 32 | 3.2.1.1 / 2.1.1 登録処理呼び出し（Saga実行順） | call_order リストで各ステップの呼び出し順を記録し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 呼び出し順が `['flush', 'scim_create', 'add_to_group', 'uc', 'flush', 'commit']` であること（①OLTP flush → ②SCIM create → ③グループ追加 → ④UC INSERT → ⑤活性化 flush → commit） |
+| 33 | 3.2.1.1 登録処理呼び出し（仮登録ステップ） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時の引数に `delete_flag=True` が含まれること（仮登録状態）かつ `db.session.add` が1回呼ばれること |
+| 34 | 3.2.1.1 登録処理呼び出し（User コンストラクタ引数・全件） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時に全登録対象項目（固定値・user_data写し・creator_id写し）がコンストラクタ引数に含まれること（delete_flag は No.32 でカバー） |
+| 35 | 3.2.1.1 登録処理呼び出し（活性化 databricks_user_id・delete_flag更新） | `User` モックが `delete_flag=True` 状態で返るよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 活性化ステップで `mock_user_obj.databricks_user_id` が `'new-uid'` に、`mock_user_obj.delete_flag` が `False` に更新されること |
+| 36 | 3.2.1.1 登録処理呼び出し（SCIM email・name） | `ScimClient` をモック化し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.create_user` が `email=form_data['email_address'], display_name=form_data['user_name']` で1回呼ばれること |
+| 37 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.create_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、例外が伝播すること |
+| 38 | 2.3.2 副作用チェック（UC INSERT失敗→uc_inserted=False） | `_insert_unity_catalog_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=False` で呼ばれること |
+| 39 | 2.3.2 副作用チェック（commit失敗→uc_inserted=True） | `db.session.commit` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=True` で呼ばれること |
+| 40 | 3.2.1.1 登録処理呼び出し（グループ追加） | `ScimClient.create_user` が `'new-uid'` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.add_user_to_group` が1回呼ばれ、位置引数に `'new-uid'` が含まれること |
+| 41 | 2.3.2 副作用チェック（グループ追加失敗→uc_inserted=False） | `ScimClient.add_user_to_group` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、`uc_inserted=False` であること |
+| 42 | 3.2.1.1 登録処理呼び出し（重複チェック呼び出し） | `check_email_duplicate` をモック化して `False` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `check_email_duplicate` が `form_data['email_address']` を引数として1回呼ばれること |
 
 ---
 
@@ -116,8 +117,8 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 42 | 3.3.1.1 更新処理呼び出し（全更新可能フィールド） | `User.query.get` がモックユーザーを返すよう設定し、`_update_oltp_user(user_id=1, user_data={...}, modifier_id=99)` を呼ぶ | モックユーザーの全更新対象フィールドが正しく設定されること（`user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`） |
-| 43 | 3.3.2.2 更新結果（対象user_id） | `User.query.get` がモックユーザーを返すよう設定し、`_update_oltp_user(user_id=42, user_data={...}, modifier_id=1)` を呼ぶ | `User.query.get` が `42` で1回呼ばれること |
+| 43 | 3.3.1.1 更新処理呼び出し（全更新可能フィールド） | `User.query.get` がモックユーザーを返すよう設定し、`_update_oltp_user(user_id=1, user_data={...}, modifier_id=99)` を呼ぶ | モックユーザーの全更新対象フィールドが正しく設定されること（`user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`） |
+| 44 | 3.3.2.2 更新結果（対象user_id） | `User.query.get` がモックユーザーを返すよう設定し、`_update_oltp_user(user_id=42, user_data={...}, modifier_id=1)` を呼ぶ | `User.query.get` が `42` で1回呼ばれること |
 
 ---
 
@@ -127,8 +128,8 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 44 | 3.3.1.1 更新処理呼び出し（execute_dml 1回） | `UnityCatalogConnector` をモック化し、`_update_unity_catalog_user(user_id=1, user_data={...}, modifier_id=99)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 45 | 3.3.2.2 更新結果（全フィールド含む） | `UnityCatalogConnector` をモック化し、`_update_unity_catalog_user(user_id=55, user_data={...}, modifier_id=1)` を呼ぶ | `execute_dml` のパラメータに全更新対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier_id`）が含まれること |
+| 45 | 3.3.1.1 更新処理呼び出し（execute_dml 1回） | `UnityCatalogConnector` をモック化し、`_update_unity_catalog_user(user_id=1, user_data={...}, modifier_id=99)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
+| 46 | 3.3.2.2 更新結果（全フィールド含む） | `UnityCatalogConnector` をモック化し、`_update_unity_catalog_user(user_id=55, user_data={...}, modifier_id=1)` を呼ぶ | `execute_dml` のパラメータに全更新対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier_id`）が含まれること |
 
 ---
 
@@ -138,10 +139,10 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 46 | 2.3.2 副作用チェック（SCIM・UC復元） | `User.query.get` がモックユーザーを返し、`ScimClient`, `UnityCatalogConnector` をモック化して `_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | `mock_scim.update_user` と `mock_conn.execute_dml` がそれぞれ1回呼ばれること |
-| 47 | 2.3.2 副作用チェック（全フィールド復元） | `mock_original` に具体値をセットし、`_rollback_update_user(databricks_user_id='uid-1', user_id=10)` を呼ぶ | SCIM `update_user` が `('uid-1', '元の名前', 0)` で呼ばれ、UC execute_dml の params に全復元対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`）が含まれること |
-| 48 | 2.3.2 副作用チェック（元データなし→何もしない） | `User.query.get` が `None` を返すよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=999)` を呼ぶ | `mock_scim.update_user` が呼ばれないこと |
-| 49 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `ScimClient.update_user` が例外を投げるよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 47 | 2.3.2 副作用チェック（SCIM・UC復元） | `User.query.get` がモックユーザーを返し、`ScimClient`, `UnityCatalogConnector` をモック化して `_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | `mock_scim.update_user` と `mock_conn.execute_dml` がそれぞれ1回呼ばれること |
+| 48 | 2.3.2 副作用チェック（全フィールド復元） | `mock_original` に具体値をセットし、`_rollback_update_user(databricks_user_id='uid-1', user_id=10)` を呼ぶ | SCIM `update_user` が `('uid-1', '元の名前', 0)` で呼ばれ、UC execute_dml の params に全復元対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`）が含まれること |
+| 49 | 2.3.2 副作用チェック（元データなし→何もしない） | `User.query.get` が `None` を返すよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=999)` を呼ぶ | `mock_scim.update_user` が呼ばれないこと |
+| 50 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `ScimClient.update_user` が例外を投げるよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
 
 ---
 
@@ -151,12 +152,12 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 50 | 2.1.1 / 3.3.2.1 正常系：commit | `db`, `ScimClient`, `_update_oltp_user`, `_update_unity_catalog_user` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `db.session.commit` が1回呼ばれること |
-| 51 | 3.3.1.1 更新処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`update_user(...)` を呼ぶ | 呼び出し順が `['scim', 'uc', 'oltp']` であること（①SCIM update → ②UC UPDATE → ③OLTP UPDATE） |
-| 52 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.update_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
-| 53 | 2.3.2 / 1.3.1 副作用チェック（UC失敗→rollback・例外伝播） | `_update_unity_catalog_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
-| 54 | 2.3.2 / 1.3.1 副作用チェック（OLTP失敗→rollback・例外伝播） | `_update_oltp_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
-| 55 | 2.3.2 副作用チェック（重複チェック非呼び出し） | `check_email_duplicate` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `check_email_duplicate` が呼ばれないこと（email は更新不可項目のため） |
+| 51 | 2.1.1 / 3.3.2.1 正常系：commit | `db`, `ScimClient`, `_update_oltp_user`, `_update_unity_catalog_user` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `db.session.commit` が1回呼ばれること |
+| 52 | 3.3.1.1 更新処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`update_user(...)` を呼ぶ | 呼び出し順が `['scim', 'uc', 'oltp']` であること（①SCIM update → ②UC UPDATE → ③OLTP UPDATE） |
+| 53 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.update_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 54 | 2.3.2 / 1.3.1 副作用チェック（UC失敗→rollback・例外伝播） | `_update_unity_catalog_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 55 | 2.3.2 / 1.3.1 副作用チェック（OLTP失敗→rollback・例外伝播） | `_update_oltp_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 56 | 2.3.2 副作用チェック（重複チェック非呼び出し） | `check_email_duplicate` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `check_email_duplicate` が呼ばれないこと（email は更新不可項目のため） |
 
 ---
 
@@ -166,10 +167,10 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 56 | 2.2.1 対象IDが存在する場合 | `db.session.query().filter().first()` が MagicMock を返すよう設定し、`get_user_by_databricks_id('uid-1', login_user_id=1)` を呼ぶ | 戻り値がモックユーザーオブジェクトであること |
-| 57 | 2.2.2 対象IDが存在しない場合 | `db.session.query().filter().first()` が `None` を返すよう設定し、`get_user_by_databricks_id('nonexistent', login_user_id=1)` を呼ぶ | 戻り値が `None` であること |
-| 58 | 2.2.3 論理削除済み除外 | `db.session.query().filter().first()` が `None` を返すよう設定し、`get_user_by_databricks_id('uid-1', login_user_id=1)` を呼ぶ | `db.session.query().filter` が1回呼ばれること（delete_flag フィルタを含む） |
-| 59 | 3.1.1.1 検索条件指定（スコープ制限） | `login_user_id=42` で `get_user_by_databricks_id('uid-1', login_user_id=42)` を呼ぶ | `db.session.query` が `UserMasterByUser` を引数として1回呼ばれること |
+| 57 | 2.2.1 対象IDが存在する場合 | `db.session.query().filter().first()` が MagicMock を返すよう設定し、`get_user_by_databricks_id('uid-1', login_user_id=1)` を呼ぶ | 戻り値がモックユーザーオブジェクトであること |
+| 58 | 2.2.2 対象IDが存在しない場合 | `db.session.query().filter().first()` が `None` を返すよう設定し、`get_user_by_databricks_id('nonexistent', login_user_id=1)` を呼ぶ | 戻り値が `None` であること |
+| 59 | 2.2.3 論理削除済み除外 | `db.session.query().filter().first()` が `None` を返すよう設定し、`get_user_by_databricks_id('uid-1', login_user_id=1)` を呼ぶ | `db.session.query().filter` が1回呼ばれること（delete_flag フィルタを含む） |
+| 60 | 3.1.1.1 検索条件指定（スコープ制限） | `login_user_id=42` で `get_user_by_databricks_id('uid-1', login_user_id=42)` を呼ぶ | `db.session.query` が `UserMasterByUser` を引数として1回呼ばれること |
 
 ---
 
@@ -179,8 +180,8 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 60 | 3.4.1.1 削除処理呼び出し（execute_dml 1回） | `UnityCatalogConnector` をモック化し、`_delete_unity_catalog_user(user_id=5)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 61 | 3.4.1.1 削除処理呼び出し（user_id パラメータ） | `UnityCatalogConnector` をモック化し、`_delete_unity_catalog_user(user_id=77)` を呼ぶ | `execute_dml` のパラメータに `user_id=77` が含まれること |
+| 61 | 3.4.1.1 削除処理呼び出し（execute_dml 1回） | `UnityCatalogConnector` をモック化し、`_delete_unity_catalog_user(user_id=5)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
+| 62 | 3.4.1.1 削除処理呼び出し（user_id パラメータ） | `UnityCatalogConnector` をモック化し、`_delete_unity_catalog_user(user_id=77)` を呼ぶ | `execute_dml` のパラメータに `user_id=77` が含まれること |
 
 ---
 
@@ -190,10 +191,10 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 62 | 2.3.2 副作用チェック（UC再INSERT） | `User.query.get` がモックユーザーを返し、`UnityCatalogConnector` をモック化して `_rollback_delete_user(user_id=1)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 63 | 2.3.2 副作用チェック（全フィールド含む） | `mock_original` に全フィールドの具体値をセットし、`_rollback_delete_user(user_id=1)` を呼ぶ | `execute_dml` のパラメータに全復元対象フィールド（`user_id`, `databricks_user_id`, `user_name`, `organization_id`, `email_address`, `user_type_id`, `language_code`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `create_date`, `creator`, `modifier`）が含まれること |
-| 64 | 2.3.2 副作用チェック（元データなし→何もしない） | `User.query.get` が `None` を返すよう設定し、`_rollback_delete_user(user_id=999)` を呼ぶ | `mock_conn.execute_dml` が呼ばれないこと |
-| 65 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `UnityCatalogConnector.execute_dml` が例外を投げるよう設定し、`_rollback_delete_user(user_id=1)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 63 | 2.3.2 副作用チェック（UC再INSERT） | `User.query.get` がモックユーザーを返し、`UnityCatalogConnector` をモック化して `_rollback_delete_user(user_id=1)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
+| 64 | 2.3.2 副作用チェック（全フィールド含む） | `mock_original` に全フィールドの具体値をセットし、`_rollback_delete_user(user_id=1)` を呼ぶ | `execute_dml` のパラメータに全復元対象フィールド（`user_id`, `databricks_user_id`, `user_name`, `organization_id`, `email_address`, `user_type_id`, `language_code`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `create_date`, `creator`, `modifier`）が含まれること |
+| 65 | 2.3.2 副作用チェック（元データなし→何もしない） | `User.query.get` が `None` を返すよう設定し、`_rollback_delete_user(user_id=999)` を呼ぶ | `mock_conn.execute_dml` が呼ばれないこと |
+| 66 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `UnityCatalogConnector.execute_dml` が例外を投げるよう設定し、`_rollback_delete_user(user_id=1)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
 
 ---
 
@@ -203,12 +204,12 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 66 | 2.1.1 / 3.4.2.1 正常系：commit | `db`, `ScimClient`, `_delete_unity_catalog_user` をモック化し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | `db.session.commit` が1回呼ばれること |
-| 67 | 3.4.1.1 削除処理呼び出し（OLTP論理削除） | `db`, `ScimClient`, `_delete_unity_catalog_user` をモック化し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | `user.delete_flag` が `True` に設定されること |
-| 68 | 3.4.1.1 削除処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | 呼び出し順が `['uc', 'oltp', 'scim']` であること（①UC DELETE → ②OLTP flush → ③SCIM delete） |
-| 69 | 2.3.2 副作用チェック（UC失敗→rollback不要） | `_delete_unity_catalog_user` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が呼ばれないこと（uc_deleted=False のため） |
-| 70 | 2.3.2 / 1.3.1 副作用チェック（OLTP flush失敗→UCロールバック・例外伝播） | `db.session.flush` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が `user.user_id` で1回呼ばれ、例外が伝播すること |
-| 71 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→UCロールバック・例外伝播） | `ScimClient.delete_user` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が `user.user_id` で1回呼ばれ、例外が伝播すること |
+| 67 | 2.1.1 / 3.4.2.1 正常系：commit | `db`, `ScimClient`, `_delete_unity_catalog_user` をモック化し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | `db.session.commit` が1回呼ばれること |
+| 68 | 3.4.1.1 削除処理呼び出し（OLTP論理削除） | `db`, `ScimClient`, `_delete_unity_catalog_user` をモック化し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | `user.delete_flag` が `True` に設定されること |
+| 69 | 3.4.1.1 削除処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`delete_user(user=user_mock, deleter_id=99)` を呼ぶ | 呼び出し順が `['uc', 'oltp', 'scim']` であること（①UC DELETE → ②OLTP flush → ③SCIM delete） |
+| 70 | 2.3.2 副作用チェック（UC失敗→rollback不要） | `_delete_unity_catalog_user` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が呼ばれないこと（uc_deleted=False のため） |
+| 71 | 2.3.2 / 1.3.1 副作用チェック（OLTP flush失敗→UCロールバック・例外伝播） | `db.session.flush` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が `user.user_id` で1回呼ばれ、例外が伝播すること |
+| 72 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→UCロールバック・例外伝播） | `ScimClient.delete_user` が例外を投げるよう設定し、`delete_user(...)` を呼ぶ | `_rollback_delete_user` が `user.user_id` で1回呼ばれ、例外が伝播すること |
 
 ---
 
@@ -218,11 +219,12 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 72 | 3.1.4.1 戻り値ハンドリング（正常系） | モックが2件のユーザーリストを返すよう設定し、全条件Noneのparamsで `get_all_users_for_export(params, user_id=1)` を呼ぶ | 戻り値がモックユーザーのリストであること |
-| 73 | 3.1.4.2 戻り値ハンドリング（空結果） | モックが空リストを返すよう設定し、`get_all_users_for_export(params, user_id=1)` を呼ぶ | 戻り値が空リストであること |
-| 74 | 2.2.3 論理削除済み除外 | `db.session.query().filter()` が空リストを返すよう設定し、`get_all_users_for_export(params, user_id=1)` を呼ぶ | `db.session.query().filter` が1回呼ばれること（delete_flag=False フィルタ） |
-| 75 | 3.1.1.1 検索条件指定（user_name） | `user_name='田中'` を含む params で `get_all_users_for_export(params, user_id=1)` を呼ぶ | `mock_q.filter` が呼ばれること |
-| 76 | 3.1.1.3 未指定条件は除外 | 全フィルター条件がNoneのparamsで `get_all_users_for_export(params, user_id=1)` を呼ぶ | 追加フィルタ（`mock_q.filter`）が0回であること |
+| 73 | 3.1.4.1 戻り値ハンドリング（正常系） | モックが2件のユーザーリストを返すよう設定し、全条件Noneのparamsで `get_all_users_for_export(params, user_id=1)` を呼ぶ | 戻り値がモックユーザーのリストであること |
+| 74 | 3.1.4.2 戻り値ハンドリング（空結果） | モックが空リストを返すよう設定し、`get_all_users_for_export(params, user_id=1)` を呼ぶ | 戻り値が空リストであること |
+| 75 | 2.2.3 論理削除済み除外 | `db.session.query().filter()` が空リストを返すよう設定し、`get_all_users_for_export(params, user_id=1)` を呼ぶ | `db.session.query().filter` が1回呼ばれること（delete_flag=False フィルタ） |
+| 76 | 3.1.1.1 検索条件指定（user_name） | `user_name='田中'` を含む params で `get_all_users_for_export(params, user_id=1)` を呼ぶ | `mock_q.filter` が呼ばれること |
+| 77 | 3.1.1.3 未指定条件は除外 | 全フィルター条件がNoneのparamsで `get_all_users_for_export(params, user_id=1)` を呼ぶ | 追加フィルタ（`mock_q.filter`）が0回であること |
+| 78 | 3.1.1.2 全フィルター条件同時指定 | `user_name='田中'`, `email_address='@example'`, `user_type_id=2`, `organization_id=1`, `region_id=2`, `status=1` を含む params で `get_all_users_for_export(params, user_id=1)` を呼ぶ | `mock_q.filter` が6回以上呼ばれ、フィルタ条件文字列に `'%田中%'`, `'%@example%'`, `'user_type_id'`, `'organization_id'`, `'region_id'`, `'status'` が含まれること |
 
 ---
 
@@ -232,14 +234,15 @@
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 77 | 3.5.1.1 CSV生成（ヘッダー行） | `generate_users_csv([])` を呼び、UTF-8 BOM付きでデコードする | 全8列（`'ユーザーID', 'ユーザー名', 'メールアドレス', '所属組織ID', '所属組織名', 'ユーザー種別', '地域', '住所'`）がヘッダーに含まれること |
-| 78 | 3.5.1.3 CSV生成（0件→ヘッダーのみ） | `generate_users_csv([])` を呼び、UTF-8 BOM付きでデコードしてsplitlinesする | 空行を除いた行数が1行（ヘッダーのみ）であること |
-| 79 | 3.5.1.2 CSV生成（全件データ行） | 2件のモックユーザーを渡して `generate_users_csv(users)` を呼ぶ | 空行を除いた行数が3行（ヘッダー + 2データ行）であること |
-| 80 | 3.5.1.4 CSV生成（列順序） | `generate_users_csv([])` を呼び、ヘッダー行をカンマで分割する | 0列目が `'ユーザーID'`、1列目が `'ユーザー名'`、2列目が `'メールアドレス'`、3列目が `'所属組織ID'`、4列目が `'所属組織名'`、5列目が `'ユーザー種別'`、6列目が `'地域'`、7列目が`'住所'` であること |
-| 81 | 3.5.2.1 エスケープ（カンマ） | `user_name='テスト,ユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'"テスト,ユーザー"'` が含まれること |
-| 82 | 3.5.2.2 エスケープ（改行） | `user_name='テスト\nユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'"テスト\nユーザー"'` が含まれること |
-| 83 | 3.5.2.3 エスケープ（ダブルクォート） | `user_name='名前"テスト"'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'""'` が含まれること（ダブルクォートの二重エスケープ） |
-| 84 | 3.5.2.4 エスケープ不要（特殊文字なし） | `user_name='テストユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'テストユーザー'` がそのまま含まれること |
-| 85 | 3.5.3.1 エンコーディング（BOM付与） | `generate_users_csv([])` を呼ぶ | 戻り値の先頭3バイトが `b'\xef\xbb\xbf'` であること |
-| 86 | 3.5.3.2 エンコーディング（日本語文字） | `user_name='山田太郎'`, `organization_name='東京営業所'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | UTF-8 BOM付きデコード後の出力に `'山田太郎'` と `'東京営業所'` が含まれること |
-| 87 | 3.5.1.5 CSV生成（None→空欄） | `_make_user()` で生成したユーザーの `organization` を `None` にセットして `generate_users_csv([user])` を呼ぶ | CSVデータ行の5列目（所属組織名）が空文字であること |
+| 79 | 3.5.1.1 CSV生成（ヘッダー行） | `generate_users_csv([])` を呼び、UTF-8 BOM付きでデコードする | 全8列（`'ユーザーID', 'ユーザー名', 'メールアドレス', '所属組織ID', '所属組織名', 'ユーザー種別', '地域', '住所'`）がヘッダーに含まれること |
+| 80 | 3.5.1.3 CSV生成（0件→ヘッダーのみ） | `generate_users_csv([])` を呼び、UTF-8 BOM付きでデコードしてsplitlinesする | 空行を除いた行数が1行（ヘッダーのみ）であること |
+| 81 | 3.5.1.2 CSV生成（全件データ行） | 2件のモックユーザーを渡して `generate_users_csv(users)` を呼ぶ | 空行を除いた行数が3行（ヘッダー + 2データ行）であること |
+| 82 | 3.5.1.4 CSV生成（列順序） | `generate_users_csv([])` を呼び、ヘッダー行をカンマで分割する | 0列目が `'ユーザーID'`、1列目が `'ユーザー名'`、2列目が `'メールアドレス'`、3列目が `'所属組織ID'`、4列目が `'所属組織名'`、5列目が `'ユーザー種別'`、6列目が `'地域'`、7列目が`'住所'` であること |
+| 83 | 3.5.2.1 エスケープ（カンマ） | `user_name='テスト,ユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'"テスト,ユーザー"'` が含まれること |
+| 84 | 3.5.2.2 エスケープ（改行） | `user_name='テスト\nユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'"テスト\nユーザー"'` が含まれること |
+| 85 | 3.5.2.3 エスケープ（ダブルクォート） | `user_name='名前"テスト"'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'""'` が含まれること（ダブルクォートの二重エスケープ） |
+| 86 | 3.5.2.4 エスケープ不要（特殊文字なし） | `user_name='テストユーザー'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | 出力に `'テストユーザー'` がそのまま含まれること |
+| 87 | 3.5.3.1 エンコーディング（BOM付与） | `generate_users_csv([])` を呼ぶ | 戻り値の先頭3バイトが `b'\xef\xbb\xbf'` であること |
+| 88 | 3.5.3.2 エンコーディング（日本語文字） | `user_name='山田太郎'`, `organization_name='東京営業所'` のモックユーザーで `generate_users_csv([user])` を呼ぶ | UTF-8 BOM付きデコード後の出力に `'山田太郎'` と `'東京営業所'` が含まれること |
+| 89 | 3.5.1.5 CSV生成（None→空欄） | `_make_user()` で生成したユーザーの `organization` を `None` にセットして `generate_users_csv([user])` を呼ぶ | CSVデータ行の4列目（0-indexed）（所属組織名）が空文字であること |
+| 90 | 3.5.1.7 CSV生成（全8列値） | `user_id=10`, `user_name='山田太郎'`, `email='yamada@example.com'`, `user_type_name='販社ユーザー'`, `org_id=5`, `org_name='東京営業所'`, `region_name='関東'`, `address='東京都渋谷区1-2-3'` のユーザーで `generate_users_csv([user])` を呼ぶ | `rows[1][0]`〜`rows[1][7]` が `'10'`, `'山田太郎'`, `'yamada@example.com'`, `'5'`, `'東京営業所'`, `'販社ユーザー'`, `'関東'`, `'東京都渋谷区1-2-3'` であること |

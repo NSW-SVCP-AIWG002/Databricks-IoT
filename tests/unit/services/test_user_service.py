@@ -222,6 +222,25 @@ class TestSearchUsers:
         search_users(params, user_id=1)
         mock_uc.user_name.desc.assert_called()
 
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_all_filter_conditions_applied(self, mock_db, _mock_uc):
+        """ 3.1.1.2: 全フィルター条件（user_name / email_address / user_type_id / organization_id / region_id / status）を同時指定したとき、すべての条件がフィルタに追加される"""
+        mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': 'user_name', 'order': 'asc',
+                  'user_name': '田中', 'email_address': '@example', 'user_type_id': 2,
+                  'organization_id': 1, 'region_id': 2, 'status': 1}
+        search_users(params, user_id=1)
+        filter_args_str = str(mock_query.filter.call_args_list)
+        assert mock_query.filter.call_count >= 6
+        assert '%田中%' in filter_args_str
+        assert '%@example%' in filter_args_str
+        assert 'user_type_id' in filter_args_str
+        assert 'organization_id' in filter_args_str
+        assert 'region_id' in filter_args_str
+        assert 'status' in filter_args_str
+
 
 # ---------------------------------------------------------------------------
 # get_user_form_options
@@ -1307,6 +1326,28 @@ class TestGetAllUsersForExport:
                                   'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
         assert mock_q.filter.call_count == 0
 
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
+    def test_all_filter_conditions_applied(self, mock_db, _mock_uc):
+        """ 3.1.1.2: 全フィルター条件（user_name / email_address / user_type_id / organization_id / region_id / status）を同時指定したとき、すべての条件がフィルタに追加される"""
+        mock_q = MagicMock()
+        mock_q.filter.return_value = mock_q
+        mock_q.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value = mock_q
+        from iot_app.services.user_service import get_all_users_for_export
+        get_all_users_for_export({'user_name': '田中', 'email_address': '@example',
+                                  'user_type_id': 2, 'organization_id': 1,
+                                  'region_id': 2, 'status': 1,
+                                  'sort_by': 'user_name', 'order': 'asc'}, user_id=1)
+        filter_args_str = str(mock_q.filter.call_args_list)
+        assert mock_q.filter.call_count >= 6
+        assert '%田中%' in filter_args_str
+        assert '%@example%' in filter_args_str
+        assert 'user_type_id' in filter_args_str
+        assert 'organization_id' in filter_args_str
+        assert 'region_id' in filter_args_str
+        assert 'status' in filter_args_str
+
 
 # ---------------------------------------------------------------------------
 # generate_users_csv
@@ -1320,6 +1361,7 @@ class TestGenerateUsersCsv:
 
     def _make_user(self, user_id=1, user_name='テスト太郎', email='t@e.com',
                    user_type_name='管理者', org_id=1, org_name='テスト組織',
+                   region_name='東京', address='東京都千代田区1-1-1',
                    create_date='2024-01-01 00:00:00'):
         user = MagicMock()
         user.user_id = user_id
@@ -1330,6 +1372,9 @@ class TestGenerateUsersCsv:
         user.organization_id = org_id
         user.organization = MagicMock()
         user.organization.organization_name = org_name
+        user.region = MagicMock()
+        user.region.region_name = region_name
+        user.address = address
         user.create_date = MagicMock()
         user.create_date.strftime.return_value = create_date
         return user
@@ -1438,4 +1483,26 @@ class TestGenerateUsersCsv:
         text = result.decode('utf-8-sig')
         reader = csv.reader(io.StringIO(text))
         rows = list(reader)
-        assert rows[1][5] == ''  # 所属組織名は5列目（0-indexed）
+        assert rows[1][4] == ''  # 所属組織名は4列目（0-indexed）
+
+    def test_all_column_values_output_correctly(self):
+        """ 3.5.1.7: 1件のユーザーを渡したとき、データ行の全8列（0〜7列目）に正しい値が出力される"""
+        import csv, io
+        from iot_app.services.user_service import generate_users_csv
+        user = self._make_user(
+            user_id=10, user_name='山田太郎', email='yamada@example.com',
+            user_type_name='販社ユーザー', org_id=5, org_name='東京営業所',
+            region_name='関東', address='東京都渋谷区1-2-3',
+        )
+        result = generate_users_csv([user])
+        text = result.decode('utf-8-sig')
+        reader = csv.reader(io.StringIO(text))
+        rows = list(reader)
+        assert rows[1][0] == '10'
+        assert rows[1][1] == '山田太郎'
+        assert rows[1][2] == 'yamada@example.com'
+        assert rows[1][3] == '5'
+        assert rows[1][4] == '東京営業所'
+        assert rows[1][5] == '販社ユーザー'
+        assert rows[1][6] == '関東'
+        assert rows[1][7] == '東京都渋谷区1-2-3'
