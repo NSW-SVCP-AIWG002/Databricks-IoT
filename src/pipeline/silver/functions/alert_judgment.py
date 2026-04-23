@@ -6,6 +6,7 @@ from pyspark.sql.types import (
 )
 
 from .mysql_connector import get_mysql_connection
+from .constants import MEASUREMENT_COLUMN_MAP
 
 
 _DATABASE = "iot_app_db"
@@ -65,37 +66,6 @@ def get_alert_abnormal_state():
     except Exception as e:
         print(f"[WARN] alert_abnormal_state 取得失敗（空DataFrameで代替）: {str(e).splitlines()[0]}")
         return _builtins.spark.createDataFrame([], schema=_ALERT_ABNORMAL_STATE_SCHEMA)
-
-
-# =============================================================================
-# 測定項目IDとセンサーカラムのマッピング
-# =============================================================================
-
-MEASUREMENT_COLUMN_MAP = {
-    1:  "external_temp",
-    2:  "set_temp_freezer_1",
-    3:  "internal_sensor_temp_freezer_1",
-    4:  "internal_temp_freezer_1",
-    5:  "df_temp_freezer_1",
-    6:  "condensing_temp_freezer_1",
-    7:  "adjusted_internal_temp_freezer_1",
-    8:  "set_temp_freezer_2",
-    9:  "internal_sensor_temp_freezer_2",
-    10: "internal_temp_freezer_2",
-    11: "df_temp_freezer_2",
-    12: "condensing_temp_freezer_2",
-    13: "adjusted_internal_temp_freezer_2",
-    14: "compressor_freezer_1",
-    15: "compressor_freezer_2",
-    16: "fan_motor_1",
-    17: "fan_motor_2",
-    18: "fan_motor_3",
-    19: "fan_motor_4",
-    20: "fan_motor_5",
-    21: "defrost_heater_output_1",
-    22: "defrost_heater_output_2",
-}
-
 
 # =============================================================================
 # 純粋関数（テスト可能な判定ロジック）

@@ -595,31 +595,31 @@ is_valid_json_udf = F.udf(is_valid_json, "boolean")
 
 | オフセット | サイズ(bytes) | フィールド名                     | データ型       | 説明                    |
 | ---------- | ------------- | -------------------------------- | -------------- | ----------------------- |
-| 0          | 4             | device_id                        | INT32          | デバイス識別ID          |
-| 4          | 8             | event_timestamp                  | INT64 (millis) | イベント発生日時（UTC） |
-| 12         | 8             | external_temp                    | FLOAT64        | 外気温度                |
-| 20         | 8             | set_temp_freezer_1               | FLOAT64        | 第1冷凍設定温度         |
-| 28         | 8             | internal_sensor_temp_freezer_1   | FLOAT64        | 第1冷凍庫内センサー温度 |
-| 36         | 8             | internal_temp_freezer_1          | FLOAT64        | 第1冷凍表示温度         |
-| 44         | 8             | df_temp_freezer_1                | FLOAT64        | 第1冷凍DF温度           |
-| 52         | 8             | condensing_temp_freezer_1        | FLOAT64        | 第1冷凍凝縮温度         |
-| 60         | 8             | adjusted_internal_temp_freezer_1 | FLOAT64        | 第1冷凍微調整後庫内温度 |
-| 68         | 8             | set_temp_freezer_2               | FLOAT64        | 第2冷凍設定温度         |
-| 76         | 8             | internal_sensor_temp_freezer_2   | FLOAT64        | 第2冷凍庫内センサー温度 |
-| 84         | 8             | internal_temp_freezer_2          | FLOAT64        | 第2冷凍表示温度         |
-| 92         | 8             | df_temp_freezer_2                | FLOAT64        | 第2冷凍DF温度           |
-| 100        | 8             | condensing_temp_freezer_2        | FLOAT64        | 第2冷凍凝縮温度         |
-| 108        | 8             | adjusted_internal_temp_freezer_2 | FLOAT64        | 第2冷凍微調整後庫内温度 |
-| 116        | 8             | compressor_freezer_1             | FLOAT64        | 第1冷凍圧縮機回転数     |
-| 124        | 8             | compressor_freezer_2             | FLOAT64        | 第2冷凍圧縮機回転数     |
-| 132        | 8             | fan_motor_1                      | FLOAT64        | 第1ファンモータ回転数   |
-| 140        | 8             | fan_motor_2                      | FLOAT64        | 第2ファンモータ回転数   |
-| 148        | 8             | fan_motor_3                      | FLOAT64        | 第3ファンモータ回転数   |
-| 156        | 8             | fan_motor_4                      | FLOAT64        | 第4ファンモータ回転数   |
-| 164        | 8             | fan_motor_5                      | FLOAT64        | 第5ファンモータ回転数   |
-| 172        | 8             | defrost_heater_output_1          | FLOAT64        | 防露ヒータ出力(1)       |
-| 180        | 8             | defrost_heater_output_2          | FLOAT64        | 防露ヒータ出力(2)       |
-| **合計**   | **188**       |                                  |                |                         |
+| 0          | 128           | device_id                        | STRING128      | デバイスUUID            |
+| 128        | 8             | event_timestamp                  | INT64 (millis) | イベント発生日時（UTC） |
+| 136        | 8             | external_temp                    | FLOAT64        | 外気温度                |
+| 144        | 8             | set_temp_freezer_1               | FLOAT64        | 第1冷凍設定温度         |
+| 152        | 8             | internal_sensor_temp_freezer_1   | FLOAT64        | 第1冷凍庫内センサー温度 |
+| 160        | 8             | internal_temp_freezer_1          | FLOAT64        | 第1冷凍表示温度         |
+| 168        | 8             | df_temp_freezer_1                | FLOAT64        | 第1冷凍DF温度           |
+| 176        | 8             | condensing_temp_freezer_1        | FLOAT64        | 第1冷凍凝縮温度         |
+| 184        | 8             | adjusted_internal_temp_freezer_1 | FLOAT64        | 第1冷凍微調整後庫内温度 |
+| 192        | 8             | set_temp_freezer_2               | FLOAT64        | 第2冷凍設定温度         |
+| 200        | 8             | internal_sensor_temp_freezer_2   | FLOAT64        | 第2冷凍庫内センサー温度 |
+| 208        | 8             | internal_temp_freezer_2          | FLOAT64        | 第2冷凍表示温度         |
+| 216        | 8             | df_temp_freezer_2                | FLOAT64        | 第2冷凍DF温度           |
+| 224        | 8             | condensing_temp_freezer_2        | FLOAT64        | 第2冷凍凝縮温度         |
+| 232        | 8             | adjusted_internal_temp_freezer_2 | FLOAT64        | 第2冷凍微調整後庫内温度 |
+| 240        | 8             | compressor_freezer_1             | FLOAT64        | 第1冷凍圧縮機回転数     |
+| 248        | 8             | compressor_freezer_2             | FLOAT64        | 第2冷凍圧縮機回転数     |
+| 256        | 8             | fan_motor_1                      | FLOAT64        | 第1ファンモータ回転数   |
+| 264        | 8             | fan_motor_2                      | FLOAT64        | 第2ファンモータ回転数   |
+| 272        | 8             | fan_motor_3                      | FLOAT64        | 第3ファンモータ回転数   |
+| 280        | 8             | fan_motor_4                      | FLOAT64        | 第4ファンモータ回転数   |
+| 288        | 8             | fan_motor_5                      | FLOAT64        | 第5ファンモータ回転数   |
+| 296        | 8             | defrost_heater_output_1          | FLOAT64        | 防露ヒータ出力(1)       |
+| 304        | 8             | defrost_heater_output_2          | FLOAT64        | 防露ヒータ出力(2)       |
+| **合計**   | **312**       |                                  |                |                         |
 
 #### バイナリ→JSON変換処理
 
@@ -632,20 +632,20 @@ def parse_binary_telemetry(binary_data: bytes, override_device_id: str = None) -
     バイナリ形式のテレメトリデータをJSON文字列に変換する
 
     Args:
-        binary_data: バイナリ形式のテレメトリデータ（188バイト）
+        binary_data: バイナリ形式のテレメトリデータ（312バイト）
         override_device_id: 上書き用デバイスID（MQTT Topic/EventHub keyから抽出したID）
 
     Returns:
         str: JSON形式の文字列。パース失敗時はNone
     """
-    if binary_data is None or len(binary_data) != 188:
+    if binary_data is None or len(binary_data) != 312:
         return None
 
     try:
         # リトルエンディアンでアンパック
-        # フォーマット: i=int32, q=int64, d=double(float64)
-        # device_id(i), event_timestamp(q), 22個のdouble値(d*22)
-        unpacked = struct.unpack('<iq22d', binary_data)
+        # フォーマット: 128s=string128, q=int64, d=double(float64)
+        # 128個の文字（device_id(s*128)）, event_timestamp(q), 22個のdouble値(d*22)
+        unpacked = struct.unpack('<128sq22d', binary_data)
 
         device_id = unpacked[0]
         event_timestamp_ms = unpacked[1]
@@ -807,7 +807,7 @@ convert_to_json_with_device_id_udf = F.udf(convert_to_json_with_device_id, Strin
 
 | エラー条件                              | 原因                           | 処理         |
 | --------------------------------------- | ------------------------------ | ------------ |
-| バイナリデータが188バイトでない         | 不正なデータサイズ             | レコード破棄 |
+| バイナリデータが312バイトでない         | 不正なデータサイズ             | レコード破棄 |
 | UTF-8デコード失敗かつバイナリパース失敗 | 不正なデータ形式               | レコード破棄 |
 | structアンパックエラー                  | バイナリフォーマット不整合     | レコード破棄 |
 | デバイスID抽出失敗                      | Topic/key/ペイロードすべて無効 | レコード破棄 |
@@ -907,12 +907,12 @@ sensor_schema = StructType([
 
 ### データ型変換ルール
 
-| 入力                   | 出力カラム        | 変換ロジック                                               |
-| ---------------------- | ----------------- | ---------------------------------------------------------- |
-| parsed.event_timestamp | event_timestamp   | to_timestamp()でTIMESTAMP型に変換                          |
+| 入力                   | 出力カラム        | 変換ロジック                                                           |
+| ---------------------- | ----------------- | ---------------------------------------------------------------------- |
+| parsed.event_timestamp | event_timestamp   | to_timestamp()でTIMESTAMP型に変換                                      |
 | parsed.device_id       | device_id         | デバイスマスタのdevice_uuidと照合し、マスタ側のdevice_id（整数）に置換 |
-| -                      | raw_json          | そのまま文字列型として抽出                                 |
-| 上記以外の項目         | external_tempなど | DOUBLE型として抽出                                         |
+| -                      | raw_json          | そのまま文字列型として抽出                                             |
+| 上記以外の項目         | external_tempなど | DOUBLE型として抽出                                                     |
 
 
 ---
@@ -2252,8 +2252,9 @@ eventhubs_connection_string = dbutils.secrets.get("eventhubs_secrets", "eventhub
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容                                                    | 担当者       |
-| ---------- | ---- | ----------------------------------------------------------- | ------------ |
-| 2026-01-19 | 1.0  | 初版作成                                                    | Kei Sugiyama |
-| 2026-02-02 | 1.1  | 異常状態テーブル・メール送信キューをOLTP DBに移設に伴う修正 | Kei Sugiyama |
-| 2026-04-17 | 1.2  | 実装の内容を設計書に反映                                    | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                                          | 担当者       |
+| ---------- | ---- | --------------------------------------------------------------------------------- | ------------ |
+| 2026-01-19 | 1.0  | 初版作成                                                                          | Kei Sugiyama |
+| 2026-02-02 | 1.1  | 異常状態テーブル・メール送信キューをOLTP DBに移設に伴う修正                       | Kei Sugiyama |
+| 2026-04-17 | 1.2  | 実装の内容を設計書に反映                                                          | Kei Sugiyama |
+| 2026-04-23 | 1.3  | センサーデータのpayloadに保持されているdevice_idを数値から文字列（128文字）に修正 | Kei Sugiyama |

@@ -14,9 +14,6 @@ builtins.spark = spark      # noqa: F821
 from .functions.mysql_connector import get_mysql_connection
 
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    DoubleType, IntegerType, StringType, StructField, StructType,
-)
 
 from .functions.alert_judgment import (
     check_alerts_with_duration,
@@ -28,7 +25,7 @@ from .functions.alert_judgment import (
     update_alert_history_on_recovery,
     update_device_status,
 )
-from .functions.constants import PIPELINE_TRIGGER_INTERVAL, TOPIC_NAME
+from .functions.constants import PIPELINE_TRIGGER_INTERVAL, TOPIC_NAME, SENSOR_SCHEMA
 from .functions.device_id_extraction import (
     extract_device_id_udf,
 )
@@ -110,36 +107,6 @@ kafka_options = {
     "kafka.max.poll.interval.ms": "600000",    # 10分（foreachBatch の処理時間上限）
 }
 
-# =============================================================================
-# センサーデータスキーマ
-# =============================================================================
-
-sensor_schema = StructType([
-    StructField("device_id", IntegerType(), False),
-    StructField("event_timestamp", StringType(), False),
-    StructField("external_temp", DoubleType(), True),
-    StructField("set_temp_freezer_1", DoubleType(), True),
-    StructField("internal_sensor_temp_freezer_1", DoubleType(), True),
-    StructField("internal_temp_freezer_1", DoubleType(), True),
-    StructField("df_temp_freezer_1", DoubleType(), True),
-    StructField("condensing_temp_freezer_1", DoubleType(), True),
-    StructField("adjusted_internal_temp_freezer_1", DoubleType(), True),
-    StructField("set_temp_freezer_2", DoubleType(), True),
-    StructField("internal_sensor_temp_freezer_2", DoubleType(), True),
-    StructField("internal_temp_freezer_2", DoubleType(), True),
-    StructField("df_temp_freezer_2", DoubleType(), True),
-    StructField("condensing_temp_freezer_2", DoubleType(), True),
-    StructField("adjusted_internal_temp_freezer_2", DoubleType(), True),
-    StructField("compressor_freezer_1", DoubleType(), True),
-    StructField("compressor_freezer_2", DoubleType(), True),
-    StructField("fan_motor_1", DoubleType(), True),
-    StructField("fan_motor_2", DoubleType(), True),
-    StructField("fan_motor_3", DoubleType(), True),
-    StructField("fan_motor_4", DoubleType(), True),
-    StructField("fan_motor_5", DoubleType(), True),
-    StructField("defrost_heater_output_1", DoubleType(), True),
-    StructField("defrost_heater_output_2", DoubleType(), True),
-])
 
 
 # =============================================================================
@@ -428,7 +395,7 @@ def build_kafka_stream():
         .filter(F.col("raw_json").isNotNull() & F.col("raw_json").rlike(r'^\{.*\}'))
 
         # STEP 2: JSONパース
-        .withColumn("parsed", F.from_json(F.col("raw_json"), sensor_schema))
+        .withColumn("parsed", F.from_json(F.col("raw_json"), SENSOR_SCHEMA))
         .filter(F.col("parsed").isNotNull())
         .filter(F.col("parsed.device_id").isNotNull())
         .filter(F.col("parsed.event_timestamp").isNotNull())
@@ -512,7 +479,7 @@ def diagnose_kafka_stream():
     s3f = s3.filter(F.col("raw_json").isNotNull() & F.col("raw_json").rlike(r'^\{.*\}'))
     print(f"[DIAGNOSE] STEP1.6 JSONフィルタ後: {s3f.count()}件")
 
-    s4 = s3f.withColumn("parsed", F.from_json(F.col("raw_json"), sensor_schema))
+    s4 = s3f.withColumn("parsed", F.from_json(F.col("raw_json"), SENSOR_SCHEMA))
     print(f"[DIAGNOSE] STEP2 JSONパース後（フィルタ前）: {s4.count()}件")
     s4f = (
         s4.filter(F.col("parsed").isNotNull())
@@ -544,7 +511,7 @@ def start_pipeline():
         .writeStream
         .foreachBatch(process_sensor_batch)
         .option("checkpointLocation", CHECKPOINT_LOCATION)
-        .trigger(processingTime="10 seconds")
+        .trigger(processingTime=PIPELINE_TRIGGER_INTERVAL)
         .start()
     )
     print(f"[PIPELINE] クエリ起動完了: id={query.id}, runId={query.runId}")
@@ -589,7 +556,7 @@ def run_batch_test():
             convert_to_json_with_device_id_udf(F.col("value"), F.col("extracted_device_id"))
         )
         .filter(F.col("raw_json").isNotNull() & F.col("raw_json").rlike(r'^\{.*\}'))
-        .withColumn("parsed", F.from_json(F.col("raw_json"), sensor_schema))
+        .withColumn("parsed", F.from_json(F.col("raw_json"), SENSOR_SCHEMA))
         .filter(F.col("parsed").isNotNull())
         .filter(F.col("parsed.device_id").isNotNull())
         .filter(F.col("parsed.event_timestamp").isNotNull())

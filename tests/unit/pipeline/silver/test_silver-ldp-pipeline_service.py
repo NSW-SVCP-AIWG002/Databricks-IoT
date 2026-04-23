@@ -14,7 +14,8 @@
 import json
 import socket
 import struct
-from unittest.mock import MagicMock
+import builtins
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,17 +25,17 @@ import pytest
 # ---------------------------------------------------------------------------
 
 def _make_binary_telemetry(
-    device_id: int = 12345,
+    device_id: str = "test_device-id",
     event_timestamp_ms: int = 1737624600000,
     sensor_values: list = None,
 ) -> bytes:
     """188バイトのバイナリテレメトリデータを生成する。
 
     バイナリフォーマット（リトルエンディアン、設計書 § バイナリフォーマット定義）:
-        <i  = device_id        (INT32,  4バイト)
+        <128s = device_id        (STRING, 128バイト)
         <q  = event_timestamp  (INT64,  8バイト, ミリ秒)
         <22d= センサー値22個   (FLOAT64×22, 176バイト)
-    合計: 4 + 8 + 176 = 188バイト
+    合計: 128 + 8 + 176 = 312バイト
     """
     if sensor_values is None:
         sensor_values = [
@@ -43,12 +44,23 @@ def _make_binary_telemetry(
             2800.0, 3100.0, 1200.0, 1180.0, 1150.0, 1220.0, 1190.0,
             0.0, 0.0,
         ]
-    return struct.pack("<iq22d", device_id, event_timestamp_ms, *sensor_values)
+    return struct.pack("<128sq22d", device_id.encode(), event_timestamp_ms, *sensor_values)
 
+# ---------------------------------------------------------------------------
+# テスト用ヘルパー — Spark Row の dict アクセスをエミュレート
+# ---------------------------------------------------------------------------
+
+class _MockRow:
+    """Spark Row の row["field"] アクセスをエミュレートするモック行オブジェクト"""
+    def __init__(self, **kw):
+        self._d = kw
+
+    def __getitem__(self, k):
+        return self._d[k]
 
 # ===========================================================================
 # STEP 1.5: デバイスID抽出 — MQTT Topic
-# 設計書: § デバイスID抽出処理 > MQTT TopicからのデバイスID抽出
+# 設計書: § データ変換仕様 > デバイスID抽出処理 > MQTT TopicからのデバイスID抽出
 # ===========================================================================
 
 @pytest.mark.unit
@@ -77,33 +89,47 @@ class TestExtractDeviceIdFromTopic:
         # Assert
         assert result == "12345"
 
-    def test_alphanumeric_id_with_hyphen_extracted_correctly(self):
-        """2.1.1: ハイフンを含む文字列IDの場合、正常に抽出される
+    def test_single_digit_id_extracted_correctly(self):
+        """2.1.1: 1桁の数値IDが正常に抽出される
 
-        実行内容: topic = "/dev-001/data/refrigerator"
-        想定結果: "dev-001" が返される（機器IDは文字列。数値に限らない）
+        実行内容: topic = "/1/data/refrigerator"
+        想定結果: "1" が返される（最小桁数の数値ID）
         """
         from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
         # Arrange
-        topic = "/dev-001/data/refrigerator"
+        topic = "/1/data/refrigerator"
         # Act
         result = extract_device_id_from_topic(topic)
         # Assert
-        assert result == "dev-001"
+        assert result == "1"
 
-    def test_alphabetic_id_extracted_correctly(self):
-        """2.1.1: アルファベットのみのIDも正常に抽出される
+    def test_large_device_id_extracted_correctly(self):
+        """2.1.1: 大きな数値IDが正常に抽出される
 
-        実行内容: topic = "/abc/data/refrigerator"
-        想定結果: "abc" が返される
+        実行内容: topic = "/9999999/data/refrigerator"
+        想定結果: "9999999" が返される
         """
         from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
         # Arrange
-        topic = "/abc/data/refrigerator"
+        topic = "/9999999/data/refrigerator"
         # Act
         result = extract_device_id_from_topic(topic)
         # Assert
-        assert result == "abc"
+        assert result == "9999999"
+        
+    def test_void_device_id_extracted_correctly(self):
+        """2.1.1: 空文字列のデバイスIDが正常に抽出される
+
+        実行内容: topic = "//data/refrigerator"
+        想定結果: None が返される
+        """
+        from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
+        # Arrange
+        topic = "//data/refrigerator"
+        # Act
+        result = extract_device_id_from_topic(topic)
+        # Assert
+        assert result is None
 
     def test_none_topic_returns_none(self):
         """1.1.1 (1.1.2): Noneが渡された場合、Noneが返される
@@ -133,6 +159,20 @@ class TestExtractDeviceIdFromTopic:
         # Assert
         assert result is None
 
+    def test_empty_string_topic_returns_none(self):
+        """1.1.1 (1.1.1): 空文字が渡された場合、Noneが返される
+
+        実行内容: topic = ""（空文字列）
+        想定結果: None が返される（正規表現に不一致）
+        """
+        from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
+        # Arrange
+        topic = ""
+        # Act
+        result = extract_device_id_from_topic(topic)
+        # Assert
+        assert result is None
+
     def test_trailing_slash_returns_none(self):
         """1.1.6 (1.6.2): 末尾にスラッシュが付く場合、Noneが返される
 
@@ -146,6 +186,20 @@ class TestExtractDeviceIdFromTopic:
         result = extract_device_id_from_topic(topic)
         # Assert
         assert result is None
+        
+    def test_string_device_id_returns_correctly(self):
+        """2.1.1: 文字列IDが正常に抽出される
+
+        実行内容: topic = "/abc/data/refrigerator"（IDが文字列）
+        想定結果: "abc" が返される
+        """
+        from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
+        # Arrange
+        topic = "/abc/data/refrigerator"
+        # Act
+        result = extract_device_id_from_topic(topic)
+        # Assert
+        assert result == "abc"
 
     def test_slash_in_device_id_returns_none(self):
         """1.1.6 (1.6.2): 機器IDにスラッシュを含む場合、Noneが返される
@@ -164,21 +218,21 @@ class TestExtractDeviceIdFromTopic:
     def test_large_numeric_id_extracted_correctly(self):
         """2.1.1: 大きな数値IDも正常に抽出される
 
-        実行内容: topic = "/9999999/data/refrigerator"
-        想定結果: "9999999" が返される
+        実行内容: topic = "/0100100101101011010/data/refrigerator"
+        想定結果: "0100100101101011010" が返される
         """
         from pipeline.silver.functions.device_id_extraction import extract_device_id_from_topic
         # Arrange
-        topic = "/9999999/data/refrigerator"
+        topic = "/0100100101101011010/data/refrigerator"
         # Act
         result = extract_device_id_from_topic(topic)
         # Assert
-        assert result == "9999999"
+        assert result == "0100100101101011010"
 
 
 # ===========================================================================
 # STEP 1.5: デバイスID抽出 — EventHub key
-# 設計書: § デバイスID抽出処理 > EventHub keyからのデバイスID抽出
+# 設計書: § データ変換仕様 > デバイスID抽出処理 > EventHub keyからのデバイスID抽出
 # ===========================================================================
 
 @pytest.mark.unit
@@ -263,24 +317,24 @@ class TestExtractDeviceIdFromKey:
         # Assert
         assert result == "12345"
 
-    def test_alphanumeric_key_with_hyphen_returns_correctly(self):
-        """2.1.1: ハイフンを含む文字列keyが正常に返される
+    def test_large_numeric_key_returns_correctly(self):
+        """2.1.1: 大きな数値keyが正常に返される
 
-        実行内容: message_key = "dev-001"
-        想定結果: "dev-001" が返される（keyは文字列、数値に限らない）
+        実行内容: message_key = "9999999"
+        想定結果: "9999999" が返される（大きな数値デバイスID）
         """
         from pipeline.silver.functions.device_id_extraction import extract_device_id_from_key
         # Arrange
-        message_key = "dev-001"
+        message_key = "9999999"
         # Act
         result = extract_device_id_from_key(message_key)
         # Assert
-        assert result == "dev-001"
+        assert result == "9999999"
 
 
 # ===========================================================================
 # STEP 1.5: デバイスID抽出 — 統合処理
-# 設計書: § デバイスID抽出処理 > デバイスID抽出の統合処理
+# 設計書: § データ変換仕様 > デバイスID抽出処理 > デバイスID抽出の統合処理
 # ===========================================================================
 
 @pytest.mark.unit
@@ -525,38 +579,40 @@ class TestParseBinaryTelemetry:
     対応観点表: 2.1 正常系処理, 1.1.1 必須チェック, 1.3 エラーハンドリング
 
     設計書定義（バイナリフォーマット）:
-        リトルエンディアン '<iq22d'
-        device_id (INT32, 4B) + event_timestamp (INT64, 8B, ms) + センサー値22個 (FLOAT64×22, 176B)
-        合計 188バイト
+        リトルエンディアン '<128sq22d'
+        device_id (STRING, 128B) + event_timestamp (INT64, 8B, ms) + センサー値22個 (FLOAT64×22, 176B)
+        合計 312バイト
         NaN値は null として出力
     """
 
-    def test_valid_188byte_binary_returns_json(self):
-        """2.1.1: 188バイトの正常なバイナリデータの場合、JSON文字列が返される
+    def test_valid_312byte_binary_returns_json(self):
+        """2.1.1: 312バイトの正常なバイナリデータの場合、JSON文字列が返される
 
-        実行内容: 正常な188バイトのバイナリデータを入力
+        実行内容: 正常な312バイトのバイナリデータを入力
         想定結果: JSON文字列が返される（device_id/event_timestamp含む）
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
         # Arrange
-        binary_data = _make_binary_telemetry(device_id=12345)
+        binary_data = _make_binary_telemetry(device_id="test_device-id", event_timestamp_ms=1737624600000)
         # Act
         result = parse_binary_telemetry(binary_data)
         # Assert
         assert result is not None
         parsed = json.loads(result)
         assert "device_id" in parsed
+        assert parsed["device_id"] == "test_device-id"
         assert "event_timestamp" in parsed
+        assert parsed["event_timestamp"] == "2025-01-23T09:30:00.000Z"
 
     def test_valid_binary_contains_all_22_sensor_fields(self):
         """2.1.2: 変換結果に22個のセンサーフィールドが含まれる
 
-        実行内容: 正常な188バイトのバイナリデータを入力
+        実行内容: 正常な312バイトのバイナリデータを入力
         想定結果: 設計書定義の全22センサーフィールドがJSONに含まれる
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
         # Arrange
-        binary_data = _make_binary_telemetry()
+        binary_data = _make_binary_telemetry(device_id="test_device-id", event_timestamp_ms=1737624600000)
         expected_fields = [
             "external_temp", "set_temp_freezer_1", "internal_sensor_temp_freezer_1",
             "internal_temp_freezer_1", "df_temp_freezer_1", "condensing_temp_freezer_1",
@@ -590,7 +646,7 @@ class TestParseBinaryTelemetry:
         assert result is None
 
     def test_wrong_size_binary_returns_none(self):
-        """1.3.1: 188バイトでないバイナリの場合、Noneが返される
+        """1.3.1: 312バイトでないバイナリの場合、Noneが返される
 
         実行内容: 100バイトのバイナリデータを入力（バイナリフォーマット不整合）
         想定結果: None が返される（サイズ検証失敗）
@@ -620,12 +676,12 @@ class TestParseBinaryTelemetry:
     def test_override_device_id_overwrites_binary_device_id(self):
         """2.1.1: override_device_idが指定された場合、バイナリ内のdevice_idが上書きされる
 
-        実行内容: device_id=99999のバイナリとoverride_device_id="11111"を入力
+        実行内容: device_id="99999"のバイナリとoverride_device_id="11111"を入力
         想定結果: 返却JSONのdevice_idが"11111"で上書きされる（設計書 §デバイスIDの上書き）
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
         # Arrange
-        binary_data = _make_binary_telemetry(device_id=99999)
+        binary_data = _make_binary_telemetry(device_id="99999")
         override_device_id = "11111"
         # Act
         result = parse_binary_telemetry(binary_data, override_device_id)
@@ -637,12 +693,12 @@ class TestParseBinaryTelemetry:
     def test_no_override_uses_binary_device_id_as_string(self):
         """2.1.1: override_device_idがNoneの場合、バイナリのdevice_idが文字列化して使用される
 
-        実行内容: device_id=12345のバイナリとoverride_device_id=Noneを入力
+        実行内容: device_id="12345"のバイナリとoverride_device_id=Noneを入力
         想定結果: 返却JSONのdevice_idが"12345"（文字列）になる
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
         # Arrange
-        binary_data = _make_binary_telemetry(device_id=12345)
+        binary_data = _make_binary_telemetry(device_id="12345")
         # Act
         result = parse_binary_telemetry(binary_data, None)
         # Assert
@@ -653,8 +709,8 @@ class TestParseBinaryTelemetry:
     def test_event_timestamp_is_iso8601_utc_format(self):
         """2.1.1: 変換結果のevent_timestampがISO 8601形式（UTC）になる
 
-        実行内容: event_timestamp_ms = 1737624600000 (2026-01-23T10:30:00 UTC)
-        想定結果: "2026-01-23T10:30:00.000Z" 形式のタイムスタンプが返される
+        実行内容: event_timestamp_ms = 1737624600000 (2025-01-23T09:30:00 UTC)
+        想定結果: "2025-01-23T09:30:00.000Z" 形式のタイムスタンプが返される
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
         # Arrange
@@ -664,16 +720,16 @@ class TestParseBinaryTelemetry:
         # Assert
         assert result is not None
         parsed = json.loads(result)
-        assert parsed["event_timestamp"] == "2026-01-23T10:30:00.000Z"
+        assert parsed["event_timestamp"] == "2025-01-23T09:30:00.000Z"
 
     def test_nan_sensor_value_converted_to_none(self):
         """2.1.1: センサー値がNaNの場合、nullとして格納される
 
-        実行内容: NaN値を含む188バイトのバイナリデータを入力
+        実行内容: NaN値を含む312バイトのバイナリデータを入力
         想定結果: 該当フィールドの値がnullになる（設計書定義「NaN値はnullとして扱う」）
         """
         from pipeline.silver.functions.json_telemetry import parse_binary_telemetry
-        import math
+        
         # Arrange
         sensor_values = [float("nan")] + [25.5] * 21
         binary_data = _make_binary_telemetry(sensor_values=sensor_values)
@@ -707,12 +763,12 @@ class TestUpdateJsonDeviceId:
     def test_valid_json_and_override_id_updates_device_id(self):
         """2.1.1 / 3.3.2.1: 有効なJSONとoverride_device_idの場合、device_idが更新される
 
-        実行内容: device_id=99999のJSONとoverride_device_id="12345"を入力
+        実行内容: device_id="test-device_id%"のJSONとoverride_device_id="12345"を入力
         想定結果: JSONのdevice_idが"12345"（str）に更新される
         """
         from pipeline.silver.functions.json_telemetry import update_json_device_id
         # Arrange
-        json_str = json.dumps({"device_id": 99999, "event_timestamp": "2026-01-23T10:30:00.000Z"})
+        json_str = json.dumps({"device_id": "test-device_id%", "event_timestamp": "2026-01-23T10:30:00.000Z"})
         override_device_id = "12345"
         # Act
         result = update_json_device_id(json_str, override_device_id)
@@ -744,7 +800,7 @@ class TestUpdateJsonDeviceId:
         """
         from pipeline.silver.functions.json_telemetry import update_json_device_id
         # Arrange
-        json_str = json.dumps({"device_id": 99999, "event_timestamp": "2026-01-23T10:30:00.000Z"})
+        json_str = json.dumps({"device_id": "test-device_id%", "event_timestamp": "2026-01-23T10:30:00.000Z"})
         override_device_id = None
         # Act
         result = update_json_device_id(json_str, override_device_id)
@@ -765,6 +821,36 @@ class TestUpdateJsonDeviceId:
         result = update_json_device_id(json_str, override_device_id)
         # Assert
         assert result == json_str
+        
+    def test_invalid_json_str_returns_original_string_2(self):
+        """1.3.1: json_strが無効なJSONの場合、元の文字列がそのまま返される（例外を伝播させない）
+
+        実行内容: override_device_id=""を入力
+        想定結果: 元の文字列がそのまま返される（ValueErrorをキャッチして継続）
+        """
+        from pipeline.silver.functions.json_telemetry import update_json_device_id
+        # Arrange
+        json_str = json.dumps({"device_id": "test-device_id%", "event_timestamp": "2026-01-23T10:30:00.000Z"})
+        override_device_id = ""
+        # Act
+        result = update_json_device_id(json_str, override_device_id)
+        # Assert
+        assert result == json_str
+        
+    def test_invalid_json_str_returns_original_string_3(self):
+        """1.3.1: json_strが無効なJSONの場合、元の文字列がそのまま返される（例外を伝播させない）
+
+        実行内容: override_device_id=[]を入力
+        想定結果: 元の文字列がそのまま返される（TypeErrorをキャッチして継続）
+        """
+        from pipeline.silver.functions.json_telemetry import update_json_device_id
+        # Arrange
+        json_str = json.dumps({"device_id": "99999", "event_timestamp": "2026-01-23T10:30:00.000Z"})
+        override_device_id = []
+        # Act
+        result = update_json_device_id(json_str, override_device_id)
+        # Assert
+        assert result == json_str
 
     def test_other_fields_preserved_after_device_id_update(self):
         """2.3.1: device_id更新後、その他のフィールドが保持される
@@ -775,7 +861,7 @@ class TestUpdateJsonDeviceId:
         from pipeline.silver.functions.json_telemetry import update_json_device_id
         # Arrange
         original = {
-            "device_id": 99999,
+            "device_id": "99999",
             "event_timestamp": "2026-01-23T10:30:00.000Z",
             "external_temp": 25.5,
             "internal_temp_freezer_1": -19.5,
@@ -835,7 +921,7 @@ class TestConvertToJsonWithDeviceId:
         from pipeline.silver.functions.json_telemetry import convert_to_json_with_device_id
         # Arrange
         payload = {
-            "device_id": 99999,
+            "device_id": "99999",
             "event_timestamp": "2026-01-23T10:30:00.000Z",
             "external_temp": 25.5,
         }
@@ -889,7 +975,7 @@ class TestConvertToJsonWithDeviceId:
         """
         from pipeline.silver.functions.json_telemetry import convert_to_json_with_device_id
         # Arrange
-        payload = {"device_id": 99999, "event_timestamp": "2026-01-23T10:30:00.000Z"}
+        payload = {"device_id": "99999", "event_timestamp": "2026-01-23T10:30:00.000Z"}
         raw_value = json.dumps(payload).encode("utf-8")
         override_device_id = None
         # Act
@@ -897,7 +983,67 @@ class TestConvertToJsonWithDeviceId:
         # Assert
         assert result is not None
         parsed = json.loads(result)
-        assert parsed["device_id"] == 99999
+        assert parsed["device_id"] == "99999"
+        
+# ===========================================================================
+# アラート異常状態テーブル読み込み
+# 設計書: § アラート処理仕様 > 異常状態テーブル取得処理
+# ===========================================================================
+
+@pytest.mark.unit
+class TestGetAlertAbnormalState:
+    """異常状態テーブルの読み込みとフォールバックを検証する
+
+    観点: アラート処理仕様 > 異常状態テーブル取得処理
+    対応観点表: 1.3 エラーハンドリング, 2.1 正常系処理
+
+    設計書定義（alert_judgment.py L36-67）:
+        - JDBC で alert_abnormal_state を読み込む
+        - 派生カラム is_abnormal（abnormal_start_time IS NOT NULL）を付与
+        - 派生カラム alert_fired（alert_fired_time IS NOT NULL）を付与
+        - 例外発生時は空DataFrameを返す（フォールバック）
+    """
+
+    @patch.object(builtins, "spark")
+    def test_exception_returns_empty_dataframe(self, mock_spark):
+        """1.3.1: JDBC 読み込み失敗時は空DataFrameが返される
+
+        実行内容: spark.read.format("jdbc").options().load() が例外を送出
+        想定結果: spark.createDataFrame([], schema=...) が呼ばれ、空DFが返される
+        """
+        from pipeline.silver.functions.alert_judgment import get_alert_abnormal_state
+        # Arrange
+        mock_spark.read.format.return_value.options.return_value.load.side_effect = Exception("DB error")
+        # Act
+        get_alert_abnormal_state()
+        # Assert
+        mock_spark.createDataFrame.assert_called_once()
+        call_args = mock_spark.createDataFrame.call_args[0]
+        assert call_args[0] == []
+
+    @patch.object(builtins, "spark")
+    def test_success_adds_is_abnormal_and_alert_fired_columns(self, mock_spark):
+        """2.1.1: 読み込み成功時に派生カラム is_abnormal と alert_fired が付与される
+
+        実行内容: spark.read.format("jdbc").options().load() が mock_df を返す
+        想定結果: df.withColumn("is_abnormal", ...) と df.withColumn("alert_fired", ...) が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import get_alert_abnormal_state
+        # Arrange
+        mock_df = MagicMock()
+        mock_spark.read.format.return_value.options.return_value.load.return_value = mock_df
+        # Act
+        get_alert_abnormal_state()
+        # Assert: 1回目の withColumn が "is_abnormal" で呼ばれた
+        first_col = mock_df.withColumn.call_args_list[0][0][0]
+        assert first_col == "is_abnormal", (
+            f"1回目の withColumn が 'is_abnormal' でない: '{first_col}'"
+        )
+        # Assert: 2回目の withColumn が "alert_fired" で呼ばれた（withColumn.return_value 上）
+        second_col = mock_df.withColumn.return_value.withColumn.call_args_list[0][0][0]
+        assert second_col == "alert_fired", (
+            f"2回目の withColumn が 'alert_fired' でない: '{second_col}'"
+        )
 
 
 # ===========================================================================
@@ -977,25 +1123,137 @@ class TestDetermineUpdatePattern:
         result = determine_update_pattern(threshold_exceeded, alert_triggered)
         # Assert
         assert result == "abnormal_start"
+        
+# ===========================================================================
+# STEP 5b: 異常状態テーブル更新
+# 設計書: § アラート処理仕様 > 異常状態テーブル更新処理
+# ===========================================================================
 
-    def test_all_combinations_return_valid_pattern(self):
-        """1.1.6 (1.6.1): 全4通りの入力組み合わせで戻り値が定義済みパターンのいずれかになる
+@pytest.mark.unit
+class TestUpdateAlertAbnormalState:
+    """異常状態テーブルの更新パターン別 SQL 実行を検証する（foreachBatch）
 
-        実行内容: (False,False), (False,True), (True,False), (True,True) の4通りを検証
-        想定結果: 全パターンが "recovery"/"alert_fired"/"abnormal_start" のいずれか
+    観点: アラート処理仕様 > 異常状態テーブル更新処理
+    対応観点表: 2.1 正常系処理, 2.3 副作用チェック
+
+    設計書定義（更新パターン）:
+        "recovery"       - threshold_exceeded=False → abnormal_start_time=NULL
+        "alert_fired"    - threshold_exceeded=True, alert_triggered=True → alert_fired_time=NOW()
+        "abnormal_start" - threshold_exceeded=True, alert_triggered=False → COALESCE(abnormal_start_time,...)
+    """
+
+    def _make_mock_conn(self):
+        """MySQL接続・カーソルモックを生成するヘルパー"""
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        return mock_conn, mock_cursor
+
+    def _make_mock_batch_df(self, records):
+        """指定レコードを collect() で返す batch_df モックを生成するヘルパー"""
+        mock_batch_df = MagicMock()
+        mock_batch_df.alias.return_value.join.return_value.select.return_value.distinct.return_value.collect.return_value = records
+        return mock_batch_df
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_empty_collect_returns_without_db_call(self, mock_get_conn):
+        """2.1.1: collect() が空の場合、DB接続なしで終了する
+
+        実行内容: バッチの collect() が [] を返す
+        想定結果: get_mysql_connection が呼ばれない（早期リターン）
         """
-        from pipeline.silver.functions.alert_judgment import determine_update_pattern
+        from pipeline.silver.functions.alert_judgment import update_alert_abnormal_state
         # Arrange
-        valid_patterns = {"recovery", "alert_fired", "abnormal_start"}
-        test_cases = [(False, False), (False, True), (True, False), (True, True)]
-        # Act & Assert
-        for threshold_exceeded, alert_triggered in test_cases:
-            result = determine_update_pattern(threshold_exceeded, alert_triggered)
-            assert result in valid_patterns, (
-                f"threshold_exceeded={threshold_exceeded}, alert_triggered={alert_triggered} で "
-                f"未定義パターン '{result}' が返された"
-            )
+        mock_batch_df = self._make_mock_batch_df([])
+        # Act
+        update_alert_abnormal_state(mock_batch_df, 0)
+        # Assert
+        mock_get_conn.assert_not_called()
 
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_recovery_pattern_sql_executed(self, mock_get_conn):
+        """2.1.1: threshold_exceeded=False の場合、復旧パターンの SQL が実行される
+
+        実行内容: threshold_exceeded=False, alert_triggered=False のレコード
+        想定結果: abnormal_start_time=NULL を含むSQL が実行され、conn.commit() が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_abnormal_state
+        # Arrange
+        records = [_MockRow(
+            device_id=1001, alert_id=5,
+            threshold_exceeded=False, alert_triggered=False,
+            current_sensor_value=25.0, event_timestamp="2026-01-23T09:00:00",
+            abnormal_start_time=None,
+        )]
+        mock_batch_df = self._make_mock_batch_df(records)
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_alert_abnormal_state(mock_batch_df, 0)
+        # Assert
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "abnormal_start_time = NULL" in sql_executed, (
+            f"recovery パターンの SQL に 'abnormal_start_time = NULL' が含まれていない"
+        )
+        mock_conn.commit.assert_called_once()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_alert_fired_pattern_sql_executed(self, mock_get_conn):
+        """2.1.1: threshold_exceeded=True, alert_triggered=True の場合、発報パターンの SQL が実行される
+
+        実行内容: threshold_exceeded=True, alert_triggered=True のレコード
+        想定結果: alert_fired_time=NOW() を含むSQL が実行され、conn.commit() が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_abnormal_state
+        # Arrange
+        records = [_MockRow(
+            device_id=1001, alert_id=5,
+            threshold_exceeded=True, alert_triggered=True,
+            current_sensor_value=-30.0, event_timestamp="2026-01-23T09:00:00",
+            abnormal_start_time="2026-01-23T08:00:00",
+        )]
+        mock_batch_df = self._make_mock_batch_df(records)
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_alert_abnormal_state(mock_batch_df, 0)
+        # Assert
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "alert_fired_time = NOW()" in sql_executed, (
+            f"alert_fired パターンの SQL に 'alert_fired_time = NOW()' が含まれていない"
+        )
+        mock_conn.commit.assert_called_once()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_abnormal_start_pattern_sql_executed(self, mock_get_conn):
+        """2.1.1: threshold_exceeded=True, alert_triggered=False の場合、異常開始パターンの SQL が実行される
+
+        実行内容: threshold_exceeded=True, alert_triggered=False のレコード
+        想定結果: COALESCE(abnormal_start_time,...) を含むSQL が実行され、conn.commit() が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_abnormal_state
+        # Arrange
+        records = [_MockRow(
+            device_id=1001, alert_id=5,
+            threshold_exceeded=True, alert_triggered=False,
+            current_sensor_value=-30.0, event_timestamp="2026-01-23T09:00:00",
+            abnormal_start_time=None,
+        )]
+        mock_batch_df = self._make_mock_batch_df(records)
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_alert_abnormal_state(mock_batch_df, 0)
+        # Assert
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "COALESCE(abnormal_start_time," in sql_executed, (
+            f"abnormal_start パターンの SQL に 'COALESCE(abnormal_start_time,' が含まれていない"
+        )
+        mock_conn.commit.assert_called_once()
 
 # ===========================================================================
 # STEP 4: アラート判定 — メール送信条件判定
@@ -1077,7 +1335,7 @@ class TestShouldEnqueueEmail:
         """1.1.1 (1.1.2): alert_triggered=Noneの場合、Falseが返される
 
         実行内容: alert_triggered=None, alert_email_flag=True
-        想定結果: False が返される（None is True → False）
+        想定結果: False が返される（None は True ではないため False）
         """
         from pipeline.silver.functions.alert_judgment import should_enqueue_email
         # Arrange
@@ -1092,7 +1350,7 @@ class TestShouldEnqueueEmail:
         """1.1.1 (1.1.2): alert_email_flag=Noneの場合、Falseが返される
 
         実行内容: alert_triggered=True, alert_email_flag=None
-        想定結果: False が返される（None is True → False）
+        想定結果: False が返される（None は True ではないため False）
         """
         from pipeline.silver.functions.alert_judgment import should_enqueue_email
         # Arrange
@@ -1284,3 +1542,509 @@ class TestIsRetryableError:
         result = is_retryable_error(error)
         # Assert
         assert result is False
+
+# ===========================================================================
+# OLTP接続 — get_mysql_connection コンテキストマネージャ
+# 設計書: § 外部連携仕様 > OLTPリトライ戦略
+# ===========================================================================
+
+@pytest.mark.unit
+class TestGetMysqlConnection:
+    """リトライ付きMySQL接続コンテキストマネージャを検証する
+
+    観点: 外部連携仕様 > OLTPリトライ戦略
+    対応観点表: 2.1 正常系処理, 1.3 エラーハンドリング
+
+    設計書定義（mysql_connector.py L49-85）:
+        - range(OLTP_MAX_RETRIES + 1) = range(4) で最大4ループ
+        - attempt < OLTP_MAX_RETRIES - 1 (= < 2) の場合のみ sleep してリトライ
+        - attempt=2 で raise last_error（実質的な試行回数は 3 回）
+    """
+
+    @patch("functions.mysql_connector.time.sleep")
+    @patch("functions.mysql_connector.get_mysql_config", return_value={})
+    @patch("functions.mysql_connector.pymysql.connect")
+    def test_success_on_first_attempt_yields_connection(self, mock_connect, mock_get_config, mock_sleep):
+        """2.1.1: 1回目の接続成功で conn が yield される
+
+        実行内容: pymysql.connect が mock_conn を返す
+        想定結果: with ブロック内で conn = mock_conn が利用可能
+        """
+        from pipeline.silver.functions.mysql_connector import get_mysql_connection
+        # Act & Assert
+        with get_mysql_connection() as conn:
+            assert conn is mock_connect.return_value
+
+    @patch("functions.mysql_connector.time.sleep")
+    @patch("functions.mysql_connector.get_mysql_config", return_value={})
+    @patch("functions.mysql_connector.pymysql.connect")
+    def test_connection_closed_after_successful_use(self, mock_connect, mock_get_config, mock_sleep):
+        """2.1.1: 正常終了後 finally ブロックで conn.close() が1回呼ばれる
+
+        実行内容: pymysql.connect が mock_conn を返し、with ブロックを正常終了
+        想定結果: mock_conn.close() が1回呼ばれる（設計書 §接続クローズ保証）
+        """
+        from pipeline.silver.functions.mysql_connector import get_mysql_connection
+        # Act
+        with get_mysql_connection() as conn:
+            pass
+        # Assert
+        mock_connect.return_value.close.assert_called_once()
+
+    @patch("functions.mysql_connector.OLTP_RETRY_INTERVALS", [0.001, 0.001, 0.001])
+    @patch("functions.mysql_connector.time.sleep")
+    @patch("functions.mysql_connector.get_mysql_config", return_value={})
+    @patch("functions.mysql_connector.pymysql.connect")
+    def test_retries_on_retryable_error_then_succeeds(self, mock_connect, mock_get_config, mock_sleep):
+        """1.3.1: 1回目失敗（接続エラー）後にリトライして2回目成功する
+
+        実行内容: connect: side_effect=[OperationalError(2006), mock_conn]
+        想定結果: time.sleep が1回呼ばれ、最終的に conn が返される
+        """
+        import pymysql
+        from pipeline.silver.functions.mysql_connector import get_mysql_connection
+        # Arrange
+        mock_conn = MagicMock()
+        mock_connect.side_effect = [
+            pymysql.err.OperationalError(2006, "MySQL server has gone away"),
+            mock_conn,
+        ]
+        # Act
+        with get_mysql_connection() as conn:
+            assert conn is mock_conn
+        # Assert
+        assert mock_sleep.call_count == 1
+
+    @patch("functions.mysql_connector.OLTP_RETRY_INTERVALS", [0.001, 0.001, 0.001])
+    @patch("functions.mysql_connector.time.sleep")
+    @patch("functions.mysql_connector.get_mysql_config", return_value={})
+    @patch("functions.mysql_connector.pymysql.connect")
+    def test_raises_after_max_retries_exceeded(self, mock_connect, mock_get_config, mock_sleep):
+        """1.3.1: 全試行失敗時は最後の例外が送出される
+
+        実行内容: pymysql.connect が常に OperationalError(2006) を送出
+        想定結果: pymysql.err.OperationalError が送出される（設計書 §最大リトライ超過）
+        """
+        import pymysql
+        from pipeline.silver.functions.mysql_connector import get_mysql_connection
+        # Arrange
+        mock_connect.side_effect = pymysql.err.OperationalError(2006, "MySQL server has gone away")
+        # Act & Assert
+        with pytest.raises(pymysql.err.OperationalError):
+            with get_mysql_connection() as conn:
+                pass
+
+    @patch("functions.mysql_connector.OLTP_RETRY_INTERVALS", [0.001, 0.001, 0.001])
+    @patch("functions.mysql_connector.time.sleep")
+    @patch("functions.mysql_connector.get_mysql_config", return_value={})
+    @patch("functions.mysql_connector.pymysql.connect")
+    def test_sleep_called_exactly_twice_on_three_failures(self, mock_connect, mock_get_config, mock_sleep):
+        """1.3.1: 全試行失敗時 sleep は2回だけ呼ばれる
+
+        実行内容: 全3試行（attempt 0, 1, 2）が全て失敗する
+        想定結果: time.sleep が2回呼ばれる
+            （attempt < OLTP_MAX_RETRIES - 1 = < 2 の場合のみ sleep: attempt 0, 1 のみ）
+            （attempt 2 は即 raise last_error → sleep なし）
+        """
+        import pymysql
+        from pipeline.silver.functions.mysql_connector import get_mysql_connection
+        # Arrange
+        mock_connect.side_effect = pymysql.err.OperationalError(2006, "MySQL server has gone away")
+        # Act
+        with pytest.raises(pymysql.err.OperationalError):
+            with get_mysql_connection() as conn:
+                pass
+        # Assert
+        assert mock_sleep.call_count == 2
+
+# ===========================================================================
+# STEP 5b: メール送信キュー登録
+# 設計書: § 外部連携仕様 > メール送信キュー登録処理
+# ===========================================================================
+
+@pytest.mark.unit
+class TestEnqueueEmailNotification:
+    """メール送信キュー登録の早期リターン条件を検証する（foreachBatch）
+
+    観点: 外部連携仕様 > メール送信キュー登録処理
+    対応観点表: 2.1 正常系処理, 1.1.1 必須チェック
+
+    設計書定義（alert_judgment.py L335-458）:
+        - alert_triggered=True AND alert_email_flag=True のレコードのみ登録
+        - 対象レコードがない場合は早期リターン
+    """
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_no_alert_records_returns_early(self, mock_get_conn):
+        """2.1.1: フィルタ後の alert_records が0件の場合、早期リターンする
+
+        実行内容: alert_records.isEmpty() = True
+        想定結果: get_mysql_connection が呼ばれない（Spark JDBC 読み込みも発生しない）
+        """
+        from pipeline.silver.functions.alert_judgment import enqueue_email_notification
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.isEmpty.return_value = True
+        # Act
+        enqueue_email_notification(mock_batch_df, 0, MagicMock())
+        # Assert
+        mock_get_conn.assert_not_called()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_empty_queue_after_join_returns_early(self, mock_get_conn):
+        """2.1.1: Spark結合後のキューレコードが0件の場合、DB接続なしで終了する
+
+        実行内容: alert_records.isEmpty()=False、queue_records.collect()=[]
+        想定結果: get_mysql_connection が呼ばれない
+        """
+        from pipeline.silver.functions.alert_judgment import enqueue_email_notification
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.isEmpty.return_value = False
+        # Spark JDBC + 結合チェーン末尾の collect() を空リストに設定
+        (
+            mock_batch_df.filter.return_value
+            .join.return_value
+            .join.return_value
+            .join.return_value
+            .select.return_value
+            .collect.return_value
+        ) = []
+        # Act
+        enqueue_email_notification(mock_batch_df, 0, MagicMock())
+        # Assert
+        mock_get_conn.assert_not_called()
+        
+# ===========================================================================
+# STEP 5b: デバイスステータス更新
+# 設計書: § 外部連携仕様 > デバイスステータス更新処理
+# ===========================================================================
+
+@pytest.mark.unit
+class TestUpdateDeviceStatus:
+    """デバイスステータスの UPSERT 処理を検証する（foreachBatch）
+
+    観点: 外部連携仕様 > デバイスステータス更新処理
+    対応観点表: 2.1 正常系処理, 3.3 更新機能, 2.3 副作用チェック
+
+    設計書定義（alert_judgment.py L608-638）:
+        - バッチ内の全レコードを対象に device_id ごとの最新 event_timestamp を取得
+        - device_status_data を UPSERT（ON DUPLICATE KEY UPDATE）
+    """
+
+    def _make_mock_conn(self):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        return mock_conn, mock_cursor
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_empty_batch_returns_without_db_call(self, mock_get_conn):
+        """2.1.1: バッチが空の場合、DB接続なしで終了する
+
+        実行内容: batch_df.groupBy().agg().collect() が [] を返す
+        想定結果: get_mysql_connection が呼ばれない（早期リターン）
+        """
+        from pipeline.silver.functions.alert_judgment import update_device_status
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_batch_df.groupBy.return_value.agg.return_value.collect.return_value = []
+        # Act
+        update_device_status(mock_batch_df, 0)
+        # Assert
+        mock_get_conn.assert_not_called()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_records_execute_upsert_sql(self, mock_get_conn):
+        """2.1.1: レコードが存在する場合、device_status_data に UPSERT SQL が実行される
+
+        実行内容: 1件のデバイスレコード（device_id=1001, last_received_time=...）
+        想定結果: INSERT INTO device_status_data ... ON DUPLICATE KEY UPDATE が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_device_status
+        # Arrange
+        records = [_MockRow(device_id=1001, last_received_time="2026-01-23T09:00:00")]
+        mock_batch_df = MagicMock()
+        mock_batch_df.groupBy.return_value.agg.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_device_status(mock_batch_df, 0)
+        # Assert
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "INSERT INTO device_status_data" in sql_executed
+        assert "ON DUPLICATE KEY UPDATE" in sql_executed
+        mock_conn.commit.assert_called_once()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_multiple_devices_execute_multiple_upserts(self, mock_get_conn):
+        """2.1.1: 複数デバイスのレコードが全て UPSERT される
+
+        実行内容: 3件のデバイスレコード
+        想定結果: cursor.execute が3回呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_device_status
+        # Arrange
+        records = [
+            _MockRow(device_id=1001, last_received_time="2026-01-23T09:00:00"),
+            _MockRow(device_id=1002, last_received_time="2026-01-23T09:01:00"),
+            _MockRow(device_id=1003, last_received_time="2026-01-23T09:02:00"),
+        ]
+        mock_batch_df = MagicMock()
+        mock_batch_df.groupBy.return_value.agg.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_device_status(mock_batch_df, 0)
+        # Assert
+        assert mock_cursor.execute.call_count == 3, (
+            f"execute が3回呼ばれるべきところ {mock_cursor.execute.call_count} 回"
+        )
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_commit_called_once_per_batch(self, mock_get_conn):
+        """2.3.1: 複数レコードを処理しても conn.commit() は1回だけ呼ばれる
+
+        実行内容: 3件のデバイスレコード
+        想定結果: conn.commit() が1回だけ呼ばれる（全レコード一括コミット）
+        """
+        from pipeline.silver.functions.alert_judgment import update_device_status
+        # Arrange
+        records = [
+            _MockRow(device_id=1001, last_received_time="2026-01-23T09:00:00"),
+            _MockRow(device_id=1002, last_received_time="2026-01-23T09:01:00"),
+            _MockRow(device_id=1003, last_received_time="2026-01-23T09:02:00"),
+        ]
+        mock_batch_df = MagicMock()
+        mock_batch_df.groupBy.return_value.agg.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_device_status(mock_batch_df, 0)
+        # Assert
+        mock_conn.commit.assert_called_once()
+        
+# ===========================================================================
+# STEP 5b: アラート履歴登録（発報時）
+# 設計書: § 外部連携仕様 > アラート履歴登録処理
+# ===========================================================================
+
+@pytest.mark.unit
+class TestInsertAlertHistory:
+    """アラート履歴の INSERT と alert_abnormal_state の UPDATE を検証する（foreachBatch）
+
+    観点: 外部連携仕様 > アラート履歴登録処理
+    対応観点表: 2.1 正常系処理, 3.2 登録機能, 2.3 副作用チェック
+
+    設計書定義（alert_judgment.py L469-518）:
+        - alert_triggered=True のレコードを alert_history に INSERT
+        - cursor.lastrowid で取得した alert_history_id を alert_abnormal_state に UPDATE
+        - conn.commit() で一括コミット
+    """
+
+    def _make_mock_conn(self, lastrowid=9999):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.lastrowid = lastrowid
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        return mock_conn, mock_cursor
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_no_fired_records_returns_early(self, mock_get_conn):
+        """2.1.1: alert_triggered=True のレコードが0件の場合、DB接続なしで終了する
+
+        実行内容: batch_df.filter().collect() が [] を返す
+        想定結果: get_mysql_connection が呼ばれない（早期リターン）
+        """
+        from pipeline.silver.functions.alert_judgment import insert_alert_history
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.collect.return_value = []
+        # Act
+        insert_alert_history(mock_batch_df, 0)
+        # Assert
+        mock_get_conn.assert_not_called()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_fired_record_inserts_history_and_updates_state_with_lastrowid(self, mock_get_conn):
+        """3.2.1 / 3.3.1: 発報レコードに対して alert_history INSERT 後、lastrowid で alert_abnormal_state を UPDATE する
+
+        実行内容: 1件の alert_triggered=True レコード
+        想定結果:
+            - cursor.execute が INSERT into alert_history を呼ぶ
+            - cursor.lastrowid = 9999 → UPDATE alert_abnormal_state で 9999 が使われる
+            - conn.commit() が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import insert_alert_history
+        # Arrange
+        records = [_MockRow(
+            alert_id=5, device_id=1001,
+            abnormal_start_time="2026-01-23T08:00:00",
+            current_sensor_value=-30.0,
+        )]
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn(lastrowid=9999)
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        insert_alert_history(mock_batch_df, 0)
+        # Assert: INSERT 呼ばれた
+        assert mock_cursor.execute.call_count == 2, (
+            f"execute が2回（INSERT + UPDATE）呼ばれるべきところ {mock_cursor.execute.call_count} 回"
+        )
+        insert_sql = mock_cursor.execute.call_args_list[0][0][0]
+        assert "INSERT INTO alert_history" in insert_sql
+        # Assert: UPDATE に lastrowid=9999 が含まれる
+        update_params = mock_cursor.execute.call_args_list[1][0][1]
+        assert update_params[0] == 9999, (
+            f"UPDATE の最初のパラメータ（alert_history_id）が 9999 でない: {update_params[0]}"
+        )
+        mock_conn.commit.assert_called_once()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    def test_multiple_fired_records_all_inserted(self, mock_get_conn):
+        """3.2.1: 複数の発報レコードが全て INSERT される
+
+        実行内容: 3件の alert_triggered=True レコード
+        想定結果: cursor.execute が INSERT 3回 + UPDATE 3回 = 6回呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import insert_alert_history
+        # Arrange
+        records = [
+            _MockRow(alert_id=1, device_id=1001, abnormal_start_time="2026-01-23T08:00:00", current_sensor_value=-30.0),
+            _MockRow(alert_id=2, device_id=1002, abnormal_start_time="2026-01-23T08:05:00", current_sensor_value=-28.0),
+            _MockRow(alert_id=3, device_id=1003, abnormal_start_time="2026-01-23T08:10:00", current_sensor_value=-32.0),
+        ]
+        mock_batch_df = MagicMock()
+        mock_batch_df.filter.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        insert_alert_history(mock_batch_df, 0)
+        # Assert: INSERT 3回 + UPDATE 3回 = 6回
+        assert mock_cursor.execute.call_count == 6, (
+            f"execute が6回（INSERT×3 + UPDATE×3）呼ばれるべきところ {mock_cursor.execute.call_count} 回"
+        )
+
+# ===========================================================================
+# STEP 5b: アラート履歴更新（復旧時）
+# 設計書: § 外部連携仕様 > アラート履歴登録処理 > 復旧時の更新処理
+# ===========================================================================
+
+@pytest.mark.unit
+class TestUpdateAlertHistoryOnRecovery:
+    """復旧時のアラート履歴更新処理を検証する（foreachBatch）
+
+    観点: 外部連携仕様 > アラート履歴登録処理 > 復旧時の更新処理
+    対応観点表: 2.1 正常系処理, 3.3 更新機能
+
+    設計書定義（alert_judgment.py L521-565）:
+        - threshold_exceeded=False かつ alert_fired 済み かつ alert_history_id 存在 のレコードを更新
+        - alert_recovery_datetime = event_timestamp, alert_status_id = ALERT_STATUS_RECOVERED (=2)
+    """
+
+    def _make_mock_conn(self):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        return mock_conn, mock_cursor
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    @patch("functions.alert_judgment.get_alert_abnormal_state")
+    def test_no_recovery_records_returns_early(self, mock_get_abnormal_state, mock_get_conn):
+        """2.1.1: 復旧対象レコードが0件の場合、DB接続なしで終了する
+
+        実行内容: recovery_candidates.join().collect() が [] を返す
+        想定結果: get_mysql_connection が呼ばれない（早期リターン）
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_history_on_recovery
+        # Arrange
+        mock_batch_df = MagicMock()
+        mock_recovery_candidates = (
+            mock_batch_df.filter.return_value.select.return_value.distinct.return_value
+        )
+        mock_recovery_candidates.join.return_value.collect.return_value = []
+        # Act
+        update_alert_history_on_recovery(mock_batch_df, 0)
+        # Assert
+        mock_get_conn.assert_not_called()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    @patch("functions.alert_judgment.get_alert_abnormal_state")
+    def test_recovery_records_execute_update_with_recovered_status(self, mock_get_abnormal_state, mock_get_conn):
+        """3.3.1: 復旧レコードに対して ALERT_STATUS_RECOVERED=2 で alert_history が UPDATE される
+
+        実行内容: 1件の復旧レコード（alert_history_id=999, event_timestamp=...）
+        想定結果:
+            - UPDATE alert_history SET alert_recovery_datetime=... が呼ばれる
+            - ALERT_STATUS_RECOVERED (=2) がパラメータに渡される
+            - conn.commit() が呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_history_on_recovery
+        # Arrange
+        records = [_MockRow(
+            event_timestamp="2026-01-23T10:00:00",
+            alert_history_id=999,
+            device_id=1001,
+            alert_id=5,
+        )]
+        mock_batch_df = MagicMock()
+        mock_recovery_candidates = (
+            mock_batch_df.filter.return_value.select.return_value.distinct.return_value
+        )
+        mock_recovery_candidates.join.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_alert_history_on_recovery(mock_batch_df, 0)
+        # Assert
+        sql_executed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "UPDATE alert_history" in sql_executed
+        params = mock_cursor.execute.call_args_list[0][0][1]
+        # パラメータ: (event_timestamp, ALERT_STATUS_RECOVERED, alert_history_id)
+        assert params[1] == 2, (
+            f"ALERT_STATUS_RECOVERED=2 がパラメータに渡されていない: {params[1]}"
+        )
+        assert params[2] == 999, (
+            f"alert_history_id=999 がパラメータに渡されていない: {params[2]}"
+        )
+        mock_conn.commit.assert_called_once()
+
+    @patch("functions.alert_judgment.get_mysql_connection")
+    @patch("functions.alert_judgment.get_alert_abnormal_state")
+    def test_multiple_recovery_records_all_updated(self, mock_get_abnormal_state, mock_get_conn):
+        """3.3.1: 複数の復旧レコードが全て UPDATE される
+
+        実行内容: 3件の復旧レコード
+        想定結果: cursor.execute が3回呼ばれる
+        """
+        from pipeline.silver.functions.alert_judgment import update_alert_history_on_recovery
+        # Arrange
+        records = [
+            _MockRow(event_timestamp="2026-01-23T10:00:00", alert_history_id=101, device_id=1001, alert_id=1),
+            _MockRow(event_timestamp="2026-01-23T10:00:00", alert_history_id=102, device_id=1002, alert_id=2),
+            _MockRow(event_timestamp="2026-01-23T10:00:00", alert_history_id=103, device_id=1003, alert_id=3),
+        ]
+        mock_batch_df = MagicMock()
+        mock_recovery_candidates = (
+            mock_batch_df.filter.return_value.select.return_value.distinct.return_value
+        )
+        mock_recovery_candidates.join.return_value.collect.return_value = records
+        mock_conn, mock_cursor = self._make_mock_conn()
+        mock_get_conn.return_value.__enter__.return_value = mock_conn
+        mock_get_conn.return_value.__exit__.return_value = False
+        # Act
+        update_alert_history_on_recovery(mock_batch_df, 0)
+        # Assert
+        assert mock_cursor.execute.call_count == 3, (
+            f"execute が3回呼ばれるべきところ {mock_cursor.execute.call_count} 回"
+        )

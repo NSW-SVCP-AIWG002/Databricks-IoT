@@ -2,6 +2,10 @@ import builtins as _builtins
 import random
 import certifi as _certifi
 
+from pyspark.sql.types import (
+    DoubleType, IntegerType, StringType, StructField, StructType,
+)
+
 # =============================================================================
 # パイプライン設定
 # =============================================================================
@@ -13,8 +17,8 @@ TOPIC_NAME = "eh-telemetry"
 # バイナリフォーマット定義
 # =============================================================================
 
-BINARY_STRUCT_FORMAT = "<iq22d"
-BINARY_DATA_SIZE = 188  # バイト数: INT32(4) + INT64(8) + FLOAT64*22(176) = 188
+BINARY_STRUCT_FORMAT = "<128sq22d"  # Little-endian: STRING(128) + INT64(8) + FLOAT64*22(176)
+BINARY_DATA_SIZE = 312  # バイト数: STRING(128) + INT64(8) + FLOAT64*22(176) = 312
 
 # センサーフィールド名（バイナリアンパック順序と対応）
 SENSOR_FIELDS = [
@@ -41,6 +45,67 @@ SENSOR_FIELDS = [
     "defrost_heater_output_1",
     "defrost_heater_output_2",
 ]
+
+# =============================================================================
+# センサーデータスキーマ（JSONパース用）
+# 設計書: § JSONパース処理 > センサーデータスキーマ
+# =============================================================================
+
+SENSOR_SCHEMA = StructType([
+    StructField("device_id", IntegerType(), False),
+    StructField("event_timestamp", StringType(), False),
+    StructField("external_temp", DoubleType(), True),
+    StructField("set_temp_freezer_1", DoubleType(), True),
+    StructField("internal_sensor_temp_freezer_1", DoubleType(), True),
+    StructField("internal_temp_freezer_1", DoubleType(), True),
+    StructField("df_temp_freezer_1", DoubleType(), True),
+    StructField("condensing_temp_freezer_1", DoubleType(), True),
+    StructField("adjusted_internal_temp_freezer_1", DoubleType(), True),
+    StructField("set_temp_freezer_2", DoubleType(), True),
+    StructField("internal_sensor_temp_freezer_2", DoubleType(), True),
+    StructField("internal_temp_freezer_2", DoubleType(), True),
+    StructField("df_temp_freezer_2", DoubleType(), True),
+    StructField("condensing_temp_freezer_2", DoubleType(), True),
+    StructField("adjusted_internal_temp_freezer_2", DoubleType(), True),
+    StructField("compressor_freezer_1", DoubleType(), True),
+    StructField("compressor_freezer_2", DoubleType(), True),
+    StructField("fan_motor_1", DoubleType(), True),
+    StructField("fan_motor_2", DoubleType(), True),
+    StructField("fan_motor_3", DoubleType(), True),
+    StructField("fan_motor_4", DoubleType(), True),
+    StructField("fan_motor_5", DoubleType(), True),
+    StructField("defrost_heater_output_1", DoubleType(), True),
+    StructField("defrost_heater_output_2", DoubleType(), True),
+])
+
+# =============================================================================
+# 測定項目IDとセンサーカラムのマッピング
+# =============================================================================
+
+MEASUREMENT_COLUMN_MAP = {
+    1:  "external_temp",
+    2:  "set_temp_freezer_1",
+    3:  "internal_sensor_temp_freezer_1",
+    4:  "internal_temp_freezer_1",
+    5:  "df_temp_freezer_1",
+    6:  "condensing_temp_freezer_1",
+    7:  "adjusted_internal_temp_freezer_1",
+    8:  "set_temp_freezer_2",
+    9:  "internal_sensor_temp_freezer_2",
+    10: "internal_temp_freezer_2",
+    11: "df_temp_freezer_2",
+    12: "condensing_temp_freezer_2",
+    13: "adjusted_internal_temp_freezer_2",
+    14: "compressor_freezer_1",
+    15: "compressor_freezer_2",
+    16: "fan_motor_1",
+    17: "fan_motor_2",
+    18: "fan_motor_3",
+    19: "fan_motor_4",
+    20: "fan_motor_5",
+    21: "defrost_heater_output_1",
+    22: "defrost_heater_output_2",
+}
 
 # =============================================================================
 # MySQL接続設定（Databricks Secrets経由で注入される想定）

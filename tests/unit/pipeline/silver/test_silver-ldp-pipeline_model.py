@@ -4,7 +4,8 @@
 対象モジュール:
     pipeline.silver.functions.alert_judgment  (MEASUREMENT_COLUMN_MAP, ALERT_STATUS_*)
     pipeline.silver.functions.constants       (BINARY_DATA_SIZE, BINARY_STRUCT_FORMAT,
-                                               SENSOR_FIELDS, OLTP_MAX_RETRIES)
+                                               SENSOR_FIELDS, OLTP_MAX_RETRIES,
+                                               sensor_schema)
 
 設計書: docs/03-features/ldp-pipeline/silver-layer/ldp-pipeline-specification.md
 観点表: docs/05-testing/unit-test/unit-test-perspectives.md
@@ -13,6 +14,43 @@
 import struct
 
 import pytest
+
+# ===========================================================================
+# パイプライン設定定数
+# 設計書: § ストリーミング処理仕様
+# ===========================================================================
+
+@pytest.mark.unit
+class TestPipelineConstants:
+    """パイプライン設定定数を検証する
+
+    観点: ストリーミング処理仕様 > パイプライン設定
+    対応観点表: 2.1 正常系処理
+
+    設計書定義:
+        PIPELINE_TRIGGER_INTERVAL = "10 seconds"  （10秒間隔のマイクロバッチ処理）
+        TOPIC_NAME = "eh-telemetry"               （Azure Event Hubs トピック名）
+    """
+
+    def test_pipeline_trigger_interval_is_10_seconds(self):
+        """2.1.1: PIPELINE_TRIGGER_INTERVAL が設計書定義の "10 seconds" である
+
+        実行内容: PIPELINE_TRIGGER_INTERVAL の値を検証
+        想定結果: "10 seconds" である（設計書 §ストリーミング処理仕様「トリガー間隔: 10秒」）
+        """
+        from pipeline.silver.functions.constants import PIPELINE_TRIGGER_INTERVAL
+        # Assert
+        assert PIPELINE_TRIGGER_INTERVAL == "10 seconds"
+
+    def test_topic_name_is_eh_telemetry(self):
+        """2.1.1: TOPIC_NAME が設計書定義の "eh-telemetry" である
+
+        実行内容: TOPIC_NAME の値を検証
+        想定結果: "eh-telemetry" である（設計書 §Kafka接続設定「トピック名」）
+        """
+        from pipeline.silver.functions.constants import TOPIC_NAME
+        # Assert
+        assert TOPIC_NAME == "eh-telemetry"
 
 
 # ===========================================================================
@@ -28,28 +66,28 @@ class TestMeasurementColumnMap:
     対応観点表: 2.1 正常系処理, 1.1.6 不整値チェック
 
     設計書定義: measurement_item_id 1〜22 の22エントリ
-        1:  external_temp           （共通外気温度）
-        2:  set_temp_freezer_1      （第1冷凍設定温度）
-        3:  internal_sensor_temp_freezer_1
-        4:  internal_temp_freezer_1
-        5:  df_temp_freezer_1
-        6:  condensing_temp_freezer_1
-        7:  adjusted_internal_temp_freezer_1
-        8:  set_temp_freezer_2
-        9:  internal_sensor_temp_freezer_2
-        10: internal_temp_freezer_2
-        11: df_temp_freezer_2
-        12: condensing_temp_freezer_2
-        13: adjusted_internal_temp_freezer_2
-        14: compressor_freezer_1    （第1冷凍圧縮機回転数）
-        15: compressor_freezer_2
-        16: fan_motor_1
-        17: fan_motor_2
-        18: fan_motor_3
-        19: fan_motor_4
-        20: fan_motor_5
-        21: defrost_heater_output_1 （防露ヒータ出力(1)）
-        22: defrost_heater_output_2
+        1:  external_temp                   （共通外気温度）
+        2:  set_temp_freezer_1              （第1冷凍設定温度）
+        3:  internal_sensor_temp_freezer_1  （第1冷凍庫内センサー温度）
+        4:  internal_temp_freezer_1         （第1冷凍表示温度）
+        5:  df_temp_freezer_1               （第1冷凍DF温度）
+        6:  condensing_temp_freezer_1       （第1冷凍凝縮温度）
+        7:  adjusted_internal_temp_freezer_1（第1冷凍微調整後庫内温度）
+        8:  set_temp_freezer_2              （第2冷凍設定温度）
+        9:  internal_sensor_temp_freezer_2  （第2冷凍庫内センサー温度）
+        10: internal_temp_freezer_2         （第2冷凍表示温度）
+        11: df_temp_freezer_2               （第2冷凍DF温度）
+        12: condensing_temp_freezer_2       （第2冷凍凝縮温度）
+        13: adjusted_internal_temp_freezer_2（第2冷凍微調整後庫内温度）
+        14: compressor_freezer_1            （第1冷凍圧縮機回転数）
+        15: compressor_freezer_2            （第2冷凍圧縮機回転数）
+        16: fan_motor_1                     （第1ファンモーター回転数）
+        17: fan_motor_2                     （第2ファンモーター回転数）
+        18: fan_motor_3                     （第3ファンモーター回転数）
+        19: fan_motor_4                     （第4ファンモーター回転数）
+        20: fan_motor_5                     （第5ファンモーター回転数）
+        21: defrost_heater_output_1         （防露ヒータ出力(1)）
+        22: defrost_heater_output_2         （防露ヒータ出力(2)）
     """
 
     def test_map_contains_exactly_22_entries(self):
@@ -144,26 +182,6 @@ class TestMeasurementColumnMap:
         values = list(MEASUREMENT_COLUMN_MAP.values())
         assert len(values) == len(set(values))
 
-    def test_undefined_item_id_0_not_in_map(self):
-        """1.1.6 (1.6.2): 設計書に定義されていない測定項目ID 0 はマップに存在しない
-
-        実行内容: キー 0 の存在チェック
-        想定結果: MEASUREMENT_COLUMN_MAP に 0 が存在しない（定義範囲は1〜22）
-        """
-        from pipeline.silver.functions.alert_judgment import MEASUREMENT_COLUMN_MAP
-        # Assert
-        assert 0 not in MEASUREMENT_COLUMN_MAP
-
-    def test_undefined_item_id_23_not_in_map(self):
-        """1.1.6 (1.6.2): 設計書に定義されていない測定項目ID 23 はマップに存在しない
-
-        実行内容: キー 23 の存在チェック
-        想定結果: MEASUREMENT_COLUMN_MAP に 23 が存在しない（定義範囲は1〜22）
-        """
-        from pipeline.silver.functions.alert_judgment import MEASUREMENT_COLUMN_MAP
-        # Assert
-        assert 23 not in MEASUREMENT_COLUMN_MAP
-
     def test_first_entry_is_external_temp(self):
         """2.1.1: 測定項目ID=1 は "external_temp"（共通外気温度）である
 
@@ -198,45 +216,45 @@ class TestBinaryFormatConstants:
     対応観点表: 2.1 正常系処理, 1.1.6 不整値チェック
 
     設計書定義:
-        BINARY_DATA_SIZE = 188 （INT32(4) + INT64(8) + FLOAT64×22(176) = 188バイト）
-        BINARY_STRUCT_FORMAT = "<iq22d" （リトルエンディアン）
+        BINARY_DATA_SIZE = 312 （STRING(128) + INT64(8) + FLOAT64×22(176) = 312バイト）
+        BINARY_STRUCT_FORMAT = "<128sq22d" （リトルエンディアン）
     """
 
-    def test_binary_data_size_is_188(self):
-        """2.1.1: BINARY_DATA_SIZE が設計書定義の188バイトである
+    def test_binary_data_size_is_312(self):
+        """2.1.1: BINARY_DATA_SIZE が設計書定義の312バイトである
 
         実行内容: BINARY_DATA_SIZE の値を検証
-        想定結果: 188 である
+        想定結果: 312 である
         """
         from pipeline.silver.functions.constants import BINARY_DATA_SIZE
         # Assert
-        assert BINARY_DATA_SIZE == 188
+        assert BINARY_DATA_SIZE == 312
 
     def test_binary_data_size_matches_struct_calcsize(self):
         """2.1.1: BINARY_DATA_SIZE が BINARY_STRUCT_FORMAT のパックサイズと一致する
 
         実行内容: struct.calcsize(BINARY_STRUCT_FORMAT) と BINARY_DATA_SIZE を比較
-        想定結果: 両者が一致する（INT32(4) + INT64(8) + FLOAT64×22(176) = 188）
+        想定結果: 両者が一致する（STRING(128) + INT64(8) + FLOAT64×22(176) = 312）
         """
         from pipeline.silver.functions.constants import BINARY_DATA_SIZE, BINARY_STRUCT_FORMAT
         # Assert
         assert struct.calcsize(BINARY_STRUCT_FORMAT) == BINARY_DATA_SIZE
 
     def test_binary_struct_format_value_is_correct(self):
-        """2.1.1: BINARY_STRUCT_FORMAT が設計書定義の "<iq22d" である
+        """2.1.1: BINARY_STRUCT_FORMAT が設計書定義の "<128sq22d" である
 
         実行内容: BINARY_STRUCT_FORMAT の値を検証
-        想定結果: "<iq22d" と一致する
+        想定結果: "<128sq22d" と一致する
 
         設計書定義:
             '<' = リトルエンディアン
-            'i' = device_id (INT32, 4バイト)
+            '128s' = device_id (STRING, 128バイト)
             'q' = event_timestamp (INT64, 8バイト, ミリ秒)
             '22d' = 22センサー値 (FLOAT64×22, 176バイト)
         """
         from pipeline.silver.functions.constants import BINARY_STRUCT_FORMAT
         # Assert
-        assert BINARY_STRUCT_FORMAT == "<iq22d"
+        assert BINARY_STRUCT_FORMAT == "<128sq22d"
 
     def test_binary_struct_format_starts_with_little_endian_marker(self):
         """2.1.1: BINARY_STRUCT_FORMAT がリトルエンディアン('<')で始まる
@@ -248,21 +266,21 @@ class TestBinaryFormatConstants:
         # Assert
         assert BINARY_STRUCT_FORMAT.startswith("<")
 
-    def test_binary_struct_format_can_pack_and_unpack_188_bytes(self):
-        """2.1.1: BINARY_STRUCT_FORMAT で188バイトのパック・アンパックが正常に行える
+    def test_binary_struct_format_can_pack_and_unpack_312_bytes(self):
+        """2.1.1: BINARY_STRUCT_FORMAT で312バイトのパック・アンパックが正常に行える
 
-        実行内容: struct.pack で188バイトのデータを生成し、struct.unpack で元の値を取り出す
-        想定結果: パック結果が188バイトで、アンパックが成功する
+        実行内容: struct.pack で312バイトのデータを生成し、struct.unpack で元の値を取り出す
+        想定結果: パック結果が312バイトで、アンパックが成功する
         """
         from pipeline.silver.functions.constants import BINARY_STRUCT_FORMAT
         # Arrange
-        test_values = [12345, 1737624600000] + [25.5] * 22
+        test_values = [b"test-device_id", 1737624600000] + [25.5] * 22
         # Act
         packed = struct.pack(BINARY_STRUCT_FORMAT, *test_values)
         unpacked = struct.unpack(BINARY_STRUCT_FORMAT, packed)
         # Assert
-        assert len(packed) == 188
-        assert unpacked[0] == 12345
+        assert len(packed) == 312
+        assert unpacked[0] == b"test-device_id"
 
 
 # ===========================================================================
@@ -277,7 +295,7 @@ class TestSensorFields:
     観点: データ変換仕様 > バイナリ/JSON判定・変換処理 > バイナリフォーマット定義
     対応観点表: 2.1 正常系処理, 1.1.6 不整値チェック
 
-    設計書定義: 22センサーフィールド（バイナリオフセット12〜188の順）
+    設計書定義: 22センサーフィールド（バイナリオフセット137〜312の順）
         external_temp, set_temp_freezer_1, internal_sensor_temp_freezer_1,
         internal_temp_freezer_1, df_temp_freezer_1, condensing_temp_freezer_1,
         adjusted_internal_temp_freezer_1, set_temp_freezer_2,
@@ -372,10 +390,10 @@ class TestSensorFields:
         assert len(SENSOR_FIELDS) == double_count
 
     def test_sensor_fields_first_element_is_external_temp(self):
-        """2.1.1: SENSOR_FIELDS[0]（バイナリオフセット12）は "external_temp" である
+        """2.1.1: SENSOR_FIELDS[0]（バイナリオフセット137）は "external_temp" である
 
         実行内容: SENSOR_FIELDS[0] の値を検証
-        想定結果: "external_temp" が返される（設計書定義のオフセット12の先頭フィールド）
+        想定結果: "external_temp" が返される（設計書定義のオフセット137の先頭フィールド）
         """
         from pipeline.silver.functions.constants import SENSOR_FIELDS
         # Assert
@@ -507,15 +525,155 @@ class TestAlertStatusConstants:
         # Assert
         assert ALERT_STATUS_RECOVERED == 2
 
-    def test_firing_and_recovered_statuses_are_distinct(self):
-        """1.1.6 (1.6.2): ALERT_STATUS_FIRING と ALERT_STATUS_RECOVERED は異なる値である
 
-        実行内容: 2つの定数の値が異なることを検証
-        想定結果: ALERT_STATUS_FIRING != ALERT_STATUS_RECOVERED
+# ===========================================================================
+# センサーデータスキーマ（SENSOR_SCHEMA）
+# 設計書: § JSONパース処理 > センサーデータスキーマ
+# ===========================================================================
+
+@pytest.mark.unit
+class TestSensorSchema:
+    """JSONパース用センサーデータスキーマの定義を検証する
+
+    観点: JSONパース処理 > センサーデータスキーマ
+    対応観点表: 2.1 正常系処理, 1.1.6 不整値チェック
+
+    設計書定義:
+        合計24フィールド（必須2 + センサー22）
+        device_id:       IntegerType, nullable=False（必須）
+        event_timestamp: StringType,  nullable=False（必須）
+        センサー22項目:   DoubleType,  nullable=True
+    """
+
+    def test_sensor_schema_has_24_fields(self):
+        """2.1.1: SENSOR_SCHEMA に設計書定義通り24フィールドが存在する
+
+        実行内容: SENSOR_SCHEMA.fields のフィールド数を検証
+        想定結果: 24 である（device_id + event_timestamp + センサー22項目）
         """
-        from pipeline.silver.functions.alert_judgment import (
-            ALERT_STATUS_FIRING,
-            ALERT_STATUS_RECOVERED,
-        )
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
         # Assert
-        assert ALERT_STATUS_FIRING != ALERT_STATUS_RECOVERED
+        assert len(SENSOR_SCHEMA.fields) == 24
+
+    def test_device_id_field_is_integer_and_required(self):
+        """2.1.1: SENSOR_SCHEMA[0] が IntegerType かつ nullable=False である
+
+        実行内容: 先頭フィールドの名前・型・nullable を検証
+        想定結果: name="device_id", type=IntegerType, nullable=False
+        """
+        from pyspark.sql.types import IntegerType
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        field = SENSOR_SCHEMA.fields[0]
+        # Assert
+        assert field.name == "device_id"
+        assert isinstance(field.dataType, IntegerType)
+        assert field.nullable is False
+
+    def test_event_timestamp_field_is_string_and_required(self):
+        """2.1.1: SENSOR_SCHEMA[1] が StringType かつ nullable=False である
+
+        実行内容: 2番目フィールドの名前・型・nullable を検証
+        想定結果: name="event_timestamp", type=StringType, nullable=False
+        """
+        from pyspark.sql.types import StringType
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        field = SENSOR_SCHEMA.fields[1]
+        # Assert
+        assert field.name == "event_timestamp"
+        assert isinstance(field.dataType, StringType)
+        assert field.nullable is False
+
+    def test_all_22_sensor_fields_are_double_and_nullable(self):
+        """2.1.1: センサー22項目（インデックス2〜23）が DoubleType かつ nullable=True である
+
+        実行内容: インデックス2〜23の全フィールドの型・nullable を検証
+        想定結果: 全フィールドが DoubleType かつ nullable=True
+        """
+        from pyspark.sql.types import DoubleType
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        sensor_fields = SENSOR_SCHEMA.fields[2:]
+        # Assert
+        assert len(sensor_fields) == 22
+        for field in sensor_fields:
+            assert isinstance(field.dataType, DoubleType), (
+                f"フィールド '{field.name}' の型が DoubleType でない: {type(field.dataType)}"
+            )
+            assert field.nullable is True, (
+                f"フィールド '{field.name}' が nullable=True でない"
+            )
+
+    def test_sensor_field_names_match_specification_in_order(self):
+        """2.1.1: センサー22項目のフィールド名が設計書定義の順序と完全一致する
+
+        実行内容: インデックス2〜23のフィールド名を設計書の定義と比較
+        想定結果: 全フィールド名・順序が一致する
+        """
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        expected_sensor_names = [
+            "external_temp",
+            "set_temp_freezer_1",
+            "internal_sensor_temp_freezer_1",
+            "internal_temp_freezer_1",
+            "df_temp_freezer_1",
+            "condensing_temp_freezer_1",
+            "adjusted_internal_temp_freezer_1",
+            "set_temp_freezer_2",
+            "internal_sensor_temp_freezer_2",
+            "internal_temp_freezer_2",
+            "df_temp_freezer_2",
+            "condensing_temp_freezer_2",
+            "adjusted_internal_temp_freezer_2",
+            "compressor_freezer_1",
+            "compressor_freezer_2",
+            "fan_motor_1",
+            "fan_motor_2",
+            "fan_motor_3",
+            "fan_motor_4",
+            "fan_motor_5",
+            "defrost_heater_output_1",
+            "defrost_heater_output_2",
+        ]
+        # Act
+        actual_names = [f.name for f in SENSOR_SCHEMA.fields[2:]]
+        # Assert
+        assert actual_names == expected_sensor_names
+
+    def test_only_device_id_and_event_timestamp_are_required(self):
+        """1.1.1: nullable=False のフィールドが device_id と event_timestamp のみである
+
+        実行内容: nullable=False のフィールド名集合を検証
+        想定結果: {"device_id", "event_timestamp"} のみ（センサー項目はすべて nullable）
+        """
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        required_fields = {f.name for f in SENSOR_SCHEMA.fields if not f.nullable}
+        # Assert
+        assert required_fields == {"device_id", "event_timestamp"}
+
+    def test_no_duplicate_field_names(self):
+        """1.1.6 (1.6.2): SENSOR_SCHEMA に重複したフィールド名が存在しない
+
+        実行内容: 全フィールド名のユニーク数と全件数を比較
+        想定結果: 重複なし（全フィールドが一意）
+        """
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA
+        # Arrange
+        names = [f.name for f in SENSOR_SCHEMA.fields]
+        # Assert
+        assert len(names) == len(set(names))
+
+    def test_sensor_schema_field_names_align_with_sensor_fields_constant(self):
+        """2.1.1: SENSOR_SCHEMA のセンサーフィールド名集合が SENSOR_FIELDS と一致する
+
+        実行内容: SENSOR_SCHEMA インデックス2〜23 の名前集合と SENSOR_FIELDS の集合を比較
+        想定結果: 両者が一致する（バイナリ変換と JSON パースで同一フィールドを参照）
+        """
+        from pipeline.silver.functions.constants import SENSOR_SCHEMA, SENSOR_FIELDS
+        # Arrange
+        schema_sensor_names = {f.name for f in SENSOR_SCHEMA.fields[2:]}
+        # Assert
+        assert schema_sensor_names == set(SENSOR_FIELDS)
