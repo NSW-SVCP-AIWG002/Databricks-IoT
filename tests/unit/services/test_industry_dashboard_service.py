@@ -18,7 +18,9 @@
 
 import re
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
 from unittest.mock import Mock, MagicMock, patch
 
 from iot_app.services.industry_dashboard_service import (
@@ -240,9 +242,9 @@ class TestGetDefaultDateRange:
 
     def test_end_datetime_is_close_to_now(self):
         """2.1.2: search_end_datetime が現在日時に近い（1分以内）"""
-        before = datetime.now()
+        before = datetime.now(_JST).replace(tzinfo=None)
         result = get_default_date_range()
-        after = datetime.now()
+        after = datetime.now(_JST).replace(tzinfo=None)
         end_dt = datetime.strptime(result["search_end_datetime"], "%Y-%m-%dT%H:%M")
         assert (
             before.replace(second=0, microsecond=0) - timedelta(seconds=30)
