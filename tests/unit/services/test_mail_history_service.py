@@ -600,6 +600,211 @@ class TestGetMailHistoryList:
         # Assert: 第2ソートキーとして mail_history_id.asc() が呼ばれること
         MockModel.mail_history_id.asc.assert_called_once()
 
+    @patch(f'{MODULE}.MailHistory')
+    def test_fallback_sort_column_when_invalid(self, MockModel):
+        """異常系: MailHistory に存在しない sort_column は sent_at にフォールバックする"""
+        # Arrange: 存在しないカラム名を None に設定し、フォールバック先 sent_at を別途設定
+        #          MagicMock はデフォルトで未定義属性を自動生成するため、明示的に None を設定する
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at_col = MagicMock()
+        MockModel.sent_at = mock_sent_at_col
+        MockModel.nonexistent_col = None
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='nonexistent_col',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: sent_at カラムの .desc() が呼ばれること（nonexistent_col → sent_at フォールバック確認）
+        mock_sent_at_col.desc.assert_called_once()
+        # Assert: 第2ソートキーとして mail_history_id.asc() が呼ばれること
+        MockModel.mail_history_id.asc.assert_called_once()
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_only_sent_at_start_filter(self, MockModel):
+        """正常系: sent_at_start のみ指定した場合、開始フィルタのみ1回適用される（sent_at_end=None は無視）"""
+        # Arrange: sent_at_end=None の場合、終了日フィルタが適用されないことを検証
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__ge__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=date(2026, 4, 1),
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: filter が1回（開始日フィルタのみ）呼ばれること
+        assert q.filter.call_count == 1
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_only_sent_at_end_filter(self, MockModel):
+        """正常系: sent_at_end のみ指定した場合、終了フィルタのみ1回適用される（sent_at_start=None は無視）"""
+        # Arrange: sent_at_start=None の場合、開始日フィルタが適用されないことを検証
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__le__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=date(2026, 4, 30),
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: filter が1回（終了日フィルタのみ）呼ばれること
+        assert q.filter.call_count == 1
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_sent_at_start_combined_with_time_min(self, MockModel):
+        """機能固有: sent_at_start は time.min (00:00:00) を付加した datetime に変換される"""
+        # Arrange: sent_at.__ge__ の呼び出し引数を検証するためモックの比較演算子を設定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__ge__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=date(2026, 4, 1),
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: sent_at.__ge__ が time.min (00:00:00) 付加の datetime で呼ばれること
+        mock_sent_at.__ge__.assert_called_once_with(datetime(2026, 4, 1, 0, 0, 0))
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_sent_at_end_combined_with_time_23_59_59(self, MockModel):
+        """機能固有: sent_at_end は time(23, 59, 59) を付加した datetime に変換される"""
+        # Arrange: sent_at.__le__ の呼び出し引数を検証するためモックの比較演算子を設定
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__le__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=date(2026, 4, 30),
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: sent_at.__le__ が time(23, 59, 59) 付加の datetime で呼ばれること
+        mock_sent_at.__le__.assert_called_once_with(datetime(2026, 4, 30, 23, 59, 59))
+
+    @patch(f'{MODULE}.or_')
+    @patch(f'{MODULE}.MailHistory')
+    def test_applies_all_filters_combined(self, MockModel, mock_or):
+        """全体確認: mail_type・keyword・sent_at_start・sent_at_end を全て指定した場合、filter が計4回適用される"""
+        # Arrange: 全フィルタ条件を指定し、各フィルタが干渉せず独立して適用されることを検証
+        q = make_mock_query([], 0)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        mock_sent_at = MagicMock()
+        mock_sent_at.__ge__ = Mock(return_value=MagicMock())
+        mock_sent_at.__le__ = Mock(return_value=MagicMock())
+        MockModel.sent_at = mock_sent_at
+        mock_or.return_value = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        get_mail_history_list(
+            organization_id=1,
+            mail_types=[1, 2],
+            keyword='テスト',
+            sent_at_start=date(2026, 4, 1),
+            sent_at_end=date(2026, 4, 30),
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: mail_type + keyword + 開始日 + 終了日 で filter が計4回呼ばれること
+        assert q.filter.call_count == 4
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_returned_record_has_no_missing_list_fields(self, MockModel):
+        """機能固有: 一覧取得レコードのフロント表示項目が全て欠損なし"""
+        # Arrange: 一覧テンプレートが参照する全フィールドを明示設定したモックレコード
+        mock_record = make_mail_history_mock(
+            mail_type=1,
+            subject='テスト件名',
+            body='テスト本文',
+            sent_at=datetime(2026, 4, 10, 12, 0, 0),
+            mail_history_uuid='test-uuid-001',
+        )
+        q = make_mock_query([mock_record], 1)
+        MockModel.query.filter_by.return_value = q
+        MockModel.mail_history_id = MagicMock()
+        from iot_app.services.mail_history_service import get_mail_history_list
+
+        # Act
+        records, _ = get_mail_history_list(
+            organization_id=1,
+            mail_types=[],
+            keyword='',
+            sent_at_start=None,
+            sent_at_end=None,
+            sort_column='sent_at',
+            order='desc',
+            page=1,
+        )
+
+        # Assert: 一覧テンプレートが参照する全フィールドが None でないこと
+        assert len(records) == 1
+        record = records[0]
+        assert record.mail_type is not None
+        assert record.subject is not None
+        assert record.body is not None
+        assert record.sent_at is not None
+        assert record.mail_history_uuid is not None
+
 
 # ============================================================
 # 6. get_mail_history_detail
@@ -661,3 +866,32 @@ class TestGetMailHistoryDetail:
             mail_history_uuid='abc-123',
             organization_id=999,
         )
+
+    @patch(f'{MODULE}.MailHistory')
+    def test_returned_record_has_no_missing_detail_fields(self, MockModel):
+        """機能固有: 詳細取得レコードのフロント表示項目が全て欠損なし"""
+        # Arrange: 詳細モーダル・view が参照する全フィールドを明示設定したモックレコード
+        mock_history = make_mail_history_mock(
+            mail_history_id=1,
+            mail_type=1,
+            sender_email='sender@example.com',
+            recipients={'to': ['recipient@example.com']},
+            sent_at=datetime(2026, 4, 10, 12, 0, 0),
+            subject='テスト件名',
+            body='テスト本文',
+            mail_history_uuid='test-uuid-001',
+        )
+        MockModel.query.filter_by.return_value.first.return_value = mock_history
+        from iot_app.services.mail_history_service import get_mail_history_detail
+
+        # Act
+        result = get_mail_history_detail('test-uuid-001', organization_id=1)
+
+        # Assert: 詳細テンプレート・view が参照する全フィールドが None でないこと
+        assert result.mail_history_id is not None
+        assert result.mail_type is not None
+        assert result.sender_email is not None
+        assert result.recipients is not None
+        assert result.sent_at is not None
+        assert result.subject is not None
+        assert result.body is not None
