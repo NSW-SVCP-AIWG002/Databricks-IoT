@@ -57,11 +57,6 @@
 .sort-header:hover {
   color: var(--color-primary);
 }
-.table__empty {
-  text-align: center;
-  padding: var(--spacing-6);
-  color: var(--color-gray-500);
-}
 </style>
 {% endblock %}
 
@@ -206,10 +201,6 @@
           </td>
         </tr>
         {% endfor %}
-      {% else %}
-        <tr>
-          <td colspan="5" class="table__empty">メール通知履歴が見つかりませんでした</td>
-        </tr>
       {% endif %}
     </tbody>
   </table>
