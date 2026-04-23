@@ -17,6 +17,7 @@ from sqlalchemy import func, text
 from iot_app import db
 from iot_app.common.exceptions import NotFoundError
 from iot_app.common.logger import get_logger
+from iot_app.common.messages import ERR_DATETIME_FORMAT, err_invalid
 from iot_app.models.customer_dashboard import DashboardGadgetMaster, GadgetTypeMaster, GoldSummaryMethodMaster
 from iot_app.services.customer_dashboard.bar_chart import aggregate_values
 from iot_app.services.customer_dashboard.common import check_device_access
@@ -46,23 +47,23 @@ def validate_chart_params(display_unit, interval, base_datetime_str):
     """チャートパラメータのバリデーション
 
     Returns:
-        bool: 全パラメータが有効な場合 True、それ以外 False
+        str | None: エラーメッセージ（正常時は None）
     """
     if display_unit not in _VALID_DISPLAY_UNITS:
-        return False
+        return err_invalid('表示単位')
 
     if interval not in INTERVAL_MINUTES:
-        return False
+        return err_invalid('集計間隔')
 
     if not base_datetime_str:
-        return False
+        return ERR_DATETIME_FORMAT
 
     try:
         datetime.strptime(base_datetime_str, '%Y/%m/%d %H:%M:%S')
     except (ValueError, TypeError):
-        return False
+        return ERR_DATETIME_FORMAT
 
-    return True
+    return None
 
 
 # ============================================================

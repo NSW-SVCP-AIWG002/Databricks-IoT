@@ -389,7 +389,7 @@ def update_language_settings():
     except Exception as e:
         db.session.rollback()
         logger.error(f'言語設定更新エラー: {str(e)}')
-        flash('更新に失敗しました', 'error')
+        flash('言語設定の更新に失敗しました', 'error')
         return redirect(url_for('account.language_settings'))
 ```
 
@@ -400,7 +400,7 @@ def update_language_settings():
 | MSG_001 | 言語設定を保存しました | 更新成功時 | フラッシュメッセージ（成功） |
 | ERR_003 | 入力内容を確認してください | バリデーションエラー時 | フラッシュメッセージ（エラー） |
 | ERR_004 | ユーザー情報が見つかりません | 更新対象レコードなし時 | フラッシュメッセージ（エラー） |
-| ERR_005 | 更新に失敗しました | DB更新エラー時 | フラッシュメッセージ（エラー） |
+| ERR_005 | 言語設定の更新に失敗しました | DB更新エラー時 | フラッシュメッセージ（エラー） |
 
 #### エラーハンドリング
 
@@ -762,7 +762,7 @@ query = f"SELECT * FROM user_master WHERE user_id = '{current_user_id}'"
 | 権限エラー | 403 Forbidden | 403エラーページ表示 | 「アクセス権限がありません」 |
 | データ未検出 | 404 Not Found | ダッシュボードへリダイレクト | 「ユーザー情報が見つかりません」 |
 | バリデーションエラー | 400 Bad Request | エラーメッセージ表示 | 「入力内容を確認してください」 |
-| データベースエラー | 500 Internal Server Error | エラーメッセージ表示 | 「更新に失敗しました」 |
+| データベースエラー | 500 Internal Server Error | エラーメッセージ表示 | 「言語設定の更新に失敗しました」 |
 
 ### エラーハンドリング実装例
 
@@ -778,7 +778,7 @@ try:
 except Exception as e:
     connection.rollback()
     logging.error(f'言語設定更新エラー: {str(e)}')
-    flash('更新に失敗しました', 'error')
+    flash('言語設定の更新に失敗しました', 'error')
     return redirect(url_for('account.language_settings'))
 finally:
     cursor.close()

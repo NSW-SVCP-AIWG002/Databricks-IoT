@@ -1241,7 +1241,7 @@ class TestBarChartCsvGeneration:
                 measurement_item_id=1,
                 summary_method_id=1,
             )
-        assert "日付形式が不正です" in str(exc_info.value)
+        assert "正しい日付形式で入力してください" in str(exc_info.value)
 
     def test_csv_export_impossible_date_raises(self):
         """1.4.5: 存在しない日付（例: 2026/02/30）で ValidationError が発生する"""
@@ -1262,7 +1262,7 @@ class TestBarChartCsvGeneration:
                 measurement_item_id=1,
                 summary_method_id=1,
             )
-        assert "日付形式が不正です" in str(exc_info.value)
+        assert "正しい日付形式で入力してください" in str(exc_info.value)
 
     def test_csv_export_none_base_datetime_raises(self):
         """1.1.2: base_datetime が None の場合に ValidationError が発生する"""
@@ -1280,7 +1280,7 @@ class TestBarChartCsvGeneration:
                 measurement_item_id=1,
                 summary_method_id=1,
             )
-        assert "日付形式が不正です" in str(exc_info.value)
+        assert "正しい日付形式で入力してください" in str(exc_info.value)
 
     @patch('iot_app.services.customer_dashboard.bar_chart.get_measurement_item_legend_name', return_value='外気温度（℃）')
     @patch('iot_app.services.customer_dashboard.bar_chart.get_device_name_by_id', return_value='DEV-001')
