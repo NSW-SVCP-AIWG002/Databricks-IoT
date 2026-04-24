@@ -348,32 +348,12 @@ def device_details_search(device_uuid):
             "page": current_params.get("page", 1),
         }
 
-        logger.info("デバイス詳細検索 アラート一覧取得開始: device_uuid=%s", device_uuid)
-        alerts, alerts_total = get_device_alerts_with_count(
-            device.device_id, search_params, g.current_user.user_id
-        )
-        logger.info("デバイス詳細検索 アラート一覧取得完了: device_uuid=%s", device_uuid)
-
-        logger.info("デバイス詳細検索 グラフデータ取得開始: device_uuid=%s", device_uuid)
-        graph_data = get_graph_data(device.device_id, search_params)
-        logger.info("デバイス詳細検索 グラフデータ取得完了: device_uuid=%s", device_uuid)
-
         response = make_response(
-            render_template(
-                "analysis/industry_dashboard/device_details.html",
-                device=device,
-                alerts=alerts,
-                alerts_total=alerts_total,
-                graph_data=graph_data,
-                page=1,
-                per_page=_ITEM_PER_PAGE,
-                search_params=search_params,
-            )
+            redirect(url_for("analysis.device_details", device_uuid=device_uuid, page=1))
         )
-
         response.delete_cookie(_DEVICE_DETAILS_COOKIE)
         _set_cookie(response, _DEVICE_DETAILS_COOKIE, search_params)
-        logger.info("デバイス詳細検索成功: device_uuid=%s", device_uuid)
+        logger.info("デバイス詳細検索成功（PRGリダイレクト）: device_uuid=%s", device_uuid)
         return response
 
     except Exception as e:

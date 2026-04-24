@@ -48,6 +48,11 @@ def validate_date_range(start_str, end_str):
         errors.append("日時の形式が正しくありません")
         return errors
 
+    now = datetime.now(_JST).replace(tzinfo=None, second=0, microsecond=0)
+
+    if start_dt < now - timedelta(days=62):
+        errors.append("開始日時は現在から62日以内で指定してください")
+
     if start_dt >= end_dt:
         errors.append("開始日時は終了日時より前である必要があります")
 
@@ -249,7 +254,7 @@ def get_recent_alerts_with_count(search_params, user_id, page=1, per_page=10):
                 al.alert_level_name,
                 asm.alert_status_name
             {base_sql}
-            ORDER BY al.alert_level_id ASC, v.alert_history_id DESC
+            ORDER BY asm.alert_status_id ASC, al.alert_level_id ASC, v.alert_history_id DESC
             LIMIT :limit OFFSET :offset
         """),
         params,
@@ -324,7 +329,8 @@ def get_device_list_with_count(search_params, user_id, page, per_page=10):
                 dm.device_uuid,
                 v.device_name,
                 v.device_organization_id AS organization_id,
-                om.organization_name
+                om.organization_name,
+                ds.last_received_time
             {base_sql}
             ORDER BY v.device_organization_id ASC, v.device_id ASC
             LIMIT :limit OFFSET :offset
@@ -396,7 +402,7 @@ def get_device_alerts_with_count(device_id, search_params, user_id):
                 al.alert_level_name,
                 asm.alert_status_name
             {base_sql}
-            ORDER BY al.alert_level_id ASC, v.alert_history_id DESC
+            ORDER BY asm.alert_status_id ASC, al.alert_level_id ASC, v.alert_history_id DESC
             LIMIT :limit OFFSET :offset
         """),
         params,

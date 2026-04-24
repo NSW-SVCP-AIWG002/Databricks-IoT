@@ -146,7 +146,7 @@
       </label>
     </div>
     {% if period_error %}
-    <p class="form__error" style="width:100%; margin:0; font-size:var(--font-size-lg);">{{ period_error }}</p>
+    <span class="form-error">{{ period_error }}</span>
     {% endif %}
   </form>
   <div class="ids-period-control__csv">
@@ -217,6 +217,17 @@
     if (navEntries.length > 0 && navEntries[0].type === 'reload') {
       window.location.replace('{{ url_for("analysis.device_details", device_uuid=device.device_uuid) }}');
     }
+  })();
+  (function() {
+    var minDate = new Date();
+    minDate.setDate(minDate.getDate() - 62);
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    var minStr = minDate.getFullYear() + '-' + pad(minDate.getMonth() + 1) + '-' + pad(minDate.getDate())
+               + 'T' + pad(minDate.getHours()) + ':' + pad(minDate.getMinutes());
+    var inputStart = document.getElementById('search_start_datetime');
+    var inputEnd   = document.getElementById('search_end_datetime');
+    if (inputStart) { inputStart.min = minStr; }
+    if (inputEnd)   { inputEnd.min   = minStr; }
   })();
 </script>
 <script type="application/json" id="graph-data-json">{{ graph_data | tojson }}</script>

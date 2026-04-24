@@ -162,7 +162,11 @@
               <td>{{ device.organization_name if device.organization_name else '' }}</td>
               <td>{{ device.device_name }}</td>
               <td>
-                <span class="table__badge">未接続</span>
+                {% if device.last_received_time %}
+                  <span class="table__badge table__badge--success">接続済み</span>
+                {% else %}
+                  <span class="table__badge">未接続</span>
+                {% endif %}
               </td>
               <td>
                 <div class="table__actions">

@@ -104,10 +104,10 @@
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
 | 1 | 店舗モニタリング初期表示 | `/analysis/industry-dashboard/store-monitoring` | GET | 店舗モニタリングの初期表示 | HTML | device_page・alert_page いずれもなし=初期表示、少なくとも一方あり=ページング |
-| 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | HTML | 検索条件をCookieに格納 |
+| 2 | 店舗モニタリング検索 | `/analysis/industry-dashboard/store-monitoring` | POST | 店舗モニタリングの検索 | 302リダイレクト (PRG) | 検索条件をCookieに格納してGETへリダイレクト。リロード時はブラウザがGETを再実行するためダイアログなし |
 | 3 | センサー情報表示 | `/analysis/industry-dashboard/store-monitoring/<device_uuid>` | GET | センサー情報表示 | HTML | - |
 | 4 | デバイス詳細初期表示 | `/analysis/industry-dashboard/device-details/<device_uuid>` | GET | デバイス詳細の初期表示 | HTML | pageパラメータなし=初期表示、あり=ページング |
-| 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | HTML | 検索条件をCookieに格納 |
+| 5 | デバイス詳細検索 | `/analysis/industry-dashboard/device-details/<device_uuid>` | POST | デバイス詳細の検索 | 302リダイレクト (PRG) | バリデーション成功時は検索条件をCookieに格納してGETへリダイレクト。バリデーションエラー時は400 HTMLで再描画。リロード時はブラウザがGETを再実行するためダイアログなし |
 | 6 | CSVエクスポート | `/analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | GET | センサー情報CSVダウンロード | CSV | 現在の検索条件を適用 |
 | 7 | 店舗名オートコンプリート | `/analysis/industry-dashboard/store-monitoring/organizations` | GET | 店舗名候補リスト取得 | JSON | qパラメータで部分一致検索。DBエラー時は空リストと500を返す |
 
@@ -135,7 +135,7 @@
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | デバイス詳細ボタン押下 | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `device_uuid` | HTML（デバイス詳細画面） | エラーモーダル表示 |
-| 表示期間変更ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | HTML（検索結果画面） | エラーメッセージ表示 |
+| 表示期間変更ボタン押下 | フォーム送信 | `POST /analysis/industry-dashboard/device-details/<device_uuid>` | `search_start_datetime, search_end_datetime` | 302リダイレクト (PRG)（バリデーションエラー時は400 HTML） | エラーメッセージ表示 |
 | ページボタン押下 | リンククリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>` | `page` | HTML（検索結果画面） | エラーモーダル表示 |
 | デバイス変更ボタン押下 | ボタンクリック | `GET /analysis/industry-dashboard/store-monitoring` | なし | HTML（店舗モニタリング画面） | エラーモーダル表示 |
 | CSVエクスポート | ボタンクリック | `GET /analysis/industry-dashboard/device-details/<device_uuid>?export=csv` | 検索条件 | CSVダウンロード | エラーメッセージ表示 |
@@ -175,7 +175,7 @@ flowchart TD
     AlertCount --> CheckAlertCount{DBクエリ結果}
 
     CheckAlertCount{DBクエリ結果} -->|成功| AlertQuery[アラート一覧取得<br>VIEW v_alert_history_by_user]
-    CheckAlertCount{DBクエリ結果} -->|失敗| Error500[500エラーモーダル表示]
+    CheckAlertCount{DBクエリ結果} -->|失敗| Error500[エラーページ表示]
 
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
     CheckAlertQuery -->|成功| DeviceCount[デバイス一覧件数取得<br>VIEW v_device_master_by_user]
@@ -240,6 +240,11 @@ flowchart TD
 
 アラート履歴テーブルからアラート履歴を取得します。
 
+**ソート順:**
+- 第一ソート項目: アラートステータスID（`alert_status_id`）昇順（発生中が先）
+- 第二ソート項目: アラートレベルID（`alert_level_id`）昇順（重大が先）
+- 第三ソート項目: アラート履歴ID（`alert_history_id`）降順（新しい順）
+
 **使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master、 device_master
 
 **SQL詳細:**
@@ -297,7 +302,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  al.alert_level_id ASC
+  asm.alert_status_id ASC
+  , al.alert_level_id ASC
   , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
@@ -417,7 +423,7 @@ def store_monitoring():
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -526,7 +532,7 @@ def store_monitoring_search():
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -536,7 +542,9 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 #### 検索条件の保持方法
 
-CookieにPOSTパラメータを格納してGETへリダイレクト（PRGパターン）。表示はGETルートが担当する
+CookieにPOSTパラメータを格納してGETへリダイレクト（PRGパターン）。表示はGETルートが担当する。
+
+> **リロード時の挙動:** PRGにより最後のHTTPリクエストがGETになるため、ブラウザのリロード時は再送信ダイアログが表示されず、GETを再実行して初期表示（空の検索条件）に戻る。
 
 #### UI状態
 
@@ -565,8 +573,8 @@ flowchart TD
 
     CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
     DeviceQuery --> CheckDeviceQuery{取得結果}
-    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
-    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[toast/エラーページ表示]
+    CheckDeviceQuery -->|DBエラー| Error500[エラーページ表示]
 
     CheckDeviceQuery -->|成功| AlertQuery[アラート一覧取得<br>VIEW v_alert_history_by_user]
     AlertQuery --> CheckAlertQuery{DBクエリ結果}
@@ -691,7 +699,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  al.alert_level_id ASC
+  asm.alert_status_id ASC
+  , al.alert_level_id ASC
   , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
@@ -801,8 +810,8 @@ def show_sensor_info(device_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 404 | リソース不存在 | toast表示（アプリ内遷移時）/ エラーページ表示（URL直打ち時） | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -836,8 +845,8 @@ flowchart TD
 
     CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
     DeviceQuery --> CheckDeviceQuery{取得結果}
-    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
-    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[toast/エラーページ表示]
+    CheckDeviceQuery -->|DBエラー| Error500[エラーページ表示]
 
     CheckDeviceQuery -->|成功| CheckPage{request.args に<br>'page' パラメータあり?}
 
@@ -880,22 +889,29 @@ flowchart TD
 
 **① 表示期間の初期値設定**
 
-初期表示時は直近24時間を表示期間として設定します。
+初期表示時は直近24時間を表示期間として設定します。日時は日本時間（JST）を使用します。
 
 ```python
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
 
 def get_default_date_range():
-    """デフォルトの表示期間を取得（直近24時間）"""
-    end_datetime = datetime.now()
-    start_datetime = end_datetime - timedelta(hours=24)
+    """デフォルトの表示期間を取得（直近24時間、日本時間 JST）"""
+    end_dt = datetime.now(_JST).replace(tzinfo=None)
+    start_dt = end_dt - timedelta(hours=24)
     return {
-        'search_start_datetime': start_datetime.strftime('%Y-%m-%dT%H:%M'),
-        'search_end_datetime': end_datetime.strftime('%Y-%m-%dT%H:%M')
+        'search_start_datetime': start_dt.strftime('%Y-%m-%dT%H:%M'),
+        'search_end_datetime': end_dt.strftime('%Y-%m-%dT%H:%M')
     }
 ```
 
 **② アラート一覧取得**
+
+**ソート順:**
+- 第一ソート項目: アラートステータスID（`alert_status_id`）昇順（発生中が先）
+- 第二ソート項目: アラートレベルID（`alert_level_id`）昇順（重大が先）
+- 第三ソート項目: アラート履歴ID（`alert_history_id`）降順（新しい順）
 
 **使用テーブル:** v_alert_history_by_user（アラート履歴一覧用VIEW）、 alert_status_master、 alert_setting_master、 alert_level_master
 
@@ -949,7 +965,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  al.alert_level_id ASC
+  asm.alert_status_id ASC
+  , al.alert_level_id ASC
   , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
@@ -1045,8 +1062,8 @@ def device_details(device_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 404 | リソース不存在 | toast表示（アプリ内遷移時）/ エラーページ表示（URL直打ち時） | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -1085,8 +1102,8 @@ flowchart TD
 
     CheckAuth -->|認証OK| DeviceQuery[データスコープ制限チェック＆デバイス情報取得<br>VIEW v_device_master_by_user]
     DeviceQuery --> CheckDeviceQuery{取得結果}
-    CheckDeviceQuery -->|スコープ外/未存在| Error404[404エラーモーダル表示]
-    CheckDeviceQuery -->|DBエラー| Error500[500エラーモーダル表示]
+    CheckDeviceQuery -->|スコープ外/未存在| Error404[toast/エラーページ表示]
+    CheckDeviceQuery -->|DBエラー| Error500[エラーページ表示]
 
     CheckDeviceQuery -->|成功| Validate[バリデーション<br>表示期間の妥当性チェック]
     Validate --> CheckValidate{バリデーションOK?}
@@ -1096,17 +1113,9 @@ flowchart TD
     ClearCookie --> GetParams[フォームから検索条件を取得<br>search_start_datetime, search_end_datetime]
     GetParams --> Convert[検索条件設定<br>page: 現在のページを引き継ぐ（current_params.get('page', 1)）]
 
-    Convert --> DeviceQuery2[デバイス情報取得]
-    DeviceQuery2 --> AlertCount[アラート一覧件数取得]
-    AlertCount --> AlertQuery[アラート履歴取得]
-    AlertQuery --> GraphQuery[グラフ用データ取得<br>表示期間を適用]
-
-    GraphQuery --> CheckGraphQuery{DBクエリ結果}
-    CheckGraphQuery -->|成功| Template[Jinja2テンプレートレンダリング]
-    CheckGraphQuery -->|失敗| Error500[500エラーモーダル表示]
-
-    Template --> PutParams[Cookieに検索条件を格納]
-    PutParams --> Response[HTMLレスポンス返却]
+    Convert --> SaveCookie[Cookieに検索条件を格納<br>response.delete_cookie / set_cookie]
+    SaveCookie --> Redirect[GETへリダイレクト<br>redirect url_for device_details device_uuid page=1]
+    Redirect --> Response[リダイレクトレスポンス返却]
 
     LoginRedirect --> End([処理完了])
     Response --> End
@@ -1128,8 +1137,14 @@ flowchart TD
 **バリデーションルール:**
 - `search_start_datetime`: 必須、日時形式（YYYY-MM-DDTHH:MM）
 - `search_end_datetime`: 必須、日時形式（YYYY-MM-DDTHH:MM）
+- 開始日時が現在から62日以内であること
 - 開始日時 < 終了日時であること
 - 表示期間が最大2ヶ月（62日）以内であること
+
+**フロントエンド制御:**
+- ページロード時にJavaScriptで `search_start_datetime` および `search_end_datetime` の `min` 属性を現在から62日前の日時（分単位）に設定し、ブラウザのUI上でそれより古い日時を選択できないようにする
+- `min` 属性はページロード時の1回のみ設定される（フォーム送信時は再設定されない）
+- 実際のバリデーションはサーバーサイド（`validate_date_range`）で行う
 
 **実装例:**
 ```python
@@ -1143,6 +1158,11 @@ def validate_date_range(start_datetime_str, end_datetime_str):
     except (ValueError, TypeError):
         errors.append('日時の形式が正しくありません')
         return errors
+
+    now = datetime.now(_JST).replace(tzinfo=None)
+
+    if start_dt < now - timedelta(days=62):
+        errors.append('開始日時は現在から62日以内で指定してください')
 
     if start_dt >= end_dt:
         errors.append('開始日時は終了日時より前である必要があります')
@@ -1209,7 +1229,8 @@ WHERE
   AND v.delete_flag = FALSE
   AND v.alert_occurrence_datetime >= DATE_ADD(NOW(), INTERVAL -30 DAY)
 ORDER BY
-  al.alert_level_id ASC
+  asm.alert_status_id ASC
+  , al.alert_level_id ASC
   , v.alert_history_id DESC
 LIMIT :item_per_page OFFSET (:alert_page - 1) * :item_per_page
 ```
@@ -1255,25 +1276,11 @@ def device_details_search(device_uuid):
         'page': current_params.get('page', 1)
     }
 
-    # アラート一覧取得（件数・リストを同時取得）
-    alerts, alerts_total = get_device_alerts_with_count(device.device_id, search_params, g.current_user.user_id)
-
-    # グラフ用データ取得（MySQLから取得）
-    graph_data = get_graph_data(device.device_id, search_params)
-
-    # レンダリング
-    response = make_response(render_template(
-        'analysis/industry_dashboard/device_details.html',
-        device=device,
-        alerts=alerts,
-        graph_data=graph_data,
-        alerts_total=alerts_total,
-        page=1,
-        per_page=ITEM_PER_PAGE,
-        search_params=search_params
-    ))
-
-    # Cookieに検索条件を格納
+    # PRGパターン: Cookieに検索条件を格納してGETへリダイレクト
+    response = make_response(
+        redirect(url_for('analysis.device_details', device_uuid=device_uuid, page=1))
+    )
+    response.delete_cookie('device_details_search_params')
     response.set_cookie(
         'device_details_search_params',
         json.dumps(search_params),
@@ -1289,9 +1296,10 @@ def device_details_search(device_uuid):
 
 | メッセージID | 表示内容 | 表示タイミング | 表示場所 |
 |-------------|---------|---------------|---------|
-| VAL_001 | 日時の形式が正しくありません | 日時形式不正時 | フォーム内エラーメッセージ（period_error） |
-| VAL_002 | 開始日時は終了日時より前である必要があります | 期間不正時 | フォーム内エラーメッセージ（period_error） |
-| VAL_003 | 表示期間は2ヶ月以内で指定してください | 期間超過時 | フォーム内エラーメッセージ（period_error） |
+| VAL_001 | 日時の形式が正しくありません | 日時形式不正時 | フォーム項目下インライン表示 |
+| VAL_002 | 開始日時は現在から62日以内で指定してください | 開始日時が62日より前の場合 | フォーム項目下インライン表示 |
+| VAL_003 | 開始日時は終了日時より前である必要があります | 期間不正時 | フォーム項目下インライン表示 |
+| VAL_004 | 表示期間は2ヶ月以内で指定してください | 期間超過時 | フォーム項目下インライン表示 |
 | ERR_001 | データの取得に失敗しました | DBクエリ失敗時 | エラーモーダル |
 
 #### エラーハンドリング
@@ -1299,11 +1307,12 @@ def device_details_search(device_uuid):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 日時の形式が正しくありません |
+| 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 開始日時は現在から62日以内で指定してください |
 | 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 開始日時は終了日時より前である必要があります |
 | 400 | パラメータ不正 | 400ステータスでデバイス詳細画面を再描画、フォーム直下にエラーメッセージを表示（period_error） | 表示期間は2ヶ月以内で指定してください |
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存在 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
-| 500 | データベースエラー | 500エラーモーダル表示 | データの取得に失敗しました |
+| 404 | リソース不存在 | toast表示（アプリ内遷移時）/ エラーページ表示（URL直打ち時） | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | データの取得に失敗しました |
 
 500エラー発生時のエラー通知については、共通仕様書参照。
 
@@ -1313,7 +1322,9 @@ DBクエリ実行の直前、直後に操作ログを出力する
 
 #### 検索条件の保持方法
 
-Cookieに検索条件を保持する
+CookieにPOSTパラメータを格納してGETへリダイレクト（PRGパターン）。バリデーションエラー時のみPOSTで再描画する。
+
+> **リロード時の挙動:** バリデーション成功後はPRGにより最後のHTTPリクエストがGETになるため、ブラウザのリロード時は再送信ダイアログが表示されず、GETを再実行して初期表示（直近24時間）に戻る。
 
 #### UI状態
 
@@ -1331,6 +1342,15 @@ Cookieに検索条件を保持する
 #### 処理詳細
 データテーブルのヘッダをクリックすることで、ページ内で閉じたソートを行う。
 詳細は[共通仕様書](../../common/common-specification.md)参照のこと
+
+**ソート実行時の初期化処理:**
+
+新たなソートを適用する前に、以下の初期化を行う。
+
+1. **ソートインジケーターのリセット**: 全カラムのソートインジケーターを未ソート状態（↕）に戻す
+2. **ソート順序のリセット**: 元の行順（サーバーから返却された順序）を基準としてソートを再適用する
+
+同一カラムを3回クリックした場合は、ソートを解除して元の行順に戻す。
 
 ---
 
@@ -1446,8 +1466,8 @@ def export_sensor_data_csv(device, search_params):
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
 | 401 | 認証エラー | ログイン画面へリダイレクト | - |
-| 404 | リソース不存 | 404エラーモーダル表示 | 指定されたデバイスが見つかりません |
-| 500 | データベースエラー | 500エラーモーダル表示 | CSVエクスポートに失敗しました |
+| 404 | リソース不存 | toast表示（アプリ内遷移時）/ エラーページ表示（URL直打ち時） | 指定されたデバイスが見つかりません |
+| 500 | データベースエラー | エラーページ表示（errors/500.html） | CSVエクスポートに失敗しました |
 
 ---
 
