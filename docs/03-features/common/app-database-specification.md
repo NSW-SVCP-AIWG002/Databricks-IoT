@@ -2360,6 +2360,7 @@ def list_alert_history():
 - 論理削除されたアラート履歴（`delete_flag = TRUE`）も含まれるため、アプリケーション側でフィルタリングが必要
 - 論理削除されたデバイス（`d.delete_flag = TRUE`）およびアラート設定（`a.delete_flag = TRUE`）はVIEW側で除外される
 
+---
 
 ### 7. ダッシュボード一覧用VIEW (v_dashboard_master_by_user)
 
