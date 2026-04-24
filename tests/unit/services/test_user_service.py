@@ -390,7 +390,7 @@ class TestInsertUnityCatalogUser:
 
 @pytest.mark.unit
 class TestRollbackCreateUser:
-    """_rollback_create_user のテスト
+    """_rollback_create_user のテスト（Phase2失敗時: OLTP rollback済み → Databricks削除のみ）
     観点: 2.3 副作用チェック, 1.3 エラーハンドリング
     """
 
@@ -400,7 +400,7 @@ class TestRollbackCreateUser:
         mock_scim = MagicMock()
         mock_scim_cls.return_value = mock_scim
         from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)
+        _rollback_create_user(user_id=None, databricks_user_id='uid-1')
         mock_scim.delete_user.assert_called_once_with('uid-1')
 
     @patch(f'{MODULE}.ScimClient')
@@ -409,30 +409,8 @@ class TestRollbackCreateUser:
         mock_scim = MagicMock()
         mock_scim_cls.return_value = mock_scim
         from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=None, databricks_user_id=None, uc_inserted=False)
+        _rollback_create_user(user_id=None, databricks_user_id=None)
         mock_scim.delete_user.assert_not_called()
-
-    @patch(f'{MODULE}.UnityCatalogConnector')
-    @patch(f'{MODULE}.ScimClient')
-    def test_uc_delete_called_when_uc_inserted_true_and_user_id_present(self, mock_scim_cls, mock_conn_cls):
-        """2.3.2: uc_inserted=True かつ user_id がある場合 UC execute_dml (DELETE) が呼ばれる"""
-        mock_scim_cls.return_value = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn_cls.return_value = mock_conn
-        from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)
-        mock_conn.execute_dml.assert_called_once()
-
-    @patch(f'{MODULE}.UnityCatalogConnector')
-    @patch(f'{MODULE}.ScimClient')
-    def test_uc_delete_skipped_when_uc_not_inserted(self, mock_scim_cls, mock_conn_cls):
-        """2.3.2: uc_inserted=False の場合 UC execute_dml はスキップされる"""
-        mock_scim_cls.return_value = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn_cls.return_value = mock_conn
-        from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=False)
-        mock_conn.execute_dml.assert_not_called()
 
     @patch(f'{MODULE}.ScimClient')
     def test_scim_exception_suppressed(self, mock_scim_cls):
@@ -441,18 +419,63 @@ class TestRollbackCreateUser:
         mock_scim.delete_user.side_effect = Exception('SCIM error')
         mock_scim_cls.return_value = mock_scim
         from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)
+        _rollback_create_user(user_id=None, databricks_user_id='uid-1')
 
-    @patch(f'{MODULE}.UnityCatalogConnector')
+
+@pytest.mark.unit
+class TestRollbackCreateUserUcFailure:
+    """_rollback_create_user_uc_failure のテスト（Phase3失敗時: OLTP補償UPDATE + Databricks削除）
+    観点: 2.3 副作用チェック, 1.3 エラーハンドリング
+    """
+
     @patch(f'{MODULE}.ScimClient')
-    def test_uc_exception_suppressed(self, mock_scim_cls, mock_conn_cls):
-        """1.3.1: UC execute_dml が例外を投げても re-raise されない（ベストエフォート）"""
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_oltp_compensate_sets_delete_flag_true(self, mock_db, mock_user_cls, mock_scim_cls):
+        """2.3.2: OLTP 補償UPDATEで delete_flag=True / databricks_user_id='' が設定され commit される"""
+        mock_user_obj = MagicMock()
+        mock_user_cls.query.get.return_value = mock_user_obj
         mock_scim_cls.return_value = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.execute_dml.side_effect = Exception('UC error')
-        mock_conn_cls.return_value = mock_conn
-        from iot_app.services.user_service import _rollback_create_user
-        _rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)
+        from iot_app.services.user_service import _rollback_create_user_uc_failure
+        _rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')
+        assert mock_user_obj.delete_flag is True
+        assert mock_user_obj.databricks_user_id == ''
+        mock_db.session.commit.assert_called_once()
+
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_scim_delete_called_with_databricks_user_id(self, mock_db, mock_user_cls, mock_scim_cls):
+        """2.3.2: Databricks User削除が databricks_user_id で呼ばれる"""
+        mock_user_cls.query.get.return_value = MagicMock()
+        mock_scim = MagicMock()
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import _rollback_create_user_uc_failure
+        _rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')
+        mock_scim.delete_user.assert_called_once_with('uid-1')
+
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_oltp_exception_suppressed(self, mock_db, mock_user_cls, mock_scim_cls):
+        """1.3.1: OLTP 補償UPDATE が例外を投げても re-raise されない（ベストエフォート）"""
+        mock_user_cls.query.get.return_value = MagicMock()
+        mock_db.session.commit.side_effect = Exception('OLTP error')
+        mock_scim_cls.return_value = MagicMock()
+        from iot_app.services.user_service import _rollback_create_user_uc_failure
+        _rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')
+
+    @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
+    @patch(f'{MODULE}.db')
+    def test_scim_exception_suppressed(self, mock_db, mock_user_cls, mock_scim_cls):
+        """1.3.1: Databricks 削除が例外を投げても re-raise されない（ベストエフォート）"""
+        mock_user_cls.query.get.return_value = MagicMock()
+        mock_scim = MagicMock()
+        mock_scim.delete_user.side_effect = Exception('SCIM error')
+        mock_scim_cls.return_value = mock_scim
+        from iot_app.services.user_service import _rollback_create_user_uc_failure
+        _rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')
 
 
 # ---------------------------------------------------------------------------
@@ -485,8 +508,8 @@ class TestCreateUser:
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_saga_order_oltp_insert_scim_uc_activate_commit(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
-        """3.2.1.1 / 2.1.1: Saga実行順 ①OLTP flush → ②SCIM create → ③グループ追加 → ④UC INSERT → ⑤活性化 flush → commit"""
+    def test_saga_order_oltp_insert_scim_activate_commit_uc(self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert):
+        """3.2.1.1 / 2.1.1: Saga実行順 ①OLTP flush → commit① → ②SCIM create → ③グループ追加 → ④活性化 flush → commit② → ⑤UC INSERT"""
         call_order = []
         mock_db.session.flush.side_effect = lambda: call_order.append('flush')
         mock_db.session.commit.side_effect = lambda: call_order.append('commit')
@@ -498,7 +521,7 @@ class TestCreateUser:
         mock_user_cls.return_value = MagicMock()
         from iot_app.services.user_service import create_user
         create_user(self._make_form_data(), creator_id=1, auth_provider=self._make_auth_provider())
-        assert call_order == ['flush', 'scim_create', 'add_to_group', 'uc', 'flush', 'commit']
+        assert call_order == ['flush', 'commit', 'scim_create', 'add_to_group', 'flush', 'commit', 'uc']
 
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
@@ -602,14 +625,14 @@ class TestCreateUser:
                         auth_provider=self._make_auth_provider())
         mock_rollback.assert_called_once()
 
-    @patch(f'{MODULE}._rollback_create_user')
+    @patch(f'{MODULE}._rollback_create_user_uc_failure')
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_uc_failure_rollback_called_with_uc_inserted_false(
-            self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert, mock_rollback):
-        """2.3.2: UC INSERT 失敗時に _rollback_create_user が uc_inserted=False で呼ばれる"""
+    def test_uc_failure_calls_rollback_uc_failure_and_raises(
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert, mock_rollback_uc):
+        """2.3.2/1.3.1: UC INSERT失敗（Phase3）時に _rollback_create_user_uc_failure が呼ばれ例外が伝播する"""
         mock_user_obj = MagicMock()
         mock_user_cls.return_value = mock_user_obj
         mock_scim = MagicMock()
@@ -620,31 +643,32 @@ class TestCreateUser:
         with pytest.raises(Exception):
             create_user(self._make_form_data(), creator_id=1,
                         auth_provider=self._make_auth_provider())
-        args, kwargs = mock_rollback.call_args
-        uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
-        assert uc_inserted is False
+        mock_rollback_uc.assert_called_once()
 
     @patch(f'{MODULE}._rollback_create_user')
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_commit_failure_rollback_called_with_uc_inserted_true(
+    def test_phase2_commit_failure_calls_rollback_and_raises(
             self, mock_db, mock_user_cls, mock_scim_cls, mock_uc_insert, mock_rollback):
-        """2.3.2: commit 失敗時に _rollback_create_user が uc_inserted=True で呼ばれる"""
+        """2.3.2/1.3.1: Phase2コミット②失敗時に _rollback_create_user が呼ばれ例外が伝播する"""
         mock_user_obj = MagicMock()
         mock_user_cls.return_value = mock_user_obj
         mock_scim = MagicMock()
         mock_scim.create_user.return_value = 'new-uid'
         mock_scim_cls.return_value = mock_scim
-        mock_db.session.commit.side_effect = Exception('commit error')
+        commit_count = [0]
+        def commit_side_effect():
+            commit_count[0] += 1
+            if commit_count[0] == 2:
+                raise Exception('commit2 error')
+        mock_db.session.commit.side_effect = commit_side_effect
         from iot_app.services.user_service import create_user
         with pytest.raises(Exception):
             create_user(self._make_form_data(), creator_id=1,
                         auth_provider=self._make_auth_provider())
-        args, kwargs = mock_rollback.call_args
-        uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
-        assert uc_inserted is True
+        mock_rollback.assert_called_once()
 
     @patch(f'{MODULE}._insert_unity_catalog_user')
     @patch(f'{MODULE}.ScimClient')
@@ -669,9 +693,9 @@ class TestCreateUser:
     @patch(f'{MODULE}.ScimClient')
     @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_add_to_group_failure_triggers_rollback_with_uc_inserted_false(
+    def test_add_to_group_failure_triggers_rollback_and_raises(
             self, mock_db, mock_user_cls, mock_scim_cls, mock_rollback):
-        """2.3.2: add_user_to_group 失敗時に _rollback_create_user が uc_inserted=False で呼ばれる"""
+        """2.3.2/1.3.1: add_user_to_group 失敗（Phase2）時に _rollback_create_user が呼ばれ例外が伝播する"""
         mock_user_obj = MagicMock()
         mock_user_cls.return_value = mock_user_obj
         mock_scim = MagicMock()
@@ -683,9 +707,6 @@ class TestCreateUser:
             create_user(self._make_form_data(), creator_id=1,
                         auth_provider=self._make_auth_provider())
         mock_rollback.assert_called_once()
-        args, kwargs = mock_rollback.call_args
-        uc_inserted = kwargs.get('uc_inserted', args[2] if len(args) > 2 else None)
-        assert uc_inserted is False
 
     @patch(f'{MODULE}.check_email_duplicate')
     @patch(f'{MODULE}._insert_unity_catalog_user')
@@ -802,42 +823,54 @@ class TestRollbackUpdateUser:
     観点: 2.3 副作用チェック, 1.3 エラーハンドリング
     """
 
+    def _make_original_data(self):
+        return {
+            'user_name': '元の名前', 'region_id': 1, 'address': '東京都',
+            'status': 0, 'alert_notification_flag': False,
+            'system_notification_flag': True, 'modifier': 1,
+        }
+
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.User')
-    def test_restores_scim_and_uc_from_oltp(self, mock_user_cls, mock_scim_cls, mock_conn_cls):
-        """2.3.2: OLTP から元データを取得し SCIM と UC を復元する"""
-        mock_original = MagicMock()
-        mock_user_cls.query.get.return_value = mock_original
+    def test_compensates_oltp_scim_and_uc(self, mock_user_cls, mock_db, mock_scim_cls, mock_conn_cls):
+        """2.3.2: original_dataを使いOLTP補償コミット・SCIM復元・UC復元を実行する"""
+        mock_user = MagicMock()
+        mock_user_cls.query.get.return_value = mock_user
         mock_scim = MagicMock()
         mock_scim_cls.return_value = mock_scim
         mock_conn = MagicMock()
         mock_conn_cls.return_value = mock_conn
         from iot_app.services.user_service import _rollback_update_user
-        _rollback_update_user(databricks_user_id='uid-1', user_id=1)
+        _rollback_update_user(databricks_user_id='uid-1', user_id=1,
+                              original_data=self._make_original_data())
+        mock_db.session.commit.assert_called_once()
         mock_scim.update_user.assert_called_once()
         mock_conn.execute_dml.assert_called_once()
 
     @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.User')
-    def test_all_fields_restored_to_scim_and_uc(self, mock_user_cls, mock_scim_cls, mock_conn_cls):
-        """2.3.2: SCIMとUCに元データの全フィールドが正しく渡される"""
-        mock_original = MagicMock()
-        mock_original.user_name = '元の名前'
-        mock_original.region_id = 3
-        mock_original.address = '京都府'
-        mock_original.status = 0
-        mock_original.alert_notification_flag = False
-        mock_original.system_notification_flag = True
-        mock_original.modifier = 77
-        mock_user_cls.query.get.return_value = mock_original
+    def test_all_fields_restored_correctly(self, mock_user_cls, mock_db, mock_scim_cls, mock_conn_cls):
+        """2.3.2: original_dataの全フィールドがOLTP/SCIM/UCに正しく渡される"""
+        mock_user = MagicMock()
+        mock_user_cls.query.get.return_value = mock_user
         mock_scim = MagicMock()
         mock_scim_cls.return_value = mock_scim
         mock_conn = MagicMock()
         mock_conn_cls.return_value = mock_conn
+        original_data = {
+            'user_name': '元の名前', 'region_id': 3, 'address': '京都府',
+            'status': 0, 'alert_notification_flag': False,
+            'system_notification_flag': True, 'modifier': 77,
+        }
         from iot_app.services.user_service import _rollback_update_user
-        _rollback_update_user(databricks_user_id='uid-1', user_id=10)
+        _rollback_update_user(databricks_user_id='uid-1', user_id=10,
+                              original_data=original_data)
+        assert mock_user.user_name == '元の名前'
+        assert mock_user.status == 0
         mock_scim.update_user.assert_called_once_with('uid-1', '元の名前', 0)
         params = mock_conn.execute_dml.call_args[0][1]
         assert params['user_id'] == 10
@@ -849,28 +882,37 @@ class TestRollbackUpdateUser:
         assert params['system_notification_flag'] is True
         assert params['modifier'] == 77
 
+    @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.User')
-    def test_skips_when_user_not_found_in_oltp(self, mock_user_cls, mock_scim_cls):
-        """2.3.2: OLTP に元データがない場合は何もしない"""
+    def test_skips_oltp_commit_when_user_not_found(self, mock_user_cls, mock_db, mock_scim_cls, mock_conn_cls):
+        """2.3.2: OLTPにユーザーが存在しない場合はOLTPコミットをスキップするがSCIM/UCは補償する"""
         mock_user_cls.query.get.return_value = None
         mock_scim = MagicMock()
         mock_scim_cls.return_value = mock_scim
+        mock_conn_cls.return_value = MagicMock()
         from iot_app.services.user_service import _rollback_update_user
-        _rollback_update_user(databricks_user_id='uid-1', user_id=999)
-        mock_scim.update_user.assert_not_called()
+        _rollback_update_user(databricks_user_id='uid-1', user_id=999,
+                              original_data=self._make_original_data())
+        mock_db.session.commit.assert_not_called()
+        mock_scim.update_user.assert_called_once()
 
+    @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.User')
-    def test_exception_suppressed(self, mock_user_cls, mock_scim_cls):
-        """1.3.1: ロールバック中の例外を re-raise しない（ベストエフォート）"""
-        mock_original = MagicMock()
-        mock_user_cls.query.get.return_value = mock_original
+    def test_exception_suppressed(self, mock_user_cls, mock_db, mock_scim_cls, mock_conn_cls):
+        """1.3.1: 各ステップの例外を re-raise しない（ベストエフォート）"""
+        mock_user = MagicMock()
+        mock_user_cls.query.get.return_value = mock_user
+        mock_db.session.commit.side_effect = Exception('commit error')
         mock_scim = MagicMock()
-        mock_scim.update_user.side_effect = Exception('SCIM restore error')
         mock_scim_cls.return_value = mock_scim
+        mock_conn_cls.return_value = MagicMock()
         from iot_app.services.user_service import _rollback_update_user
-        _rollback_update_user(databricks_user_id='uid-1', user_id=1)
+        _rollback_update_user(databricks_user_id='uid-1', user_id=1,
+                              original_data=self._make_original_data())
 
 
 # ---------------------------------------------------------------------------
@@ -890,9 +932,11 @@ class TestUpdateUser:
     @patch(f'{MODULE}._update_unity_catalog_user')
     @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_success_commits(self, mock_db, mock_scim_cls, mock_update_oltp, mock_update_uc):
-        """2.1.1/3.3.2.1: 正常終了時に db.session.commit が呼ばれる"""
+    def test_success_commits(self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_update_uc):
+        """2.1.1/3.3.2.1: 正常終了時に db.session.commit が1回呼ばれる"""
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim_cls.return_value = MagicMock()
         from iot_app.services.user_service import update_user
         update_user(user_id=1, databricks_user_id='uid-1',
@@ -902,10 +946,12 @@ class TestUpdateUser:
     @patch(f'{MODULE}._update_unity_catalog_user')
     @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_saga_order_scim_then_uc_then_oltp(self, mock_db, mock_scim_cls, mock_update_oltp, mock_update_uc):
-        """3.3.1.1: Saga実行順は ①SCIM update → ②UC UPDATE → ③OLTP UPDATE"""
+    def test_saga_order_oltp_then_scim_then_uc(self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_update_uc):
+        """3.3.1.1: Saga実行順は ①OLTP UPDATE → ②SCIM update → ③UC UPDATE"""
         call_order = []
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim = MagicMock()
         mock_scim.update_user.side_effect = lambda *_, **__: call_order.append('scim')
         mock_scim_cls.return_value = mock_scim
@@ -914,13 +960,16 @@ class TestUpdateUser:
         from iot_app.services.user_service import update_user
         update_user(user_id=1, databricks_user_id='uid-1',
                     user_data=self._make_user_data(), modifier_id=1)
-        assert call_order == ['scim', 'uc', 'oltp']
+        assert call_order == ['oltp', 'scim', 'uc']
 
     @patch(f'{MODULE}._rollback_update_user')
+    @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_scim_failure_triggers_rollback_and_raises(self, mock_db, mock_scim_cls, mock_rollback):
+    def test_scim_failure_triggers_rollback_and_raises(self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_rollback):
         """2.3.2/1.3.1: SCIM update 失敗時にロールバックが呼ばれ例外が伝播する"""
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim = MagicMock()
         mock_scim.update_user.side_effect = Exception('SCIM error')
         mock_scim_cls.return_value = mock_scim
@@ -932,10 +981,13 @@ class TestUpdateUser:
 
     @patch(f'{MODULE}._rollback_update_user')
     @patch(f'{MODULE}._update_unity_catalog_user')
+    @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_uc_failure_triggers_rollback_and_raises(self, mock_db, mock_scim_cls, mock_update_uc, mock_rollback):
+    def test_uc_failure_triggers_rollback_and_raises(self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_rollback):
         """2.3.2/1.3.1: UC UPDATE 失敗時にロールバックが呼ばれ例外が伝播する"""
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim_cls.return_value = MagicMock()
         mock_update_uc.side_effect = Exception('UC error')
         from iot_app.services.user_service import update_user
@@ -948,26 +1000,30 @@ class TestUpdateUser:
     @patch(f'{MODULE}._update_unity_catalog_user')
     @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
-    def test_oltp_failure_triggers_rollback_and_raises(
-            self, mock_db, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_rollback):
-        """2.3.2/1.3.1: OLTP UPDATE 失敗時にロールバックが呼ばれ例外が伝播する"""
+    def test_oltp_failure_does_not_trigger_rollback_and_raises(
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_rollback):
+        """2.3.2/1.3.1: OLTP UPDATE 失敗時は _rollback_update_user を呼ばず例外が伝播する（SCIM/UCは未実行のため補償不要）"""
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim_cls.return_value = MagicMock()
         mock_update_oltp.side_effect = Exception('OLTP error')
         from iot_app.services.user_service import update_user
         with pytest.raises(Exception):
             update_user(user_id=1, databricks_user_id='uid-1',
                         user_data=self._make_user_data(), modifier_id=1)
-        mock_rollback.assert_called_once()
+        mock_rollback.assert_not_called()
 
     @patch(f'{MODULE}.check_email_duplicate')
     @patch(f'{MODULE}._update_unity_catalog_user')
     @patch(f'{MODULE}._update_oltp_user')
     @patch(f'{MODULE}.ScimClient')
+    @patch(f'{MODULE}.User')
     @patch(f'{MODULE}.db')
     def test_check_email_duplicate_not_called(
-            self, mock_db, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_check):
+            self, mock_db, mock_user_cls, mock_scim_cls, mock_update_oltp, mock_update_uc, mock_check):
         """2.3.2: update_user は email を変更しないため check_email_duplicate を呼ばない"""
+        mock_user_cls.query.get.return_value = MagicMock()
         mock_scim_cls.return_value = MagicMock()
         from iot_app.services.user_service import update_user
         update_user(user_id=1, databricks_user_id='uid-1',

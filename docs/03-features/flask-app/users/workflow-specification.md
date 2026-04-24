@@ -784,28 +784,30 @@ flowchart TD
     DupResult -->|重複なし| CreateUser[OLTP DB.user_master<br>ユーザー登録<br>INSERT INTO<br> user_master<br>delete_flag=TRUE<br>databricks_user_id='']
     CreateUser --> CheckCreate{OLTP DB<br>操作結果}
 
-    CheckCreate -->|失敗| Error500
-    CheckCreate -->|成功| CreateDatabricksUser[Databricks User作成<br>POST /api/2.0/preview/scim/v2/Users]
+    CheckCreate -->|失敗| RollbackOLTP1[OLTPロールバック<br>db.session.rollback]
+    RollbackOLTP1 --> Error500[500エラーページ表示]
+    CheckCreate -->|成功| Commit1[OLTP DB<br>コミット①]
+    Commit1 --> CreateDatabricksUser[Databricks User作成<br>POST /api/2.0/preview/scim/v2/Users]
     CreateDatabricksUser --> CheckDatabricksUser{Databricks User作成<br>操作結果}
 
-    CheckDatabricksUser -->|失敗| RollbackOLTP[OLTPロールバック<br>db.session.rollback]
-    RollbackOLTP --> Error500[500エラーページ表示]
+    CheckDatabricksUser -->|失敗| CleanupDatabricks[Databricks User削除<br>DELETE /api/2.0/preview/scim/v2/Users/id]
     CheckDatabricksUser -->|成功| AddGroup[Databricksワークスペースグループへ追加<br>PATCH /api/2.0/preview/scim/v2/Groups]
     AddGroup --> CheckGroup{グループ追加<br>操作結果}
 
-    CheckGroup -->|失敗| CleanupDatabricks[Databricks User削除<br>DELETE /api/2.0/preview/scim/v2/Users/id]
-    CheckGroup -->|成功| InsertUC[UnityCatalog.<br>user_masterへ<br>ユーザー登録<br>INSERT INTO<br> user_master]
-
-    InsertUC --> CheckUC{UnityCatalog<br>操作結果}
-    CheckUC -->|失敗| CleanupDatabricks
-    CheckUC --> |成功| ActivateUser[OLTP DB.user_master<br>ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
+    CheckGroup -->|失敗| CleanupDatabricks
+    CheckGroup -->|成功| ActivateUser[OLTP DB.user_master<br>ユーザー活性化<br>UPDATE user_master<br>SET databricks_user_id, delete_flag=FALSE]
 
     ActivateUser --> CheckActivate{OLTP DB UPDATE<br>操作結果}
-    CheckActivate -->|失敗| CleanupUC[UC user_master DELETE<br>DELETE FROM iot_catalog.oltp_db.user_master]
-    CheckActivate --> |成功| CheckEnv{環境判定<br>requires_additional_setup?}
+    CheckActivate -->|失敗| CleanupDatabricks
+    CheckActivate --> |成功| Commit2[OLTP DB<br>コミット②]
 
-    CleanupUC --> CleanupDatabricks
-    CleanupDatabricks --> RollbackOLTP
+    Commit2 --> InsertUC[UnityCatalog.<br>user_masterへ<br>ユーザー登録<br>INSERT INTO<br> user_master]
+
+    InsertUC --> CheckUC{UnityCatalog<br>操作結果}
+    CheckUC -->|失敗| CompensateOLTP[OLTP DB 補償<br>UPDATE user_master<br>SET delete_flag=TRUE]
+    CompensateOLTP --> CleanupDatabricks
+    CleanupDatabricks --> Error500
+    CheckUC --> |成功| CheckEnv{環境判定<br>requires_additional_setup?}
 
     CheckEnv -->|Azure/AWS| FlashCloud[フラッシュメッセージ設定<br>ユーザーを登録しました]
     CheckEnv -->|オンプレミス| InsertUserPw[user_password INSERT<br>password_hash = NULL]
@@ -908,18 +910,16 @@ def _insert_unity_catalog_user(user_id: int, databricks_user_id: str, user_data:
 def _rollback_create_user(
     user_id: int | None,
     databricks_user_id: str | None,
-    uc_inserted: bool,
 ) -> None:
-    """登録失敗時の補償トランザクション（ベストエフォート）
+    """Phase2失敗時の補償トランザクション（ベストエフォート）
 
     db.session.rollback() 後に呼び出す。
-    OLTP は rollback() で自動巻き戻し済みのため、Databricks と UC のみ削除する。
-    UC INSERTが完了していない場合は UC DELETE は行わない。
+    OLTP は rollback() で自動巻き戻し済み（Phase1コミット済みの仮登録レコードは残る）のため、
+    Databricks のみ削除する。
 
     Args:
-        user_id:             OLTP に INSERT したユーザーID（INSERT前に失敗した場合は None）
+        user_id:             OLTP に INSERT したユーザーID（未使用・将来拡張用）
         databricks_user_id:  Databricks に作成したユーザーID（作成前に失敗した場合は None）
-        uc_inserted:         UC user_master INSERT が完了済みかどうか
     """
     try:
         if databricks_user_id:
@@ -928,16 +928,35 @@ def _rollback_create_user(
     except Exception:
         logger.error("登録ロールバック失敗: Databricks User削除", exc_info=True)
 
+
+def _rollback_create_user_uc_failure(
+    user_id: int,
+    databricks_user_id: str,
+) -> None:
+    """Phase3（UC INSERT）失敗時の補償トランザクション（ベストエフォート）
+
+    OLTP は既にコミット済み（delete_flag=FALSE）のため、補償UPDATEで仮登録状態に戻す。
+    その後 Databricks ユーザーを削除する。
+
+    Args:
+        user_id:             OLTP に登録したユーザーID
+        databricks_user_id:  Databricks に作成したユーザーID
+    """
     try:
-        if uc_inserted and user_id:
-            uc = UnityCatalogConnector()
-            uc.execute_dml(
-                "DELETE FROM iot_catalog.oltp_db.user_master WHERE user_id = :user_id",
-                {'user_id': user_id},
-                operation="UC user_master 登録ロールバック",
-            )
+        user = User.query.get(user_id)
+        if user:
+            user.delete_flag = True
+            user.databricks_user_id = ''
+            db.session.commit()
     except Exception:
-        logger.error("登録ロールバック失敗: UC user_master DELETE", exc_info=True)
+        logger.error("登録ロールバック失敗: OLTP 補償トランザクション", exc_info=True)
+
+    try:
+        if databricks_user_id:
+            scim_client = ScimClient()
+            scim_client.delete_user(databricks_user_id)
+    except Exception:
+        logger.error("登録ロールバック失敗: Databricks User削除", exc_info=True)
 
 
 def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
@@ -953,11 +972,16 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
 
     Raises:
         Exception: 登録処理失敗時（ロールバック済み）
-    """
-    databricks_user_id = None
-    user_id = None
-    uc_inserted = False
 
+    処理順序（Saga）:
+        Phase1: ① OLTP INSERT（delete_flag=TRUE） → flush → commit①
+        Phase2: ② Databricks User作成 → ③ グループ追加 → ④ OLTP UPDATE（活性化） → flush → commit②
+        Phase3: ⑤ Unity Catalog user_master INSERT
+    """
+    user_id = None
+    databricks_user_id = None
+
+    # === Phase 1: OLTP 仮登録 ===
     try:
         # ① OLTP DB INSERT（delete_flag=TRUE）
         user = User(
@@ -979,7 +1003,14 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
         db.session.add(user)
         db.session.flush()
         user_id = user.user_id
+        db.session.commit()  # ← コミット①
 
+    except Exception:
+        db.session.rollback()
+        raise
+
+    # === Phase 2: Databricks 登録 + OLTP 本登録 ===
+    try:
         # ② Databricks User作成
         scim_client = ScimClient()
         databricks_user_id = scim_client.create_user(
@@ -990,34 +1021,37 @@ def create_user(user_data: dict, creator_id: int, auth_provider) -> dict:
         # ③ Databricksワークスペースグループへ追加
         scim_client.add_user_to_group(DATABRICKS_WORKSPACE_GROUP_ID, databricks_user_id)
 
-        # ④ Unity Catalog user_master INSERT
-        _insert_unity_catalog_user(user_id, databricks_user_id, user_data, creator_id)
-        uc_inserted = True
-
-        # ⑤ OLTP DB UPDATE（活性化）
+        # ④ OLTP DB UPDATE（本登録・活性化）
         user.databricks_user_id = databricks_user_id
         user.delete_flag = False
         db.session.flush()
-
-        db.session.commit()
-
-        # ⑥ オンプレミス環境：招待処理
-        # オンプレ環境対応は凍結中、実装不要
-        if auth_provider.requires_additional_setup():
-            try:
-                _send_invite(user)
-                return {'invite_sent': True, 'invite_failed': False}
-            except Exception:
-                return {'invite_sent': False, 'invite_failed': True}
-        # ここまで実装不要
-
-
-        return {'invite_sent': False, 'invite_failed': False}
+        db.session.commit()  # ← コミット②
 
     except Exception:
         db.session.rollback()
-        _rollback_create_user(user_id, databricks_user_id, uc_inserted)
+        _rollback_create_user(user_id, databricks_user_id)
         raise
+
+    # === Phase 3: Unity Catalog 登録 ===
+    try:
+        # ⑤ Unity Catalog user_master INSERT
+        _insert_unity_catalog_user(user_id, databricks_user_id, user_data, creator_id)
+
+    except Exception:
+        _rollback_create_user_uc_failure(user_id, databricks_user_id)
+        raise
+
+    # ⑥ オンプレミス環境：招待処理
+    # オンプレ環境対応は凍結中、実装不要
+    if auth_provider.requires_additional_setup():
+        try:
+            _send_invite(user)
+            return {'invite_sent': True, 'invite_failed': False}
+        except Exception:
+            return {'invite_sent': False, 'invite_failed': True}
+    # ここまで実装不要
+
+    return {'invite_sent': False, 'invite_failed': False}
 
 
 # views/admin/users.py
@@ -1214,24 +1248,26 @@ flowchart TD
     CheckExistsResult -->|存在しない| NotFoundError[エラー表示<br>指定されたユーザーが見つかりません]
     NotFoundError --> ValidEnd[処理中断]
 
-    CheckExistsResult -->|存在する| UpdateDatabricks[Databricks User更新<br>PATCH /api/2.0/preview/scim/v2/Users]
+    CheckExistsResult -->|存在する| UpdateDB[OLTP DB<br>user_master<br>ユーザー更新]
+
+    UpdateDB --> CheckDBMstr{DB操作結果}
+
+    CheckDBMstr -->|失敗| Error500
+    CheckDBMstr -->|成功| Commit1[OLTP DB<br>コミット]
+
+    Commit1 --> UpdateDatabricks[Databricks User更新<br>PATCH /api/2.0/preview/scim/v2/Users]
 
     UpdateDatabricks --> CheckDatabricks{Databricks<br>操作結果}
 
-    CheckDatabricks -->|失敗| Error500
+    CheckDatabricks -->|失敗| RollbackAll[_rollback_update_user<br>original_dataでOLTP補償コミット<br>SCIM・UCを元値に復元]
     CheckDatabricks -->|成功| UpdateUC[UnityCatalog<br>user_master<br>ユーザー更新]
 
     UpdateUC --> CheckUC{UnityCatalog<br>操作結果}
 
-    CheckUC -->|成功| UpdateDB[OLTP DB<br>user_master<br>ユーザー更新]
-    CheckUC -->|失敗| RollbackDatabricks[Databricks User復元]
-    RollbackDatabricks --> Error500
+    CheckUC -->|成功| Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_users]
+    CheckUC -->|失敗| RollbackAll
 
-    UpdateDB --> CheckDBMstr{DB操作結果}
-
-    CheckDBMstr -->|成功| Redirect[一覧画面へリダイレクト<br>redirect url_for admin.list_users]
-    CheckDBMstr -->|失敗| RollbackUC[UnityCatalog<br>user_master<br>元データを復元]
-    RollbackUC --> RollbackDatabricks
+    RollbackAll --> Error500
 
     Redirect --> Success[フラッシュメッセージ設定<br>ユーザー情報を更新しました]
 
@@ -1299,19 +1335,31 @@ def _update_oltp_user(user_id: int, user_data: dict, modifier_id: int) -> None:
     db.session.flush()
 
 
-def _rollback_update_user(databricks_user_id: str, user_id: int) -> None:
-    """Databricks/UC を元データで復元する（db.session.rollback() 後に呼ぶこと）
+def _rollback_update_user(databricks_user_id: str, user_id: int, original_data: dict) -> None:
+    """original_data を使い OLTP/SCIM/UC を元値に補償する（ベストエフォート）
 
-    db.session.rollback() 後は OLTP が元データに戻っているため、
-    OLTP から元値を取得して Databricks と UC を復元する。
-    ロールバック自体の失敗はログ出力のみでエラーを握りつぶす（ベストエフォート）。
+    SCIM/UC 失敗時に呼ぶ。OLTP はコミット済みのため補償トランザクションで元値に上書きする。
+    3ステップを独立した try/except で実行し、失敗してもログのみで続行する。
     """
     try:
-        original = User.query.get(user_id)
-        if not original:
-            return
+        user = User.query.get(user_id)
+        if user:
+            user.user_name                = original_data['user_name']
+            user.region_id                = original_data['region_id']
+            user.address                  = original_data['address']
+            user.status                   = original_data['status']
+            user.alert_notification_flag  = original_data['alert_notification_flag']
+            user.system_notification_flag = original_data['system_notification_flag']
+            user.modifier                 = original_data['modifier']
+            db.session.commit()
+    except Exception:
+        logger.error("ユーザー更新ロールバック失敗: OLTP補償", exc_info=True)
+    try:
         scim_client = ScimClient()
-        scim_client.update_user(databricks_user_id, original.user_name, original.status)
+        scim_client.update_user(databricks_user_id, original_data['user_name'], original_data['status'])
+    except Exception:
+        logger.error("ユーザー更新ロールバック失敗: SCIM復元", exc_info=True)
+    try:
         uc = UnityCatalogConnector()
         uc.execute_dml(
             """
@@ -1323,19 +1371,19 @@ def _rollback_update_user(databricks_user_id: str, user_id: int) -> None:
             WHERE user_id=:user_id
             """,
             {
-                'user_name':                  original.user_name,
-                'region_id':                  original.region_id,
-                'address':                    original.address,
-                'status':                     original.status,
-                'alert_notification_flag':    original.alert_notification_flag,
-                'system_notification_flag':   original.system_notification_flag,
-                'modifier':                   original.modifier,
+                'user_name':                  original_data['user_name'],
+                'region_id':                  original_data['region_id'],
+                'address':                    original_data['address'],
+                'status':                     original_data['status'],
+                'alert_notification_flag':    original_data['alert_notification_flag'],
+                'system_notification_flag':   original_data['system_notification_flag'],
+                'modifier':                   original_data['modifier'],
                 'user_id':                    user_id,
             },
             operation="UC user_master 更新ロールバック",
         )
     except Exception:
-        logger.error("ユーザー更新ロールバック失敗", exc_info=True)
+        logger.error("ユーザー更新ロールバック失敗: UC復元", exc_info=True)
 
 
 def update_user(user_id: int, databricks_user_id: str, user_data: dict, modifier_id: int) -> None:
@@ -1350,21 +1398,32 @@ def update_user(user_id: int, databricks_user_id: str, user_data: dict, modifier
     Raises:
         Exception: 更新失敗時（ロールバック済み）
     """
+    original = User.query.get(user_id)
+    original_data = {
+        'user_name':                  original.user_name,
+        'region_id':                  original.region_id,
+        'address':                    original.address,
+        'status':                     original.status,
+        'alert_notification_flag':    original.alert_notification_flag,
+        'system_notification_flag':   original.system_notification_flag,
+        'modifier':                   original.modifier,
+    }
+
     try:
-        # ① Databricks User更新（displayName, activeのみ）
-        scim_client = ScimClient()
-        scim_client.update_user(databricks_user_id, user_data['user_name'], user_data['status'])
-
-        # ② UC user_master更新
-        _update_unity_catalog_user(user_id, user_data, modifier_id)
-
-        # ③ OLTP DB更新
+        # Phase 1: OLTP DB更新（失敗時はSCIM/UCが未実行のため補償不要）
         _update_oltp_user(user_id, user_data, modifier_id)
         db.session.commit()
-
     except Exception:
-        db.session.rollback()  # OLTPは自動巻き戻し（元データに復元済み）
-        _rollback_update_user(databricks_user_id, user_id)  # rollback後にOLTPから元データ取得してDatabricks/UC復元
+        db.session.rollback()
+        raise
+
+    try:
+        # Phase 2: SCIM + UC更新（失敗時はoriginal_dataでOLTP/SCIM/UCを補償）
+        scim_client = ScimClient()
+        scim_client.update_user(databricks_user_id, user_data['user_name'], user_data['status'])
+        _update_unity_catalog_user(user_id, user_data, modifier_id)
+    except Exception:
+        _rollback_update_user(databricks_user_id, user_id, original_data)
         raise
 
 

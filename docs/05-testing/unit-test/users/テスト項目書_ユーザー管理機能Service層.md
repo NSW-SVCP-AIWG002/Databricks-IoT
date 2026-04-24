@@ -78,35 +78,45 @@
 
 ## TestRollbackCreateUser
 
-`_rollback_create_user()` はユーザー登録Sagaの補償処理で、SCIM削除・UC削除をベストエフォートで実行する。各処理で例外が発生しても握りつぶして続行する。
+`_rollback_create_user()` はPhase2失敗時の補償処理で、Databricks削除をベストエフォートで実行する。OLTP は `db.session.rollback()` で自動巻き戻し済み（Phase1コミット済みの仮登録レコードは残存）。
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 26 | 2.3.2 副作用チェック（SCIM 削除実行） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が `'uid-1'` で1回呼ばれること |
-| 27 | 2.3.2 副作用チェック（SCIM 削除スキップ） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id=None, uc_inserted=False)` を呼ぶ | `mock_scim.delete_user` が呼ばれないこと |
-| 28 | 2.3.2 副作用チェック（UC 削除実行） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | `mock_conn.execute_dml` が1回呼ばれること |
-| 29 | 2.3.2 副作用チェック（UC 削除スキップ） | `ScimClient`, `UnityCatalogConnector` をモック化し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | `mock_conn.execute_dml` が呼ばれないこと |
-| 30 | 1.3.1 エラーハンドリング（SCIM例外抑制） | `ScimClient.delete_user` が例外を投げるよう設定し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1', uc_inserted=False)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
-| 31 | 1.3.1 エラーハンドリング（UC例外抑制） | `UnityCatalogConnector.execute_dml` が例外を投げるよう設定し、`_rollback_create_user(user_id=5, databricks_user_id='uid-1', uc_inserted=True)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 26 | 2.3.2 副作用チェック（SCIM 削除実行） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1')` を呼ぶ | `mock_scim.delete_user` が `'uid-1'` で1回呼ばれること |
+| 27 | 2.3.2 副作用チェック（SCIM 削除スキップ） | `ScimClient` をモック化し、`_rollback_create_user(user_id=None, databricks_user_id=None)` を呼ぶ | `mock_scim.delete_user` が呼ばれないこと |
+| 28 | 1.3.1 エラーハンドリング（SCIM例外抑制） | `ScimClient.delete_user` が例外を投げるよう設定し、`_rollback_create_user(user_id=None, databricks_user_id='uid-1')` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+
+---
+
+## TestRollbackCreateUserUcFailure
+
+`_rollback_create_user_uc_failure()` はPhase3（UC INSERT）失敗時の補償処理。OLTPは既にコミット済みのため補償UPDATEで仮登録状態に戻し、その後Databricksユーザーを削除する。
+
+| No | テスト観点 | 操作手順 | 予想結果 |
+| -- | ---------- | -------- | -------- |
+| 29 | 2.3.2 副作用チェック（OLTP補償UPDATE） | `db`, `User`, `ScimClient` をモック化し、`_rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')` を呼ぶ | `mock_user_obj.delete_flag` が `True` に、`mock_user_obj.databricks_user_id` が `''` に設定され、`db.session.commit` が1回呼ばれること |
+| 30 | 2.3.2 副作用チェック（SCIM 削除実行） | `db`, `User`, `ScimClient` をモック化し、`_rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')` を呼ぶ | `mock_scim.delete_user` が `'uid-1'` で1回呼ばれること |
+| 31 | 1.3.1 エラーハンドリング（OLTP例外抑制） | `db.session.commit` が例外を投げるよう設定し、`_rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 31b | 1.3.1 エラーハンドリング（SCIM例外抑制） | `ScimClient.delete_user` が例外を投げるよう設定し、`_rollback_create_user_uc_failure(user_id=5, databricks_user_id='uid-1')` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
 
 ---
 
 ## TestCreateUser
 
-`create_user()` はSCIM登録・UCへのINSERT・OLTP登録を順に実行するSagaオーケストレーター。各ステップ失敗時には `_rollback_create_user()` でロールバックし例外を伝播する。
+`create_user()` は3フェーズのSagaオーケストレーター。Phase1: OLTP仮登録→commit①、Phase2: Databricks登録→OLTP本登録→commit②、Phase3: UC INSERT。各フェーズの失敗時に対応する補償処理を実行し例外を伝播する。
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 32 | 3.2.1.1 / 2.1.1 登録処理呼び出し（Saga実行順） | call_order リストで各ステップの呼び出し順を記録し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 呼び出し順が `['flush', 'scim_create', 'add_to_group', 'uc', 'flush', 'commit']` であること（①OLTP flush → ②SCIM create → ③グループ追加 → ④UC INSERT → ⑤活性化 flush → commit） |
+| 32 | 3.2.1.1 / 2.1.1 登録処理呼び出し（Saga実行順） | call_order リストで各ステップの呼び出し順を記録し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 呼び出し順が `['flush', 'commit', 'scim_create', 'add_to_group', 'flush', 'commit', 'uc']` であること（①OLTP flush → commit① → ②SCIM create → ③グループ追加 → ④活性化 flush → commit② → ⑤UC INSERT） |
 | 33 | 3.2.1.1 登録処理呼び出し（仮登録ステップ） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時の引数に `delete_flag=True` が含まれること（仮登録状態）かつ `db.session.add` が1回呼ばれること |
-| 34 | 3.2.1.1 登録処理呼び出し（User コンストラクタ引数・全件） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時に全登録対象項目（固定値・user_data写し・creator_id写し）がコンストラクタ引数に含まれること（delete_flag は No.32 でカバー） |
+| 34 | 3.2.1.1 登録処理呼び出し（User コンストラクタ引数・全件） | `User` のコンストラクタを記録するよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `User()` 生成時に全登録対象項目（固定値・user_data写し・creator_id写し）がコンストラクタ引数に含まれること（delete_flag は No.33 でカバー） |
 | 35 | 3.2.1.1 登録処理呼び出し（活性化 databricks_user_id・delete_flag更新） | `User` モックが `delete_flag=True` 状態で返るよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | 活性化ステップで `mock_user_obj.databricks_user_id` が `'new-uid'` に、`mock_user_obj.delete_flag` が `False` に更新されること |
 | 36 | 3.2.1.1 登録処理呼び出し（SCIM email・name） | `ScimClient` をモック化し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.create_user` が `email=form_data['email_address'], display_name=form_data['user_name']` で1回呼ばれること |
 | 37 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.create_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、例外が伝播すること |
-| 38 | 2.3.2 副作用チェック（UC INSERT失敗→uc_inserted=False） | `_insert_unity_catalog_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=False` で呼ばれること |
-| 39 | 2.3.2 副作用チェック（commit失敗→uc_inserted=True） | `db.session.commit` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が `uc_inserted=True` で呼ばれること |
+| 38 | 2.3.2 / 1.3.1 副作用チェック（Phase3 UC INSERT失敗→rollback_uc_failure・例外伝播） | `_insert_unity_catalog_user` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user_uc_failure` が1回呼ばれ、例外が伝播すること |
+| 39 | 2.3.2 / 1.3.1 副作用チェック（Phase2 commit②失敗→rollback・例外伝播） | `db.session.commit` が2回目の呼び出し時のみ例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、例外が伝播すること |
 | 40 | 3.2.1.1 登録処理呼び出し（グループ追加） | `ScimClient.create_user` が `'new-uid'` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `mock_scim.add_user_to_group` が1回呼ばれ、位置引数に `'new-uid'` が含まれること |
-| 41 | 2.3.2 副作用チェック（グループ追加失敗→uc_inserted=False） | `ScimClient.add_user_to_group` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、`uc_inserted=False` であること |
+| 41 | 2.3.2 / 1.3.1 副作用チェック（グループ追加失敗→rollback・例外伝播） | `ScimClient.add_user_to_group` が例外を投げるよう設定し、`create_user(...)` を呼ぶ | `_rollback_create_user` が1回呼ばれ、例外が伝播すること |
 | 42 | 3.2.1.1 登録処理呼び出し（重複チェック呼び出し） | `check_email_duplicate` をモック化して `False` を返すよう設定し、`create_user(form_data, creator_id=1, auth_provider=...)` を呼ぶ | `check_email_duplicate` が `form_data['email_address']` を引数として1回呼ばれること |
 
 ---
@@ -135,28 +145,28 @@
 
 ## TestRollbackUpdateUser
 
-`_rollback_update_user()` はユーザー更新Sagaの補償処理で、SCIM・UCを更新前の状態に復元する。例外が発生しても握りつぶして続行する。
+`_rollback_update_user()` はユーザー更新Sagaの補償処理。`original_data` を受け取り、OLTP補償コミット・SCIM復元・UC復元を独立した3ステップでベストエフォート実行する。
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 47 | 2.3.2 副作用チェック（SCIM・UC復元） | `User.query.get` がモックユーザーを返し、`ScimClient`, `UnityCatalogConnector` をモック化して `_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | `mock_scim.update_user` と `mock_conn.execute_dml` がそれぞれ1回呼ばれること |
-| 48 | 2.3.2 副作用チェック（全フィールド復元） | `mock_original` に具体値をセットし、`_rollback_update_user(databricks_user_id='uid-1', user_id=10)` を呼ぶ | SCIM `update_user` が `('uid-1', '元の名前', 0)` で呼ばれ、UC execute_dml の params に全復元対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`）が含まれること |
-| 49 | 2.3.2 副作用チェック（元データなし→何もしない） | `User.query.get` が `None` を返すよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=999)` を呼ぶ | `mock_scim.update_user` が呼ばれないこと |
-| 50 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `ScimClient.update_user` が例外を投げるよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=1)` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
+| 47 | 2.3.2 副作用チェック（OLTP/SCIM/UC補償） | `User.query.get` がモックユーザーを返し、`db`, `ScimClient`, `UnityCatalogConnector` をモック化して `_rollback_update_user(databricks_user_id='uid-1', user_id=1, original_data={...})` を呼ぶ | `db.session.commit`・`mock_scim.update_user`・`mock_conn.execute_dml` がそれぞれ1回呼ばれること |
+| 48 | 2.3.2 副作用チェック（全フィールド補償） | `original_data` に具体値をセットし、`_rollback_update_user(databricks_user_id='uid-1', user_id=10, original_data=original_data)` を呼ぶ | OLTP の各フィールドが `original_data` の値にセットされ、SCIM `update_user` が `('uid-1', '元の名前', 0)` で呼ばれ、UC execute_dml の params に全補償対象フィールド（`user_id`, `user_name`, `region_id`, `address`, `status`, `alert_notification_flag`, `system_notification_flag`, `modifier`）が含まれること |
+| 49 | 2.3.2 副作用チェック（OLTPユーザー不在→OLTPコミットなし・SCIM/UCは補償） | `User.query.get` が `None` を返すよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=999, original_data={...})` を呼ぶ | `db.session.commit` が呼ばれず、`mock_scim.update_user` が1回呼ばれること |
+| 50 | 1.3.1 エラーハンドリング（ロールバック例外抑制） | `db.session.commit` が例外を投げるよう設定し、`_rollback_update_user(databricks_user_id='uid-1', user_id=1, original_data={...})` を呼ぶ | 例外が re-raise されないこと（ベストエフォート） |
 
 ---
 
 ## TestUpdateUser
 
-`update_user()` はSCIM更新・UC更新・OLTP更新の順に実行するSagaオーケストレーター。各ステップ失敗時には `_rollback_update_user()` でロールバックし例外を伝播する。メールアドレスは更新不可項目のため重複チェックは行わない。
+`update_user()` はOLTP更新・SCIM更新・UC更新の順に実行するSagaオーケストレーター。OLTP失敗時はdb.session.rollbackのみで例外を伝播（SCIM/UCは未実行）、SCIM/UC失敗時は `_rollback_update_user(original_data)` でOLTP/SCIM/UCを補償し例外を伝播する。メールアドレスは更新不可項目のため重複チェックは行わない。
 
 | No | テスト観点 | 操作手順 | 予想結果 |
 | -- | ---------- | -------- | -------- |
-| 51 | 2.1.1 / 3.3.2.1 正常系：commit | `db`, `ScimClient`, `_update_oltp_user`, `_update_unity_catalog_user` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `db.session.commit` が1回呼ばれること |
-| 52 | 3.3.1.1 更新処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`update_user(...)` を呼ぶ | 呼び出し順が `['scim', 'uc', 'oltp']` であること（①SCIM update → ②UC UPDATE → ③OLTP UPDATE） |
-| 53 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `ScimClient.update_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
-| 54 | 2.3.2 / 1.3.1 副作用チェック（UC失敗→rollback・例外伝播） | `_update_unity_catalog_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
-| 55 | 2.3.2 / 1.3.1 副作用チェック（OLTP失敗→rollback・例外伝播） | `_update_oltp_user` が例外を投げるよう設定し、`update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 51 | 2.1.1 / 3.3.2.1 正常系：commit | `db`, `User`, `ScimClient`, `_update_oltp_user`, `_update_unity_catalog_user` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `db.session.commit` が1回呼ばれること |
+| 52 | 3.3.1.1 更新処理呼び出し（Saga実行順） | call_order リストを使い各ステップの呼び出し順を記録し、`update_user(...)` を呼ぶ | 呼び出し順が `['oltp', 'scim', 'uc']` であること（①OLTP UPDATE → ②SCIM update → ③UC UPDATE） |
+| 53 | 2.3.2 / 1.3.1 副作用チェック（SCIM失敗→rollback・例外伝播） | `User`, `_update_oltp_user` をモック化し、`ScimClient.update_user` が例外を投げるよう設定して `update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 54 | 2.3.2 / 1.3.1 副作用チェック（UC失敗→rollback・例外伝播） | `User`, `_update_oltp_user` をモック化し、`_update_unity_catalog_user` が例外を投げるよう設定して `update_user(...)` を呼ぶ | `_rollback_update_user` が1回呼ばれ、例外が伝播すること |
+| 55 | 2.3.2 / 1.3.1 副作用チェック（OLTP失敗→rollback非呼び出し・例外伝播） | `User`, `_update_unity_catalog_user` をモック化し、`_update_oltp_user` が例外を投げるよう設定して `update_user(...)` を呼ぶ | `_rollback_update_user` が呼ばれず、例外が伝播すること（SCIM/UCは未実行のため補償不要） |
 | 56 | 2.3.2 副作用チェック（重複チェック非呼び出し） | `check_email_duplicate` をモック化し、`update_user(user_id=1, databricks_user_id='uid-1', user_data={...}, modifier_id=1)` を呼ぶ | `check_email_duplicate` が呼ばれないこと（email は更新不可項目のため） |
 
 ---
