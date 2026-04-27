@@ -221,15 +221,15 @@ def view_device_detail(device_uuid):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             device_types, organizations, _ = get_device_form_options(g.current_user.user_id)
+            status_map = get_device_status_map([device.device_id])
         except Exception:
             abort(500)
-        editable = g.current_user.user_type_id in [1, 2, 3]
         return render_template(
             'admin/devices/detail_modal.html',
             device=device,
             device_types=device_types,
             organizations=organizations,
-            editable=editable,
+            status_map=status_map,
         )
     return render_template('admin/devices/detail.html', device=device)
 

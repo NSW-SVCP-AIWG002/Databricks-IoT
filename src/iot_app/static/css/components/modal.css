@@ -82,3 +82,13 @@
 .modal:has(.modal-content--lg) {
   max-width: min(900px, 90vw);
 }
+
+/* 小サイズモーダル（削除確認等） */
+.modal--sm {
+  max-width: 400px;
+  min-width: 300px;
+}
+
+.modal__icon--warning {
+  color: #F59E0B;
+}

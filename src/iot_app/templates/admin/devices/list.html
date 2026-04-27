@@ -276,21 +276,24 @@
 {% endif %}
 
 {# モーダルオーバーレイ（詳細・登録・編集共用） #}
-<div id="dm-modal-overlay" class="modal-overlay" onclick="if(event.target===this)DeviceModule.closeModal()">
+<div id="dm-modal-overlay" class="modal-overlay" onclick="DeviceModule.handleOverlayClick(event)">
   <div class="modal" id="dm-modal-content" onclick="event.stopPropagation()">
   </div>
 </div>
 
 {# 削除確認モーダル #}
 <div id="delete-confirm-modal" class="modal-overlay">
-  <div class="modal">
+  <div class="modal modal--sm">
+    <div class="modal__header">
+      <h2 class="modal__title"><span class="modal__icon--warning">⚠</span> 削除確認</h2>
+    </div>
     <div class="modal__body">
-      <p class="modal__message">選択したデバイスを削除してもよろしいですか？</p>
+      <p class="modal__message">選択したデバイス（<span id="delete-count">0</span>件）を削除しますか？</p>
       <p class="modal__message">この操作は取り消すことができません。</p>
     </div>
     <div class="modal__footer">
+      <button type="button" class="button button--danger" id="delete-confirm-btn">削除する</button>
       <button type="button" class="button" id="delete-cancel-btn">キャンセル</button>
-      <button type="button" class="button button--danger" id="delete-confirm-btn">削除</button>
     </div>
   </div>
 </div>

@@ -59,16 +59,17 @@
     <div class="dm-detail__row">
       <dt class="dm-detail__label">ステータス</dt>
       <dd class="dm-detail__value">
-        <span class="device-status" id="device-status-badge" data-uuid="{{ device.device_uuid }}">—</span>
+        {%- set status = status_map.get(device.device_id, '未接続') %}
+        {%- if status == '接続済み' %}
+        <span class="device-status device-status--connected">接続済み</span>
+        {%- else %}
+        <span class="device-status device-status--disconnected">未接続</span>
+        {%- endif %}
       </dd>
     </div>
   </dl>
 </div>
 
 <div class="modal__footer">
-  {%- if editable %}
-  <button type="button" class="button button--primary"
-          onclick="DeviceModule.openEditModal('{{ device.device_uuid }}')">編集</button>
-  {%- endif %}
   <button type="button" class="button" onclick="DeviceModule.closeModal()">閉じる</button>
 </div>

@@ -1,7 +1,7 @@
 'use strict';
 
 var DeviceModule = (function () {
-  var overlay, content;
+  var overlay, content, currentModalMode;
 
   function init() {
     overlay = document.getElementById('dm-modal-overlay');
@@ -55,6 +55,8 @@ var DeviceModule = (function () {
     var deleteForm       = document.getElementById('delete-form');
     if (deleteBtn && deleteModal) {
       deleteBtn.addEventListener('click', function () {
+        var countEl = document.getElementById('delete-count');
+        if (countEl) countEl.textContent = document.querySelectorAll('.row-check:checked').length;
         deleteModal.classList.add('active');
       });
       deleteCancelBtn.addEventListener('click', function () {
@@ -63,9 +65,6 @@ var DeviceModule = (function () {
       deleteConfirmBtn.addEventListener('click', function () {
         deleteModal.classList.remove('active');
         deleteForm.submit();
-      });
-      deleteModal.addEventListener('click', function (e) {
-        if (e.target === deleteModal) deleteModal.classList.remove('active');
       });
     }
 
@@ -178,10 +177,11 @@ var DeviceModule = (function () {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    openDetailModal: function (uuid) { openModal('/admin/devices/' + uuid); },
-    openCreateModal: function ()     { openModal('/admin/devices/create'); },
-    openEditModal:   function (uuid) { openModal('/admin/devices/' + uuid + '/edit'); },
+    openDetailModal: function (uuid) { currentModalMode = 'detail'; openModal('/admin/devices/' + uuid); },
+    openCreateModal: function ()     { currentModalMode = 'create'; openModal('/admin/devices/create'); },
+    openEditModal:   function (uuid) { currentModalMode = 'edit';   openModal('/admin/devices/' + uuid + '/edit'); },
     closeModal:      closeModal,
+    handleOverlayClick: function (e) { if (e.target === overlay && currentModalMode !== 'detail') closeModal(); },
     submitForm:      submitForm,
   };
 })();
