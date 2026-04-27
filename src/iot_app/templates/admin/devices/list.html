@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+
+{% block title %}デバイス管理{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/device.css') }}">
+{% endblock %}
+
+{% block content %}
+
+{# (1) ページタイトル + アクションボタン #}
+<div class="dm-page-header">
+  <h1 class="page-title">デバイス管理</h1>
+  {%- if g.current_user.user_type_id in [1, 2, 3] %}
+  <div class="dm-page-actions">
+    <form method="POST" action="{{ url_for('admin.export_devices_csv_view') }}" style="display:inline;">
+      <button type="submit" class="button button--primary">CSVエクスポート</button>
+    </form>
+    <button type="button" class="button button--primary" onclick="DeviceModule.openCreateModal()">登録</button>
+    <button type="button" class="button button--danger" id="delete-btn" disabled>削除</button>
+  </div>
+  {%- endif %}
+</div>
+
+{# (2) 検索フォーム #}
+<div class="search-form" id="search-form-container">
+  <div class="search-form__header" id="search-form-toggle">
+    <span class="search-form__title">検索条件</span>
+    <span class="search-form__toggle-icon" id="search-toggle-icon">▼</span>
+  </div>
+  <div class="search-form__body" id="search-form-body">
+    <form method="POST" action="{{ url_for('admin.search_devices_view') }}" id="search-form">
+      <div class="dm-search-row">
+        <div class="form-group">
+          <label class="form-label" for="device_id">デバイスID</label>
+          <input type="text" id="device_id" name="device_id" class="form-input" maxlength="128"
+                 value="{{ search_params.get('device_id', '') }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="device_name">デバイス名</label>
+          <input type="text" id="device_name" name="device_name" class="form-input" maxlength="100"
+                 value="{{ search_params.get('device_name', '') }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="device_type_id">デバイス種別</label>
+          <select id="device_type_id" name="device_type_id" class="form-input">
+            <option value="">すべて</option>
+            {% for dt in device_types %}
+            <option value="{{ dt.device_type_id }}"
+              {% if search_params.get('device_type_id') == dt.device_type_id %}selected{% endif %}>
+              {{ dt.device_type_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="location">設置場所</label>
+          <input type="text" id="location" name="location" class="form-input" maxlength="100"
+                 value="{{ search_params.get('location', '') }}">
+        </div>
+      </div>
+      <div class="dm-search-row">
+        <div class="form-group">
+          <label class="form-label" for="organization_id">所属組織</label>
+          <select id="organization_id" name="organization_id" class="form-input">
+            <option value="">すべて</option>
+            {% for org in organizations %}
+            <option value="{{ org.organization_id }}"
+              {% if search_params.get('organization_id') == org.organization_id %}selected{% endif %}>
+              {{ org.organization_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="certificate_expiration_date">証明書期限（以前）</label>
+          <input type="date" id="certificate_expiration_date" name="certificate_expiration_date" class="form-input"
+                 value="{{ search_params.get('certificate_expiration_date', '') }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="status">ステータス</label>
+          <select id="status" name="status" class="form-input">
+            <option value="">すべて</option>
+            <option value="connected" {% if search_params.get('status') == 'connected' %}selected{% endif %}>接続済み</option>
+            <option value="disconnected" {% if search_params.get('status') == 'disconnected' %}selected{% endif %}>未接続</option>
+          </select>
+        </div>
+      </div>
+      <div class="dm-search-row dm-search-row--sort">
+        <div class="form-group">
+          <label class="form-label" for="sort_by">ソート項目</label>
+          <select id="sort_by" name="sort_by" class="form-input">
+            <option value=""></option>
+            {% for item in sort_items %}
+            <option value="{{ item.sort_item_name }}"
+              {% if search_params.get('sort_by') == item.sort_item_name %}selected{% endif %}>
+              {{ item.sort_item_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="order">ソート順</label>
+          <select id="order" name="order" class="form-input">
+            <option value=""></option>
+            <option value="asc" {% if search_params.get('order') == 'asc' %}selected{% endif %}>昇順</option>
+            <option value="desc" {% if search_params.get('order') == 'desc' %}selected{% endif %}>降順</option>
+          </select>
+        </div>
+      </div>
+      <div class="dm-search-center">
+        <button type="submit" class="button button--primary">検索</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# (3) 検索条件バッジ + 件数 #}
+<div class="dm-result-header">
+  <div class="dm-conditions">
+    <span class="dm-conditions__label">現在の検索条件：</span>
+    {% set has_condition = namespace(value=false) %}
+    {% if search_params.get('device_id') %}
+      {% set has_condition.value = true %}
+      <span class="dm-badge">デバイスID：{{ search_params.get('device_id') }}</span>
+    {% endif %}
+    {% if search_params.get('device_name') %}
+      {% set has_condition.value = true %}
+      <span class="dm-badge">デバイス名：{{ search_params.get('device_name') }}</span>
+    {% endif %}
+    {% if search_params.get('device_type_id') is not none and search_params.get('device_type_id') != '' %}
+      {% set has_condition.value = true %}
+      {% for dt in device_types %}
+        {% if dt.device_type_id == search_params.get('device_type_id') %}
+          <span class="dm-badge">デバイス種別：{{ dt.device_type_name }}</span>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if search_params.get('location') %}
+      {% set has_condition.value = true %}
+      <span class="dm-badge">設置場所：{{ search_params.get('location') }}</span>
+    {% endif %}
+    {% if search_params.get('organization_id') is not none and search_params.get('organization_id') != '' %}
+      {% set has_condition.value = true %}
+      {% for org in organizations %}
+        {% if org.organization_id == search_params.get('organization_id') %}
+          <span class="dm-badge">所属組織：{{ org.organization_name }}</span>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if search_params.get('certificate_expiration_date') %}
+      {% set has_condition.value = true %}
+      <span class="dm-badge">証明書期限：{{ search_params.get('certificate_expiration_date') }}以前</span>
+    {% endif %}
+    {% if search_params.get('status') %}
+      {% set has_condition.value = true %}
+      <span class="dm-badge">ステータス：{{ '接続済み' if search_params.get('status') == 'connected' else '未接続' }}</span>
+    {% endif %}
+    {% if not has_condition.value %}
+      <span>なし</span>
+    {% endif %}
+  </div>
+  <div class="dm-result-count">
+    <span class="dm-result-count__label">検索結果：</span>
+    <span class="dm-result-count__value">{{ total }}件</span>
+  </div>
+</div>
+
+{# (4) データテーブル #}
+<form method="POST" action="{{ url_for('admin.delete_device_view') }}" id="delete-form">
+  <div class="table-container" id="device-table-container">
+    <table class="table" id="device-table">
+      <thead class="table__head">
+        <tr>
+          {%- if g.current_user.user_type_id in [1, 2, 3] %}
+          <th style="width:50px;"><input type="checkbox" id="check-all"></th>
+          {%- endif %}
+          <th style="width:15%;">デバイスID <span class="sort-indicator" data-column="device_uuid">↕</span></th>
+          <th style="width:20%;">デバイス名 <span class="sort-indicator" data-column="device_name">↕</span></th>
+          <th style="width:10%;">デバイス種別</th>
+          <th style="width:15%;">設置場所 <span class="sort-indicator" data-column="device_location">↕</span></th>
+          <th style="width:15%;">所属組織</th>
+          <th style="width:15%;">証明書期限 <span class="sort-indicator" data-column="certificate_expiration_date">↕</span></th>
+          <th style="width:10%;">ステータス</th>
+          <th style="width:130px;">操作</th>
+        </tr>
+      </thead>
+      <tbody class="table__body">
+        {% for device in devices %}
+        <tr>
+          {%- if g.current_user.user_type_id in [1, 2, 3] %}
+          <td><input type="checkbox" name="device_uuids" value="{{ device.device_uuid }}" class="row-check"></td>
+          {%- endif %}
+          <td>{{ device.device_uuid }}</td>
+          <td>{{ device.device_name }}</td>
+          <td>
+            {%- for dt in device_types %}
+              {%- if dt.device_type_id == device.device_type_id %}{{ dt.device_type_name }}{%- endif %}
+            {%- endfor %}
+          </td>
+          <td>{{ device.device_location or '' }}</td>
+          <td>
+            {%- for org in organizations %}
+              {%- if org.organization_id == device.organization_id %}{{ org.organization_name }}{%- endif %}
+            {%- endfor %}
+          </td>
+          <td>
+            {%- if device.certificate_expiration_date %}
+              {{ device.certificate_expiration_date.strftime('%Y-%m-%d') }}
+            {%- endif %}
+          </td>
+          <td>
+            {%- set status = status_map.get(device.device_id, '未接続') %}
+            {%- if status == '接続済み' %}
+            <span class="device-status device-status--connected">接続済み</span>
+            {%- else %}
+            <span class="device-status device-status--disconnected">未接続</span>
+            {%- endif %}
+          </td>
+          <td>
+            <div class="table__actions">
+              <button type="button" class="button button--primary button--sm"
+                      onclick="DeviceModule.openDetailModal('{{ device.device_uuid }}')">参照</button>
+              {%- if g.current_user.user_type_id in [1, 2, 3] %}
+              <button type="button" class="button button--primary button--sm"
+                      onclick="DeviceModule.openEditModal('{{ device.device_uuid }}')">更新</button>
+              {%- endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 9 if g.current_user.user_type_id in [1, 2, 3] else 8 }}"
+              class="table__empty">データがありません</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+{# (5) ページネーション #}
+{% set per_page = search_params.get('per_page', 25) %}
+{% set current_page = search_params.get('page', 1) %}
+{% set total_pages = ((total + per_page - 1) // per_page) if per_page > 0 else 1 %}
+
+{% if total_pages >= 1 %}
+<div class="pagination">
+  {% if current_page > 1 %}
+    <a class="pagination__button" href="{{ url_for('admin.devices_list', page=current_page - 1) }}">&lt;</a>
+  {% endif %}
+  {% set ns = namespace(pages=[]) %}
+  {% if total_pages <= 5 %}
+    {% for i in range(1, total_pages + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+  {% else %}
+    {% set ns.pages = [1] %}
+    {% if current_page > 3 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set pstart = [2, current_page - 1] | max %}
+    {% set pend = [total_pages - 1, current_page + 1] | min %}
+    {% for i in range(pstart, pend + 1) %}{% set ns.pages = ns.pages + [i] %}{% endfor %}
+    {% if current_page < total_pages - 2 %}{% set ns.pages = ns.pages + ['...'] %}{% endif %}
+    {% set ns.pages = ns.pages + [total_pages] %}
+  {% endif %}
+  {% for p in ns.pages %}
+    {% if p == '...' %}
+      <span class="pagination__ellipsis">...</span>
+    {% else %}
+      <a class="pagination__button {% if p == current_page %}pagination__button--active{% endif %}"
+         href="{{ url_for('admin.devices_list', page=p) }}">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if current_page < total_pages %}
+    <a class="pagination__button" href="{{ url_for('admin.devices_list', page=current_page + 1) }}">&gt;</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{# モーダルオーバーレイ（詳細・登録・編集共用） #}
+<div id="dm-modal-overlay" class="modal-overlay" onclick="if(event.target===this)DeviceModule.closeModal()">
+  <div class="modal" id="dm-modal-content" onclick="event.stopPropagation()">
+  </div>
+</div>
+
+{# 削除確認モーダル #}
+<div id="delete-confirm-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal__body">
+      <p class="modal__message">選択したデバイスを削除してもよろしいですか？</p>
+      <p class="modal__message">この操作は取り消すことができません。</p>
+    </div>
+    <div class="modal__footer">
+      <button type="button" class="button" id="delete-cancel-btn">キャンセル</button>
+      <button type="button" class="button button--danger" id="delete-confirm-btn">削除</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/device.js') }}"></script>
+
+{% with messages = get_flashed_messages(with_categories=True) %}
+{% if messages %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    {% for category, message in messages %}
+    Toast.show('{{ message | e }}', '{{ "success" if category == "success" else "error" }}');
+    {% endfor %}
+  });
+</script>
+{% endif %}
+{% endwith %}
+{% endblock %}

@@ -31,11 +31,13 @@ class Config:
         f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    DEVICE_DATA_INTERVAL_SECONDS = int(os.getenv("DEVICE_DATA_INTERVAL_SECONDS", 60))
 
 
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
+    WTF_CSRF_ENABLED = False
 
 
 class ProductionConfig(Config):

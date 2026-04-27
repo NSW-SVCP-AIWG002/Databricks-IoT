@@ -68,6 +68,7 @@ def make_mock_query():
     q.join.return_value = q
     q.outerjoin.return_value = q
     q.filter.return_value = q
+    q.filter_by.return_value = q
     q.order_by.return_value = q
     q.count.return_value = 0
     q.all.return_value = []
@@ -243,11 +244,10 @@ class TestSearchDevices:
 
         # Act: 検索実行
         search_devices(params, user_id=1)
-        filter_args_str = str(q.filter.call_args_list)
 
         # Assert: filter が1回以上呼ばれ、device_id を含むフィルタが適用されること
         assert q.filter.call_count > 0
-        assert 'DEV-001' in filter_args_str
+        mock_dbmu.device_uuid.like.assert_called_with('%DEV-001%')
 
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMasterByUser')
@@ -264,11 +264,10 @@ class TestSearchDevices:
 
         # Act: 検索実行
         search_devices(params, user_id=1)
-        filter_args_str = str(q.filter.call_args_list)
 
         # Assert: filter が1回以上呼ばれ、device_name を含むフィルタが適用されること
         assert q.filter.call_count > 0
-        assert 'センサー' in filter_args_str
+        mock_dbmu.device_name.like.assert_called_with('%センサー%')
 
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMasterByUser')
@@ -308,7 +307,7 @@ class TestSearchDevices:
 
         # Assert: location を含むフィルタが適用されること
         assert q.filter.call_count > 0
-        assert '本社' in filter_args_str
+        mock_dbmu.device_location.like.assert_called_with('%本社%')
 
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMasterByUser')
@@ -438,12 +437,11 @@ class TestSearchDevices:
 
         # Act: 全条件指定で検索実行
         search_devices(params, user_id=1)
-        filter_args_str = str(q.filter.call_args_list)
 
         # Assert: 各検索条件が全てフィルタとして適用されること
-        assert 'DEV-001' in filter_args_str
-        assert 'センサー' in filter_args_str
-        assert '本社' in filter_args_str
+        mock_dbmu.device_uuid.like.assert_called_with('%DEV-001%')
+        mock_dbmu.device_name.like.assert_called_with('%センサー%')
+        mock_dbmu.device_location.like.assert_called_with('%本社%')
 
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMasterByUser')
@@ -461,13 +459,11 @@ class TestSearchDevices:
 
         # Act: 一部条件のみで検索実行
         search_devices(params, user_id=1)
-        filter_args_str = str(q.filter.call_args_list)
 
-        # Assert: 指定した条件（device_id）は適用され、未指定条件の値は含まれないこと
-        assert 'DEV-001' in filter_args_str
-        # 未指定条件のデフォルト値（空文字）がフィルタ値として現れないこと
-        assert "device_name=''" not in filter_args_str
-        assert "location=''" not in filter_args_str
+        # Assert: 指定した条件（device_id）は適用され、未指定条件はフィルタとして渡されないこと
+        mock_dbmu.device_uuid.like.assert_called_with('%DEV-001%')
+        mock_dbmu.device_name.like.assert_not_called()
+        mock_dbmu.device_location.like.assert_not_called()
 
     @patch(f'{MODULE}.DeviceTypeMaster')
     @patch(f'{MODULE}.DeviceMasterByUser')
@@ -580,473 +576,20 @@ class TestSearchDevices:
         mock_dbmu.query = q
         params = make_default_search_params(certificate_expiration_date=date(2025, 12, 31))
 
-        # Act
-        search_devices(params, user_id=1)
+        # MagicMock.__le__ はデフォルト NotImplemented を返すため date との <= 比較で TypeError になる。
+        # patch.object でテスト実行中のみ __le__ を上書きして比較を通過させる。
+        cert_attr = mock_dbmu.certificate_expiration_date
+        with patch(f'{MODULE}.DeviceMasterByUser', mock_dbmu):
+            with patch.object(type(cert_attr), '__le__', new=lambda self, other: MagicMock()):
+                # Act
+                search_devices(params, user_id=1)
 
         # Assert: certificate_expiration_date 条件が filter() として適用されること
         assert q.filter.call_count > 0
 
 
 # ============================================================
-# 3. validate_device_data
-# 観点: 1.1.1 必須チェック, 1.1.2 最大文字列長チェック, 1.1.6 不整値チェック, 1.3 エラーハンドリング
-# ============================================================
-
-@pytest.mark.unit
-class TestValidateDeviceDataRequired:
-    """validate_device_data - 必須チェック
-    観点: 1.1.1 必須チェック, 1.3.2 ValidationError
-    """
-
-    def test_device_uuid_empty_raises_validation_error(self):
-        """1.1.1 / 1.3.2: device_uuid が空文字の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid='')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_uuid_none_raises_validation_error(self):
-        """1.1.2 / 1.3.2: device_uuid が None の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid=None)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_name_empty_raises_validation_error(self):
-        """1.1.1 / 1.3.2: device_name が空文字の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_name='')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_name_none_raises_validation_error(self):
-        """1.1.2 / 1.3.2: device_name が None の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_name=None)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_type_id_none_raises_validation_error(self):
-        """1.1.2 / 1.3.2: device_type_id が None の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_type_id=None)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_organization_id_none_raises_validation_error(self):
-        """1.1.2 / 1.3.2: organization_id が None の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(organization_id=None)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_name_whitespace_only_passes_required_check(self):
-        """1.1.4: device_name が空白のみの場合、必須チェックはパスする（入力あり扱い）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_name='   ')
-
-        # Act & Assert: 必須チェックでは例外が発生しないこと（空白文字列は「入力あり」）
-        # ※ 後続の他チェック（トリム後空文字判定等）で ValidationError になる実装の場合は
-        #    設計書に記載なし、要確認
-        validate_device_data(data, is_create=True)
-
-    def test_device_model_empty_raises_validation_error(self):
-        """1.1.1 / 1.3.2: device_model が空文字の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_model='')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_model_none_raises_validation_error(self):
-        """1.1.2 / 1.3.2: device_model が None の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_model=None)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-
-@pytest.mark.unit
-class TestValidateDeviceDataMaxLength:
-    """validate_device_data - 最大文字列長チェック
-    観点: 1.1.2 最大文字列長チェック, 1.3.2 ValidationError
-    """
-
-    def test_device_uuid_max_length_minus1_passes(self):
-        """1.2.1: device_uuid が127文字（最大-1）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_uuid='A' * 127)
-
-        # Act & Assert: 例外が発生しないこと（最大128文字の1文字手前）
-        validate_device_data(data, is_create=True)
-
-    def test_device_uuid_max_length_exact_passes(self):
-        """1.2.2: device_uuid が128文字（最大）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_uuid='A' * 128)
-
-        # Act & Assert: 例外が発生しないこと（最大文字数ちょうど）
-        validate_device_data(data, is_create=True)
-
-    def test_device_uuid_max_length_exceeded_raises(self):
-        """1.2.3: device_uuid が129文字（最大+1）の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid='A' * 129)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_name_max_length_minus1_passes(self):
-        """1.2.1: device_name が99文字（最大-1）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_name='あ' * 99)
-
-        # Act & Assert: 例外が発生しないこと（最大100文字の1文字手前）
-        validate_device_data(data, is_create=True)
-
-    def test_device_name_max_length_exact_passes(self):
-        """1.2.2: device_name が100文字（最大）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_name='あ' * 100)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_name_max_length_exceeded_raises(self):
-        """1.2.3: device_name が101文字（最大+1）の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_name='あ' * 101)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_model_max_length_minus1_passes(self):
-        """1.2.1: device_model が99文字（最大-1）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_model='M' * 99)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_model_max_length_exact_passes(self):
-        """1.2.2: device_model が100文字（最大）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_model='M' * 100)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_model_max_length_exceeded_raises(self):
-        """1.2.3: device_model が101文字（最大+1）の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_model='M' * 101)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_sim_id_max_length_minus1_passes(self):
-        """1.2.1: sim_id が19文字（最大-1）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(sim_id='1' * 19)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_sim_id_max_length_exact_passes(self):
-        """1.2.2: sim_id が20文字（最大）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(sim_id='1' * 20)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_sim_id_max_length_exceeded_raises(self):
-        """1.2.3: sim_id が21文字（最大+1）の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(sim_id='1' * 21)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_location_max_length_minus1_passes(self):
-        """1.2.1: device_location が99文字（最大-1）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_location='あ' * 99)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_location_max_length_exact_passes(self):
-        """1.2.2: device_location が100文字（最大）の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_location='あ' * 100)
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_location_max_length_exceeded_raises(self):
-        """1.2.3: device_location が101文字（最大+1）の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_location='あ' * 101)
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_model_empty_string_passes(self):
-        """1.2.4: device_model が空文字の場合、バリデーションが通る（任意項目）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_model='')
-
-        # Act & Assert: 例外が発生しないこと（空文字は文字列長0で最大値以下）
-        validate_device_data(data, is_create=True)
-
-    def test_sim_id_empty_string_passes(self):
-        """1.2.4: sim_id が空文字の場合、バリデーションが通る（任意項目）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(sim_id='')
-
-        # Act & Assert: 例外が発生しないこと（空文字は文字列長0で最大値以下）
-        validate_device_data(data, is_create=True)
-
-    def test_device_location_empty_string_passes(self):
-        """1.2.4: device_location が空文字の場合、バリデーションが通る（任意項目）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_location='')
-
-        # Act & Assert: 例外が発生しないこと（空文字は文字列長0で最大値以下）
-        validate_device_data(data, is_create=True)
-
-
-@pytest.mark.unit
-class TestValidateDeviceDataFormat:
-    """validate_device_data - 形式チェック
-    観点: 1.1.6 不整値チェック, 1.3.2 ValidationError
-    """
-
-    def test_device_uuid_alphanumeric_and_hyphen_passes(self):
-        """1.6.1: device_uuid が英数字とハイフンのみの場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(device_uuid='ABC-123-def')
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_device_uuid_with_underscore_raises(self):
-        """1.6.2: device_uuid にアンダースコアが含まれる場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid='DEV_001')
-
-        # Act & Assert: ValidationError が発生すること（英数字+ハイフンのみ許可）
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_uuid_with_dot_raises(self):
-        """1.6.2: device_uuid にドットが含まれる場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid='DEV.001')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_device_uuid_with_space_raises(self):
-        """1.6.2: device_uuid にスペースが含まれる場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(device_uuid='DEV 001')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_mac_address_valid_format_passes(self):
-        """1.6.1: mac_address が XX:XX:XX:XX:XX:XX 形式の場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(mac_address='AA:BB:CC:DD:EE:FF')
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_mac_address_lowercase_valid_passes(self):
-        """1.6.1: mac_address が小文字の場合でも、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(mac_address='aa:bb:cc:dd:ee:ff')
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-    def test_mac_address_wrong_separator_raises(self):
-        """1.6.2: mac_address の区切り文字がコロン以外の場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(mac_address='AA-BB-CC-DD-EE-FF')
-
-        # Act & Assert: ValidationError が発生すること（XX:XX:XX:XX:XX:XX 形式のみ許可）
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_mac_address_invalid_hex_char_raises(self):
-        """1.6.2: mac_address に16進数以外の文字が含まれる場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(mac_address='GG:HH:II:JJ:KK:LL')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_mac_address_too_short_raises(self):
-        """1.6.2: mac_address のセグメントが5つの場合、ValidationError がスローされる"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(mac_address='AA:BB:CC:DD:EE')
-
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_mac_address_empty_string_raises(self):
-        """1.6.3: mac_address が空文字の場合、ValidationError がスローされる（形式不正）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-        from iot_app.common.exceptions import ValidationError
-
-        data = make_valid_device_data(mac_address='')
-
-        # Act & Assert: ValidationError が発生すること（空文字は XX:XX:XX:XX:XX:XX 形式に不適合）
-        with pytest.raises(ValidationError):
-            validate_device_data(data, is_create=True)
-
-    def test_mac_address_none_passes(self):
-        """1.1.4 (空文字相当): mac_address が None の場合、バリデーションが通る（任意項目）"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data(mac_address=None)
-
-        # Act & Assert: 例外が発生しないこと（mac_address は任意項目）
-        validate_device_data(data, is_create=True)
-
-    def test_valid_data_passes_all_validation(self):
-        """1.1.3: 全項目が有効な場合、バリデーションが通る"""
-        # Arrange
-        from iot_app.services.device_service import validate_device_data
-
-        data = make_valid_device_data()
-
-        # Act & Assert: 例外が発生しないこと
-        validate_device_data(data, is_create=True)
-
-
-# ============================================================
-# 4. create_device
+# 3. create_device
 # 観点: 3.2.1 登録処理呼び出し, 3.2.2 登録結果, 2.3 副作用チェック
 # ============================================================
 
@@ -1113,8 +656,9 @@ class TestCreateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.UnityCatalogConnector')
     def test_create_success_calls_db_session_add_and_commit(
-        self, mock_dm, mock_db
+        self, mock_uc, mock_dm, mock_db
     ):
         """3.2.1.1 / 3.2.2.1: 有効なデータで登録内容が DB に渡され、session.commit が呼ばれる"""
         # Arrange
@@ -1154,8 +698,9 @@ class TestCreateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.UnityCatalogConnector')
     def test_create_with_optional_fields_none_passes(
-        self, mock_dm, mock_db
+        self, mock_uc, mock_dm, mock_db
     ):
         """3.2.1.2: 任意項目に None を含む場合、None のまま DB に渡される"""
         # Arrange
@@ -1179,8 +724,9 @@ class TestCreateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.UnityCatalogConnector')
     def test_create_returns_created_device_id(
-        self, mock_dm, mock_db
+        self, mock_uc, mock_dm, mock_db
     ):
         """3.2.2.1: 登録成功時、Repository（session.add）に渡されたデバイスオブジェクトが返却される"""
         # Arrange
@@ -1301,8 +847,10 @@ class TestCreateDevice:
 
         # Assert: DB への session.add は呼ばれていること（DB は先に処理）
         mock_db.session.add.assert_called_once()
-        # Assert: DB rollback が呼ばれること（補償トランザクション）
-        mock_db.session.rollback.assert_called()
+        # Assert: DB delete が呼ばれること（補償トランザクション - UC失敗時にDBから削除）
+        mock_db.session.delete.assert_called()
+        # Assert: commit が2回呼ばれること（1回目: 通常登録、2回目: delete後のコミット）
+        assert mock_db.session.commit.call_count == 2
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
@@ -1330,7 +878,7 @@ class TestCreateDevice:
 
 
 # ============================================================
-# 5. get_device_by_uuid
+# 4. get_device_by_uuid
 # 観点: 2.2 対象データ存在チェック（スコープ制限適用）
 # ============================================================
 
@@ -1460,7 +1008,7 @@ class TestGetDeviceByUuid:
 
 
 # ============================================================
-# 6. update_device
+# 5. update_device
 # 観点: 3.3.1 更新処理呼び出し, 3.3.2 更新結果, 2.3 副作用チェック
 # ============================================================
 
@@ -1472,7 +1020,8 @@ class TestUpdateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
-    def test_update_success(self, mock_dm, mock_db):
+    @patch(f'{MODULE}.UnityCatalogConnector')
+    def test_update_success(self, mock_uc, mock_dm, mock_db):
         """3.3.2.1: 正常な更新データで処理が完了し、session.commit が呼ばれる"""
         # Arrange
         from iot_app.services.device_service import update_device
@@ -1493,10 +1042,9 @@ class TestUpdateDevice:
     def test_update_raises_if_mac_address_duplicate_other_device(
         self, mock_dm, mock_db
     ):
-        """3.3.1.3: 他デバイスの mac_address と重複する場合、ValidationError がスローされる"""
+        """3.3.1.3: 他デバイスの mac_address と重複する場合、DuplicateMacAddressError がスローされる"""
         # Arrange
-        from iot_app.services.device_service import update_device
-        from iot_app.common.exceptions import ValidationError
+        from iot_app.services.device_service import update_device, DuplicateMacAddressError
 
         existing_device = make_device_mock(device_uuid='DEV-001')
         duplicate_device = make_device_mock(device_uuid='DEV-002')
@@ -1517,8 +1065,8 @@ class TestUpdateDevice:
         mock_dm.query.filter_by.side_effect = filter_by_side_effect
         data = make_valid_device_data(mac_address='BB:CC:DD:EE:FF:AA')
 
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
+        # Act & Assert: DuplicateMacAddressError が発生すること
+        with pytest.raises(DuplicateMacAddressError):
             update_device('DEV-001', data, user_id=1)
 
         # Assert: DB への session.commit が呼ばれないこと
@@ -1541,7 +1089,8 @@ class TestUpdateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
-    def test_update_with_minimal_required_data_passes(self, mock_dm, mock_db):
+    @patch(f'{MODULE}.UnityCatalogConnector')
+    def test_update_with_minimal_required_data_passes(self, mock_uc, mock_dm, mock_db):
         """2.1.2: 任意項目をすべて None にした最小構成の入力でも更新が正常終了する"""
         # Arrange
         from iot_app.services.device_service import update_device
@@ -1600,8 +1149,9 @@ class TestUpdateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.UnityCatalogConnector')
     def test_update_repository_called_with_target_device_uuid(
-        self, mock_dm, mock_db
+        self, mock_uc, mock_dm, mock_db
     ):
         """3.3.2.2: update_device に渡した device_uuid で DB クエリが呼ばれ、指定 ID のデバイスが更新対象となる"""
         # Arrange
@@ -1625,29 +1175,28 @@ class TestUpdateDevice:
 
     @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.DeviceMaster')
-    def test_update_validation_error_does_not_call_repository(
+    def test_update_not_found_does_not_call_repository(
         self, mock_dm, mock_db
     ):
-        """3.3.1.3: バリデーションエラー（必須項目が空）発生時、session.commit は呼ばれない"""
+        """2.2.2: 更新対象の device_uuid が存在しない場合、NotFoundError がスローされ session.commit は呼ばれない"""
         # Arrange
         from iot_app.services.device_service import update_device
-        from iot_app.common.exceptions import ValidationError
+        from iot_app.common.exceptions import NotFoundError
 
-        existing_device = make_device_mock(device_uuid='DEV-001')
-        mock_dm.query.filter_by.return_value.first.return_value = existing_device
-        # 必須項目 device_name を空文字（バリデーションエラー）
-        data = make_valid_device_data(device_name='')
+        # 対象デバイスが見つからない
+        mock_dm.query.filter_by.return_value.first.return_value = None
+        data = make_valid_device_data()
 
-        # Act & Assert: ValidationError が発生すること
-        with pytest.raises(ValidationError):
-            update_device('DEV-001', data, user_id=1)
+        # Act & Assert: NotFoundError が発生すること
+        with pytest.raises(NotFoundError):
+            update_device('NONEXISTENT-001', data, user_id=1)
 
         # Assert: session.commit が呼ばれないこと（Repository 未呼出）
         mock_db.session.commit.assert_not_called()
 
 
 # ============================================================
-# 7. delete_device
+# 6. delete_device
 # 観点: 3.4.1 削除処理呼び出し, 3.4.2 削除結果, 2.2 対象データ存在チェック, 2.3 副作用チェック
 # ============================================================
 
@@ -1659,8 +1208,9 @@ class TestDeleteDevice:
         delete_device() には DeviceMasterByUser オブジェクトを渡す。
     """
 
+    @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
-    def test_delete_success_calls_commit(self, mock_db):
+    def test_delete_success_calls_commit(self, mock_db, mock_uc):
         """3.4.1.1 / 3.4.2.1: DeviceMasterByUser オブジェクトを渡した場合、論理削除が完了し session.commit が呼ばれる"""
         # Arrange
         from iot_app.services.device_service import delete_device
@@ -1674,8 +1224,9 @@ class TestDeleteDevice:
         # Assert: session.commit が呼ばれること（論理削除フラグ更新）
         mock_db.session.commit.assert_called_once()
 
+    @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
-    def test_delete_rollback_on_db_error(self, mock_db):
+    def test_delete_rollback_on_db_error(self, mock_db, mock_uc):
         """2.3.2: DB エラー発生時に rollback が呼ばれ、データが更新されない"""
         # Arrange
         from iot_app.services.device_service import delete_device
@@ -1691,8 +1242,9 @@ class TestDeleteDevice:
         # Assert: rollback が呼ばれること
         mock_db.session.rollback.assert_called()
 
+    @patch(f'{MODULE}.UnityCatalogConnector')
     @patch(f'{MODULE}.db')
-    def test_delete_sets_delete_flag_to_true(self, mock_db):
+    def test_delete_sets_delete_flag_to_true(self, mock_db, mock_uc):
         """3.4.1.1: 論理削除実行後、デバイスの delete_flag が True に設定される"""
         # Arrange
         from iot_app.services.device_service import delete_device
@@ -1706,12 +1258,12 @@ class TestDeleteDevice:
         # Assert: delete_flag が True に更新されること（論理削除の実装確認）
         assert device.delete_flag is True
 
-    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.UnityCatalogConnector')
-    def test_delete_unity_catalog_called_after_db_commit(
-        self, mock_uc, mock_db
+    @patch(f'{MODULE}.db')
+    def test_delete_unity_catalog_called_before_db_commit(
+        self, mock_db, mock_uc
     ):
-        """3.4.2.1: OLTP DB commit 後に UnityCatalog 論理削除が呼ばれること（フローの順序保証）"""
+        """3.4.2.1: UnityCatalog 論理削除が OLTP DB commit より先に呼ばれること（フローの順序保証）"""
         # Arrange
         from iot_app.services.device_service import delete_device
 
@@ -1732,35 +1284,35 @@ class TestDeleteDevice:
         # Act
         delete_device(device, deleter_id=1)
 
-        # Assert: DB commit → UnityCatalog 論理削除 の順であること
-        assert 'db_commit' in call_order
+        # Assert: UnityCatalog 論理削除 → DB commit の順であること
         assert 'unity_catalog' in call_order
-        assert call_order.index('db_commit') < call_order.index('unity_catalog')
+        assert 'db_commit' in call_order
+        assert call_order.index('unity_catalog') < call_order.index('db_commit')
 
-    @patch(f'{MODULE}.db')
     @patch(f'{MODULE}.UnityCatalogConnector')
-    def test_delete_rollback_on_unity_catalog_error(
-        self, mock_uc, mock_db
+    @patch(f'{MODULE}.db')
+    def test_delete_raises_on_unity_catalog_error(
+        self, mock_db, mock_uc
     ):
-        """2.3.2: UnityCatalog 論理削除が失敗した場合、DB rollback が呼ばれ例外が伝播する"""
+        """2.3.2: UnityCatalog 論理削除が失敗した場合、DB は変更されず例外が伝播する"""
         # Arrange
         from iot_app.services.device_service import delete_device
 
         device = make_device_mock(device_uuid='DEV-001')
         device.delete_flag = False
-        # OLTP commit は成功、UC 論理削除で例外発生
+        # UC 論理削除で例外発生（DB commit より先）
         mock_uc.return_value.execute_dml.side_effect = Exception('UnityCatalog削除エラー')
 
         # Act & Assert: 例外が伝播すること
         with pytest.raises(Exception, match='UnityCatalog削除エラー'):
             delete_device(device, deleter_id=1)
 
-        # Assert: DB rollback が呼ばれること（UC ロールバック）
-        mock_db.session.rollback.assert_called()
+        # Assert: DB は変更されていないこと（commit 未実施）
+        mock_db.session.commit.assert_not_called()
 
 
 # ============================================================
-# 8. generate_devices_csv
+# 7. generate_devices_csv
 # 観点: 3.5.1 CSV生成ロジック, 3.5.2 エスケープ処理, 3.5.3 エンコーディング処理
 # ============================================================
 
@@ -2016,7 +1568,7 @@ class TestGenerateDevicesCsv:
 
 
 # ============================================================
-# 11. get_device_form_options
+# 8. get_device_form_options
 # 観点: 2.1 正常系処理, 1.3.1 例外伝播, 3.1.4.2 空結果
 # ============================================================
 
@@ -2298,42 +1850,36 @@ class TestGetAllDevicesForExport:
         # Assert
         q.filter.assert_called()
 
-    def test_get_all_filters_by_status_connected(self):
+    def test_get_all_filters_by_status_connected(self, app):
         """3.1.6.1: status='connected' 指定時に接続済み閾値フィルタが適用される"""
-        # Arrange
         from iot_app.services.device_service import get_all_devices_for_export
 
-        with patch(f'{MODULE}.db') as mock_db, \
-             patch(f'{MODULE}.current_app') as mock_app:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': 300}
-            q = make_mock_query()
-            mock_db.session.query.return_value = q
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = 300
+        with app.app_context():
+            with patch(f'{MODULE}.db') as mock_db:
+                q = make_mock_query()
+                mock_db.session.query.return_value = q
 
-            # Act
-            get_all_devices_for_export(
-                make_default_search_params(status='connected'), user_id=1
-            )
+                get_all_devices_for_export(
+                    make_default_search_params(status='connected'), user_id=1
+                )
 
-        # Assert
         q.filter.assert_called()
 
-    def test_get_all_filters_by_status_disconnected(self):
+    def test_get_all_filters_by_status_disconnected(self, app):
         """3.1.6.1: status='disconnected' 指定時に未接続閾値フィルタが適用される"""
-        # Arrange
         from iot_app.services.device_service import get_all_devices_for_export
 
-        with patch(f'{MODULE}.db') as mock_db, \
-             patch(f'{MODULE}.current_app') as mock_app:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': 300}
-            q = make_mock_query()
-            mock_db.session.query.return_value = q
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = 300
+        with app.app_context():
+            with patch(f'{MODULE}.db') as mock_db:
+                q = make_mock_query()
+                mock_db.session.query.return_value = q
 
-            # Act
-            get_all_devices_for_export(
-                make_default_search_params(status='disconnected'), user_id=1
-            )
+                get_all_devices_for_export(
+                    make_default_search_params(status='disconnected'), user_id=1
+                )
 
-        # Assert
         q.filter.assert_called()
 
     def test_get_all_returns_empty_when_no_match(self):
@@ -2375,21 +1921,14 @@ class TestGetDeviceStatusLabel:
 
     def test_returns_disconnected_when_none(self):
         """3.1.7.1: last_received_time が None の場合は '未接続' を返す"""
-        # Arrange
         from iot_app.services.device_service import _get_device_status_label
 
-        with patch(f'{MODULE}.current_app') as mock_app:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': 300}
+        result = _get_device_status_label(None)
 
-            # Act
-            result = _get_device_status_label(None)
-
-        # Assert
         assert result == '未接続'
 
-    def test_returns_connected_when_within_threshold(self):
+    def test_returns_connected_when_within_threshold(self, app):
         """3.1.7.1: elapsed <= threshold * 2 の場合は '接続済み' を返す"""
-        # Arrange
         from iot_app.services.device_service import _get_device_status_label
         from datetime import datetime, timezone, timedelta
 
@@ -2397,20 +1936,16 @@ class TestGetDeviceStatusLabel:
         now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         last_received_time = now - timedelta(seconds=300)  # elapsed=300 <= 600
 
-        with patch(f'{MODULE}.current_app') as mock_app, \
-             patch(f'{MODULE}.datetime') as mock_dt:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': threshold}
-            mock_dt.now.return_value = now
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = threshold
+        with app.app_context():
+            with patch(f'{MODULE}.datetime') as mock_dt:
+                mock_dt.now.return_value = now
+                result = _get_device_status_label(last_received_time)
 
-            # Act
-            result = _get_device_status_label(last_received_time)
-
-        # Assert
         assert result == '接続済み'
 
-    def test_returns_disconnected_when_exceeds_threshold(self):
+    def test_returns_disconnected_when_exceeds_threshold(self, app):
         """3.1.7.2: elapsed > threshold * 2 の場合は '未接続' を返す"""
-        # Arrange
         from iot_app.services.device_service import _get_device_status_label
         from datetime import datetime, timezone, timedelta
 
@@ -2418,20 +1953,16 @@ class TestGetDeviceStatusLabel:
         now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         last_received_time = now - timedelta(seconds=700)  # elapsed=700 > 600
 
-        with patch(f'{MODULE}.current_app') as mock_app, \
-             patch(f'{MODULE}.datetime') as mock_dt:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': threshold}
-            mock_dt.now.return_value = now
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = threshold
+        with app.app_context():
+            with patch(f'{MODULE}.datetime') as mock_dt:
+                mock_dt.now.return_value = now
+                result = _get_device_status_label(last_received_time)
 
-            # Act
-            result = _get_device_status_label(last_received_time)
-
-        # Assert
         assert result == '未接続'
 
-    def test_returns_connected_at_exact_threshold(self):
+    def test_returns_connected_at_exact_threshold(self, app):
         """3.1.7.3: elapsed = threshold * 2 の場合は '接続済み' を返す（境界値）"""
-        # Arrange
         from iot_app.services.device_service import _get_device_status_label
         from datetime import datetime, timezone, timedelta
 
@@ -2439,20 +1970,16 @@ class TestGetDeviceStatusLabel:
         now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         last_received_time = now - timedelta(seconds=600)  # elapsed=600 == 600
 
-        with patch(f'{MODULE}.current_app') as mock_app, \
-             patch(f'{MODULE}.datetime') as mock_dt:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': threshold}
-            mock_dt.now.return_value = now
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = threshold
+        with app.app_context():
+            with patch(f'{MODULE}.datetime') as mock_dt:
+                mock_dt.now.return_value = now
+                result = _get_device_status_label(last_received_time)
 
-            # Act
-            result = _get_device_status_label(last_received_time)
-
-        # Assert
         assert result == '接続済み'
 
-    def test_returns_disconnected_just_over_threshold(self):
+    def test_returns_disconnected_just_over_threshold(self, app):
         """3.1.7.4: elapsed = threshold * 2 + 1 の場合は '未接続' を返す（境界値）"""
-        # Arrange
         from iot_app.services.device_service import _get_device_status_label
         from datetime import datetime, timezone, timedelta
 
@@ -2460,13 +1987,10 @@ class TestGetDeviceStatusLabel:
         now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         last_received_time = now - timedelta(seconds=601)  # elapsed=601 > 600
 
-        with patch(f'{MODULE}.current_app') as mock_app, \
-             patch(f'{MODULE}.datetime') as mock_dt:
-            mock_app.config = {'DEVICE_DATA_INTERVAL_SECONDS': threshold}
-            mock_dt.now.return_value = now
+        app.config['DEVICE_DATA_INTERVAL_SECONDS'] = threshold
+        with app.app_context():
+            with patch(f'{MODULE}.datetime') as mock_dt:
+                mock_dt.now.return_value = now
+                result = _get_device_status_label(last_received_time)
 
-            # Act
-            result = _get_device_status_label(last_received_time)
-
-        # Assert
         assert result == '未接続'

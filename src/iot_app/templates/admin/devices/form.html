@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'edit' %}デバイス更新{% else %}デバイス登録{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{% if mode == 'edit' %}デバイス更新{% else %}デバイス登録{% endif %}</h1>
+  <a href="{{ url_for('admin.devices_list') }}" class="button">一覧へ戻る</a>
+</div>
+
+<div class="card">
+  <p class="form-description">
+    {% if mode == 'edit' %}
+    デバイス情報を更新します。以下のフォームを更新してください。
+    {% else %}
+    デバイス情報を登録します。以下のフォームを入力してください。
+    {% endif %}
+  </p>
+
+  {% if form %}
+    {% for field_errors in form.errors.values() %}
+      {% for error in field_errors %}
+      <div class="alert alert--danger">{{ error }}</div>
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  {% if mode == 'edit' %}
+  <form method="POST" action="{{ url_for('admin.update_device_view', device_uuid=device.device_uuid) }}">
+  {% else %}
+  <form method="POST" action="{{ url_for('admin.create_device_view') }}">
+  {% endif %}
+    <div class="form-group">
+      <label class="form-label" for="device_uuid">
+        デバイスID <span class="form-label__required">必須</span>
+      </label>
+      {% if mode == 'edit' %}
+      <input type="text" id="device_uuid" class="form-input" value="{{ device.device_uuid }}" readonly>
+      {% else %}
+      <input type="text" id="device_uuid" name="device_uuid" class="form-input{% if form and form.device_uuid.errors %} form-input--error{% endif %}" maxlength="128"
+             value="{{ form.device_uuid.data if form else '' }}" placeholder="例: DEV-001">
+      {% if form and form.device_uuid.errors %}
+      <p class="form-error">{{ form.device_uuid.errors[0] }}</p>
+      {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="device_name">
+        デバイス名 <span class="form-label__required">必須</span>
+      </label>
+      <input type="text" id="device_name" name="device_name" class="form-input{% if form and form.device_name.errors %} form-input--error{% endif %}" maxlength="100"
+             value="{{ form.device_name.data if form else (device.device_name if device else '') }}">
+      {% if form and form.device_name.errors %}
+      <p class="form-error">{{ form.device_name.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="device_type_id">
+        デバイス種別 <span class="form-label__required">必須</span>
+      </label>
+      <select id="device_type_id" name="device_type_id" class="form-input{% if form and form.device_type_id.errors %} form-input--error{% endif %}">
+        <option value=""></option>
+        {% for dt in device_types %}
+        <option value="{{ dt.device_type_id }}"
+          {% if form and form.device_type_id.data == dt.device_type_id %}selected
+          {% elif not form and device and device.device_type_id == dt.device_type_id %}selected
+          {% endif %}>
+          {{ dt.device_type_name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if form and form.device_type_id.errors %}
+      <p class="form-error">{{ form.device_type_id.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="device_model">モデル情報</label>
+      <input type="text" id="device_model" name="device_model" class="form-input{% if form and form.device_model.errors %} form-input--error{% endif %}" maxlength="100"
+             value="{{ form.device_model.data if form else (device.device_model if device else '') }}">
+      {% if form and form.device_model.errors %}
+      <p class="form-error">{{ form.device_model.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="sim_id">SIMID</label>
+      <input type="text" id="sim_id" name="sim_id" class="form-input{% if form and form.sim_id.errors %} form-input--error{% endif %}" maxlength="20"
+             value="{{ form.sim_id.data if form else (device.sim_id if device else '') }}">
+      {% if form and form.sim_id.errors %}
+      <p class="form-error">{{ form.sim_id.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="mac_address">MACアドレス</label>
+      <input type="text" id="mac_address" name="mac_address" class="form-input{% if form and form.mac_address.errors %} form-input--error{% endif %}" maxlength="17"
+             placeholder="AA:BB:CC:DD:EE:FF"
+             value="{{ form.mac_address.data if form else (device.mac_address if device else '') }}">
+      {% if form and form.mac_address.errors %}
+      <p class="form-error">{{ form.mac_address.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="device_location">設置場所</label>
+      <input type="text" id="device_location" name="device_location" class="form-input{% if form and form.device_location.errors %} form-input--error{% endif %}" maxlength="100"
+             value="{{ form.device_location.data if form else (device.device_location if device else '') }}">
+      {% if form and form.device_location.errors %}
+      <p class="form-error">{{ form.device_location.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="organization_id">
+        所属組織 <span class="form-label__required">必須</span>
+      </label>
+      <select id="organization_id" name="organization_id" class="form-input{% if form and form.organization_id.errors %} form-input--error{% endif %}">
+        <option value=""></option>
+        {% for org in organizations %}
+        <option value="{{ org.organization_id }}"
+          {% if form and form.organization_id.data == org.organization_id %}selected
+          {% elif not form and device and device.organization_id == org.organization_id %}selected
+          {% endif %}>
+          {{ org.organization_name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if form and form.organization_id.errors %}
+      <p class="form-error">{{ form.organization_id.errors[0] }}</p>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="certificate_expiration_date">証明書期限</label>
+      <input type="date" id="certificate_expiration_date" name="certificate_expiration_date" class="form-input"
+             value="{% if form and form.certificate_expiration_date.data %}{{ form.certificate_expiration_date.data.strftime('%Y-%m-%d') }}{% elif device and device.certificate_expiration_date %}{{ device.certificate_expiration_date.strftime('%Y-%m-%d') }}{% endif %}">
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button button--primary">
+        {% if mode == 'edit' %}更新{% else %}登録{% endif %}
+      </button>
+      <a href="{{ url_for('admin.devices_list') }}" class="button">キャンセル</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

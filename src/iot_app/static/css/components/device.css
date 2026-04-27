@@ -1,0 +1,240 @@
+/* ===== デバイス管理 固有スタイル ===== */
+
+/* ─────────────────────────────────────────────────────────
+   ページヘッダー（タイトル + アクションボタン）
+   ───────────────────────────────────────────────────────── */
+
+.dm-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-6);
+}
+
+.dm-page-header .page-title {
+  margin-bottom: 0;
+}
+
+.dm-page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   検索フォーム 横並びレイアウト
+   ───────────────────────────────────────────────────────── */
+
+.dm-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.dm-search-row .form-group {
+  flex: 1;
+  min-width: 180px;
+  max-width: calc(25% - 12px);
+}
+
+.dm-search-row--sort .form-group {
+  flex: 1;
+  max-width: calc(25% - 12px);
+}
+
+.dm-search-center {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   検索条件バッジ + 件数ヘッダー
+   ───────────────────────────────────────────────────────── */
+
+.dm-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-white);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-base);
+}
+
+.dm-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.dm-conditions__label {
+  color: var(--color-gray-700);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.dm-badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-search-badge);
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
+}
+
+.dm-result-count {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  white-space: nowrap;
+}
+
+.dm-result-count__label {
+  color: var(--color-gray-700);
+  font-weight: var(--font-weight-medium);
+}
+
+.dm-result-count__value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+}
+
+/* ─────────────────────────────────────────────────────────
+   テーブルコンテナ（縦スクロール）
+   ───────────────────────────────────────────────────────── */
+
+#device-table-container {
+  overflow-y: auto;
+}
+
+/* ─────────────────────────────────────────────────────────
+   モーダル（詳細・登録・編集共用）
+   ───────────────────────────────────────────────────────── */
+
+#dm-modal-content {
+  background: var(--color-white);
+  border-radius: var(--border-radius-base);
+  min-width: 400px;
+  max-width: 680px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.dm-modal-desc {
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-4);
+}
+
+.dm-modal-loading,
+.dm-modal-error {
+  padding: var(--spacing-8);
+  text-align: center;
+  font-size: var(--font-size-base);
+  color: var(--color-gray-600);
+}
+
+.dm-modal-error {
+  color: var(--color-danger);
+}
+
+/* ─────────────────────────────────────────────────────────
+   詳細モーダル レイアウト
+   ───────────────────────────────────────────────────────── */
+
+.dm-detail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.dm-detail__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding: var(--spacing-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.dm-detail__row:last-child {
+  border-bottom: none;
+}
+
+.dm-detail__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-700);
+  font-size: var(--font-size-base);
+}
+
+.dm-detail__value {
+  color: var(--color-gray-900);
+  font-size: var(--font-size-base);
+  word-break: break-all;
+}
+
+/* ─────────────────────────────────────────────────────────
+   フォームエラー
+   ───────────────────────────────────────────────────────── */
+
+.form-error {
+  margin-top: var(--spacing-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+}
+
+.form-input--error {
+  border-color: var(--color-danger);
+}
+
+.form-input--error:focus {
+  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   スケルトンスクリーン
+   ───────────────────────────────────────────────────────── */
+
+@keyframes dm-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.dm-skeleton-cell {
+  height: 14px;
+  border-radius: var(--border-radius-base);
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 1200px 100%;
+  animation: dm-shimmer 1.5s infinite linear;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ステータスバッジ
+   ───────────────────────────────────────────────────────── */
+
+.device-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: 9999px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.device-status--connected {
+  background-color: #00ff7f;
+  color: #1a5c3a;
+}
+
+.device-status--disconnected {
+  background-color: #dcdcdc;
+  color: var(--color-gray-700);
+}

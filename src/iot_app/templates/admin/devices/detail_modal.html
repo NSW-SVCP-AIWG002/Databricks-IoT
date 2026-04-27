@@ -1,0 +1,74 @@
+<div class="modal__header">
+  <h2 class="modal__title">デバイス参照</h2>
+</div>
+
+<div class="modal__body">
+  <p class="dm-modal-desc">登録されているデバイス情報を表示します。</p>
+
+  <dl class="dm-detail">
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">デバイスID</dt>
+      <dd class="dm-detail__value">{{ device.device_uuid }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">デバイス名</dt>
+      <dd class="dm-detail__value">{{ device.device_name }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">デバイス種別</dt>
+      <dd class="dm-detail__value">
+        {% for dt in device_types %}
+          {% if dt.device_type_id == device.device_type_id %}{{ dt.device_type_name }}{% endif %}
+        {% endfor %}
+      </dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">モデル情報</dt>
+      <dd class="dm-detail__value">{{ device.device_model or '—' }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">SIMID</dt>
+      <dd class="dm-detail__value">{{ device.sim_id or '—' }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">MACアドレス</dt>
+      <dd class="dm-detail__value">{{ device.mac_address or '—' }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">設置場所</dt>
+      <dd class="dm-detail__value">{{ device.device_location or '—' }}</dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">所属組織</dt>
+      <dd class="dm-detail__value">
+        {% for org in organizations %}
+          {% if org.organization_id == device.organization_id %}{{ org.organization_name }}{% endif %}
+        {% endfor %}
+      </dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">証明書期限</dt>
+      <dd class="dm-detail__value">
+        {%- if device.certificate_expiration_date %}
+          {{ device.certificate_expiration_date.strftime('%Y/%m/%d') }}
+        {%- else %}
+          —
+        {%- endif %}
+      </dd>
+    </div>
+    <div class="dm-detail__row">
+      <dt class="dm-detail__label">ステータス</dt>
+      <dd class="dm-detail__value">
+        <span class="device-status" id="device-status-badge" data-uuid="{{ device.device_uuid }}">—</span>
+      </dd>
+    </div>
+  </dl>
+</div>
+
+<div class="modal__footer">
+  {%- if editable %}
+  <button type="button" class="button button--primary"
+          onclick="DeviceModule.openEditModal('{{ device.device_uuid }}')">編集</button>
+  {%- endif %}
+  <button type="button" class="button" onclick="DeviceModule.closeModal()">閉じる</button>
+</div>

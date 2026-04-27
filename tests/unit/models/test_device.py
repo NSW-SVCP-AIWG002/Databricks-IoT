@@ -342,17 +342,14 @@ class TestDeviceTypeMasterDefaults:
 def make_valid_device_master_by_user_kwargs(**overrides):
     """DeviceMasterByUser コンストラクタの最小有効引数セットを返す"""
     kwargs = {
-        'user_id':              1,
-        'user_name':            'テストユーザー',
-        'user_organization_id': 1,
-        'device_id':            1,
-        'device_type_id':       1,
-        'device_name':          'センサー1号機',
-        'device_model':         'MODEL-A100',
-        'device_stock_id':      1,
-        'creator':              1,
-        'modifier':             1,
-        'depth':                0,
+        'user_id':         1,
+        'device_id':       1,
+        'device_uuid':     'DEV-001',
+        'organization_id': 1,
+        'device_type_id':  1,
+        'device_name':     'センサー1号機',
+        'device_model':    'MODEL-A100',
+        'depth':           0,
     }
     kwargs.update(overrides)
     return kwargs

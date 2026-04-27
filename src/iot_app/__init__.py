@@ -127,6 +127,10 @@ def create_app():
     def health():
         return jsonify(status='ok'), 200
 
+    # 管理機能 Blueprint
+    from iot_app.views.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
     # 業種別ダッシュボード Blueprint
     from iot_app.views.analysis.industry_dashboard import analysis_bp
     app.register_blueprint(analysis_bp)

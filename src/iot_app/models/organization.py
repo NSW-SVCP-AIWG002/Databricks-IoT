@@ -49,3 +49,17 @@ class OrganizationClosure(db.Model):
     parent_organization_id = db.Column(db.Integer, db.ForeignKey('organization_master.organization_id'), primary_key=True, nullable=False)
     subsidiary_organization_id = db.Column(db.Integer, db.ForeignKey('organization_master.organization_id'), primary_key=True, nullable=False)
     depth = db.Column(db.Integer, nullable=False, default=0)
+
+
+class OrganizationMasterByUser(db.Model):
+    """組織マスタ（ユーザースコープ制限ビュー）"""
+    __tablename__ = 'v_organization_master_by_user'
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, primary_key=True)
+    organization_name = db.Column(db.String(200), nullable=False)
+    delete_flag = db.Column(db.Boolean, nullable=False, default=False)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('delete_flag', False)
+        super().__init__(**kwargs)

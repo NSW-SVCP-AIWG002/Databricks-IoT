@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}デバイス参照{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">デバイス参照</h1>
+  <a href="{{ url_for('admin.devices_list') }}" class="button">一覧へ戻る</a>
+</div>
+
+<div class="card">
+  <p class="form-description">登録されているデバイス情報を表示します。</p>
+
+  <div class="detail-table">
+
+    <div class="detail-row">
+      <dt class="detail-label">デバイスID</dt>
+      <dd class="detail-value">{{ device.device_uuid }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">デバイス名</dt>
+      <dd class="detail-value">{{ device.device_name }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">デバイス種別</dt>
+      <dd class="detail-value">{{ device.device_type_id }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">モデル情報</dt>
+      <dd class="detail-value">{{ device.device_model or '—' }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">SIMID</dt>
+      <dd class="detail-value">{{ device.sim_id or '—' }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">MACアドレス</dt>
+      <dd class="detail-value">{{ device.mac_address or '—' }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">設置場所</dt>
+      <dd class="detail-value">{{ device.device_location or '—' }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">所属組織</dt>
+      <dd class="detail-value">{{ device.organization_id or '—' }}</dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">証明書期限</dt>
+      <dd class="detail-value">
+        {%- if device.certificate_expiration_date %}
+        {{ device.certificate_expiration_date.strftime('%Y/%m/%d') }}
+        {%- else %}
+        —
+        {%- endif %}
+      </dd>
+    </div>
+
+    <div class="detail-row">
+      <dt class="detail-label">ステータス</dt>
+      <dd class="detail-value">
+        <span class="device-status" id="device-status-badge" data-uuid="{{ device.device_uuid }}">
+          —
+        </span>
+      </dd>
+    </div>
+
+  </div>
+
+  <div class="form-actions">
+    <a href="{{ url_for('admin.devices_list') }}" class="button">閉じる</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/device.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    DeviceModule.initDetailStatus();
+  });
+</script>
+{% endblock %}

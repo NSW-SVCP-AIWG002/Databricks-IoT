@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS device_master (
     device_type_id              INT          NOT NULL,
     device_name                 VARCHAR(100) NOT NULL,
     device_model                VARCHAR(100) NOT NULL,
-    device_inventory_id         INT          NOT NULL,
+    device_inventory_id         INT          NULL,
     sim_id                      VARCHAR(100) NULL,
     mac_address                 VARCHAR(100) NULL,
     software_version            VARCHAR(100) NULL,
@@ -316,12 +316,14 @@ CREATE TABLE IF NOT EXISTS alert_setting_master (
 
 -- 16. デバイスステータス
 CREATE TABLE IF NOT EXISTS device_status_data (
-    device_id   INT NOT NULL AUTO_INCREMENT,
-    last_received_time      TIMESTAMP NULL,
-    delete_flag BOOLEAN      NOT NULL DEFAULT FALSE,
-    create_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (device_id)
+    device_id          INT       NOT NULL,
+    last_received_time TIMESTAMP NULL,
+    delete_flag        BOOLEAN   NOT NULL DEFAULT FALSE,
+    create_date        DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_date        DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_id),
+    CONSTRAINT FK_device_status_device FOREIGN KEY (device_id)
+        REFERENCES device_master (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 15. ソート項目マスタ
@@ -599,3 +601,31 @@ CREATE TABLE IF NOT EXISTS alert_abnomal_state (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+-- ビュー定義
+-- ============================================================
+
+-- デバイス一覧用VIEW（ユーザースコープ制限）
+CREATE OR REPLACE VIEW v_device_master_by_user AS
+SELECT
+    u.user_id,
+    d.device_id,
+    d.device_uuid,
+    d.organization_id,
+    d.device_type_id,
+    d.device_name,
+    d.device_model,
+    d.sim_id,
+    d.mac_address,
+    d.software_version,
+    d.device_location,
+    d.certificate_expiration_date,
+    d.delete_flag,
+    oc.depth
+FROM user_master u
+INNER JOIN organization_closure oc
+    ON u.organization_id = oc.parent_organization_id
+INNER JOIN device_master d
+    ON oc.subsidiary_organization_id = d.organization_id
+WHERE u.delete_flag = FALSE;
