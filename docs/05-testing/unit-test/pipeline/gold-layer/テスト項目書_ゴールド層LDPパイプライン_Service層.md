@@ -11,14 +11,12 @@
 
 テストクラスと、ワークフロー仕様書の各ワークフロー・処理フロー項目の対応を示します。
 
-| テストクラス            | テスト項目No. | 対応ワークフロー                           | 処理フロー項目                                            | エンドポイント                            |
-| ----------------------- | :-----------: | ------------------------------------------ | --------------------------------------------------------- | ----------------------------------------- |
-| TestRunAggregation      |     1〜17     | 時次集計処理 / 日次集計処理 / 月次集計処理 | ①シルバー層データ読込 / ②共通集計処理 / ③ゴールド層へ書込 | `run_aggregation()`                       |
-| TestAggregateSensorData |    18〜20     | 時次集計処理 / 日次集計処理 / 月次集計処理 | ②共通集計処理（aggregate_sensor_data）                    | `aggregate_sensor_data()`                 |
-| TestMergeToGold         |    21〜22     | 時次集計処理 / 日次集計処理 / 月次集計処理 | ③共通書込処理（merge_to_gold）                            | `merge_to_gold()`                         |
-| TestTeamsNotifier       |    23〜29     | エラーハンドリング（Teams通知フロー）      | Teams Webhook呼び出し（通知送信）                         | `TeamsNotifier.send_error_notification()` |
-| TestBuildAdaptiveCard   |    30〜33     | エラーハンドリング（Teams通知フロー）      | 通知メッセージペイロード作成                              | `TeamsNotifier._build_adaptive_card()`    |
-| TestNotifyError         |      34       | エラーハンドリング（Teams通知フロー）      | Webhook URL取得・TeamsNotifier呼び出し                    | `notify_error()`                          |
+| テストクラス          | テスト項目No. | 対応ワークフロー                           | 処理フロー項目                                            | エンドポイント                            |
+| --------------------- | :-----------: | ------------------------------------------ | --------------------------------------------------------- | ----------------------------------------- |
+| TestRunAggregation    |     1〜17     | 時次集計処理 / 日次集計処理 / 月次集計処理 | ①シルバー層データ読込 / ②共通集計処理 / ③ゴールド層へ書込 | `run_aggregation()`                       |
+| TestTeamsNotifier     |    18〜24     | エラーハンドリング（Teams通知フロー）      | Teams Webhook呼び出し（通知送信）                         | `TeamsNotifier.send_error_notification()` |
+| TestBuildAdaptiveCard |    25〜28     | エラーハンドリング（Teams通知フロー）      | 通知メッセージペイロード作成                              | `TeamsNotifier._build_adaptive_card()`    |
+| TestNotifyError       |      29       | エラーハンドリング（Teams通知フロー）      | Webhook URL取得・TeamsNotifier呼び出し                    | `notify_error()`                          |
 
 ---
 
@@ -28,19 +26,19 @@
 
 ### 時次集計処理
 
-| 処理フロー項目                         | 対応テストクラス                            | テスト項目No. |
-| -------------------------------------- | ------------------------------------------- | :-----------: |
-| ①シルバー層データ読込                  | TestRunAggregation                          |     1, 4      |
-| ②共通集計処理（aggregate_sensor_data） | TestRunAggregation, TestAggregateSensorData | 1, 4  |
-| ③ゴールド層へ書込（merge_to_gold）     | TestRunAggregation, TestMergeToGold         | 1, 4  |
+| 処理フロー項目                         | 対応テストクラス   | テスト項目No. |
+| -------------------------------------- | ------------------ | :-----------: |
+| ①シルバー層データ読込                  | TestRunAggregation |     1, 4      |
+| ②共通集計処理（aggregate_sensor_data） | TestRunAggregation |     1, 4      |
+| ③ゴールド層へ書込（merge_to_gold）     | TestRunAggregation |     1, 4      |
 
 ### 日次集計処理
 
-| 処理フロー項目                         | 対応テストクラス                            |         テスト項目No.         |
-| -------------------------------------- | ------------------------------------------- | :---------------------------: |
-| ①シルバー層データ読込                  | TestRunAggregation                          | 2, 5, 7, 8, 9, 10, 13, 14, 15 |
-| ②共通集計処理（aggregate_sensor_data） | TestRunAggregation, TestAggregateSensorData |     2, 5, 11, 16      |
-| ③ゴールド層へ書込（merge_to_gold）     | TestRunAggregation, TestMergeToGold         |     2, 5, 12, 17      |
+| 処理フロー項目                         | 対応テストクラス   |          テスト項目No.          |
+| -------------------------------------- | ------------------ | :-----------------------------: |
+| ①シルバー層データ読込                  | TestRunAggregation | 2, 5, 7, 8, 9, 10, 13, 14, 15  |
+| ②共通集計処理（aggregate_sensor_data） | TestRunAggregation |        2, 5, 11, 16             |
+| ③ゴールド層へ書込（merge_to_gold）     | TestRunAggregation |        2, 5, 12, 17             |
 
 ### 月次集計処理
 
@@ -54,8 +52,8 @@
 
 | 処理フロー項目                         | 対応テストクラス      | テスト項目No. |
 | -------------------------------------- | --------------------- | :-----------: |
-| 通知メッセージペイロード作成           | TestBuildAdaptiveCard |    18〜23     |
-| Teams Webhook呼び出し（通知送信）      | TestTeamsNotifier     |    24〜29     |
+| 通知メッセージペイロード作成           | TestBuildAdaptiveCard |    25〜28     |
+| Teams Webhook呼び出し（通知送信）      | TestTeamsNotifier     |    18〜24     |
 | Webhook URL取得・TeamsNotifier呼び出し | TestNotifyError       |      29       |
 
 ---
@@ -127,3 +125,4 @@
 | ---------- | ---- | --------------------------------------------------------------------------------------------------------------------- | ------------ |
 | 2026-04-24 | 1.0  | 初版作成                                                                                                              | Kei Sugiyama |
 | 2026-04-24 | 1.1  | TestRunAggregation（ERRORログ確認5件）・TestAggregateSensorData・TestMergeToGold・TestNotifyError を追加（23件→34件） | Kei Sugiyama |
+| 2026-04-27 | 1.2  | 対応表・カバレッジ表の誤りを修正（Model層クラスの誤混入削除、TestTeamsNotifier〜TestNotifyError の項目No.を正しく修正）合計29件 | Kei Sugiyama |
