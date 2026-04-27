@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}CSVインポート完了 - IoT管理システム{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page__body">
+    <div class="modal modal--visible" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal__overlay"></div>
+      <div class="modal__container">
+        <div class="modal__header">
+          <h2 class="modal__title" id="modal-title">インポート完了</h2>
+        </div>
+        <div class="modal__body">
+          <p class="modal__description modal__description--success">
+            CSVファイルのインポートが完了しました。
+          </p>
+          {% if imported_count is defined %}
+            <p class="modal__description">インポート件数: <strong>{{ imported_count }}</strong> 件</p>
+          {% endif %}
+        </div>
+        <div class="modal__actions">
+          <a href="{{ url_for('transfer.csv_import_get') }}" class="button button--secondary">
+            閉じる
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

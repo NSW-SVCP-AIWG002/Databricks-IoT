@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}CSVインポート確認 - IoT管理システム{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page__body">
+    <div class="modal modal--visible" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal__overlay"></div>
+      <div class="modal__container">
+        <div class="modal__header">
+          <h2 class="modal__title" id="modal-title">インポート確認</h2>
+        </div>
+        <div class="modal__body">
+          <p class="modal__description">以下の内容でインポートを実行しますか？</p>
+          <dl class="description-list">
+            <dt class="description-list__term">対象マスタ</dt>
+            <dd class="description-list__detail">{{ master_name }}</dd>
+            <dt class="description-list__term">ファイル名</dt>
+            <dd class="description-list__detail">{{ file_name }}</dd>
+          </dl>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="button button--primary" id="confirm-import-btn">
+            インポート実行
+          </button>
+          <a href="{{ url_for('transfer.csv_import_get') }}" class="button button--secondary">
+            キャンセル
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

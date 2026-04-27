@@ -8,6 +8,7 @@ python-dotenv>=1.0.0
 
 # Data manipulation
 pandas>=2.0.0
+chardet>=5.0.0
 
 # Database
 sqlalchemy>=2.0.0

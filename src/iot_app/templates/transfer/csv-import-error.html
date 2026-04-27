@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}CSVインポートエラー - IoT管理システム{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page__body">
+    <div class="modal modal--visible" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal__overlay"></div>
+      <div class="modal__container">
+        <div class="modal__header">
+          <h2 class="modal__title" id="modal-title">インポートエラー</h2>
+        </div>
+        <div class="modal__body">
+          <p class="modal__description modal__description--error">
+            CSVファイルのインポートが失敗しました。<br>
+            以下のエラーを修正してから再度インポートしてください。
+          </p>
+          {% if import_errors %}
+            <div class="table__wrapper">
+              <table class="table">
+                <thead class="table__head">
+                  <tr class="table__row">
+                    <th class="table__header">行</th>
+                    <th class="table__header">列</th>
+                    <th class="table__header">エラー内容</th>
+                  </tr>
+                </thead>
+                <tbody class="table__body">
+                  {% for error in import_errors %}
+                    <tr class="table__row">
+                      <td class="table__cell">{{ error.row }}</td>
+                      <td class="table__cell">{{ error.column }}</td>
+                      <td class="table__cell">{{ error.message }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </div>
+        <div class="modal__actions">
+          <a href="{{ url_for('transfer.csv_import_get') }}" class="button button--primary">
+            修正して再インポート
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

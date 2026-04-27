@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}CSVインポート - IoT管理システム{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page__header">
+    <h1 class="page__title">CSVインポート</h1>
+  </div>
+
+  <div class="page__body">
+    <div class="modal modal--visible" id="csv-import-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal__overlay"></div>
+      <div class="modal__container">
+
+        <!-- (1) 機能説明エリア -->
+        <div class="modal__header">
+          <h2 class="modal__title" id="modal-title">CSVインポート</h2>
+        </div>
+
+        <div class="modal__body">
+          <p class="modal__description">
+            CSVファイルを選択してマスタデータを一括インポートします。<br>
+            操作列に R（登録）/ U（更新）/ D（削除）を指定してください。
+          </p>
+
+          <form id="csv-import-form"
+                action="{{ url_for('transfer.csv_import_post') }}"
+                method="POST"
+                enctype="multipart/form-data"
+                novalidate>
+            {{ form.hidden_tag() }}
+
+            <!-- (4) エラーメッセージ表示エリア -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert--{{ category }}" role="alert">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+            {% if form.master_type_id.errors or form.csv_file.errors %}
+              <div class="alert alert--error" role="alert">
+                {% for error in form.master_type_id.errors %}<p>{{ error }}</p>{% endfor %}
+                {% for error in form.csv_file.errors %}<p>{{ error }}</p>{% endfor %}
+              </div>
+            {% endif %}
+
+            <!-- (2) マスタ種別選択エリア -->
+            <div class="form__group">
+              <label class="form__label form__label--required" for="master_type_id">
+                対象マスタ
+              </label>
+              {{ form.master_type_id(id='master_type_id', class='form__select') }}
+            </div>
+
+            <!-- (3) ファイルアップロードエリア -->
+            <div class="form__group">
+              <label class="form__label form__label--required" for="csv_file">
+                CSVファイル
+              </label>
+              <div class="file-upload" id="file-upload-area">
+                <div class="file-upload__dropzone" id="dropzone">
+                  <p class="file-upload__instruction">CSVファイルをドラッグ&ドロップ<br>または</p>
+                  {{ form.csv_file(id='csv_file', class='file-upload__input', accept='.csv') }}
+                  <label for="csv_file" class="button button--secondary file-upload__button">
+                    ファイルを選択
+                  </label>
+                  <p class="file-upload__hint">対応形式: CSV (.csv) ／ 最大サイズ: 10MB</p>
+                </div>
+                <!-- (5) アップロードファイル情報エリア -->
+                <div class="file-upload__info" id="file-info" hidden>
+                  <span class="file-upload__filename" id="file-name"></span>
+                  <button type="button" class="file-upload__remove button button--danger--text" id="remove-file">
+                    削除
+                  </button>
+                </div>
+                <!-- (4b) ファイルエラーメッセージ -->
+                <p class="form__error" id="file-error" hidden></p>
+              </div>
+            </div>
+
+            <!-- (6) アクションボタンエリア -->
+            <div class="modal__actions">
+              <button type="submit" class="button button--primary" id="import-btn" disabled>
+                インポート
+              </button>
+              <a href="javascript:history.back()" class="button button--secondary">
+                キャンセル
+              </a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const fileInput = document.getElementById('csv_file');
+  const fileInfo  = document.getElementById('file-info');
+  const fileName  = document.getElementById('file-name');
+  const removeBtn = document.getElementById('remove-file');
+  const importBtn = document.getElementById('import-btn');
+  const fileError = document.getElementById('file-error');
+  const dropzone  = document.getElementById('dropzone');
+
+  function showFile(file) {
+    fileError.hidden = true;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      fileError.textContent = 'CSVファイルを選択してください';
+      fileError.hidden = false;
+      importBtn.disabled = true;
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      fileError.textContent = 'ファイルサイズは10MB以下にしてください';
+      fileError.hidden = false;
+      importBtn.disabled = true;
+      return;
+    }
+    fileName.textContent = file.name;
+    fileInfo.hidden = false;
+    importBtn.disabled = false;
+  }
+
+  fileInput.addEventListener('change', function () {
+    if (this.files.length > 0) showFile(this.files[0]);
+  });
+
+  removeBtn.addEventListener('click', function () {
+    fileInput.value = '';
+    fileInfo.hidden = true;
+    importBtn.disabled = true;
+  });
+
+  ['dragover', 'dragleave', 'drop'].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) { e.preventDefault(); });
+  });
+  dropzone.addEventListener('drop', function (e) {
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      showFile(file);
+    }
+  });
+}());
+</script>
+{% endblock %}

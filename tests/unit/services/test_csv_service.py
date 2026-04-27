@@ -184,11 +184,16 @@ class TestValidateCsvFormat:
         import pandas as pd
         from iot_app.services.csv_service import validate_csv_format
 
-        # Arrange: アクセス可能な組織 ID = 1 のみ
+        # Arrange: アクセス可能な組織 ID = 1 のみ（全必須列を含む正常データ）
         _make_mock_db_scope(mock_db, [(1,)])
-        df = pd.DataFrame([
-            {'操作列': 'R', '組織ID': '1', 'デバイスID': 'DEV-001', 'デバイス名': 'センサーA'}
-        ])
+        df = pd.DataFrame([{
+            '操作列': 'R',
+            'デバイスID': 'DEV-001',
+            'デバイス名': 'センサーA',
+            'デバイス種別': 'センサー',
+            'モデル情報': 'MODEL-A',
+            '所属組織ID': '1',
+        }])
         user = _make_user(organization_id=1)
 
         # Act
@@ -222,11 +227,16 @@ class TestValidateCsvFormat:
         import pandas as pd
         from iot_app.services.csv_service import validate_csv_format
 
-        # Arrange: 1 行目データに必須項目違反
+        # Arrange: 全必須列を持ち、デバイスID が空の 1 行目データ
         _make_mock_db_scope(mock_db, [(1,)])
-        df = pd.DataFrame([
-            {'操作列': 'R', '組織ID': '1', 'デバイスID': '', 'デバイス名': ''}
-        ])
+        df = pd.DataFrame([{
+            '操作列': 'R',
+            '所属組織ID': '1',
+            'デバイスID': '',
+            'デバイス名': 'センサーA',
+            'デバイス種別': 'センサー',
+            'モデル情報': 'MODEL-A',
+        }])
         user = _make_user(organization_id=1)
 
         # Act
@@ -591,13 +601,8 @@ class TestGenerateCsv:
         # Act
         result = generate_csv(rows)
 
-        # Assert: bytes の場合は先頭 3 バイトが BOM であること
-        #         str の場合は str 型であること（実装確定後に要確認）
-        if isinstance(result, bytes):
-            assert result[:3] == b'\xef\xbb\xbf'  # UTF-8 BOM
-        else:
-            # TODO: 実装完了後に戻り値型（bytes / str）を確定し、BOM 検証を追加する
-            assert isinstance(result, str)
+        # Assert: 先頭 3 バイトが UTF-8 BOM であること
+        assert result[:3] == b'\xef\xbb\xbf'
 
     def test_japanese_characters_output_without_corruption(self):
         """3.5.3.2: 日本語データが文字化けなく正しく出力される"""
