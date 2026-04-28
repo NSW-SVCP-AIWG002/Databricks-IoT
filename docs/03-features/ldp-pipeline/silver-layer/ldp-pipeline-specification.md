@@ -1554,10 +1554,10 @@ def enqueue_email_notification(batch_df, batch_id, spark):
             "left"
         )
         .select(
-            alert_records.device_id,
-            alert_records.organization_id,
-            alert_records.alert_id,
-            F.col("email_address").alias("recipient_email"),
+            F.col("device_id"),
+            F.col("organization_id"),
+            F.col("alert_id"),
+            F.to_json(F.struct(F.array(F.col("email_address")).alias("to"))).alias("recipient_email"),
             F.concat(
                 F.lit("[アラート] "),
                 F.col("alert_name"),
