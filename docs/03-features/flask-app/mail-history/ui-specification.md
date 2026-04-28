@@ -137,7 +137,7 @@
 | (4.6) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号、総件数 | 中央揃え |
 | (5.1) | メール種別 | mail_type | Badge | O | - | - | - | DB: `mail_history.mail_type` | バッジ表示 |
 | (5.2) | 送信元メールアドレス | sender_email | Label | O | - | 254 | - | DB: `mail_history.sender_email` | - |
-| (5.3) | 送信先メールアドレス | recipients | Label | O | - | - | - | DB: `mail_history.recipients` (JSON型) | カンマ区切りで表示 |
+| (5.3) | 送信先メールアドレス | recipients | Label | O | - | - | - | DB: `mail_recipient.recipient_email` | カンマ区切りで表示 |
 | (5.4) | 送信日時 | sent_at | Label | O | - | - | - | DB: `mail_history.sent_at` | `YYYY/MM/DD HH:mm` 形式 |
 | (5.5) | メール件名 | subject | Label | O | - | 500 | - | DB: `mail_history.subject` | 全文表示 |
 | (5.6) | メール本文 | body | Label | O | - | - | - | DB: `mail_history.body` | 全文表示、改行を保持 |
@@ -396,8 +396,8 @@
 **5-3: 送信先メールアドレス**
 - 概要: メールの送信先メールアドレスを表示
 - ラベル: 「送信先メールアドレス」
-- データソース: DB `mail_history.recipients` (JSON型)
-- 表示形式: `recipients.to` 配列の要素をカンマ区切りで表示（例: `user1@example.com, user2@example.com`）
+- データソース: DB `mail_recipient.recipient_email`
+- 表示形式: `mail_recipient` テーブルの `recipient_email` をカンマ区切りで表示（例: `user1@example.com, user2@example.com`）
 
 **5-4: 送信日時**
 - 概要: メール送信日時を表示

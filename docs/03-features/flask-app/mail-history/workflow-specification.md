@@ -206,7 +206,7 @@ logger.info(f'認証・権限チェック成功: user_id={current_user.user_id},
 
 **パラメータ検証:**
 - `page`: 1以上の整数
-- `sort_id`: sort_item_master テーブルに存在するIDのみ（1-4）
+- `sort_id`: sort_item_master テーブルに存在するIDのみ（1-3）
 - `order`: ascまたはdescのみ
 
 **実装例:**
@@ -256,7 +256,6 @@ logger.info(f'クエリパラメータ取得成功: page={page}, sort_id={sort_i
 SELECT
   mail_history_id,
   mail_type,
-  recipients,
   subject,
   body,
   sent_at
@@ -550,7 +549,6 @@ sent_at_end = form.sent_at_end.data
 SELECT
   mail_history_id,
   mail_type,
-  recipients,
   subject,
   body,
   sent_at
@@ -889,11 +887,12 @@ flowchart TD
 
 
     CheckAuth -->|NG| Error403[403エラー]
-    CheckAuth -->|OK| Query[DBクエリ実行<br>SELECT * FROM mail_history<br>WHERE mail_history_uuid = mail_history_uuid<br>AND organization_id = current_user.organization_id]
-    Query --> CheckDB{データ取得<br>結果}
+    CheckAuth -->|OK| Query1[DBクエリ実行①<br>SELECT FROM mail_history<br>WHERE mail_history_uuid = mail_history_uuid<br>AND organization_id = current_user.organization_id]
+    Query1 --> CheckDB{データ取得<br>結果}
 
     CheckDB -->|見つからない| Error404[404エラー<br>データが見つかりません]
-    CheckDB -->|成功| Template[Jinja2パーシャルテンプレートレンダリング<br>render_template<br>notice/mail_history/detail_modal.html]
+    CheckDB -->|成功| Query2[DBクエリ実行②<br>SELECT FROM mail_recipient<br>WHERE mail_history_id = mail_history_id]
+    Query2 --> Template[Jinja2パーシャルテンプレートレンダリング<br>render_template<br>mail-history/detail_modal.html]
     Template --> Response[HTMLレスポンス返却<br>モーダル内部のHTMLのみ]
     Response --> Modal[モーダルを開く]
 
@@ -918,15 +917,16 @@ flowchart TD
 
 データベースから指定されたメール送信履歴を取得します。
 
-**使用テーブル:** mail_history（メール送信履歴）
+**使用テーブル:** mail_history（メール送信履歴）、mail_recipient（メール宛先）
 
 **SQL詳細:**
+
 ```sql
+-- クエリ1: メール送信履歴取得
 SELECT
   mail_history_id,
   mail_type,
   sender_email,
-  recipients,
   subject,
   body,
   sent_at
@@ -935,12 +935,22 @@ FROM
 WHERE
   mail_history_uuid = :mail_history_uuid
   AND organization_id = :organization_id
+
+-- クエリ2: 宛先取得
+SELECT
+  recipient_email
+FROM
+  mail_recipient
+WHERE
+  mail_history_id = :mail_history_id
+ORDER BY
+  user_id ASC
 ```
 
 **変数・パラメータ:**
 - `mail_history_uuid`: string - メール送信履歴UUID
 - `organization_id`: string - データスコープ制限用の組織ID
-- `recipients`: dict - 送信先メールアドレス（JSON型、toフィールドにメールアドレス配列を含む）
+- `recipients`: list[str] - 宛先メールアドレスリスト（mail_recipient テーブルから取得）
 
 **実装例:**
 ```python
@@ -963,8 +973,16 @@ def mail_history_detail(mail_history_uuid):
 
         logger.info(f'メール通知履歴取得成功: mail_history_id={mail_history.mail_history_id}')
 
-        return render_template('notice/mail_history/detail_modal.html',
-                              mail_history=mail_history)
+        logger.info('宛先取得開始')
+        recipients = MailRecipient.query.filter_by(
+            mail_history_id=mail_history.mail_history_id
+        ).order_by(MailRecipient.user_id).all()
+        recipient_emails = [r.recipient_email for r in recipients]
+        logger.info(f'宛先取得成功: count={len(recipient_emails)}')
+
+        return render_template('mail-history/detail_modal.html',
+                              mail_history=mail_history,
+                              recipient_emails=recipient_emails)
 
     except Exception as e:
         logger.error(f'メール通知履歴詳細表示失敗: mail_history_uuid={mail_history_uuid}, error={str(e)}')
@@ -1037,10 +1055,11 @@ flowchart TD
 |----|-----------|--------|---------|------------|------|----------------|
 | 1 | mail_history | メール送信履歴 | SELECT | 初期表示、検索 | メール送信履歴取得 | PRIMARY KEY (mail_history_id)<br>INDEX (organization_id)<br>INDEX (sent_at)<br>INDEX (mail_type) |
 | 2 | mail_history | メール送信履歴 | SELECT | メール通知履歴詳細表示 | メール送信履歴詳細取得 | PRIMARY KEY (mail_history_id)<br>INDEX (organization_id) |
-| 3 | sort_item_master | ソート項目マスタ | SELECT | 初期表示、検索、ソート | ソート項目の検証とカラム名マッピング | PRIMARY KEY (view_id, sort_item_id) |
-| 4 | user_master | ユーザーマスタ | SELECT | 初期表示、検索、詳細表示 | 認証・認可、ユーザー情報（organization_id）の取得 | PRIMARY KEY (user_id) |
-| 5 | organization_master | 組織マスタ | SELECT | （参照のみ） | 関連組織情報の取得 | PRIMARY KEY (organization_id) |
-| 6 | mail_type_master | メール種別マスタ | SELECT | 初期表示、検索 | メール種別IDの検証と値の変換 | PRIMARY KEY (mail_type_id) |
+| 3 | mail_recipient | メール宛先 | SELECT | メール通知履歴詳細表示 | 宛先メールアドレス取得 | PRIMARY KEY (mail_history_id, user_id)<br>INDEX (user_id) |
+| 4 | sort_item_master | ソート項目マスタ | SELECT | 初期表示、検索、ソート | ソート項目の検証とカラム名マッピング | PRIMARY KEY (view_id, sort_item_id) |
+| 5 | user_master | ユーザーマスタ | SELECT | 初期表示、検索、詳細表示 | 認証・認可、ユーザー情報（organization_id）の取得 | PRIMARY KEY (user_id) |
+| 6 | organization_master | 組織マスタ | SELECT | （参照のみ） | 関連組織情報の取得 | PRIMARY KEY (organization_id) |
+| 7 | mail_type_master | メール種別マスタ | SELECT | 初期表示、検索 | メール種別IDの検証と値の変換 | PRIMARY KEY (mail_type_id) |
 
 ### インデックス最適化
 
@@ -1049,6 +1068,8 @@ flowchart TD
 - mail_history.organization_id: INDEX - データスコープ制限による検索高速化
 - mail_history.sent_at: INDEX - 日時範囲検索高速化
 - mail_history.mail_type: INDEX - メール種別検索高速化
+- mail_recipient.(mail_history_id, user_id): PRIMARY KEY - メール宛先一意識別
+- mail_recipient.user_id: INDEX - ユーザーID検索高速化
 - sort_item_master.(view_id, sort_item_id): PRIMARY KEY - ソート項目一意識別
 - mail_type_master.mail_type_id: PRIMARY KEY - メール種別マスタ一意識別
 
@@ -1082,7 +1103,22 @@ flowchart TD
 
 **実装例:**
 ```python
-@notice_bp.route('/notice/mail-history', methods=['GET'])
+from functools import wraps
+from flask import abort
+
+def require_mail_history_access():
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            current_user = get_current_user()
+            if current_user.role not in ['system_admin', 'management_admin', 'sales_company_user', 'service_company_user']:
+                abort(403)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@notice_bp.route('/mail-history', methods=['GET'])
+@require_mail_history_access()
 def mail_history_list():
     # 認証はmiddleware.pyで一元管理。g.current_userにユーザー情報が格納済み
     organization_id = g.current_user.organization_id
