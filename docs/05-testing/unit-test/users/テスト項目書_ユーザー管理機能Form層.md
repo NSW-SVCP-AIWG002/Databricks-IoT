@@ -1,10 +1,76 @@
 # テスト項目書 - ユーザー管理機能 Form層
 
-**対象ファイル:** `tests/unit/forms/test_user_form.py`
-**対象モジュール:** `iot_app.forms.user`
+- **対象ファイル**: `src/iot_app/forms/user.py`
+- **テストコード**: `tests/unit/forms/test_user_form.py`
+- **観点表**: `docs/05-testing/unit-test/unit-test-perspectives.md`
+- **ワークフロー仕様書**: `docs/03-features/flask-app/users/workflow-specification.md`
+
 **テスト総数:** 32件
 
 ---
+
+## 対応表
+
+テストクラスと、ワークフロー仕様書の各ワークフロー・処理フロー項目の対応を示します。
+
+| テストクラス | テスト項目No. | 対応ワークフロー | 処理フロー項目 | エンドポイント |
+|------------|:---:|--------------|-------------|-------------|
+| TestUserCreateForm | 1〜20 | ユーザー登録（登録実行） | フォーム入力バリデーション（正常系・必須・最大長・形式） | `POST /admin/users/register` |
+| TestUserUpdateForm | 21〜32 | ユーザー更新（更新実行） | フォーム入力バリデーション（正常系・必須・最大長・更新不可項目確認） | `POST /admin/users/<id>/update` |
+
+---
+
+## ワークフロー別カバレッジ
+
+ワークフロー仕様書の各ワークフローに対して、どのテストクラスが対応しているかを示します。
+
+### ユーザー登録（登録実行）
+
+| 処理フロー項目 | 対応テストクラス | テスト項目No. |
+|-------------|--------------|:---:|
+| フォーム入力バリデーション（全必須項目が有効） | TestUserCreateForm | 1 |
+| 必須チェック（user_name 空文字） | TestUserCreateForm | 2 |
+| 最大文字列長チェック（user_name 上限+1） | TestUserCreateForm | 3 |
+| 最大文字列長チェック（user_name 上限±0） | TestUserCreateForm | 4 |
+| 最大文字列長チェック（user_name 上限-1） | TestUserCreateForm | 5 |
+| 必須チェック（email_address 空文字） | TestUserCreateForm | 6 |
+| メールアドレス形式チェック（@なし） | TestUserCreateForm | 7 |
+| 最大文字列長チェック（email_address 上限+1） | TestUserCreateForm | 8 |
+| 最大文字列長チェック（email_address 上限±0） | TestUserCreateForm | 9 |
+| 最大文字列長チェック（email_address 上限-1） | TestUserCreateForm | 10 |
+| メールアドレス形式チェック（ドメインなし） | TestUserCreateForm | 11 |
+| メールアドレス形式チェック（ローカル部なし） | TestUserCreateForm | 12 |
+| 最大文字列長チェック（address 上限+1） | TestUserCreateForm | 13 |
+| 最大文字列長チェック（address 上限±0） | TestUserCreateForm | 14 |
+| 最大文字列長チェック（address 上限-1） | TestUserCreateForm | 15 |
+| 任意項目（address 空文字） | TestUserCreateForm | 16 |
+| 必須チェック（organization_id 未選択） | TestUserCreateForm | 17 |
+| 必須チェック（user_type_id 未選択） | TestUserCreateForm | 18 |
+| 必須チェック（region_id 未選択） | TestUserCreateForm | 19 |
+| 必須チェック（status 未選択） | TestUserCreateForm | 20 |
+
+### ユーザー更新（更新実行）
+
+| 処理フロー項目 | 対応テストクラス | テスト項目No. |
+|-------------|--------------|:---:|
+| フォーム入力バリデーション（全必須項目が有効） | TestUserUpdateForm | 21 |
+| 更新不可項目（email_address・organization_id・user_type_id）非存在確認 | TestUserUpdateForm | 32 |
+| 必須チェック（user_name 空文字） | TestUserUpdateForm | 22 |
+| 最大文字列長チェック（user_name 上限+1） | TestUserUpdateForm | 23 |
+| 最大文字列長チェック（user_name 上限ちょうど） | TestUserUpdateForm | 24 |
+| 最大文字列長チェック（user_name 上限-1） | TestUserUpdateForm | 25 |
+| 最大文字列長チェック（address 上限+1） | TestUserUpdateForm | 26 |
+| 最大文字列長チェック（address 上限ちょうど） | TestUserUpdateForm | 27 |
+| 最大文字列長チェック（address 上限-1） | TestUserUpdateForm | 28 |
+| 任意項目（address 空文字） | TestUserUpdateForm | 29 |
+| 必須チェック（region_id 未選択） | TestUserUpdateForm | 30 |
+| 必須チェック（status 未選択） | TestUserUpdateForm | 31 |
+
+---
+
+## テストクラス一覧
+
+テストクラスに対して、テスト観点、操作手順、予想結果を示します。
 
 ### TestUserCreateForm
 

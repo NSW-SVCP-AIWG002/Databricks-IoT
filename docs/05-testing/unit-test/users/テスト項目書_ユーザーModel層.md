@@ -1,12 +1,61 @@
 # テスト項目書 - ユーザー管理機能 Model層
 
-**対象ファイル:** `tests/unit/models/test_user.py`
-**対象モジュール:** `iot_app.models.user`
+- **対象ファイル**: `src/iot_app/models/user.py`
+- **テストコード**: `tests/unit/models/test_user.py`
+- **観点表**: `docs/05-testing/unit-test/unit-test-perspectives.md`
+- **ワークフロー仕様書**: `docs/03-features/flask-app/users/workflow-specification.md`
+
 **テスト総数:** 15件
 
 ---
 
-## TestUserModel
+## 対応表
+
+テストクラスと、ワークフロー仕様書の各ワークフロー・処理フロー項目の対応を示します。
+
+| テストクラス | テスト項目No. | 対応ワークフロー | 処理フロー項目 | エンドポイント |
+|------------|:---:|--------------|-------------|-------------|
+| TestUserModel | 1〜11 | 全ワークフロー横断 | カラム定義・制約・デフォルト値検証（user_master テーブル） | 全エンドポイント |
+| TestUserTypeModel | 12〜15 | 初期表示 / 検索・絞り込み / ユーザー登録（登録実行） / ユーザー更新（更新実行） | カラム定義・制約・デフォルト値検証（user_type_master テーブル） | `GET /admin/users` / `POST /admin/users/register` / `POST /admin/users/<id>/update` |
+
+---
+
+## ワークフロー別カバレッジ
+
+ワークフロー仕様書の各ワークフローに対して、どのテストクラスが対応しているかを示します。
+
+### 全ワークフロー横断（user_master テーブル定義）
+
+| 処理フロー項目 | 対応テストクラス | テスト項目No. |
+|-------------|--------------|:---:|
+| テーブル名確認（user_master） | TestUserModel | 1 |
+| 主キー確認（user_id） | TestUserModel | 2 |
+| オートインクリメント確認（user_id） | TestUserModel | 3 |
+| NOT NULL 確認（user_name） | TestUserModel | 4 |
+| NOT NULL 確認（email_address） | TestUserModel | 5 |
+| NOT NULL 確認（databricks_user_id） | TestUserModel | 6 |
+| デフォルト値確認（language_code = 'ja'） | TestUserModel | 7 |
+| デフォルト値確認（status = 1） | TestUserModel | 8 |
+| デフォルト値確認（alert_notification_flag = True） | TestUserModel | 9 |
+| デフォルト値確認（system_notification_flag = True） | TestUserModel | 10 |
+| デフォルト値確認（delete_flag = False） | TestUserModel | 11 |
+
+### 初期表示 / 検索・絞り込み / ユーザー登録（登録実行） / ユーザー更新（更新実行）
+
+| 処理フロー項目 | 対応テストクラス | テスト項目No. |
+|-------------|--------------|:---:|
+| テーブル名確認（user_type_master） | TestUserTypeModel | 12 |
+| 主キー確認（user_type_id） | TestUserTypeModel | 13 |
+| NOT NULL 確認（user_type_name） | TestUserTypeModel | 14 |
+| デフォルト値確認（delete_flag = False） | TestUserTypeModel | 15 |
+
+---
+
+## テストクラス一覧
+
+テストクラスに対して、テスト観点、操作手順、予想結果を示します。
+
+### TestUserModel
 
 `User` モデルのカラム定義テスト（観点: 2.1 正常系処理（カラム定義・制約・デフォルト値が設計書通りであること））
 
@@ -26,7 +75,7 @@
 
 ---
 
-## TestUserTypeModel
+### TestUserTypeModel
 
 `UserType` モデルのカラム定義テスト（観点: 2.1 正常系処理（カラム定義・制約・デフォルト値が設計書通りであること））
 

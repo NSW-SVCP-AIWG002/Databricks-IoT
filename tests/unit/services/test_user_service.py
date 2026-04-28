@@ -224,6 +224,18 @@ class TestSearchUsers:
 
     @patch(f'{MODULE}.UserMasterByUser')
     @patch(f'{MODULE}.db')
+    def test_sort_applied_when_sort_unspecified(self, mock_db, mock_uc):
+        """3.1.2.1: sort_by が未指定（空文字）の場合も order_by が呼ばれること（デフォルトソート）"""
+        mock_query = self._make_query_mock(mock_db, mock_uc, total=0)
+        from iot_app.services.user_service import search_users
+        params = {'page': 1, 'per_page': 20, 'sort_by': '', 'order': '',
+                  'user_name': '', 'email_address': '', 'user_type_id': None,
+                  'organization_id': None, 'region_id': None, 'status': None}
+        search_users(params, user_id=1)
+        mock_query.order_by.assert_called()
+
+    @patch(f'{MODULE}.UserMasterByUser')
+    @patch(f'{MODULE}.db')
     def test_all_filter_conditions_applied(self, mock_db, _mock_uc):
         """ 3.1.1.2: 全フィルター条件（user_name / email_address / user_type_id / organization_id / region_id / status）を同時指定したとき、すべての条件がフィルタに追加される"""
         mock_query = self._make_query_mock(mock_db, _mock_uc, total=1)
