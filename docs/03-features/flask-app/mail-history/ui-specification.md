@@ -2,17 +2,22 @@
 
 ## 📑 目次
 
-- [基本情報](#基本情報)
-- [画面レイアウト](#画面レイアウト)
-  - [ワイヤーフレーム](#ワイヤーフレーム)
-  - [レイアウト構成](#レイアウト構成)
-- [要素概要](#要素概要)
-- [要素詳細](#要素詳細)
-- [備考](#備考)
+- [メール通知履歴 - UI仕様書](#メール通知履歴---ui仕様書)
+  - [📑 目次](#-目次)
+  - [基本情報](#基本情報)
+  - [画面レイアウト](#画面レイアウト)
+    - [ワイヤーフレーム](#ワイヤーフレーム)
+    - [レイアウト構成](#レイアウト構成)
+  - [要素概要](#要素概要)
+  - [要素詳細](#要素詳細)
+    - [(2) 検索フォーム](#2-検索フォーム)
+    - [(4) データテーブル](#4-データテーブル)
+    - [(5) メール通知履歴参照モーダル](#5-メール通知履歴参照モーダル)
+  - [備考](#備考)
 
 ---
 
-**重要:** このUI仕様書を参照する前に、必ず [UI共通仕様書](../../common/ui-common-specification.md) を参照してください。UI共通仕様書には、すべての画面で共通するUI仕様（ボタン、フォーム要素、テーブル、モーダル、バリデーション、エラーメッセージ、アクセシビリティ等）が定義されています。このドキュメントには、画面固有の仕様のみを記載しています。
+**重要:** このUI仕様書を作成する前に、必ず [UI共通仕様書](../../common/ui-common-specification.md) を参照してください。UI共通仕様書には、すべての画面で共通するUI仕様（ボタン、フォーム要素、テーブル、モーダル、バリデーション、エラーメッセージ、アクセシビリティ等）が定義されています。このテンプレートには、画面固有の仕様のみを記載してください。
 
 ---
 
@@ -119,8 +124,8 @@
 |------|------|------|------|------|------|------|------|------|------|
 | (1) | ヘッダー | header | - | O | - | - | - | 固定値: 「メール通知履歴」 | 固定表示 |
 | (2.1) | メール種別 | mail_type_ids | MultiSelect | I/O | - | - | 全選択 | - | 複数選択可能、ID値で管理 |
-| (2.2) | 送信日時（開始） | sent_at_start | Date | I/O | - | - | - | - | 日付選択 |
-| (2.3) | 送信日時（終了） | sent_at_end | Date | I/O | - | - | - | - | 日付選択 |
+| (2.2) | 送信日時（開始） | sent_at_start | Date | I/O | - | - | 現在日時から7日前の00:00 | - | 日付選択 |
+| (2.3) | 送信日時（終了） | sent_at_end | Date | I/O | - | - | 現在日時の23:59 | - | 日付選択 |
 | (2.4) | キーワード（件名・本文） | keyword | Text | I/O | - | 255 | - | - | 件名または本文を検索 |
 | (2.5) | 検索ボタン | search_button | Button | I | - | - | - | 固定値: 「検索」 | プライマリボタン |
 | (3) | 現在の検索条件 | search_condition | Label | O | - | - | - | - | 適用中の検索条件を表示 |
@@ -132,7 +137,7 @@
 | (4.6) | ページネーション | pagination | Pagination | I/O | - | - | 1 | DB: ページ番号、総件数 | 中央揃え |
 | (5.1) | メール種別 | mail_type | Badge | O | - | - | - | DB: `mail_history.mail_type` | バッジ表示 |
 | (5.2) | 送信元メールアドレス | sender_email | Label | O | - | 254 | - | DB: `mail_history.sender_email` | - |
-| (5.3) | 送信先メールアドレス | recipients | Label | O | - | - | - | DB: `mail_history.recipients` (JSON型) | カンマ区切りで表示 |
+| (5.3) | 送信先メールアドレス | recipients | Label | O | - | - | - | DB: `mail_recipient.recipient_email` | カンマ区切りで表示 |
 | (5.4) | 送信日時 | sent_at | Label | O | - | - | - | DB: `mail_history.sent_at` | `YYYY/MM/DD HH:mm` 形式 |
 | (5.5) | メール件名 | subject | Label | O | - | 500 | - | DB: `mail_history.subject` | 全文表示 |
 | (5.6) | メール本文 | body | Label | O | - | - | - | DB: `mail_history.body` | 全文表示、改行を保持 |
@@ -192,7 +197,7 @@
 ```html
 <div class="form-group">
   <label for="sentAtStart" class="form-label">送信日時（開始）</label>
-  <input type="date" id="sentAtStart" name="sent_at_start" class="form-input">
+  <input type="date" id="sentAtStart" name="sent_at_start" class="form-input" value="{{ sent_at_start }}">
 </div>
 ```
 
@@ -206,7 +211,7 @@
 ```html
 <div class="form-group">
   <label for="sentAtEnd" class="form-label">送信日時（終了）</label>
-  <input type="date" id="sentAtEnd" name="sent_at_end" class="form-input">
+  <input type="date" id="sentAtEnd" name="sent_at_end" class="form-input" value="{{ sent_at_end }}">
 </div>
 ```
 
@@ -317,12 +322,12 @@
 - BEMクラス: `.table__action-btn`
 - ボタン: 「詳細」
 - クリック時: メール通知履歴参照モーダル（5）を開く
-- メール送信履歴IDリクエストし、詳細情報を取得する
+- メール送信履歴UUIDをリクエストし、詳細情報を取得する
 
 
 **HTML例:**
 ```html
-<button class="table__action-btn" onclick="openMailHistoryModal('mail_history_id')">詳細</button>
+<button class="table__action-btn" onclick="openMailHistoryModal('mail_history_uuid')">詳細</button>
 ```
 
 **ソートインジケーター:**
@@ -340,7 +345,7 @@
 |------|------|
 | タイトル | 「メール通知履歴詳細」 |
 | サイズ | 中（600px幅） |
-| 閉じる方法 | 背景クリック、ESCキー、閉じるボタン |
+| 閉じる方法 | 閉じるボタンのみ |
 
 **要素構成図:**
 
@@ -391,8 +396,8 @@
 **5-3: 送信先メールアドレス**
 - 概要: メールの送信先メールアドレスを表示
 - ラベル: 「送信先メールアドレス」
-- データソース: DB `mail_history.recipients` (JSON型)
-- 表示形式: `recipients.to` 配列の要素をカンマ区切りで表示（例: `user1@example.com, user2@example.com`）
+- データソース: DB `mail_recipient.recipient_email`
+- 表示形式: `mail_recipient` テーブルの `recipient_email` をカンマ区切りで表示（例: `user1@example.com, user2@example.com`）
 
 **5-4: 送信日時**
 - 概要: メール送信日時を表示
