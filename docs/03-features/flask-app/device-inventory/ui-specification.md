@@ -249,7 +249,7 @@
 ┌───────────────────────────────────────────────────────┐
 │ ⚠️ デバイス台帳登録確認                                │
 │                                                       │
-│ デバイスを登録します。登録してもよろしいですか？         │
+│ デバイスを登録します。登録しますか？                     │
 │                                                       │
 │ クラウドに登録するデバイスID                            │
 │ DEV-001                                               │
@@ -310,7 +310,7 @@
 ┌───────────────────────────────────────────────────────┐
 │ ⚠️ デバイス台帳更新確認                                │
 │                                                       │
-│ デバイスを更新します。更新してもよろしいですか？         │
+│ デバイスを更新します。更新しますか？                     │
 │                                                       │
 │ （登録確認モーダルと同様のフォーム）                     │
 │                                                       │
@@ -325,7 +325,9 @@
 ┌───────────────────────────────────────────────────────┐
 │ ⚠️ デバイス台帳削除確認                                │
 │                                                       │
-│ デバイスを削除します。削除してもよろしいですか？         │
+│ デバイスを削除します。削除しますか？         │
+│ 削除しようとしているデータに紐づくデバイス情報が存在します。|
+| 本当に削除しますか？                                     │
 │                                                       │
 │                                    [削除] [キャンセル] │
 └───────────────────────────────────────────────────────┘
@@ -392,88 +394,88 @@
 
 ## 要素概要
 
-| No     | 項目名                 | オブジェクト名                 | 入力タイプ | I/O | 必須 | 最大桁 | 初期値      | 表示内容                                                                                | 備考                                               |
-| ------ | ---------------------- | ------------------------------ | ---------- | --- | ---- | ------ | ----------- | --------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| (1.1)  | ヘッダーアイコン       | header_icon                    | -          | O   | -    | -      | -           | 固定値: Google icons 「description_24dp」                                               | 固定表示                                           |
-| (1.2)  | ヘッダータイトル       | header_title                   | -          | O   | -    | -      | -           | 固定値: デバイス台帳管理                                                                | 固定表示                                           |
-| (1.3)  | CSVエクスポートボタン  | export_button                  | Button     | I   | -    | -      | -           | 固定値: 「エクスポート」                                                                | プライマリボタン                                   |
-| (1.4)  | 登録ボタン             | register_button                | Button     | I   | -    | -      | -           | 固定値: 「登録」                                                                        | プライマリボタン                                   |
-| (1.5)  | 削除ボタン             | delete_button                  | Button     | I   | -    | -      | -           | 固定値: 「削除」                                                                        | デンジャーボタン、チェックボックス未選択時は非活性 |
-| (2.1)  | デバイスUUID           | device_uuid_search             | Text       | I/O | -    | 128    | -           | -                                                                                       | 部分一致検索                                       |
-| (2.2)  | デバイス名             | device_name_search             | Text       | I/O | -    | 100    | -           | -                                                                                       | 部分一致検索                                       |
-| (2.3)  | デバイス種別           | device_type                    | Select     | I/O | -    | -      | すべて      | マスタ: device_type_master                                                              | ドロップダウン                                     |
-| (2.4)  | 在庫状況               | inventory_status               | Select     | I/O | -    | -      | すべて      | マスタ: inventory_status_master                                                         | ドロップダウン                                     |
-| (2.5)  | 在庫場所               | inventory_location             | Text       | I/O | -    | 100    | -           | -                                                                                       | 部分一致検索                                       |
-| (2.6)  | 購入日（開始）         | purchase_date_from             | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (2.7)  | 購入日（終了）         | purchase_date_to               | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (2.8)  | ソート項目             | sort_item_id                   | Select     | I/O | -    | -      | 0（未選択） | マスタ: sort_item_master（view_id=7）から取得。未選択時はsort_item_id=0をサーバーへ送信 | ドロップダウン                                     |
-| (2.9)  | ソート順               | sort_order                     | Select     | I/O | -    | -      | 未選択      | 固定値: 未選択/昇順/降順                                                                | ドロップダウン                                     |
-| (2.10) | 検索ボタン             | search_button                  | Button     | I   | -    | -      | -           | 固定値: 「検索」                                                                        | プライマリボタン、中央揃え                         |
-| (3.1)  | チェックボックス       | select_checkbox                | Checkbox   | I   | -    | -      | -           | -                                                                                       | 削除対象選択用                                     |
-| (3.2)  | デバイス名             | device_name                    | Label      | O   | -    | 100    | -           | DB: device_master.device_name                                                           | ソート可                                           |
-| (3.3)  | デバイス種別           | device_type                    | Label      | O   | -    | -      | -           | DB: device_type_master.device_type_name                                                 | ソート可                                           |
-| (3.4)  | SIMID                  | sim_id                         | Label      | O   | -    | 20     | -           | DB: device_master.sim_id                                                                | ソート可                                           |
-| (3.5)  | MACアドレス            | mac_address                    | Label      | O   | -    | 17     | -           | DB: device_inventory_master.mac_address                                                 | ソート可                                           |
-| (3.6)  | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -           | DB: inventory_status_master.inventory_status_name                                       | バッジ表示、ソート可                               |
-| (3.7)  | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -           | DB: device_inventory_master.purchase_date                                               | YYYY/MM/DD形式、ソート可                           |
-| (3.8)  | 保証期限               | warranty_status                | Label      | O   | -    | -      | -           | DB: device_inventory_master.manufacturer_warranty_end_date                              | 警告アイコン付き、ソート可                         |
-| (3.9)  | 在庫場所               | inventory_location             | Label      | O   | -    | 100    | -           | DB: device_inventory_master.inventory_location                                          | ソート可                                           |
-| (3.10) | 参照ボタン             | reference_button               | Button     | I   | -    | -      | -           | 固定値:「参照」                                                                         | プライマリボタン                                   |
-| (3.11) | 更新ボタン             | update_button                  | Button     | I   | -    | -      | -           | 固定値:「更新」                                                                         | プライマリボタン                                   |
-| (3.12) | ページネーション       | pagination                     | Pagination | I/O | -    | -      | 1           | DB: ページ番号                                                                          | 中央揃え                                           |
-| (4.1)  | デバイスUUID           | device_uuid                    | Text       | I/O | ○    | 128    | -           | -                                                                                       | テキストエリア                                     |
-| (4.2)  | デバイス名             | device_name                    | Text       | I/O | ○    | 100    | -           | -                                                                                       | テキストエリア                                     |
-| (4.3)  | デバイス種別           | device_type                    | Select     | I/O | ○    | -      | -           | マスタ: device_type_master                                                              | ドロップダウン                                     |
-| (4.4)  | モデル情報             | device_model                   | Text       | I/O | ○    | 100    | -           | -                                                                                       | テキストエリア                                     |
-| (4.5)  | SIMID                  | sim_id                         | Text       | I/O | -    | 20     | -           | -                                                                                       | テキストエリア                                     |
-| (4.6)  | MACアドレス            | mac_address                    | Text       | I/O | ○    | 17     | -           | -                                                                                       | XX:XX:XX:XX:XX:XX形式                              |
-| (4.7)  | 組織                   | organization_id                | Select     | I/O | ○    | -      | -           | マスタ: organization_master                                                             | ドロップダウン                                     |
-| (4.8)  | ソフトウェアバージョン | software_version               | Text       | I/O | -    | 100    | -           | -                                                                                       | テキストエリア                                     |
-| (4.9)  | 設置場所               | device_location                | Text       | I/O | -    | 100    | -           | -                                                                                       | テキストエリア                                     |
-| (4.10) | 証明書期限             | certificate_expiration_date    | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (4.11) | 在庫状況               | inventory_status               | Select     | I/O | ○    | -      | -           | マスタ：inventory_status_master                                                         | ドロップダウン                                     |
-| (4.12) | 購入日                 | purchase_date                  | Date       | I/O | ○    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (4.13) | 出荷予定日             | estimated_ship_date            | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (4.14) | 出荷日                 | ship_date                      | Date       | I/O | -    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (4.15) | メーカー保証終了日     | manufacturer_warranty_end_date | Date       | I/O | ○    | -      | -           | -                                                                                       | 日付ピッカー                                       |
-| (4.16) | 在庫場所               | inventory_location             | Text       | I/O | ○    | 100    | -           | -                                                                                       | テキストエリア                                     |
-| (4.17) | 登録ボタン             | submit_button                  | Button     | I   | -    | -      | -           | 固定値: 「登録」                                                                        | プライマリボタン                                   |
-| (4.18) | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -           | 固定値: 「キャンセル」                                                                  | セカンダリボタン                                   |
-| (6.1)  | デバイスUUID           | device_uuid                    | Label      | O   | -    | -      | -           | DB: device_master.device_uuid                                                           | -                                                  |
-| (6.2)  | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -           | DB: inventory_status_master.inventory_status_name                                       | -                                                  |
-| (6.3)  | モデル情報             | device_model                   | Label      | O   | -    | -      | -           | DB: device_inventory_master.device_model                                                | -                                                  |
-| (6.4)  | MACアドレス            | mac_address                    | Label      | O   | -    | -      | -           | DB: device_inventory_master.mac_address                                                 | -                                                  |
-| (6.5)  | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -           | DB: device_inventory_master.purchase_date                                               | -                                                  |
-| (6.6)  | 出荷予定日             | estimated_ship_date            | Label      | O   | -    | -      | -           | DB: device_inventory_master.estimated_ship_date                                         | -                                                  |
-| (6.7)  | 出荷日                 | ship_date                      | Label      | O   | -    | -      | -           | DB: device_inventory_master.ship_date                                                   | -                                                  |
-| (6.8)  | メーカー保証終了日     | manufacturer_warranty_end_date | Label      | O   | -    | -      | -           | DB: device_inventory_master.manufacturer_warranty_end_date                              | -                                                  |
-| (6.9)  | 在庫場所               | inventory_location             | Label      | O   | -    | -      | -           | DB: device_inventory_master.inventory_location                                          | -                                                  |
-| (6.10) | 作成日時               | create_date                    | Label      | O   | -    | -      | -           | DB: device_inventory_master.create_date                                                 | -                                                  |
-| (6.11) | 作成者                 | creator                        | Label      | O   | -    | -      | -           | DB: device_inventory_master.creator（users.user_nameを表示）                            | -                                                  |
-| (6.12) | 更新日時               | update_date                    | Label      | O   | -    | -      | -           | DB: device_inventory_master.update_date                                                 | -                                                  |
-| (6.13) | 更新者                 | modifier                       | Label      | O   | -    | -      | -           | DB: device_inventory_master.modifier（users.user_nameを表示）                           | -                                                  |
-| (6.14) | 閉じるボタン           | close_button                   | Button     | I   | -    | -      | -           | 固定値:「閉じる」                                                                       | セカンダリボタン                                   |
-| (7.1)  | デバイスUUID           | device_uuid                    | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.2)  | デバイス名             | device_name                    | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.3)  | デバイス種別           | device_type                    | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.4)  | モデル情報             | device_model                   | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.5)  | SIMID                  | sim_id                         | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.6)  | MACアドレス            | mac_address                    | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.7)  | 組織                   | organization                   | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.8)  | ソフトウェアバージョン | software_version               | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.9)  | 設置場所               | device_location                | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.10) | 証明書期限             | certificate_expiration_date    | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.11) | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.12) | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.13) | 出荷予定日             | estimated_ship_date            | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.14) | 出荷日                 | ship_date                      | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.15) | メーカー保証終了日     | manufacturer_warranty_end_date | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.16) | 在庫場所               | inventory_location             | Label      | O   | -    | -      | -           | 入力値: フォーム入力値                                                                  | -                                                  |
-| (7.17) | 登録ボタン             | register_button                | Button     | I   | -    | -      | -           | 固定値:「登録」                                                                         | プライマリボタン                                   |
-| (7.18) | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -           | 固定値:「キャンセル」                                                                   | セカンダリボタン                                   |
-| (9.1)  | 削除ボタン             | delete_button                  | Button     | I   | -    | -      | -           | 固定値:「削除」                                                                         | デンジャーボタン                                   |
-| (9.2)  | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -           | 固定値:「キャンセル」                                                                   | セカンダリボタン                                   |
-| (10.1) | OKボタン               | ok_button                      | Button     | I   | -    | -      | -           | 固定値:「OK」                                                                           | プライマリ                                         |
+| No     | 項目名                 | オブジェクト名                 | 入力タイプ | I/O | 必須 | 最大桁 | 初期値       | 表示内容                                                                                 | 備考                                                 |
+| ------ | ---------------------- | ------------------------------ | ---------- | --- | ---- | ------ | ------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| (1.1)  | ヘッダーアイコン       | header_icon                    | -          | O   | -    | -      | -            | 固定値: Google icons 「description_24dp」                                                | 固定表示                                             |
+| (1.2)  | ヘッダータイトル       | header_title                   | -          | O   | -    | -      | -            | 固定値: デバイス台帳管理                                                                 | 固定表示                                             |
+| (1.3)  | CSVエクスポートボタン  | export_button                  | Button     | I   | -    | -      | -            | 固定値: 「エクスポート」                                                                 | プライマリボタン                                     |
+| (1.4)  | 登録ボタン             | register_button                | Button     | I   | -    | -      | -            | 固定値: 「登録」                                                                         | プライマリボタン                                     |
+| (1.5)  | 削除ボタン             | delete_button                  | Button     | I   | -    | -      | -            | 固定値: 「削除」                                                                         | デンジャーボタン、チェックボックス未選択時は非活性   |
+| (2.1)  | デバイスUUID           | device_uuid_search             | Text       | I/O | -    | 128    | -            | -                                                                                        | 前方一致検索                                         |
+| (2.2)  | デバイス名             | device_name_search             | Text       | I/O | -    | 100    | -            | -                                                                                        | 部分一致検索                                         |
+| (2.3)  | デバイス種別           | device_type                    | Select     | I/O | -    | -      | すべて       | マスタ: device_type_master                                                               | ドロップダウン、すべて選択時は `-1` をサーバーへ送信 |
+| (2.4)  | 在庫状況               | inventory_status               | Select     | I/O | -    | -      | すべて       | マスタ: inventory_status_master                                                          | ドロップダウン、すべて選択時は `-1` をサーバーへ送信 |
+| (2.5)  | 在庫場所               | inventory_location             | Text       | I/O | -    | 100    | -            | -                                                                                        | 部分一致検索                                         |
+| (2.6)  | 購入日（開始）         | purchase_date_from             | Date       | I/O | -    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (2.7)  | 購入日（終了）         | purchase_date_to               | Date       | I/O | -    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (2.8)  | ソート項目             | sort_item_id                   | Select     | I/O | -    | -      | -1（未選択） | マスタ: sort_item_master（view_id=7）から取得。未選択時はsort_item_id=-1をサーバーへ送信 | ドロップダウン                                       |
+| (2.9)  | ソート順               | sort_order                     | Select     | I/O | -    | -      | -1（未選択） | 固定値: -1（未選択）/ 1（昇順）/ 2（降順）。未選択時は -1 をサーバーへ送信               | ドロップダウン                                       |
+| (2.10) | 検索ボタン             | search_button                  | Button     | I   | -    | -      | -            | 固定値: 「検索」                                                                         | プライマリボタン、中央揃え                           |
+| (3.1)  | チェックボックス       | select_checkbox                | Checkbox   | I   | -    | -      | -            | -                                                                                        | 削除対象選択用                                       |
+| (3.2)  | デバイス名             | device_name                    | Label      | O   | -    | 100    | -            | DB: device_master.device_name                                                            | ソート可                                             |
+| (3.3)  | デバイス種別           | device_type                    | Label      | O   | -    | -      | -            | DB: device_type_master.device_type_name                                                  | ソート可                                             |
+| (3.4)  | SIMID                  | sim_id                         | Label      | O   | -    | 20     | -            | DB: device_master.sim_id                                                                 | ソート可                                             |
+| (3.5)  | MACアドレス            | mac_address                    | Label      | O   | -    | 17     | -            | DB: device_inventory_master.mac_address                                                  | ソート可                                             |
+| (3.6)  | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -            | DB: inventory_status_master.inventory_status_name                                        | バッジ表示、ソート可                                 |
+| (3.7)  | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -            | DB: device_inventory_master.purchase_date                                                | YYYY/MM/DD形式、ソート可                             |
+| (3.8)  | 保証期限               | warranty_status                | Label      | O   | -    | -      | -            | DB: device_inventory_master.manufacturer_warranty_end_date                               | 警告アイコン付き、ソート可                           |
+| (3.9)  | 在庫場所               | inventory_location             | Label      | O   | -    | 100    | -            | DB: device_inventory_master.inventory_location                                           | ソート可                                             |
+| (3.10) | 参照ボタン             | reference_button               | Button     | I   | -    | -      | -            | 固定値:「参照」                                                                          | プライマリボタン                                     |
+| (3.11) | 更新ボタン             | update_button                  | Button     | I   | -    | -      | -            | 固定値:「更新」                                                                          | プライマリボタン                                     |
+| (3.12) | ページネーション       | pagination                     | Pagination | I/O | -    | -      | 1            | DB: ページ番号                                                                           | 中央揃え                                             |
+| (4.1)  | デバイスUUID           | device_uuid                    | Text       | I/O | ○    | 128    | -            | -                                                                                        | テキストエリア                                       |
+| (4.2)  | デバイス名             | device_name                    | Text       | I/O | ○    | 100    | -            | -                                                                                        | テキストエリア                                       |
+| (4.3)  | デバイス種別           | device_type                    | Select     | I/O | ○    | -      | -            | マスタ: device_type_master                                                               | ドロップダウン                                       |
+| (4.4)  | モデル情報             | device_model                   | Text       | I/O | ○    | 100    | -            | -                                                                                        | テキストエリア                                       |
+| (4.5)  | SIMID                  | sim_id                         | Text       | I/O | -    | 20     | -            | -                                                                                        | テキストエリア                                       |
+| (4.6)  | MACアドレス            | mac_address                    | Text       | I/O | ○    | 17     | -            | -                                                                                        | XX:XX:XX:XX:XX:XX形式                                |
+| (4.7)  | 組織                   | organization_id                | Select     | I/O | ○    | -      | -            | マスタ: organization_master                                                              | ドロップダウン                                       |
+| (4.8)  | ソフトウェアバージョン | software_version               | Text       | I/O | -    | 100    | -            | -                                                                                        | テキストエリア                                       |
+| (4.9)  | 設置場所               | device_location                | Text       | I/O | -    | 100    | -            | -                                                                                        | テキストエリア                                       |
+| (4.10) | 証明書期限             | certificate_expiration_date    | Date       | I/O | -    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (4.11) | 在庫状況               | inventory_status               | Select     | I/O | ○    | -      | -            | マスタ：inventory_status_master                                                          | ドロップダウン                                       |
+| (4.12) | 購入日                 | purchase_date                  | Date       | I/O | ○    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (4.13) | 出荷予定日             | estimated_ship_date            | Date       | I/O | -    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (4.14) | 出荷日                 | ship_date                      | Date       | I/O | -    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (4.15) | メーカー保証終了日     | manufacturer_warranty_end_date | Date       | I/O | ○    | -      | -            | -                                                                                        | 日付ピッカー                                         |
+| (4.16) | 在庫場所               | inventory_location             | Text       | I/O | ○    | 100    | -            | -                                                                                        | テキストエリア                                       |
+| (4.17) | 登録ボタン             | submit_button                  | Button     | I   | -    | -      | -            | 固定値: 「登録」                                                                         | プライマリボタン                                     |
+| (4.18) | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -            | 固定値: 「キャンセル」                                                                   | セカンダリボタン                                     |
+| (6.1)  | デバイスUUID           | device_uuid                    | Label      | O   | -    | -      | -            | DB: device_master.device_uuid                                                            | -                                                    |
+| (6.2)  | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -            | DB: inventory_status_master.inventory_status_name                                        | -                                                    |
+| (6.3)  | モデル情報             | device_model                   | Label      | O   | -    | -      | -            | DB: device_inventory_master.device_model                                                 | -                                                    |
+| (6.4)  | MACアドレス            | mac_address                    | Label      | O   | -    | -      | -            | DB: device_inventory_master.mac_address                                                  | -                                                    |
+| (6.5)  | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -            | DB: device_inventory_master.purchase_date                                                | -                                                    |
+| (6.6)  | 出荷予定日             | estimated_ship_date            | Label      | O   | -    | -      | -            | DB: device_inventory_master.estimated_ship_date                                          | -                                                    |
+| (6.7)  | 出荷日                 | ship_date                      | Label      | O   | -    | -      | -            | DB: device_inventory_master.ship_date                                                    | -                                                    |
+| (6.8)  | メーカー保証終了日     | manufacturer_warranty_end_date | Label      | O   | -    | -      | -            | DB: device_inventory_master.manufacturer_warranty_end_date                               | -                                                    |
+| (6.9)  | 在庫場所               | inventory_location             | Label      | O   | -    | -      | -            | DB: device_inventory_master.inventory_location                                           | -                                                    |
+| (6.10) | 作成日時               | create_date                    | Label      | O   | -    | -      | -            | DB: device_inventory_master.create_date                                                  | -                                                    |
+| (6.11) | 作成者                 | creator                        | Label      | O   | -    | -      | -            | DB: device_inventory_master.creator（users.user_nameを表示）                             | -                                                    |
+| (6.12) | 更新日時               | update_date                    | Label      | O   | -    | -      | -            | DB: device_inventory_master.update_date                                                  | -                                                    |
+| (6.13) | 更新者                 | modifier                       | Label      | O   | -    | -      | -            | DB: device_inventory_master.modifier（users.user_nameを表示）                            | -                                                    |
+| (6.14) | 閉じるボタン           | close_button                   | Button     | I   | -    | -      | -            | 固定値:「閉じる」                                                                        | セカンダリボタン                                     |
+| (7.1)  | デバイスUUID           | device_uuid                    | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.2)  | デバイス名             | device_name                    | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.3)  | デバイス種別           | device_type                    | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.4)  | モデル情報             | device_model                   | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.5)  | SIMID                  | sim_id                         | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.6)  | MACアドレス            | mac_address                    | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.7)  | 組織                   | organization                   | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.8)  | ソフトウェアバージョン | software_version               | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.9)  | 設置場所               | device_location                | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.10) | 証明書期限             | certificate_expiration_date    | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.11) | 在庫状況               | inventory_status               | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.12) | 購入日                 | purchase_date                  | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.13) | 出荷予定日             | estimated_ship_date            | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.14) | 出荷日                 | ship_date                      | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.15) | メーカー保証終了日     | manufacturer_warranty_end_date | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.16) | 在庫場所               | inventory_location             | Label      | O   | -    | -      | -            | 入力値: フォーム入力値                                                                   | -                                                    |
+| (7.17) | 登録ボタン             | register_button                | Button     | I   | -    | -      | -            | 固定値:「登録」                                                                          | プライマリボタン                                     |
+| (7.18) | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -            | 固定値:「キャンセル」                                                                    | セカンダリボタン                                     |
+| (9.1)  | 削除ボタン             | delete_button                  | Button     | I   | -    | -      | -            | 固定値:「削除」                                                                          | デンジャーボタン                                     |
+| (9.2)  | キャンセルボタン       | cancel_button                  | Button     | I   | -    | -      | -            | 固定値:「キャンセル」                                                                    | セカンダリボタン                                     |
+| (10.1) | OKボタン               | ok_button                      | Button     | I   | -    | -      | -            | 固定値:「OK」                                                                            | プライマリ                                           |
 
 (5)は(4)と同様の要素、(8)は(7)と同様の要素、(11)と(12)は(10)と同様の要素のため、詳細記載省略
 
@@ -510,7 +512,7 @@
 ```
 
 **2.1: デバイスUUID入力**
-- 概要: クラウドに登録するデバイスID（デバイスUUID）で部分一致検索
+- 概要: クラウドに登録するデバイスID（デバイスUUID）で前方一致検索
 - ラベル: 「クラウドに登録するデバイスID」
 - プレースホルダー: なし
 - 入力中のリアルタイムバリデーション: なし
@@ -546,7 +548,7 @@
 - 概要: 検索結果のソート基準を選択
 - ラベル: 「ソート項目」
 - 選択肢: `sort_item_master`（view_id=7）から動的に取得
-  - 未選択（sort_item_id=0, デフォルト。デバイス在庫IDがソート項目になる）
+  - 未選択（sort_item_id=-1, デフォルト。デバイス在庫ID降順で表示）
   - クラウドに登録するデバイスID（sort_item_id=1）
   - デバイス名（sort_item_id=2）
   - デバイス種別（sort_item_id=3）
@@ -556,15 +558,15 @@
   - 購入日（sort_item_id=7）
   - 保証期限（sort_item_id=8）
   - 在庫場所（sort_item_id=9）
-- 未選択時はサーバーへ `sort_item_id=0` を送信する
+- 未選択時はサーバーへ `sort_item_id=-1` を送信する
 
 **2.9: ソート順ドロップダウン**
 - 概要: ソートの昇順・降順を選択
 - ラベル: 「ソート順」
 - 選択肢:
-  - 未選択 (デフォルト(降順がソート順になる))
-  - 昇順
-  - 降順
+  - `''`（未選択, デフォルト。sort_order=-1 をサーバーへ送信。デバイス在庫ID降順で表示）
+  - 昇順（sort_order=1）
+  - 降順（sort_order=2）
 
 **2.10: 検索ボタン**
 - 概要: 入力した条件で検索を実行
@@ -573,12 +575,12 @@
 
 **バリデーション:**
 
-| 項目             | バリデーションルール | エラーメッセージ                                              |
-| ---------------- | -------------------- | ------------------------------------------------------------- |
-| 2.1 デバイスUUID | 最大128文字          | 「クラウド登録するデバイスIDは128文字以内で入力してください」 |
-| 2.2 デバイス名   | 最大100文字          | 「デバイス名は100文字以内で入力してください」                 |
-| 2.5 在庫場所     | 最大100文字          | 「在庫場所は100文字以内で入力してください」                   |
-| 2.6, 2.7 購入日  | 開始日 ≤ 終了日      | 「開始日は終了日以前を指定してください」                      |
+| 項目             | バリデーションルール | エラーメッセージ                                                |
+| ---------------- | -------------------- | --------------------------------------------------------------- |
+| 2.1 デバイスUUID | 最大128文字          | 「クラウドに登録するデバイスIDは128文字以内で入力してください」 |
+| 2.2 デバイス名   | 最大100文字          | 「デバイス名は100文字以内で入力してください」                   |
+| 2.5 在庫場所     | 最大100文字          | 「在庫場所は100文字以内で入力してください」                     |
+| 2.6, 2.7 購入日  | 開始日 ≤ 終了日      | 「開始日は終了日以前を指定してください」                        |
 
 ---
 
@@ -886,29 +888,33 @@
 
 **バリデーション:**
 
-| 項目                       | バリデーションルール | エラーメッセージ                                                |
-| -------------------------- | -------------------- | --------------------------------------------------------------- |
-| 4.1 デバイスUUID           | 必須                 | 「クラウドに登録するデバイスIDを入力してください」              |
-| 4.1 デバイスUUID           | 最大128文字          | 「クラウドに登録するデバイスIDは128文字以内で入力してください」 |
-| 4.2 デバイス名             | 必須                 | 「デバイス名を入力してください」                                |
-| 4.2 デバイス名             | 最大100文字          | 「デバイス名は100文字以内で入力してください」                   |
-| 4.3 デバイス種別           | 必須                 | 「デバイス種別を選択してください」                              |
-| 4.4 モデル情報             | 必須                 | 「モデル情報を入力してください」                                |
-| 4.4 モデル情報             | 最大100文字          | 「モデル情報は100文字以下で入力してください」                   |
-| 4.5 SIMID                  | 最大20文字           | 「SIMIDは20文字以下で入力してください」                         |
-| 4.6 MACアドレス            | 必須                 | 「MACアドレスを入力してください」                               |
-| 4.6 MACアドレス            | 形式チェック         | 「MACアドレスはXX:XX:XX:XX:XX:XX形式で入力してください」        |
-| 4.7 組織                   | 必須                 | 「組織を選択してください」                                      |
-| 4.8 ソフトウェアバージョン | 最大100文字          | 「ソフトウェアバージョンは100文字以下で入力してください」       |
-| 4.9 設置場所               | 最大100文字          | 「設置場所は100文字以下で入力してください」                     |
-| 4.11 在庫状況              | 必須                 | 「在庫状況を選択してください」                                  |
-| 4.12 購入日                | 必須                 | 「購入日を入力してください」                                    |
-| 4.13 出荷予定日            | 購入日以降           | 「出荷予定日は購入日以降を指定してください」                    |
-| 4.14 出荷日                | 購入日以降           | 「出荷日は購入日以降を指定してください」                        |
-| 4.15 メーカー保証終了日    | 必須                 | 「メーカー保証終了日を入力してください」                        |
-| 4.15 メーカー保証終了日    | 購入日以降           | 「メーカー保証終了日は購入日以降を指定してください」            |
-| 4.16 在庫場所              | 必須                 | 「在庫場所を入力してください」                                  |
-| 4.16 在庫場所              | 最大100文字          | 「在庫場所は100文字以下で入力してください」                     |
+| 項目                       | バリデーションルール          | エラーメッセージ                                                                    |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------- |
+| 4.1 デバイスUUID           | 必須                          | 「クラウドに登録するデバイスIDを入力してください」                                  |
+| 4.1 デバイスUUID           | 最大128文字                   | 「クラウドに登録するデバイスIDは128文字以内で入力してください」                     |
+| 4.1 デバイスUUID           | フォーマット（azure / local） | 「device_uuidの形式が不正です（ASCII 7ビット英数字、(- . % # _ * ? , : ')使用可）」 |
+| 4.1 デバイスUUID           | フォーマット（aws）           | 「device_uuidの形式が不正です（[a-zA-Z0-9_-]使用可）」                              |
+| 4.2 デバイス名             | 必須                          | 「デバイス名を入力してください」                                                    |
+| 4.2 デバイス名             | 最大100文字                   | 「デバイス名は100文字以内で入力してください」                                       |
+| 4.3 デバイス種別           | 必須                          | 「デバイス種別を選択してください」                                                  |
+| 4.4 モデル情報             | 必須                          | 「モデル情報を入力してください」                                                    |
+| 4.4 モデル情報             | 最大100文字                   | 「モデル情報は100文字以下で入力してください」                                       |
+| 4.5 SIMID                  | 最大20文字                    | 「SIMIDは20文字以下で入力してください」                                             |
+| 4.6 MACアドレス            | 必須                          | 「MACアドレスを入力してください」                                                   |
+| 4.6 MACアドレス            | 形式チェック                  | 「MACアドレスはXX:XX:XX:XX:XX:XX形式で入力してください」                            |
+| 4.7 組織                   | 必須                          | 「組織を選択してください」                                                          |
+| 4.8 ソフトウェアバージョン | 最大100文字                   | 「ソフトウェアバージョンは100文字以下で入力してください」                           |
+| 4.9 設置場所               | 最大100文字                   | 「設置場所は100文字以下で入力してください」                                         |
+| 4.11 在庫状況              | 必須                          | 「在庫状況を選択してください」                                                      |
+| 4.12 購入日                | 必須                          | 「購入日を入力してください」                                                        |
+| 4.13 出荷予定日            | 購入日以降                    | 「出荷予定日は購入日以降を指定してください」                                        |
+| 4.14 出荷日                | 購入日以降                    | 「出荷日は購入日以降を指定してください」                                            |
+| 4.15 メーカー保証終了日    | 必須                          | 「メーカー保証終了日を入力してください」                                            |
+| 4.15 メーカー保証終了日    | 購入日以降                    | 「メーカー保証終了日は購入日以降を指定してください」                                |
+| 4.16 在庫場所              | 必須                          | 「在庫場所を入力してください」                                                      |
+| 4.16 在庫場所              | 最大100文字                   | 「在庫場所は100文字以下で入力してください」                                         |
+
+> **注記 — デバイスUUID フォーマットチェック:** フォーマットバリデーションは環境変数 `AUTH_TYPE` に基づき適用ルールが切り替わる。`AUTH_TYPE=azure`（デフォルト）または `local` の場合は azure ルール、`AUTH_TYPE=aws` の場合は aws ルールを適用する。バリデーションの実装詳細は [ワークフロー仕様書 §device_uuidバリデーション実装例](./workflow-specification.md) を参照。
 
 **ボタン配置:**
 - 4.17 登録ボタン: 左側、プライマリボタン、デバイス台帳登録処理を実行
@@ -1046,6 +1052,8 @@
 | サイズ     | 中（600px幅）            |
 | 閉じる方法 | キャンセルボタン         |
 
+メッセージ「削除しようとしているデータに紐づくデバイス情報が存在します。本当に削除しますか？」は、削除対象であるデバイス台帳データに紐づくデバイスマスタのデータがdelete_flagがFalseの状態で存在する場合のみ表示する。そのほかの場合は非表示とする。
+
 ---
 
 ### (10) デバイス台帳登録完了モーダル
@@ -1111,6 +1119,9 @@
 | 2026-01-26 | 1.0  | 初版作成                                                                                                                                                                                                                 | Yoshiharu Mukaiyama |
 | 2026-04-13 | 1.1  | 在庫状況を必須に変更                                                                                                                                                                                                     | Kei Sugiyama        |
 | 2026-04-13 | 1.2  | 在庫状況バッジ色に「出荷予定」（水色 `#17a2b8`）・「返却予定」（紫 `#6f42c1`）を追加（7種類すべて定義）。登録モーダルワイヤーフレームの在庫状況に `[必須]` を追加。バリデーション一覧に `4.11 在庫状況 \| 必須` 行を追加 | Kei Sugiyama        |
+| 2026-04-17 | 1.3  | デバイスUUID (2.1) の検索方式を部分一致 → 前方一致に変更。要素表備考欄および §2.1 詳細説明を更新                                                                                                                         | Kei Sugiyama        |
+| 2026-04-17 | 1.4  | 登録モーダルバリデーション表に 4.1 デバイスUUID の AUTH_TYPE 別フォーマットチェック行を追加（azure/local・aws の2行）。バリデーション表直後に AUTH_TYPE 補足注記を追加                                                   | Kei Sugiyama        |
+| 2026-04-17 | 1.5  | 検索フォームバリデーション (2.1) のエラーメッセージ誤字を修正（「クラウド登録する」→「クラウドに登録する」）                                                                                                             | Kei Sugiyama        |
 
 ---
 

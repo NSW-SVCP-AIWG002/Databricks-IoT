@@ -362,7 +362,7 @@ function initGadget(gadgetEl) {
         .then(function (res) {
           if (!res.ok) {
             return res.json().then(function (data) {
-              Toast.show(data.error || 'エラーが発生しました', 'error');
+              Toast.show(data.error || MESSAGES.ERR_CSV_DOWNLOAD_FAILED, 'error');
             });
           }
           return res.blob().then(function (blob) {
@@ -374,7 +374,7 @@ function initGadget(gadgetEl) {
           });
         })
         .catch(function () {
-          Toast.show('CSVのダウンロードに失敗しました', 'error');
+          Toast.show(MESSAGES.ERR_CSV_DOWNLOAD_FAILED, 'error');
         });
     });
   }

@@ -48,9 +48,10 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     AUTH_TYPE = 'dev'
+    MYSQL_TEST_DATABASE = os.getenv("MYSQL_TEST_DATABASE", "databricks_iot_test")
     SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{Config.MYSQL_DATABASE}"
+        "TEST_DATABASE_URL",
+        f"mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{MYSQL_TEST_DATABASE}"
     )
     WTF_CSRF_ENABLED = False
 

@@ -10,6 +10,8 @@ from flask_wtf import FlaskForm
 from wtforms import IntegerField, RadioField, SelectMultipleField, StringField
 from wtforms.validators import DataRequired, Length, Optional, ValidationError
 
+from iot_app.common.messages import ERR_GADGET_ITEM_COUNT, err_max_length, err_required, err_select_required
+
 
 class CircleChartGadgetForm(FlaskForm):
     """円グラフガジェット登録フォーム
@@ -20,8 +22,8 @@ class CircleChartGadgetForm(FlaskForm):
     gadget_name = StringField(
         'タイトル',
         validators=[
-            DataRequired(message='タイトルを入力してください'),
-            Length(max=20, message='タイトルは20文字以内で入力してください'),
+            DataRequired(message=err_required('タイトル')),
+            Length(max=20, message=err_max_length('タイトル', 20)),
         ],
     )
 
@@ -29,7 +31,7 @@ class CircleChartGadgetForm(FlaskForm):
         '表示デバイス選択',
         choices=[('fixed', 'デバイス固定'), ('variable', 'デバイス可変')],
         default='variable',
-        validators=[DataRequired(message='表示デバイスを選択してください')],
+        validators=[DataRequired(message=err_select_required('表示デバイス'))],
     )
 
     device_id = IntegerField(
@@ -40,7 +42,7 @@ class CircleChartGadgetForm(FlaskForm):
     group_id = IntegerField(
         'グループ選択',
         default=1,
-        validators=[DataRequired(message='グループを選択してください')],
+        validators=[DataRequired(message=err_select_required('グループ'))],
     )
 
     measurement_item_ids = SelectMultipleField(
@@ -57,11 +59,11 @@ class CircleChartGadgetForm(FlaskForm):
         if not field.choices:
             return
         if not field.data or len(field.data) < 1 or len(field.data) > 5:
-            raise ValidationError('表示項目を1つ以上5つ以下で選択してください')
+            raise ValidationError(ERR_GADGET_ITEM_COUNT)
 
     def validate(self, extra_validators=None):
         result = super().validate(extra_validators)
         if self.device_mode.data == 'fixed' and not self.device_id.data:
-            self.device_id.errors.append('デバイスを選択してください')
+            self.device_id.errors.append(err_select_required('デバイス'))
             result = False
         return result
