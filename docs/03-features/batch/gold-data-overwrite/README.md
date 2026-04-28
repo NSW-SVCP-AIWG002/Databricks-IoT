@@ -2,16 +2,18 @@
 
 ## 概要
 
-ゴールド層データ再生成ジョブは、ゴールド層LDPパイプラインによって生成された時次サマリデータ、日次サマリデータを再生成するバッチジョブです。
-再生成対象日のシルバー層センサーデータを全件取得し、時次サマリデータ、日次サマリデータを再生成します。
-このバッチジョブの作用によって、Catalog内に存在するDeltaテーブルに登録されている時次サマリデータ、日次サマリデータと、OLTP DBに登録されている時次サマリデータ、日次サマリデータの間でのデータ不整合を解消し、業種別/顧客作成ダッシュボードから閲覧できるサマリデータと、対話型AIチャットで取得可能なサマリデータを一致させます。
+ゴールド層データ再生成ジョブは、ゴールド層LDPパイプラインによって生成された時次サマリデータ、日次サマリデータ、月次サマリデータを再生成するバッチジョブです。
+再生成対象日（時次・日次は2日前、月次は1ヶ月前）のシルバー層センサーデータを全件取得し、各サマリデータを再生成します。
+このバッチジョブの作用によって、Catalog内に存在するDeltaテーブルに登録されている時次・日次・月次サマリデータと、OLTP DBに登録されている時次・日次・月次サマリデータの間でのデータ不整合を解消し、業種別/顧客作成ダッシュボードから閲覧できるサマリデータと、対話型AIチャットで取得可能なサマリデータを一致させます。
 
 ### 主な責務
 
 1. **時次サマリデータ生成**: シルバー層センサーデータ（iot_catalog.silver.silver_sensor_data）からデータを取得、時次サマリデータを生成
 2. **日次サマリデータ生成**: シルバー層センサーデータ（iot_catalog.silver.silver_sensor_data）からデータを取得、日次サマリデータを生成
-3. **時次サマリデータUPSERT**: 再生成した時次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_hourly_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_hourly_summary）上のデータをUPSERTする
-4. **日次サマリデータUPSERT**: 再生成した日次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_daily_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_daily_summary）上のデータをUPSERTする
+3. **月次サマリデータ生成**: シルバー層センサーデータ（iot_catalog.silver.silver_sensor_data）からデータを取得、月次サマリデータを生成
+4. **時次サマリデータUPSERT**: 再生成した時次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_hourly_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_hourly_summary）上のデータをUPSERTする
+5. **日次サマリデータUPSERT**: 再生成した日次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_daily_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_daily_summary）上のデータをUPSERTする
+6. **月次サマリデータUPSERT**: 再生成した月次サマリデータの内容でDeltaテーブル（iot_catalog.gold.gold_sensor_data_monthly_summary）の登録結果、OLTP（iot_app_db.gold_sensor_data_monthly_summary）上のデータをUPSERTする
 
 ---
 
@@ -33,12 +35,14 @@
 
 ### 出力先
 
-| 出力先                          | 形式                 | 説明                                |
-| ------------------------------- | -------------------- | ----------------------------------- |
-| gold_sensor_data_hourly_summary | OLTP DB UPSERT       | センサーデータ時次サマリの登録/更新 |
-| gold_sensor_data_daily_summary  | OLTP DB UPSERT       | センサーデータ日次サマリの登録/更新 |
-| gold_sensor_data_hourly_summary | Deltaテーブル UPSERT | センサーデータ時次サマリの登録/更新 |
-| gold_sensor_data_daily_summary  | Deltaテーブル UPSERT | センサーデータ日次サマリの登録/更新 |
+| 出力先                           | 形式                 | 説明                                |
+| -------------------------------- | -------------------- | ----------------------------------- |
+| gold_sensor_data_hourly_summary  | OLTP DB UPSERT       | センサーデータ時次サマリの登録/更新 |
+| gold_sensor_data_daily_summary   | OLTP DB UPSERT       | センサーデータ日次サマリの登録/更新 |
+| gold_sensor_data_monthly_summary | OLTP DB UPSERT       | センサーデータ月次サマリの登録/更新 |
+| gold_sensor_data_hourly_summary  | Deltaテーブル UPSERT | センサーデータ時次サマリの登録/更新 |
+| gold_sensor_data_daily_summary   | Deltaテーブル UPSERT | センサーデータ日次サマリの登録/更新 |
+| gold_sensor_data_monthly_summary | Deltaテーブル UPSERT | センサーデータ月次サマリの登録/更新 |
 
 ### センサーデータ時次サマリ（Deltaテーブル）カラム一覧
 
@@ -128,25 +132,20 @@
 ```mermaid
 flowchart TD
     subgraph Batch["ゴールド層データ再生成ジョブ（1日間隔）"]
-        GetData[シルバー層からデータ取得]
-
-        subgraph Hourly[時次サマリ作成タスク]
-            SummaryHourly[時次サマリ作成]
-            UpsertHourly[時次サマリUPSERT]
-        
-            SummaryHourly --> UpsertHourly
+        subgraph Hourly["タスク1: 時次サマリ再生成（対象=2日前）"]
+            T1[run_hourly_aggregation 呼び出し<br>対象日の0〜23時を1時間単位でサマリ生成・UPSERT]
         end
 
-        subgraph Daily[日次サマリ作成タスク]
-            SummaryDaily[日次サマリ作成]
-            UpsertDaily[日次サマリUPSERT]
-
-            SummaryDaily --> UpsertDaily
+        subgraph Daily["タスク2: 日次サマリ再生成（対象=2日前）"]
+            T2[run_daily_aggregation 呼び出し<br>対象日の日次サマリ生成・UPSERT]
         end
 
-        GetData --> SummaryHourly
-        UpsertHourly --> SummaryDaily
+        subgraph Monthly["タスク3: 月次サマリ再生成（対象=1ヶ月前）"]
+            T3[run_monthly_aggregation 呼び出し<br>対象月の月次サマリ生成・UPSERT]
+        end
 
+        Hourly -->|成功| Daily
+        Daily -->|成功| Monthly
     end
 
     subgraph DeltaTable["Deltaテーブル"]
@@ -154,21 +153,28 @@ flowchart TD
         SilverData[(silver_sensor_data)]
         DHourlySummary[(gold_sensor_data_hourly_summary)]
         DDailySummary[(gold_sensor_data_daily_summary)]
+        DMonthlySummary[(gold_sensor_data_monthly_summary)]
         SummaryMethod[(gold_summary_method_master)]
     end
 
     subgraph OLTP["OLTP DB"]
         OHourlySummary[(gold_sensor_data_hourly_summary)]
         ODailySummary[(gold_sensor_data_daily_summary)]
+        OMonthlySummary[(gold_sensor_data_monthly_summary)]
     end
 
-    GetData -.-> |データ取得|SilverData
-    SummaryHourly　-.-> |サマリ方法取得|SummaryMethod
-    UpsertHourly -.-> |データUPSERT|DHourlySummary
-    UpsertHourly -.-> |データUPSERT|OHourlySummary
-    SummaryDaily　-.-> |サマリ方法取得|SummaryMethod
-    UpsertDaily -.-> |データUPSERT|DDailySummary
-    UpsertDaily -.-> |データUPSERT|ODailySummary
+    T1 -.-> |データ取得|SilverData
+    T1 -.-> |サマリ方法取得|SummaryMethod
+    T1 -.-> |データUPSERT|DHourlySummary
+    T1 -.-> |データUPSERT|OHourlySummary
+    T2 -.-> |データ取得|SilverData
+    T2 -.-> |サマリ方法取得|SummaryMethod
+    T2 -.-> |データUPSERT|DDailySummary
+    T2 -.-> |データUPSERT|ODailySummary
+    T3 -.-> |データ取得|SilverData
+    T3 -.-> |サマリ方法取得|SummaryMethod
+    T3 -.-> |データUPSERT|DMonthlySummary
+    T3 -.-> |データUPSERT|OMonthlySummary
 ```
 
 ### リトライフロー
@@ -204,10 +210,10 @@ flowchart TB
 
 ## パフォーマンス要件
 
-| 要件           | 値       | 対応策                                                         |
-| -------------- | -------- | -------------------------------------------------------------- |
-| 実行間隔       | 1日      | Databricks Workflowの定期実行（毎日定時実行）                  |
-| バッチ処理時間 | 60分以内 | 再生成対象日はバッチ実行日の前日のデータのみとし、データ量削減 |
+| 要件           | 値       | 対応策                                                                                   |
+| -------------- | -------- | ---------------------------------------------------------------------------------------- |
+| 実行間隔       | 1日      | Databricks Workflowの定期実行（毎日定時実行）                                            |
+| バッチ処理時間 | 60分以内 | 再生成対象は時次・日次=実行日の2日前、月次=実行日の1ヶ月前のデータのみとし、データ量削減 |
 
 ---
 
@@ -256,8 +262,9 @@ flowchart TB
 
 ## 変更履歴
 
-| 日付       | 版数 | 変更内容 | 担当者       |
-| ---------- | ---- | -------- | ------------ |
-| 2026-04-01 | 1.0  | 初版作成                                                                                                             | Kei Sugiyama |
-| 2026-04-09 | 1.1  | リトライフロー図追加・上流パイプライン説明誤記修正（メール送信ジョブの記述混入箇所を修正）                           | Kei Sugiyama |
+| 日付       | 版数 | 変更内容                                                                                                                            | 担当者       |
+| ---------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 2026-04-01 | 1.0  | 初版作成                                                                                                                            | Kei Sugiyama |
+| 2026-04-09 | 1.1  | リトライフロー図追加・上流パイプライン説明誤記修正（メール送信ジョブの記述混入箇所を修正）                                          | Kei Sugiyama |
 | 2026-04-09 | 1.2  | 誤記修正（日次サマリ関連「時次」「日時」→「日次」・主な責務「日次サマリデータ生成」表記統一・機能要件定義書参照 FR-003-2→FR-002-2） | Kei Sugiyama |
+| 2026-04-16 | 1.3  | 月次タスク追加・LDPパイプライン委譲方式に変更（処理フロー図・主な責務・出力先・パフォーマンス要件を更新）                           | Kei Sugiyama |
