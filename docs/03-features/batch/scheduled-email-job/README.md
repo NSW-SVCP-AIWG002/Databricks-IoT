@@ -18,6 +18,7 @@
     - [読み取りテーブル（UnityCatalog）](#読み取りテーブルunitycatalog)
     - [書き込みテーブル（OLTP DB）](#書き込みテーブルoltp-db)
     - [書き込みテーブル（UnityCatalog）](#書き込みテーブルunitycatalog)
+    - [書き込みテーブル（UnityCatalog）](#書き込みテーブルunitycatalog-1)
   - [処理フロー](#処理フロー)
     - [リトライフロー](#リトライフロー)
   - [障害時のTeams通知](#障害時のteams通知)
@@ -36,6 +37,7 @@
 ## 概要
 
 メール通知送信ジョブは、IoTデバイスのアラート検出時にメール通知キューへ登録されたレコードを、Azure App Service WebJobで定期実行して送信するバッチジョブです。
+メール通知送信ジョブは、IoTデバイスのアラート検出時にメール通知キューへ登録されたレコードを、Azure App Service WebJobで定期実行して送信するバッチジョブです。
 
 シルバー層LDPパイプラインがアラートを検出するたびにメール送信キュー（`email_notification_queue`）へPENDINGステータスのレコードを登録し、本ジョブが1分間隔でそのレコードを取得してSendGrid API経由でメール送信を行います。LDPストリーミング処理とメール送信を非同期化することで、ストリーミング処理のレイテンシに影響を与えないアーキテクチャを実現しています。
 
@@ -46,11 +48,15 @@
 3. **ステータス管理**: 送信結果に応じてキューレコードのステータスを更新（SENT / PENDING / FAILED）
 4. **履歴記録**: 送信完了メールの記録を`mail_history`テーブルに保存
 5. **リカバリ処理**: ジョブ異常終了時にPROCESSING状態で滞留しているレコードをFAILEDステータスに変更
+5. **リカバリ処理**: ジョブ異常終了時にPROCESSING状態で滞留しているレコードをFAILEDステータスに変更
 
 ---
 
 ## 機能ID
 
+| 機能ID   | 機能名       | 説明                                             |
+| -------- | ------------ | ------------------------------------------------ |
+| FR-003-2 | アラート通知 | メール送信キューからのメール送信（バッチジョブ） |
 | 機能ID   | 機能名       | 説明                                             |
 | -------- | ------------ | ------------------------------------------------ |
 | FR-003-2 | アラート通知 | メール送信キューからのメール送信（バッチジョブ） |
@@ -66,6 +72,31 @@
 | email_notification_queue | OLTP DB テーブル | シルバー層パイプラインがアラート検出時に登録するメール送信待機列 |
 
 ### メール通知キューカラム一覧
+
+| #   | カラム物理名      | カラム論理名         | データ型     | NULL     | 説明                                           |
+| --- | ----------------- | -------------------- | ------------ | -------- | ---------------------------------------------- |
+| 1   | queue_id          | キューID             | BIGINT       | NOT NULL | キューレコードの一意識別子（自動採番）         |
+| 2   | device_id         | デバイスID           | INT          | NOT NULL | アラート発生元デバイスID                       |
+| 3   | organization_id   | 組織ID               | INT          | NOT NULL | デバイス所属組織ID                             |
+| 4   | alert_id          | アラートID           | INT          | NOT NULL | 発生したアラート設定ID                         |
+| 5   | recipient_email   | 送信先メールアドレス | JSON         | NOT NULL | 通知送信先のメールアドレス（JSON形式）         |
+| 6   | subject           | メール件名           | VARCHAR(500) | NOT NULL | メール件名                                     |
+| 7   | body              | メール本文           | TEXT         | NOT NULL | メール本文                                     |
+| 8   | alert_detail_json | アラート詳細JSON     | JSON         | NOT NULL | アラート詳細情報（測定項目・値・閾値等）       |
+| 9   | status            | ステータス           | VARCHAR(20)  | NOT NULL | `PENDING` / `PROCESSING` / `SENT` / `FAILED`   |
+| 10  | retry_count       | リトライ回数         | INT          | NOT NULL | 送信リトライ回数（初期値: 0、最大: 3）         |
+| 11  | error_message     | エラーメッセージ     | JSON         | NULL     | 送信失敗時のエラー内容                         |
+| 12  | event_timestamp   | イベント発生日時     | DATETIME     | NOT NULL | アラートが発生した日時                         |
+| 13  | processed_time    | 処理日時             | DATETIME     | NULL     | 送信処理を実施した日時（成功・失敗問わず記録） |
+| 14  | create_date       | 作成日時             | DATETIME     | NOT NULL | レコード作成日時                               |
+| 15  | update_date       | 更新日時             | DATETIME     | NOT NULL | レコード更新日時                               |
+
+**recipient_emailの形式**:
+```json
+{
+  "to": ["user1@example.com", "user2@example.com"]
+}
+```
 
 | #   | カラム物理名      | カラム論理名         | データ型     | NULL     | 説明                                           |
 | --- | ----------------- | -------------------- | ------------ | -------- | ---------------------------------------------- |
@@ -136,6 +167,13 @@
 }
 ```
 
+**recipientsの形式**:
+```json
+{
+  "to": ["user1@example.com", "user2@example.com"]
+}
+```
+
 ---
 
 ## 使用テーブル一覧
@@ -147,14 +185,28 @@
 | email_notification_queue | メール送信待機レコード取得                                                         |
 | organization_master      | メール通知時、通知先組織の実在チェックで利用する                                   |
 | user_master              | メール送信履歴テーブルにデータ登録する際に必要な関連ユーザIDを生成するため利用する |
+| テーブル名               | 用途                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| email_notification_queue | メール送信待機レコード取得                                                         |
+| organization_master      | メール通知時、通知先組織の実在チェックで利用する                                   |
+| user_master              | メール送信履歴テーブルにデータ登録する際に必要な関連ユーザIDを生成するため利用する |
 
 ### 読み取りテーブル（UnityCatalog）
 
+なし
 なし
 
 
 ### 書き込みテーブル（OLTP DB）
 
+| テーブル名               | 用途                                                     |
+| ------------------------ | -------------------------------------------------------- |
+| email_notification_queue | ステータス・retry_count・processed_time・update_date更新 |
+| mail_history             | 送信済みメールの履歴記録                                 |
+
+### 書き込みテーブル（UnityCatalog）
+
+なし
 | テーブル名               | 用途                                                     |
 | ------------------------ | -------------------------------------------------------- |
 | email_notification_queue | ステータス・retry_count・processed_time・update_date更新 |
@@ -183,6 +235,7 @@ flowchart TB
         end
 
         subgraph DLTTBL["OLTP DB"]
+        subgraph DLTTBL["OLTP DB"]
             direction LR
             OrganizationMaster[(organization_master<br>organization_id=<br>email_notification_queue.organization_id)]
             UserMaster[(user_master<br>email=<br>email_notification_queue.recipient_email)]
@@ -191,6 +244,7 @@ flowchart TB
 
     subgraph Batch["メール送信バッチジョブ（1分間隔）"]
         Recovery[PROCESSING滞留レコード更新<br>最終更新後15分経過で<br>ステータスをFAILEDへUPDATE]
+        Recovery[PROCESSING滞留レコード更新<br>最終更新後15分経過で<br>ステータスをFAILEDへUPDATE]
         Fetch[PENDINGレコード取得<br>最大100件]
         MasterCheck[組織マスタ存在チェック<br>ユーザマスタ存在チェック<br>user_id取得]
         InvalidFailed[無効レコードを<br>FAILEDに更新]
@@ -198,7 +252,10 @@ flowchart TB
         BulkSend[subject+bodyでグルーピング<br>バルク送信<br>グループごとに1 APIコール]
         Success{送信成功?}
         UpdateSent[ステータス→SENT<br>processed_time・update_date記録]
+        UpdateSent[ステータス→SENT<br>processed_time・update_date記録]
         CheckRetry{retry_count < 2?}
+        UpdatePending[retry_count++<br>ステータス→PENDING<br>processed_time・update_date記録]
+        UpdateFailed[ステータス→FAILED<br>processed_time・update_date記録]
         UpdatePending[retry_count++<br>ステータス→PENDING<br>processed_time・update_date記録]
         UpdateFailed[ステータス→FAILED<br>processed_time・update_date記録]
         RecordHistory[mail_history登録]
@@ -271,6 +328,15 @@ Teams通知の実装詳細は[共通仕様書](../../common/common-specification
 
 > 本バッチジョブは、アプリケーションの設計思想（アプリケーションのポータブル化、コスト低減）の観点から、実行契機をemail_notification_queueテーブルへのレコード挿入イベント駆動ではなく、定時実行とする。
 > イベント駆動として実装しようとすると、クラウド固有機能やクラウドマネージドサービスを複数必要とするため、コスト増、クラウド基盤依存となってしまう。
+| 要件           | 値                       | 対応策                                                    |
+| -------------- | ------------------------ | --------------------------------------------------------- |
+| 実行間隔       | 1分（60秒）              | App Service WebJobのスケジュール実行（settings.job.json） |
+| バッチ処理時間 | 1分以内                  | 1バッチあたり最大100件で次実行に干渉しない                |
+| メール送信     | 平均100件/分             | SendGrid APIタイムアウト30秒以内                          |
+| E2Eレイテンシ  | アラート検出から70秒以内 | ストリーミング処理5秒 + キュー待機60秒                    |
+
+> 本バッチジョブは、アプリケーションの設計思想（アプリケーションのポータブル化、コスト低減）の観点から、実行契機をemail_notification_queueテーブルへのレコード挿入イベント駆動ではなく、定時実行とする。
+> イベント駆動として実装しようとすると、クラウド固有機能やクラウドマネージドサービスを複数必要とするため、コスト増、クラウド基盤依存となってしまう。
 
 ---
 
@@ -281,8 +347,14 @@ Teams通知の実装詳細は[共通仕様書](../../common/common-specification
 | email_notification_queue（SENT / FAILED）   | 30日間   | SENT・FAILEDレコード | DELETE                   |
 | email_notification_queue（PROCESSING 滞留） | 15分     | 削除しない           | FAILEDステータスへUPDATE |
 | mail_history                                | 恒久保持 | 削除しない           | -                        |
+| テーブル                                    | 保持期間 | 削除対象             | 削除方式                 |
+| ------------------------------------------- | -------- | -------------------- | ------------------------ |
+| email_notification_queue（SENT / FAILED）   | 30日間   | SENT・FAILEDレコード | DELETE                   |
+| email_notification_queue（PROCESSING 滞留） | 15分     | 削除しない           | FAILEDステータスへUPDATE |
+| mail_history                                | 恒久保持 | 削除しない           | -                        |
 
 SENT/FAILED レコードのクリーンアップは `email_queue_cleanup` ジョブ（日次 03:00）で実行する。  
+PROCESSING 滞留レコードのFAILEDステータスへの更新は `email_notification_sender` ジョブ起動時に毎回実行する。
 PROCESSING 滞留レコードのFAILEDステータスへの更新は `email_notification_sender` ジョブ起動時に毎回実行する。
 
 ---
