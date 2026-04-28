@@ -2449,7 +2449,7 @@ class TestGetBarChartCreateContext:
         from iot_app.services.customer_dashboard.bar_chart import get_bar_chart_create_context
 
         # Act
-        result = get_bar_chart_create_context([1, 2])
+        result = get_bar_chart_create_context(user_id=1)
 
         # Assert
         assert 'summary_methods' in result
@@ -2463,7 +2463,7 @@ class TestGetBarChartCreateContext:
         mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
 
         # Act
-        get_bar_chart_create_context([1])
+        get_bar_chart_create_context(user_id=1)
 
         # Assert: GoldSummaryMethodMaster に対するクエリが呼ばれている
         calls = [str(c) for c in mock_db.session.query.call_args_list]
@@ -2477,10 +2477,134 @@ class TestGetBarChartCreateContext:
         from iot_app.services.customer_dashboard.bar_chart import get_bar_chart_create_context
 
         # Act
-        result = get_bar_chart_create_context([1])
+        result = get_bar_chart_create_context(user_id=1)
 
         # Assert
         assert 'measurement_items' in result
         assert 'organizations' in result
         assert 'devices' in result
         assert 'summary_methods' in result
+
+    @patch(f'{MODULE}.db')
+    def test_organizations_queries_view_by_user_id(self, mock_db):
+        """組織一覧取得に v_organization_master_by_user を user_id でフィルタして使用する
+        ワークフロー仕様書 § 棒グラフ登録モーダル表示 ④ 組織一覧取得
+          使用テーブル: v_organization_master_by_user
+          SQL: WHERE user_id = :current_user_id AND delete_flag = FALSE
+        """
+        from iot_app.models.customer_dashboard import VOrganizationMasterByUser
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+
+        from iot_app.services.customer_dashboard.bar_chart import get_bar_chart_create_context
+
+        # Act
+        get_bar_chart_create_context(user_id=1)
+
+        # Assert: VOrganizationMasterByUser に対するクエリが呼ばれている
+        calls = [str(c) for c in mock_db.session.query.call_args_list]
+        assert any('VOrganizationMasterByUser' in c for c in calls)
+
+    @patch(f'{MODULE}.db')
+    def test_devices_queries_view_by_user_id(self, mock_db):
+        """デバイス一覧取得に v_device_master_by_user を user_id でフィルタして使用する
+        ワークフロー仕様書 § 棒グラフ登録モーダル表示 ⑤ デバイス一覧取得
+          使用テーブル: v_device_master_by_user
+          SQL: WHERE user_id = :current_user_id AND delete_flag = FALSE
+        """
+        from iot_app.models.customer_dashboard import VDeviceMasterByUser
+        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+
+        from iot_app.services.customer_dashboard.bar_chart import get_bar_chart_create_context
+
+        # Act
+        get_bar_chart_create_context(user_id=1)
+
+        # Assert: VDeviceMasterByUser に対するクエリが呼ばれている
+        calls = [str(c) for c in mock_db.session.query.call_args_list]
+        assert any('VDeviceMasterByUser' in c for c in calls)
+
+
+# ============================================================
+# Section: get_gadget_by_uuid
+# ============================================================
+
+
+@pytest.mark.unit
+class TestGetGadgetByUuid:
+    """棒グラフ - ガジェット設定取得（VIEWスコープ制限）
+
+    ワークフロー仕様書 § ガジェットデータ取得 ①
+      使用テーブル: v_dashboard_gadget_master_by_user
+      SQL: WHERE user_id = :current_user_id AND gadget_uuid = :gadget_uuid AND delete_flag = FALSE
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_gadget_when_found(self, mock_db):
+        """1.3.1 ガジェット存在: user_id + gadget_uuid フィルタでガジェットを返す"""
+        mock_gadget = MagicMock()
+        mock_gadget.gadget_uuid = 'test-uuid-001'
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_gadget
+
+        from iot_app.services.customer_dashboard.bar_chart import get_gadget_by_uuid
+
+        # Act
+        result = get_gadget_by_uuid('test-uuid-001', user_id=1)
+
+        # Assert
+        assert result == mock_gadget
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_found(self, mock_db):
+        """1.3.2 ガジェット未存在: VIEWにスコープ外ガジェットは存在しないため None を返す"""
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+
+        from iot_app.services.customer_dashboard.bar_chart import get_gadget_by_uuid
+
+        # Act
+        result = get_gadget_by_uuid('nonexistent-uuid', user_id=1)
+
+        # Assert
+        assert result is None
+
+
+# ============================================================
+# Section: check_device_access
+# ============================================================
+
+
+@pytest.mark.unit
+class TestCheckDeviceAccess:
+    """棒グラフ - デバイス存在&スコープチェック（VIEW使用）
+
+    ワークフロー仕様書 § ガジェット登録 ①
+      使用テーブル: v_device_master_by_user
+      SQL: WHERE user_id = :current_user_id AND device_id = :device_id AND delete_flag = FALSE
+    """
+
+    @patch(f'{MODULE}.db')
+    def test_returns_device_when_accessible(self, mock_db):
+        """3.1.5.1 スコープ内: user_id + device_id フィルタでデバイスが存在する場合はデバイスを返す"""
+        mock_device = MagicMock()
+        mock_device.device_id = 42
+        mock_db.session.query.return_value.filter.return_value.first.return_value = mock_device
+
+        from iot_app.services.customer_dashboard.bar_chart import check_device_access
+
+        # Act
+        result = check_device_access(device_id=42, user_id=1)
+
+        # Assert
+        assert result == mock_device
+
+    @patch(f'{MODULE}.db')
+    def test_returns_none_when_not_accessible(self, mock_db):
+        """3.1.5.2 スコープ外: VIEWにスコープ外デバイスは存在しないため None を返す"""
+        mock_db.session.query.return_value.filter.return_value.first.return_value = None
+
+        from iot_app.services.customer_dashboard.bar_chart import check_device_access
+
+        # Act
+        result = check_device_access(device_id=999, user_id=1)
+
+        # Assert
+        assert result is None

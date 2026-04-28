@@ -933,15 +933,11 @@ flowchart TD
     Start([登録ボタンクリック<br>ダッシュボード登録モーダル]) --> Validate[バリデーション<br>ダッシュボードタイトル]
     Validate --> CheckValidate{バリデーションOK?}
     CheckValidate -->|NG| Error400[400エラーメッセージ表示]
-    CheckValidate -->|OK| OrgIdQuery[ログインユーザーIDから組織IDを取得]
-
-    OrgIdQuery --> CheckOrgIdQuery{DB操作結果}
-    CheckOrgIdQuery -->|成功| Insert[ダッシュボード登録<br>DB dashboard_master INSERT]
-    CheckOrgIdQuery -->|失敗| Error500[500エラーページ表示]
+    CheckValidate -->|OK| Insert[ダッシュボード登録<br>DB dashboard_master INSERT]
 
     Insert --> CheckInsert{DB操作結果}
     CheckInsert -->|成功| UpdateSetting[ユーザー設定更新<br>選択中ダッシュボードIDを更新]
-    CheckInsert -->|失敗| Error500
+    CheckInsert -->|失敗| Error500[500エラーページ表示]
     UpdateSetting --> Commit[トランザクションコミット]
 
     Commit --> Redirect[リダイレクト<br>/analysis/customer-dashboard]
@@ -972,23 +968,7 @@ flowchart TD
 
 #### 処理詳細（サーバーサイド）
 
-**① 組織ID取得**
-
-ダッシュボード登録用に user_id から organization_id を取得
-
-**サービス関数実装例:**
-```python
-# services/customer_dashboard/common.py
-def get_organization_id_by_user(user_id):
-    """ユーザーIDから所属組織IDを返す。"""
-    return (
-        db.session.query(User.organization_id)
-        .filter(User.user_id == user_id, User.delete_flag == False)
-        .scalar()
-    )
-```
-
-**② ダッシュボード登録**
+**⑩ ダッシュボード登録**
 
 **使用テーブル:** dashboard_master
 
@@ -1031,7 +1011,7 @@ def create_dashboard(name, organization_id, user_id):
     return dashboard
 ```
 
-**③ ユーザー設定更新**
+**② ユーザー設定更新**
 
 新規登録したダッシュボードを選択中ダッシュボードとして設定します。`upsert_dashboard_user_setting` サービス関数を使用します（実装例は「ダッシュボード初期表示 ③」参照）。
 
@@ -1564,6 +1544,7 @@ flowchart TD
     200OK --> End([処理完了])
     Error400 --> End
     Error403 --> End
+    Error404 --> End
     Error500 --> End
 ```
 
