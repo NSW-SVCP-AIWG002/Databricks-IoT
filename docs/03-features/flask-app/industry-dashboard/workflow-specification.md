@@ -1167,7 +1167,7 @@ def validate_date_range(start_datetime_str, end_datetime_str):
     if start_dt >= end_dt:
         errors.append('開始日時は終了日時より前である必要があります')
 
-    if (end_dt - start_dt).days > 62:
+    if (end_dt - start_dt) > timedelta(days=62):
         errors.append('表示期間は2ヶ月以内で指定してください')
 
     return errors

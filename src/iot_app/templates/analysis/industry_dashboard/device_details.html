@@ -121,29 +121,31 @@
 <div class="card ids-period-control">
   <form method="POST" action="{{ url_for('analysis.device_details_search', device_uuid=device.device_uuid) }}"
         class="ids-period-control__form">
-    <div class="ids-period-control__inputs">
-      <input
-        type="datetime-local"
-        id="search_start_datetime"
-        name="search_start_datetime"
-        class="form-input"
-        value="{{ search_params.get('search_start_datetime', '') }}"
-      >
-      <span class="ids-period-control__separator">～</span>
-      <input
-        type="datetime-local"
-        id="search_end_datetime"
-        name="search_end_datetime"
-        class="form-input"
-        value="{{ search_params.get('search_end_datetime', '') }}"
-      >
-    </div>
-    <div class="ids-period-control__actions">
-      <button type="submit" class="button button--primary" id="btn-period">表示期間変更</button>
-      <label class="form-option">
-        <input type="checkbox" id="auto_update" class="form-option__input" checked>
-        <span class="form-option__label">自動更新</span>
-      </label>
+    <div class="ids-period-control__row">
+      <div class="ids-period-control__inputs">
+        <input
+          type="datetime-local"
+          id="search_start_datetime"
+          name="search_start_datetime"
+          class="form-input"
+          value="{{ search_params.get('search_start_datetime', '') }}"
+        >
+        <span class="ids-period-control__separator">～</span>
+        <input
+          type="datetime-local"
+          id="search_end_datetime"
+          name="search_end_datetime"
+          class="form-input"
+          value="{{ search_params.get('search_end_datetime', '') }}"
+        >
+      </div>
+      <div class="ids-period-control__actions">
+        <button type="submit" class="button button--primary" id="btn-period">表示期間変更</button>
+        <label class="form-option">
+          <input type="checkbox" id="auto_update" class="form-option__input" checked>
+          <span class="form-option__label">自動更新</span>
+        </label>
+      </div>
     </div>
     {% if period_error %}
     <span class="form-error">{{ period_error }}</span>

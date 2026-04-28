@@ -18,6 +18,12 @@
 import re
 import pytest
 from datetime import datetime, timedelta, timezone
+from freezegun import freeze_time
+
+# 追加: 2026-04-24
+# freeze_time用 UTC固定時刻 → JST換算: 2026-04-01 12:00:00
+# 62日カットオフ（JST）= 2026-01-29 12:00:00
+_FROZEN_NOW_UTC = "2026-04-01 03:00:00"
 
 _JST = timezone(timedelta(hours=9))
 from unittest.mock import Mock, MagicMock, patch
@@ -128,22 +134,28 @@ class TestValidateDateRange:
     # ------------------------------------------------------------------
 
     def test_valid_range_within_62_days_returns_empty_errors(self):
-        """1.4.1 / 正常系: 有効な日時範囲（1日）でエラーリストが空"""
-        start = "2026-02-01T10:00"
-        end   = "2026-02-02T10:00"
-        errors = validate_date_range(start, end)
+        """1.4.1 / 正常系: 有効な日時範囲（1日）でエラーリストが空
+        修正: 2026-04-24 freeze_time対応（62日以内バリデーション追加に伴う修正）"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            start = "2026-03-01T00:00"
+            end   = "2026-03-02T00:00"
+            errors = validate_date_range(start, end)
         assert errors == []
 
     def test_valid_range_exactly_62_days_returns_empty_errors(self):
-        """1.3.2 / 境界値: 表示期間がちょうど62日はエラーなし"""
-        start = "2026-01-01T00:00"
-        end   = "2026-03-04T00:00"
-        errors = validate_date_range(start, end)
+        """1.3.2 / 境界値: 表示期間がちょうど62日はエラーなし
+        修正: 2026-04-24 freeze_time対応（62日以内バリデーション追加に伴う修正）"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            start = "2026-02-01T00:00"  # 固定now(JST:4/1)から59日前 → 62日以内✓
+            end   = "2026-04-04T00:00"  # start + 62日
+            errors = validate_date_range(start, end)
         assert errors == []
 
     def test_exactly_61_days_is_valid(self):
-        """61日はエラーなし（上限62日の境界値: 61日 < 62日）"""
-        errors = validate_date_range("2026-01-01T00:00", "2026-03-03T00:00")
+        """61日はエラーなし（上限62日の境界値: 61日 < 62日）
+        修正: 2026-04-24 freeze_time対応（62日以内バリデーション追加に伴う修正）"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            errors = validate_date_range("2026-02-01T00:00", "2026-04-03T00:00")
         assert errors == []
 
     # ------------------------------------------------------------------
@@ -225,12 +237,17 @@ class TestValidateDateRange:
         assert len(errors) > 0
         assert any("2ヶ月以内" in e for e in errors)
 
-    def test_period_62_days_23h59m_is_within_limit_returns_empty_errors(self):
-        """1.3.2 / 境界値: .days比較のため62日+23時間59分はエラーなし（日単位切り捨て仕様）"""
-        start = "2026-01-01T00:00"
-        end   = "2026-03-04T23:59"
-        errors = validate_date_range(start, end)
-        assert errors == []
+    def test_period_62_days_1min_over_limit_returns_error(self):
+        """1.3.2 / 境界値: 62日0h1mはエラー（timedelta比較のため時間込みで62日超はNG）
+        修正: 2026-04-24 freeze_time対応（62日以内バリデーション追加に伴う修正）
+        修正: 2026-04-27 62日0h0min超をエラーにする仕様変更に伴う修正
+              start が62日以内（cutoff=2026-01-29 12:00）であることも freeze_time で担保"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            start = "2026-01-31T23:59"  # cutoff(2026-01-29 12:00)より後 → ルックバックエラーなし
+            end   = "2026-04-04T00:00"  # start + 62日0時間1分 → timedelta(days=62) 超
+            errors = validate_date_range(start, end)
+        assert len(errors) > 0
+        assert any("2ヶ月以内" in e for e in errors)
 
 
 # =============================================================================
@@ -287,6 +304,17 @@ class TestGetDefaultDateRange:
             f"start_datetime format mismatch: {result['search_start_datetime']}"
         assert re.match(pattern, result["search_end_datetime"]), \
             f"end_datetime format mismatch: {result['search_end_datetime']}"
+
+    # 追加: 2026-04-24
+    def test_uses_jst_timezone_not_utc(self):
+        """UTC 15:00固定時、返却値がJST翌日00:00になることを確認（UTC時刻ではないこと）
+        UTC 2026-01-01 15:00:00 → JST 2026-01-02 00:00:00
+        UTCをそのまま使うと end=15:00 だが、JSTなら翌日 00:00 になるため区別可能"""
+        with freeze_time("2026-01-01 15:00:00"):  # UTC固定
+            result = get_default_date_range()
+        end_dt = datetime.strptime(result["search_end_datetime"], "%Y-%m-%dT%H:%M")
+        assert end_dt == datetime(2026, 1, 2, 0, 0), \
+            f"JSTの時刻（翌日 00:00）が期待されるが実際は {end_dt}（UTCの可能性）"
 
 
 # =============================================================================
@@ -513,6 +541,30 @@ class TestGetRecentAlertsWithCount:
         history_pos = sql_text.find("alert_history_id DESC")
         assert level_pos < history_pos, "alert_level_id ASC が alert_history_id DESC より前に来る必要があります"
 
+    # 追加: 2026-04-24
+    def test_order_by_three_keys_status_level_history(self, mocker):
+        """3キーのソート順が設計書通りであること
+        第一: alert_status_id ASC（発生中が先）
+        第二: alert_level_id ASC（重大が先）
+        第三: alert_history_id DESC（新しい順）"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_recent_alerts_with_count(
+            search_params={"organization_name": "", "device_name": ""},
+            user_id=10,
+        )
+
+        sql_text = str(mock_db.session.execute.call_args_list[1][0][0])
+        assert "alert_status_id ASC" in sql_text, "alert_status_id ASC がSQLに存在しない"
+        assert "alert_level_id ASC" in sql_text,  "alert_level_id ASC がSQLに存在しない"
+        assert "alert_history_id DESC" in sql_text, "alert_history_id DESC がSQLに存在しない"
+        status_pos  = sql_text.find("alert_status_id ASC")
+        level_pos   = sql_text.find("alert_level_id ASC")
+        history_pos = sql_text.find("alert_history_id DESC")
+        assert status_pos < level_pos,   "第一ソート(alert_status_id ASC)が第二ソート(alert_level_id ASC)より前にない"
+        assert level_pos  < history_pos, "第二ソート(alert_level_id ASC)が第三ソート(alert_history_id DESC)より前にない"
+
 
 # =============================================================================
 # 6. デバイス一覧取得 - get_device_list_with_count()
@@ -626,6 +678,40 @@ class TestGetDeviceListWithCount:
         call_params = mock_db.session.execute.call_args_list[0][0][1]
         assert call_params["user_id"] == 42
 
+    # 追加: 2026-04-24
+    def test_device_status_data_joined_in_query(self, mocker):
+        """device_status_data テーブルが JOIN されていること
+        デバイスステータス（最終受信時刻）の取得元が device_status_data であることを保証"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_list_with_count(
+            search_params={"organization_name": "", "device_name": ""},
+            user_id=10,
+            page=1,
+        )
+
+        sql_text = str(mock_db.session.execute.call_args_list[0][0][0])
+        assert "device_status_data" in sql_text, \
+            "device_status_data テーブルがJOINされていない"
+
+    # 追加: 2026-04-24
+    def test_last_received_time_included_in_select(self, mocker):
+        """SELECT に last_received_time が含まれていること
+        デバイスステータス（最終受信時刻）が取得されることを保証"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_list_with_count(
+            search_params={"organization_name": "", "device_name": ""},
+            user_id=10,
+            page=1,
+        )
+
+        sql_text = str(mock_db.session.execute.call_args_list[1][0][0])
+        assert "last_received_time" in sql_text, \
+            "last_received_time が SELECT に含まれていない"
+
 
 # =============================================================================
 # 7. デバイス別アラート一覧取得 - get_device_alerts_with_count()
@@ -722,6 +808,27 @@ class TestGetDeviceAlertsWithCount:
         level_pos = sql_text.find("alert_level_id ASC")
         history_pos = sql_text.find("alert_history_id DESC")
         assert level_pos < history_pos, "alert_level_id ASC が alert_history_id DESC より前に来る必要があります"
+
+    # 追加: 2026-04-24
+    def test_order_by_three_keys_status_level_history(self, mocker):
+        """3キーのソート順が設計書通りであること
+        第一: alert_status_id ASC（発生中が先）
+        第二: alert_level_id ASC（重大が先）
+        第三: alert_history_id DESC（新しい順）"""
+        mock_db = mocker.patch("iot_app.services.industry_dashboard_service.db")
+        _mock_execute_two(mock_db, count=0, rows=[])
+
+        get_device_alerts_with_count(device_id=1, search_params={"page": 1}, user_id=10)
+
+        sql_text = str(mock_db.session.execute.call_args_list[1][0][0])
+        assert "alert_status_id ASC" in sql_text,  "alert_status_id ASC がSQLに存在しない"
+        assert "alert_level_id ASC" in sql_text,   "alert_level_id ASC がSQLに存在しない"
+        assert "alert_history_id DESC" in sql_text, "alert_history_id DESC がSQLに存在しない"
+        status_pos  = sql_text.find("alert_status_id ASC")
+        level_pos   = sql_text.find("alert_level_id ASC")
+        history_pos = sql_text.find("alert_history_id DESC")
+        assert status_pos < level_pos,   "第一ソート(alert_status_id ASC)が第二ソート(alert_level_id ASC)より前にない"
+        assert level_pos  < history_pos, "第二ソート(alert_level_id ASC)が第三ソート(alert_history_id DESC)より前にない"
 
 
 # =============================================================================
@@ -1346,3 +1453,50 @@ class TestGetAllSensorData:
         })
 
         assert result == []
+
+
+# =============================================================================
+# 追加: 2026-04-24
+# 62日以内バリデーション — validate_date_range() 新規テスト
+# 観点: 1.1.4 日付形式チェック（開始日時が現在から62日以内であること）
+# =============================================================================
+
+@pytest.mark.unit
+class TestValidateDateRangeStartDateCutoff:
+    """開始日時 62日以内チェック
+
+    観点: 1.1.3 数値範囲チェック（日付範囲）, 1.3.2 ValidationError
+    対応ワークフロー仕様書:
+        - validate_date_range(start_datetime_str, end_datetime_str)
+        - start_dt < now(JST) - 62日 → エラー
+    バリデーションルール:
+        - 開始日時は現在時刻（JST）から62日以内であること
+        - 境界: start == cutoff はエラーなし（< であり == ではない）
+    freeze_time基点: _FROZEN_NOW_UTC → JST 2026-04-01 12:00:00
+        カットオフ = 2026-01-29 12:00:00（JST）
+    """
+
+    def test_start_datetime_older_than_62_days_returns_error(self):
+        """1.3.1 / VAL_NEW: 開始日時が63日前の場合エラー"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            # 固定now(JST)=2026-04-01 12:00, カットオフ=2026-01-29 12:00
+            # 2026-01-28 は カットオフより1日前 → エラー
+            errors = validate_date_range("2026-01-28T00:00", "2026-01-29T00:00")
+        assert len(errors) > 0
+        assert any("62日以内" in e for e in errors)
+
+    def test_start_datetime_exactly_at_62day_cutoff_is_valid(self):
+        """1.3.2 / VAL_NEW / 境界値: 開始日時がちょうどカットオフ（62日前）はエラーなし"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            # カットオフ = 2026-01-29 12:00（JST）
+            # start_dt < cutoff は False → エラーなし
+            errors = validate_date_range("2026-01-29T12:00", "2026-01-30T12:00")
+        assert errors == []
+
+    def test_start_datetime_1min_before_cutoff_returns_error(self):
+        """1.3.1 / VAL_NEW / 境界値: カットオフより1分前はエラー"""
+        with freeze_time(_FROZEN_NOW_UTC):
+            # 2026-01-29 11:59 < 2026-01-29 12:00（カットオフ）→ エラー
+            errors = validate_date_range("2026-01-29T11:59", "2026-01-30T11:59")
+        assert len(errors) > 0
+        assert any("62日以内" in e for e in errors)

@@ -247,6 +247,50 @@ class TestStoreMonitoringGet:
         # Assert
         assert response.status_code == 200
 
+    # 追加: 2026-04-27
+    def test_device_list_shows_connected_badge_when_last_received_time_exists(
+        self, industry_test_data, client
+    ):
+        """デバイスステータステーブルにlast_received_timeが登録されている場合、接続済みバッジが表示されること
+
+        ワークフロー仕様書「デバイスステータス: device_status_data テーブルから
+        last_received_time を JOIN して取得」に対応。
+        device_status_data にレコードを登録し、店舗モニタリング一覧に
+        「接続済み」バッジが表示されることを確認する。
+        テンプレートの条件: {% if device.last_received_time %} → 「接続済み」バッジを表示
+        """
+        from datetime import datetime
+
+        from sqlalchemy import text as _text
+
+        from iot_app import db
+
+        last_received = datetime(2026, 3, 15, 10, 30, 0)
+        db.session.execute(
+            _text(
+                "INSERT INTO device_status_data "
+                "(device_id, last_received_time, delete_flag, create_date, update_date) "
+                "VALUES (:device_id, :last_received, 0, NOW(), NOW()) "
+                "ON DUPLICATE KEY UPDATE last_received_time = :last_received, update_date = NOW()"
+            ),
+            {"device_id": industry_test_data["device_id"], "last_received": last_received},
+        )
+        db.session.commit()
+
+        try:
+            # Act
+            response = client.get(STORE_MONITORING_URL)
+
+            # Assert: 200 かつ「接続済み」バッジが含まれること
+            assert response.status_code == 200
+            assert "接続済み".encode("utf-8") in response.data
+        finally:
+            db.session.execute(
+                _text("DELETE FROM device_status_data WHERE device_id = :device_id"),
+                {"device_id": industry_test_data["device_id"]},
+            )
+            db.session.commit()
+
 
 # ===========================================================================
 # 5.1. 店舗モニタリング検索（POST）
@@ -670,6 +714,30 @@ class TestDeviceDetailsGet:
         # Assert
         assert response.status_code == 500
 
+    # 追加: 2026-04-27
+    def test_initial_display_uses_jst_for_datetime(self, industry_test_data, client):
+        """初期表示のデフォルト日時がUTCではなくJST基準で設定されること
+
+        get_default_date_range() は _JST = timezone(timedelta(hours=9)) を使用して
+        JST基準の現在日時を返す。UTC 15:00 はJST翌日 00:00 となる。
+        初期表示後の Set-Cookie にJST基準の終了日時が含まれることで確認する。
+        """
+        import urllib.parse
+
+        from freezegun import freeze_time
+
+        # UTC 2026-01-01 15:00:00 → JST 2026-01-02 00:00:00
+        with freeze_time("2026-01-01 15:00:00"):
+            response = client.get(
+                f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}"
+            )
+
+        # Assert: Set-Cookie を URL デコードし JST の終了日時「2026-01-02T00:00」が含まれること
+        # UTC基準なら「2026-01-01T15:00」になるため、JSTを使用していることを証明できる
+        assert response.status_code == 200
+        set_cookie = urllib.parse.unquote(response.headers.get("Set-Cookie", ""))
+        assert "2026-01-02T00:00" in set_cookie
+
 
 # ===========================================================================
 # デバイス詳細検索・バリデーション（POST /device-details/<uuid>）
@@ -885,6 +953,56 @@ class TestDeviceDetailsPost:
 
         # Assert
         assert response.status_code == 500
+
+    # 追加: 2026-04-27
+    def test_validation_error_message_in_response_body(self, industry_test_data, client):
+        """バリデーションエラー時にエラーメッセージがHTMLレスポンス本体に含まれること
+
+        ワークフロー仕様書「バリデーションエラー時: period_error をテンプレートに渡す」に対応。
+        不正フォーマット入力時、エラーメッセージ「日時の形式が正しくありません」が
+        HTMLにインライン表示されることを確認する。
+        既存の test_invalid_datetime_format_returns_400 は 400 ステータスのみ確認するが、
+        本テストはさらにエラーメッセージのテキストが HTML に含まれることを確認する。
+        """
+        # Act
+        response = client.post(
+            f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+            data={
+                "search_start_datetime": "2026/02/01 00:00",  # 不正フォーマット（スラッシュ区切り）
+                "search_end_datetime": "2026-02-02T00:00",
+            },
+        )
+
+        # Assert
+        assert response.status_code == 400
+        assert "日時の形式が正しくありません".encode("utf-8") in response.data
+
+    # 追加: 2026-04-27
+    def test_start_older_than_62days_returns_400_with_message(
+        self, industry_test_data, client
+    ):
+        """開始日時が現在から62日より前の場合に400とエラーメッセージを返すこと
+
+        ワークフロー仕様書「バリデーション: 開始日時は現在から62日以内で指定してください」に対応。
+        freeze_time で現在時刻を固定し、62日前より古い開始日時を送信した場合に
+        400とエラーメッセージが返ることを確認する。
+        """
+        from freezegun import freeze_time
+
+        # UTC 2026-04-01 03:00:00 → JST 2026-04-01 12:00:00
+        # 62日前 = 2026-01-29 12:00:00 JST → 2026-01-28T00:00 は62日より前
+        with freeze_time("2026-04-01 03:00:00"):
+            response = client.post(
+                f"{DEVICE_DETAILS_URL}/{industry_test_data['device_uuid']}",
+                data={
+                    "search_start_datetime": "2026-01-28T00:00",
+                    "search_end_datetime": "2026-01-29T00:00",
+                },
+            )
+
+        # Assert
+        assert response.status_code == 400
+        assert "62日以内".encode("utf-8") in response.data
 
 
 # ===========================================================================
