@@ -605,11 +605,12 @@ Comment=一覧のソート項目を管理するマスタテーブル\nkei.sugiya
 TableInnerOption=
 TableOption=
 Page=MAIN
-Left=100
-Top=2750
+Left=50
+Top=3050
 Field="画面ID","view_id","INT","NOT NULL",0,"","画面(機能)固有のID",$000000FF,""
 Field="ソート項目ID","sort_item_id","INT","NOT NULL",1,"","ソート項目固有のID",$000000FF,""
 Field="ソート項目名","sort_item_name","VARCHAR(100)","NOT NULL",,"","ソート項目の内容",$FFFFFFFF,""
+Field="ソート項目表示名","sort_item_display_name","VARCHAR(100)","NOT NULL",,"","ソート項目の画面に表示する内容",$FFFFFFFF,""
 Field="表示順序","sort_order","INT","NOT NULL",,"","ソート項目リストでの表示順",$FFFFFFFF,""
 Field="削除フラグ","delete_flag","BOOLEAN","NOT NULL",,"FALSE","論理削除状態：True　その他の場合：False",$FFFFFFFF,""
 Field="作成日時","create_date","DATETIME","NOT NULL",,"","項目作成日時",$FFFFFFFF,""
@@ -617,8 +618,8 @@ Field="更新日時","update_date","DATETIME","NOT NULL",,"","項目更新日時
 EffectMode=None
 Color=$000000
 BkColor=$00F5FF
-ModifiedDateTime=20251223143216
-Position="MAIN",100,2750
+ModifiedDateTime=20260417110027
+Position="MAIN",50,3050
 ZOrder=42
 
 [Entity]

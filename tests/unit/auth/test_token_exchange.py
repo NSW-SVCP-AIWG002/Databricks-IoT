@@ -87,7 +87,7 @@ class TestTokenExchangerExchangeToken:
             data = call_kwargs.get("data", {})
             assert data.get("grant_type") == "urn:ietf:params:oauth:grant-type:token-exchange"
             assert data.get("subject_token") == "test-idp-jwt"
-            assert data.get("subject_token_type") == "urn:ietf:params:oauth:token-type:id_token"
+            assert data.get("subject_token_type") == "urn:ietf:params:oauth:token-type:access_token"
             assert data.get("scope") == "all-apis"
 
     def test_exchange_non_200_raises_token_exchange_error(self, exchanger):
