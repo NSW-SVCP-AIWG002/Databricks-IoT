@@ -122,7 +122,7 @@ OLTP DBのgold_sensor_data_hourly_summary、gold_sensor_data_daily_summary、gol
 
 ```mermaid
 flowchart TD
-    Start([時次集計処理開始]) --> GetDate[処理対象時を取得<br>default: 前時]
+    Start([時次集計処理開始]) --> GetDate[処理対象日を取得<br>default: 前日]
     GetDate --> CheckSource{シルバー層に<br>対象時データが<br>存在するか}
 
     CheckSource -->|データなし| LogNoData[ログ出力<br>対象データなし]
@@ -168,16 +168,31 @@ flowchart TD
 **実行例:**
 
 ```python
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
-# 前時の時刻を取得
-target_datetime = datetime.now() - timedelta(hour=1)
+def run_hourly_aggregation(target_date: date = None):
+    """時次集計を実行する。指定日の全時間（0〜23時）に対してサマリを生成する。
 
-# 時次集計を実行
-run_aggregation(
-    period=AggregationPeriod.DAILY,
-    target_filter=f"event_datetime = '{target_datetime}'"
-)
+    Args:
+        target_date: 処理対象日。省略時は前日（実行日 − 1日）を使用。
+                     再生成バッチから呼び出す場合は対象日を明示的に渡すこと。
+                     例: date(2026, 1, 28)
+    """
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    for hour in range(24):
+        target_datetime = datetime(target_date.year, target_date.month, target_date.day, hour, 0, 0)
+        run_aggregation(
+            period=AggregationPeriod.HOURLY,
+            target_filter=f"event_datetime = '{target_datetime}'"
+        )
+
+# 通常バッチからの呼び出し（前日を自動使用）
+run_hourly_aggregation()
+
+# 再生成バッチからの呼び出し例（対象日を指定）
+# run_hourly_aggregation(target_date=date(2026, 1, 28))
 ```
 
 **処理ステップ:**
@@ -278,14 +293,27 @@ flowchart TD
 ```python
 from datetime import date, timedelta
 
-# 前日の日付を取得
-target_date = date.today() - timedelta(days=1)
+def run_daily_aggregation(target_date: date = None):
+    """日次集計を実行する。
 
-# 日次集計を実行
-run_aggregation(
-    period=AggregationPeriod.DAILY,
-    target_filter=f"event_date = '{target_date}'"
-)
+    Args:
+        target_date: 処理対象日。省略時は前日（実行日 − 1日）を使用。
+                     再生成バッチから呼び出す場合は対象日を明示的に渡すこと。
+                     例: date(2026, 1, 28)
+    """
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    run_aggregation(
+        period=AggregationPeriod.DAILY,
+        target_filter=f"event_date = '{target_date}'"
+    )
+
+# 通常バッチからの呼び出し（前日を自動使用）
+run_daily_aggregation()
+
+# 再生成バッチからの呼び出し例（対象日を指定）
+# run_daily_aggregation(target_date=date(2026, 1, 28))
 ```
 
 **処理ステップ:**
@@ -388,16 +416,32 @@ flowchart TD
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
-# 前月の年月を取得
-last_month = date.today() - relativedelta(months=1)
-month_start = last_month.replace(day=1)
-month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
+def run_monthly_aggregation(target_month: str = None):
+    """月次集計を実行する。
 
-# 月次集計を実行
-run_aggregation(
-    period=AggregationPeriod.MONTHLY,
-    target_filter=f"event_date BETWEEN '{month_start}' AND '{month_end}'"
-)
+    Args:
+        target_month: 処理対象月（"YYYY-MM" 形式）。省略時は前月を使用。
+                      再生成バッチから呼び出す場合は対象月を明示的に渡すこと。
+                      例: "2026-01"
+    """
+    if target_month is None:
+        base = date.today() - relativedelta(months=1)
+    else:
+        base = date.fromisoformat(f"{target_month}-01")
+
+    month_start = base.replace(day=1)
+    month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
+
+    run_aggregation(
+        period=AggregationPeriod.MONTHLY,
+        target_filter=f"event_date BETWEEN '{month_start}' AND '{month_end}'"
+    )
+
+# 通常バッチからの呼び出し（前月を自動使用）
+run_monthly_aggregation()
+
+# 再生成バッチからの呼び出し例（対象月を指定）
+# run_monthly_aggregation(target_month="2026-01")
 ```
 
 **処理ステップ:**
