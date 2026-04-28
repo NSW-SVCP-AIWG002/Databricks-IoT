@@ -65,7 +65,7 @@
 **注:**
 - **レスポンス形式**:
   - `HTML`: Jinja2テンプレートをレンダリングして返す（`render_template()`）
-  - `HTML（パーシャル）`: モーダル内部のHTMLのみを返す（`render_template('mail-history/detail_modal.html')`）
+  - `HTML（パーシャル）`: モーダル内部のHTMLのみを返す（`render_template('notice/mail_history/detail_modal.html')`）
 - **Flask Blueprint構成**: `notice_bp`（通知機能Blueprint）
 - **SSR特性**: すべての処理はサーバーサイドで完結（JSONレスポンスなし）
 
@@ -121,7 +121,7 @@ flowchart TD
 
     Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>notice/mail_history/list.html]
     Template --> Response[HTMLレスポンス返却]
 
     CheckDB -->|失敗| Error500[500エラーページ表示]
@@ -285,16 +285,14 @@ logger.info('メール通知履歴取得開始')
 offset = (page - 1) * PER_PAGE
 
 try:
-    mail_histories = MailHistory.query.filter_by(
-        organization_id=organization_id
-    ).order_by(
+    query = MailHistory.query.filter_by(organization_id=organization_id)
+
+    total = query.count()
+    offset = (page - 1) * PER_PAGE
+    mail_histories = query.order_by(
         getattr(MailHistory, sort_by).desc() if order == 'desc' else getattr(MailHistory, sort_by).asc(),
         MailHistory.mail_history_id.asc()  # 第2ソートキー
     ).limit(PER_PAGE).offset(offset).all()
-
-    total = MailHistory.query.filter_by(
-        organization_id=organization_id
-    ).count()
 
     logger.info(f'メール通知履歴取得成功: count={len(mail_histories)}, total={total}')
 except Exception as e:
@@ -307,13 +305,13 @@ except Exception as e:
 Jinja2テンプレートをレンダリングしてHTMLレスポンスを返却します。
 
 **処理内容:**
-- テンプレート: `mail-history/list.html`
+- テンプレート: `notice/mail_history/list.html`
 - コンテキスト: `mail_histories`, `total`, `page`, `sort_by`, `order`
 
 **実装例:**
 ```python
 logger.info('HTMLレンダリング開始')
-return render_template('mail-history/list.html',
+return render_template('notice/mail_history/list.html',
                       mail_histories=mail_histories,
                       total=total,
                       page=page,
@@ -381,7 +379,7 @@ flowchart TD
     PutParams --> Query[DBクエリ実行<br>SELECT FROM mail_history<br>WHERE organization_id=現在の組織ID<br>AND mail_type IN mail_types<br>AND sent_at BETWEEN sent_at_start AND sent_at_end<br>ORDER BY sent_at DESC<br>LIMIT 25 OFFSET 0]
     Query --> CheckDB{DBクエリ結果}
 
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>notice/mail_history/list.html]
     Template --> Response[HTMLレスポンス返却]
 
     CheckDB -->|失敗| Error500[500エラーページ表示]
@@ -479,9 +477,16 @@ import json
 logger.info(f'メール通知履歴検索開始: user_id={current_user.user_id}')
 
 # メール種別マスタからデータを取得してフォームの選択肢を生成
-def get_mail_type_choices():
-    mail_types = MailTypeMaster.query.filter_by(delete_flag=0).order_by(MailTypeMaster.mail_type_id).all()
-    return [(mt.mail_type_id, mt.mail_type_name) for mt in mail_types]
+def get_mail_type_choices() -> list:
+    return (
+        MailTypeMaster.query
+        .filter_by(delete_flag=False)
+        .order_by(MailTypeMaster.mail_type_id)
+        .all()
+    )
+
+# view側でフォームの選択肢を設定する場合
+# form.mail_type_ids.choices = [(mt.mail_type_id, mt.mail_type_name) for mt in get_mail_type_choices()]
 
 class SearchForm(FlaskForm):
     # フロントエンドから送信されるのはメール種別ID（1, 2, 3, 4）
@@ -495,7 +500,7 @@ logger.info('フォームバリデーション開始')
 form = SearchForm(request.form)
 if not form.validate():
     logger.warning(f'フォームバリデーションエラー: errors={form.errors}')
-    return render_template('mail-history/list.html', form=form, mail_histories=[], errors=form.errors)
+    return render_template('notice/mail_history/list.html', form=form, mail_histories=[], errors=form.errors)
 
 logger.info('フォームバリデーション成功')
 
@@ -513,9 +518,12 @@ if mail_type_ids:
     # 許可されていないIDは無視（想定外の値の送信を防止）
     logger.info(f'メール種別マスタ検証成功: valid_count={len(mail_types)}')
 
-# 検索条件をCookieに保存
+# 検索条件をCookieに保存（共通ユーティリティを使用）
+# Cookie名: search_conditions_mail_history
+# secure属性はAUTH_TYPE='dev'（ローカルHTTP）の場合はFalse、本番はTrue
+from iot_app.common.cookie import set_search_conditions_cookie
 response = make_response()
-response.set_cookie('mail_history_search', json.dumps({
+set_search_conditions_cookie(response, 'mail_history', {
     'mail_types': mail_types,
     'keyword': form.keyword.data or '',
     'sent_at_start': form.sent_at_start.data.isoformat() if form.sent_at_start.data else None,
@@ -523,7 +531,7 @@ response.set_cookie('mail_history_search', json.dumps({
     'page': 1,
     'sort_id': 3,  # デフォルト: 3 (sent_at)
     'order': 'desc'
-}), httponly=True, samesite='Lax')
+})
 
 keyword = form.keyword.data or ''
 sent_at_start = form.sent_at_start.data
@@ -598,10 +606,14 @@ try:
         )
 
     if sent_at_start:
-        query = query.filter(MailHistory.sent_at >= sent_at_start)
+        # date → datetime に変換（当日 00:00:00 から検索）
+        start_dt = datetime.combine(sent_at_start, time.min)
+        query = query.filter(MailHistory.sent_at >= start_dt)
 
     if sent_at_end:
-        query = query.filter(MailHistory.sent_at <= sent_at_end)
+        # date → datetime に変換（当日 23:59:59 まで検索）
+        end_dt = datetime.combine(sent_at_end, time(23, 59, 59))
+        query = query.filter(MailHistory.sent_at <= end_dt)
 
     mail_histories = query.order_by(
         getattr(MailHistory, sort_by).desc() if order == 'desc' else getattr(MailHistory, sort_by).asc(),
@@ -627,7 +639,7 @@ except Exception as e:
 
 | HTTPステータス | エラー種別 | 処理内容 | 表示内容 |
 |--------------|-----------|---------|---------|
-| 400 | バリデーションエラー | フォーム再表示（エラーメッセージ付き） | バリデーションエラーメッセージ |
+| 422 | バリデーションエラー | フォーム再表示（エラーメッセージ付き） | バリデーションエラーメッセージ |
 | 500 | データベースエラー | 500エラーページ表示 | データの取得に失敗しました |
 
 #### UI状態
@@ -702,7 +714,7 @@ flowchart TD
     FixOrder --> UpdateCookie
     UpdateCookie --> Query[DBクエリ実行<br>Cookieの検索条件と新ソート条件で検索]
     Query --> CheckDB{DBクエリ結果}
-    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>mail-history/list.html]
+    CheckDB -->|成功| Template[Jinja2テンプレートレンダリング<br>render_template<br>notice/mail_history/list.html]
     Template --> Response[HTMLレスポンス返却]
     CheckDB -->|失敗| Error500[500エラーページ表示]
     Response --> End([処理完了])
@@ -727,9 +739,10 @@ GET /notice/mail-history?sort_id=3&order=desc
 
 @notice_bp.route('/mail-history', methods=['GET'])
 def mail_history_list():
-    # Cookieから検索条件を取得
-    cookie_data = request.cookies.get('mail_history_search')
-    search_params = json.loads(cookie_data) if cookie_data else {}
+    # Cookieから検索条件を取得（共通ユーティリティを使用）
+    # Cookie名: search_conditions_mail_history
+    from iot_app.common.cookie import get_search_conditions_cookie, set_search_conditions_cookie
+    search_params = get_search_conditions_cookie('mail_history')
 
     # ソート項目IDを取得
     sort_id = request.args.get('sort_id', search_params.get('sort_id', 3), type=int)  # デフォルト: 3 (sent_at)
@@ -743,12 +756,12 @@ def mail_history_list():
     if order not in ['asc', 'desc']:
         order = 'desc'
 
-    # Cookieに保存
+    # Cookieに保存（secure属性はAUTH_TYPE='dev'で自動的にFalse）
     search_params['sort_id'] = sort_id
     search_params['order'] = order
     search_params['page'] = 1  # ソート時はページをリセット
     response = make_response()
-    response.set_cookie('mail_history_search', json.dumps(search_params), httponly=True, samesite='Lax')
+    set_search_conditions_cookie(response, 'mail_history', search_params)
 
     # 検索条件でクエリ実行（第2ソートキーとしてmail_history_idを使用）
     # 注: sort_byはsort_item_masterテーブルで検証済みのため、SQLインジェクションのリスクはない
@@ -817,9 +830,10 @@ GET /notice/mail-history?page=5
 ```python
 @notice_bp.route('/mail-history', methods=['GET'])
 def mail_history_list():
-    # Cookieから検索条件を取得
-    cookie_data = request.cookies.get('mail_history_search')
-    search_params = json.loads(cookie_data) if cookie_data else {}
+    # Cookieから検索条件を取得（共通ユーティリティを使用）
+    # Cookie名: search_conditions_mail_history
+    from iot_app.common.cookie import get_search_conditions_cookie
+    search_params = get_search_conditions_cookie('mail_history')
 
     # ページ番号を取得（クエリパラメータ優先、なければCookieから）
     page = request.args.get('page', search_params.get('page', 1), type=int)
@@ -1084,10 +1098,8 @@ flowchart TD
 ### 認証・認可実装
 
 **認可ロジック:**
-- システム保守者: すべてのメール送信履歴を参照可能
-- 管理者: すべてのメール送信履歴を参照可能
-- 販社ユーザ: 自社に紐づくメール送信履歴のみ参照可能
-- サービス利用者: 自社データのみ参照可能
+- 全ロール共通：自身の組織の `organization_id` を持つメール送信履歴のみ参照可能
+- ロールによるデータ範囲の差異なし（`organization_id` フィルタのみで制御）
 
 **実装例:**
 ```python
@@ -1108,8 +1120,10 @@ def require_mail_history_access():
 @notice_bp.route('/mail-history', methods=['GET'])
 @require_mail_history_access()
 def mail_history_list():
-    # メール通知履歴一覧表示処理
-    pass
+    # 認証はmiddleware.pyで一元管理。g.current_userにユーザー情報が格納済み
+    organization_id = g.current_user.organization_id
+    # organization_idで全ユーザー一律にデータスコープを制限
+    # ...
 ```
 
 ### データスコープ制限
