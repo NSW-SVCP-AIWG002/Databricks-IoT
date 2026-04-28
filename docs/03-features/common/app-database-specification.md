@@ -48,6 +48,7 @@
     - [36. センサーデータ時次サマリ（gold\_sensor\_data\_hourly\_summary）](#36-センサーデータ時次サマリgold_sensor_data_hourly_summary)
     - [37. センサーデータ日次サマリ（gold\_sensor\_data\_daily\_summary）](#37-センサーデータ日次サマリgold_sensor_data_daily_summary)
     - [38. センサーデータ月次サマリ（gold\_sensor\_data\_monthly\_summary）](#38-センサーデータ月次サマリgold_sensor_data_monthly_summary)
+    - [39. メール宛先 (mail\_recipient)](#39-メール宛先-mail_recipient)
   - [VIEW定義](#view定義)
     - [1. デバイス一覧用VIEW (v\_device\_master\_by\_user)](#1-デバイス一覧用view-v_device_master_by_user)
     - [2. ユーザー一覧用VIEW (v\_user\_master\_by\_user)](#2-ユーザー一覧用view-v_user_master_by_user)
@@ -117,6 +118,8 @@
 - アラート設定マスタ ← デバイスマスタ
 - アラート設定マスタ ← アラートレベルマスタ
 - メール送信履歴 ← メール種別マスタ
+- メール宛先 ← メール送信履歴
+- メール宛先 ← ユーザーマスタ
 - アラート履歴 ← アラートステータスマスタ
 - ユーザーパスワード ← ユーザーマスタ（オンプレミス環境専用）
 - パスワードリセットトークン ← ユーザーマスタ（オンプレミス環境専用）
@@ -181,6 +184,7 @@
 | 36  | gold_sensor_data_hourly_summary  | センサーデータ時次サマリ       | シルバー化処理されたテレメトリデータを時単位で集計したデータを管理             |
 | 37  | gold_sensor_data_daily_summary   | センサーデータ日次サマリ       | シルバー化処理されたテレメトリデータを日単位で集計したデータを管理             |
 | 38  | gold_sensor_data_monthly_summary | センサーデータ月次サマリ       | シルバー化処理されたテレメトリデータを月単位で集計したデータを管理             |
+| 39  | mail_recipient                   | メール宛先                     | メール送信履歴に対する宛先情報を管理                                           |
 
 ---
 
@@ -746,21 +750,18 @@
 | 2   | mail_history_uuid | メール送信履歴UUID   | VARCHAR(36)  | NOT NULL | -   | -   | -                 | UUID（外部公開用一意識別子）              |
 | 3   | mail_type         | メール種別ID         | INT          | NOT NULL | -   | ○   | -                 | メール種別ID（mail_type_master参照）      |
 | 4   | sender_email      | 送信元メールアドレス | VARCHAR(254) | NOT NULL | -   | -   | -                 | 送信元のメールアドレス                    |
-| 5   | recipients        | 送信先メールアドレス | JSON         | NOT NULL | -   | -   | -                 | 送信先のメールアドレス（JSON形式）        |
-| 6   | subject           | メール件名           | VARCHAR(500) | NOT NULL | -   | -   | -                 | メールの件名                              |
-| 7   | body              | メール本文           | TEXT         | NOT NULL | -   | -   | -                 | メールの本文                              |
-| 8   | sent_at           | 送信日時             | DATETIME     | NOT NULL | -   | -   | -                 | メール送信日時                            |
-| 9   | user_id           | 関連ユーザーID       | INT          | NULL     | -   | ○   | -                 | 関連するユーザーID（user_master参照）     |
-| 10  | organization_id   | 関連組織ID           | INT          | NULL     | -   | ○   | -                 | 関連する組織ID（organization_master参照） |
-| 11  | create_date       | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                          |
-| 12  | creator           | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                |
-| 13  | update_date       | 更新日時             | DATETIME     | NULL     | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                      |
-| 14  | modifier          | 更新者               | INT          | NULL     | -   | -   | -                 | レコード更新者のユーザーID                |
+| 5   | subject           | メール件名           | VARCHAR(500) | NOT NULL | -   | -   | -                 | メールの件名                              |
+| 6   | body              | メール本文           | TEXT         | NOT NULL | -   | -   | -                 | メールの本文                              |
+| 7   | sent_at           | 送信日時             | DATETIME     | NOT NULL | -   | -   | -                 | メール送信日時                            |
+| 8   | organization_id   | 関連組織ID           | INT          | NULL     | -   | ○   | -                 | 関連する組織ID（organization_master参照） |
+| 9   | create_date       | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                          |
+| 10  | creator           | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                |
+| 11  | update_date       | 更新日時             | DATETIME     | NULL     | -   | -   | CURRENT_TIMESTAMP | レコード最終更新日時                      |
+| 12  | modifier          | 更新者               | INT          | NULL     | -   | -   | -                 | レコード更新者のユーザーID                |
 
 **外部キー:**
 
 - `mail_type` → `mail_type_master.mail_type_id`
-- `user_id` → `user_master.user_id`
 - `organization_id` → `organization_master.organization_id`
 
 **インデックス:**
@@ -774,7 +775,7 @@
 **ビジネスルール:**
 
 - mail_typeはメール種別マスタのID（1:アラート通知, 2:招待メール, 3:パスワードリセット, 4:システム通知）
-- recipientsはJSON形式で、toフィールドに送信先メールアドレスの配列を含む（例: `{"to": ["user1@example.com", "user2@example.com"]}`）
+- 宛先情報はmail_recipientテーブルで管理する
 - メール送信履歴は作成のみで更新は行わない（update_date, modifierは通常NULL）
 - データスコープ制限: organization_idでアクセス制御
 
@@ -808,6 +809,36 @@
 | 2            | 招待メール         | ユーザー招待時のメール           |
 | 3            | パスワードリセット | パスワードリセット依頼時のメール |
 | 4            | システム通知       | システムからの各種通知メール     |
+
+---
+
+### 39. メール宛先 (mail_recipient)
+
+**概要**: メール送信履歴に対する宛先情報を管理するテーブル
+
+| #   | カラム物理名      | カラム論理名         | データ型     | NULL     | PK  | FK  | デフォルト値 | 説明                                                    |
+| --- | ----------------- | -------------------- | ------------ | -------- | --- | --- | ------------ | ------------------------------------------------------- |
+| 1   | mail_history_id   | メール送信履歴ID     | INT          | NOT NULL | ○   | ○   | -                 | 送信履歴ID（mail_history参照）。複合主キーの一部        |
+| 2   | user_id           | ユーザーID           | INT          | NOT NULL | ○   | ○   | -                 | 宛先ユーザーID（user_master参照）。複合主キーの一部     |
+| 3   | recipient_email   | 宛先メールアドレス   | VARCHAR(254) | NOT NULL | -   | -   | -                 | 宛先のメールアドレス                                    |
+| 4   | create_date       | 作成日時             | DATETIME     | NOT NULL | -   | -   | CURRENT_TIMESTAMP | レコード作成日時                                        |
+| 5   | creator           | 作成者               | INT          | NOT NULL | -   | -   | -                 | レコード作成者のユーザーID                              |
+
+**外部キー:**
+
+- `mail_history_id` → `mail_history.mail_history_id`
+- `user_id` → `user_master.user_id`
+
+**インデックス:**
+
+- PRIMARY KEY: `mail_history_id`, `user_id`（複合主キー）
+- INDEX: `user_id`
+
+**ビジネスルール:**
+
+- 1件のメール送信に対して宛先の数だけレコードが登録される（例: 宛先5件の場合は5レコード）
+- user_idは必ず登録される（一括送信含む）
+- メール宛先は作成のみで更新・削除は行わない
 
 ---
 
