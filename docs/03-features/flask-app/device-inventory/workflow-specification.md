@@ -154,6 +154,7 @@ flowchart TD
 
 - `get_default_search_params()` / `search_device_inventories()` / `get_device_inventory_form_options()` は `device_inventory_service.py` に定義
 - Cookie操作は `common` の `get_search_conditions_cookie` / `set_search_conditions_cookie` / `clear_search_conditions_cookie` を使用
+- デバイスUUIDは前方一致検索、デバイス名/在庫場所は部分一致検索とする
 
 ```python
 # forms/device_inventory.py

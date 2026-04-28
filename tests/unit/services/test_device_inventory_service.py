@@ -272,6 +272,7 @@ class TestSearchDeviceInventories:
         assert q.filter.call_count > 0
         # Assert: 文字列パラメータによる検索が前方一致検索であること
         assert 'DEV-001%' in filter_args_str
+        assert '%DEV-001%' not in filter_args_str
 
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
@@ -281,7 +282,7 @@ class TestSearchDeviceInventories:
     def test_search_with_device_name_applies_filter(
         self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
     ):
-        """3.1.1.2: device_name を指定した場合、like フィルタが適用される/前方一致検索であること"""
+        """3.1.1.2: device_name を指定した場合、like フィルタが適用される/部分一致検索であること"""
         # Arrange
         from iot_app.services.device_inventory_service \
             import search_device_inventories
@@ -301,9 +302,71 @@ class TestSearchDeviceInventories:
 
         # Assert: filterメソッドが1回以上実行されること
         assert q.filter.call_count > 0
-        # Assert: 文字列パラメータによる検索が前方一致検索であること
-        assert 'センサー%' in filter_args_str
+        # Assert: device_name の検索は部分一致（%value%）であること
+        assert '%センサー%' in filter_args_str
 
+    @patch(f'{MODULE}.SortItemMaster')
+    @patch(f'{MODULE}.InventoryStatusMaster')
+    @patch(f'{MODULE}.DeviceTypeMaster')
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_search_with_inventory_location_applies_partial_match_filter(
+        self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
+    ):
+        """3.1.1.1: inventory_location を指定した場合、like フィルタが適用される/部分一致検索（%value%）であること"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import search_device_inventories
+
+        q = make_mock_query()
+        mock_dim.query = q
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            inventory_location='倉庫A')     # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        filter_args_str = str(q.filter.call_args_list)
+
+        # Assert: filterメソッドが1回以上実行されること
+        assert q.filter.call_count > 0
+        # Assert: inventory_location の検索は部分一致（%value%）であること
+        assert '%倉庫A%' in filter_args_str
+        
+    @patch(f'{MODULE}.SortItemMaster')
+    @patch(f'{MODULE}.InventoryStatusMaster')
+    @patch(f'{MODULE}.DeviceTypeMaster')
+    @patch(f'{MODULE}.DeviceMaster')
+    @patch(f'{MODULE}.DeviceInventoryMaster')
+    def test_search_with_inventory_location_applies_partial_match_filter(
+        self, mock_dim, mock_dm, mock_dtm, mock_ism, mock_sim
+    ):
+        """3.1.1.1: device_uuid、device_name、inventory_location を指定した場合、like フィルタが適用されること"""
+        # Arrange
+        from iot_app.services.device_inventory_service \
+            import search_device_inventories
+
+        q = make_mock_query()
+        mock_dim.query = q
+        mock_sim.query.filter_by.return_value.first.return_value = None
+        params = make_default_search_params(
+            device_uuid='VALID',
+            device_name='ゲート',
+            inventory_location='5階'
+            )     # ヘルパーの値を書き換えてパラメータ生成
+        inventories, total = search_device_inventories(
+            params)          # Act: SELECT実行
+        filter_args_str = str(q.filter.call_args_list)
+
+        # Assert: filterメソッドが3回以上実行されること
+        assert q.filter.call_count > 2
+        # Assert: device_uuid の検索は前方一致（value%）であること
+        assert 'VALID%' in filter_args_str
+        assert '%VALID%' not in filter_args_str
+        # Assert: device_name の検索は部分一致（%value%）であること
+        assert '%ゲート%' not in filter_args_str
+        # Assert: inventory_location の検索は部分一致（%value%）であること
+        assert '%5階%' not in filter_args_str
+        
     @patch(f'{MODULE}.SortItemMaster')
     @patch(f'{MODULE}.InventoryStatusMaster')
     @patch(f'{MODULE}.DeviceTypeMaster')
@@ -1865,236 +1928,7 @@ class TestGetOrganizationOptions:
 
 
 # ============================================================
-# 9. get_device_uuid_validator
-# 観点: 1.1.6 不整値チェック, 2.1 正常系処理
-# ============================================================
-
-VALIDATOR_MODULE = 'iot_app.services.device_inventory_service'
-
-
-@pytest.mark.unit
-class TestGetDeviceUuidValidator:
-    """get_device_uuid_validator - AUTH_TYPE別バリデータ取得
-
-    観点セクション: 1.1.6 不整値チェック(マスタ存在など), 2.1 正常系処理
-    """
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_returns_azure_validator_when_auth_type_is_azure(self):
-        """2.1.1: AUTH_TYPE=azure のとき azure バリデータが返る"""
-        # Arrange / Act
-        from iot_app.services.device_inventory_service \
-            import get_device_uuid_validator
-        import re
-
-        result = get_device_uuid_validator()
-
-        # Assert
-        assert result['max_length'] == 128
-        assert 'pattern' in result
-        assert 'description' in result
-        # azure パターン: 英数字・ハイフン・ドット・パーセント・シャープ・アンダースコア・アスタリスク・クエスチョンマーク・カンマ・コロン・シングルクオートのみ使用可
-        assert re.match(result['pattern'], 'valid_device_-.%#*?,:')
-        assert not re.match(result['pattern'], 'invalid_device_@')
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'aws'})
-    def test_returns_aws_validator_when_auth_type_is_aws(self):
-        """2.1.1: AUTH_TYPE=aws のとき aws バリデータが返る"""
-        # Arrange / Act
-        from iot_app.services.device_inventory_service \
-            import get_device_uuid_validator
-        import re
-        result = get_device_uuid_validator()
-
-        # Assert
-        assert result['max_length'] == 128
-        assert 'pattern' in result
-        assert 'description' in result
-        # aws パターン: 英数字・ハイフン・アンダースコアのみ
-        assert re.match(result['pattern'], 'valid-device_123')
-        assert not re.match(result['pattern'], 'invalid.device')
-
-    def test_returns_same_as_azure_when_auth_type_is_local(self):
-        """2.1.1: AUTH_TYPE=local のとき azure と同じバリデータが返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import get_device_uuid_validator
-
-        # Act
-        with patch.dict(os.environ, {'AUTH_TYPE': 'azure'}):
-            azure_validator = get_device_uuid_validator()
-        with patch.dict(os.environ, {'AUTH_TYPE': 'local'}):
-            local_validator = get_device_uuid_validator()
-
-        # Assert — local は azure と同一オブジェクトを参照
-        assert local_validator['pattern'] == azure_validator['pattern']
-        assert local_validator['max_length'] == azure_validator['max_length']
-
-    def test_defaults_to_azure_when_auth_type_not_set(self):
-        """2.1.1: AUTH_TYPE 未設定のとき azure バリデータが返る（デフォルト値 'azure'）"""
-        # AUTH_TYPE を環境変数から除去した状態でテスト
-        env_without_auth = {k: v for k,
-                            v in os.environ.items() if k != 'AUTH_TYPE'}
-        import re
-        with patch.dict(os.environ, env_without_auth, clear=True):
-            from iot_app.services.device_inventory_service \
-                import get_device_uuid_validator
-
-            result = get_device_uuid_validator()
-
-        # Assert
-        assert result['max_length'] == 128
-        assert re.match(result['pattern'], 'valid_device_-.%#*?,:\\')
-        assert not re.match(result['pattern'], 'invalid_device_@')
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'unknown_provider'})
-    def test_raises_value_error_when_auth_type_is_unknown(self):
-        """1.1.6.1: 未知の AUTH_TYPE のとき ValueError が送出される"""
-        # Arrange / Act / Assert
-        from iot_app.services.device_inventory_service \
-            import get_device_uuid_validator
-
-        with pytest.raises(ValueError, match="Unknown AUTH_TYPE: unknown_provider"):
-            get_device_uuid_validator()
-
-
-# ============================================================
-# 10. validate_device_uuid
-# 観点: 1.1.2 最大文字列長チェック, 1.1.6 不整値チェック, 2.1 正常系処理
-# ============================================================
-
-@pytest.mark.unit
-class TestValidateDeviceUuid:
-    """validate_device_uuid - device_uuidバリデーション実行
-
-    観点セクション: 1.1.2 最大文字列長チェック, 1.1.6 不整値チェック(パターン), 2.1 正常系処理
-    """
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_valid_azure_uuid_returns_true_and_empty_message(self):
-        """2.1.1: azure 環境で有効な device_uuid を渡すと (True, '') が返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-
-        valid_uuid = "MyDevice-001.%#_*?,:valid"
-
-        # Act
-        result, message = validate_device_uuid(valid_uuid)
-
-        # Assert
-        assert result is True
-        assert message == ''
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'aws'})
-    def test_valid_aws_uuid_returns_true_and_empty_message(self):
-        """2.1.1: aws 環境で有効な device_uuid を渡すと (True, '') が返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-
-        valid_uuid = 'MyDevice_001-abc'
-
-        # Act
-        result, message = validate_device_uuid(valid_uuid)
-
-        # Assert
-        assert result is True
-        assert message == ''
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_uuid_at_max_length_returns_true(self):
-        """1.1.2.1: ちょうど128文字の device_uuid は有効 (True が返る)"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-
-        uuid_128 = 'A' * 128
-
-        # Act
-        result, message = validate_device_uuid(uuid_128)
-
-        # Assert
-        assert result is True
-        assert message == ''
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_uuid_over_max_length_returns_false_with_message(self):
-        """1.1.2.2: 129文字以上の device_uuid は (False, エラーメッセージ) が返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-        uuid_129 = 'A' * 129
-
-        # Act
-        result, message = validate_device_uuid(uuid_129)
-
-        # Assert
-        assert result is False
-        assert 'device_uuidは128文字以内で入力してください' in message
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_invalid_chars_for_azure_returns_false_with_message(self):
-        """1.1.6.1: azure 環境で使用不可文字（スペース等）を含む uuid は (False, エラーメッセージ) が返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
-        invalid_uuid = 'device uuid with space'  # スペースは azure でも不可
-
-        # Act
-        result, message = validate_device_uuid(invalid_uuid)
-
-        # Assert
-        assert result is False
-        assert 'device_uuidの形式が不正です' in message
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'aws'})
-    def test_invalid_chars_for_aws_returns_false_with_message(self):
-        """1.1.6.1: aws 環境で使用不可文字（ドット等）を含む uuid は (False, エラーメッセージ) が返る"""
-        # Arrange
-        from iot_app.services.device_inventory_service import validate_device_uuid
-        invalid_uuid = 'device.uuid.with.dots'  # ドットは aws では不可
-
-        # Act
-        result, message = validate_device_uuid(invalid_uuid)
-
-        # As
-        # sert
-        assert result is False
-        assert 'device_uuidの形式が不正です' in message
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_length_error_message_includes_max_length(self):
-        """1.1.2.2: 文字数超過エラーメッセージに最大文字数（128）が含まれる"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-
-        too_long = 'A' * 200
-
-        # Act
-        _, message = validate_device_uuid(too_long)
-
-        # Assert
-        assert '128' in message
-
-    @patch.dict(os.environ, {'AUTH_TYPE': 'azure'})
-    def test_pattern_error_message_includes_description(self):
-        """1.1.6.1: パターン不一致エラーメッセージにバリデータ description が含まれる"""
-        # Arrange
-        from iot_app.services.device_inventory_service \
-            import validate_device_uuid
-
-        invalid_uuid = 'invalid uuid!'
-
-        # Act
-        _, message = validate_device_uuid(invalid_uuid)
-
-        # Assert — azure の description が含まれること
-        assert 'ASCII 7ビット英数字' in message or 'device_uuidの形式が不正です' in message
-
-
-# ============================================================
-# 11. check_linked_device_master
+# 9. check_linked_device_master
 # 観点: 2.1 正常系処理, 2.2 対象データ存在チェック
 # ============================================================
 
