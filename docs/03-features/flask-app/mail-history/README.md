@@ -14,6 +14,9 @@
     - [メール種別マスタ (mail\_type\_master)](#メール種別マスタ-mail_type_master)
       - [テーブル設計](#テーブル設計-1)
       - [インデックス](#インデックス-1)
+    - [メール宛先 (mail\_recipient)](#メール宛先-mail_recipient)
+      - [テーブル設計](#テーブル設計-2)
+      - [インデックス](#インデックス-2)
   - [Flaskルート一覧](#flaskルート一覧)
   - [アクセス権限](#アクセス権限)
   - [実装ステータス](#実装ステータス)
@@ -65,11 +68,9 @@
 | mail_history_uuid | メール送信履歴UUID | VARCHAR(36) | ○ | UUID（外部公開用一意識別子） |
 | mail_type | メール種別ID | INT | ○ | 外部キー: mail_type_master.mail_type_id |
 | sender_email | 送信元メールアドレス | VARCHAR(254) | ○ | 送信元のメールアドレス |
-| recipients | 送信先メールアドレス | JSON | ○ | 送信先のメールアドレス（JSON形式） |
 | subject | メール件名 | VARCHAR(500) | ○ | メールの件名 |
 | body | メール本文 | TEXT | ○ | メールの本文 |
 | sent_at | 送信日時 | DATETIME | ○ | メール送信日時 |
-| user_id | 関連ユーザーID | INT | - | 外部キー: user_master.user_id |
 | organization_id | 関連組織ID | INT | - | 外部キー: organization_master.organization_id（データスコープ制限用） |
 | create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
 | creator | 作成者 | INT | ○ | レコード作成者のユーザID |
@@ -105,6 +106,25 @@
 | インデックス名 | カラム | 種別 | 目的 |
 |---------------|--------|-----|------|
 | PRIMARY | mail_type_id | 主キー | メール種別の一意識別 |
+
+### メール宛先 (mail_recipient)
+
+#### テーブル設計
+
+| カラム名 | 論理名 | データ型 | 必須 | 備考 |
+|----------|-------|---------|------|------|
+| mail_history_id | メール送信履歴ID | INT | ○ | 複合主キー、外部キー: mail_history.mail_history_id |
+| user_id | ユーザーID | INT | ○ | 複合主キー、外部キー: user_master.user_id |
+| recipient_email | 宛先メールアドレス | VARCHAR(254) | ○ | 宛先のメールアドレス |
+| create_date | 作成日時 | DATETIME | ○ | レコード作成日時 |
+| creator | 作成者 | INT | ○ | レコード作成者のユーザID |
+
+#### インデックス
+
+| インデックス名 | カラム | 種別 | 目的 |
+|---------------|--------|-----|------|
+| PRIMARY | mail_history_id, user_id | 複合主キー | メール宛先の一意識別 |
+| idx_user_id | user_id | INDEX | ユーザーID検索高速化 |
 
 ---
 
