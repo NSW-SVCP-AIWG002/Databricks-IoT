@@ -1,8 +1,7 @@
 import csv
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from io import StringIO
 
-from flask import current_app
 from sqlalchemy import or_
 
 from iot_app import db
@@ -14,7 +13,6 @@ from iot_app.models.organization import OrganizationMaster, OrganizationMasterBy
 from iot_app.models.sort_item import SortItem
 
 _ITEM_PER_PAGE = 25
-_DEFAULT_DEVICE_DATA_INTERVAL_SECONDS = 60
 
 
 class DuplicateDeviceIdError(Exception):
@@ -72,29 +70,22 @@ def search_devices(params: dict, user_id: int):
             DeviceMasterByUser.certificate_expiration_date <= params['certificate_expiration_date']
         )
     if params.get('status'):
-        try:
-            interval = current_app.config.get(
-                'DEVICE_DATA_INTERVAL_SECONDS', _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-            )
-        except RuntimeError:
-            interval = _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=interval * 2)
         query = query.outerjoin(
             DeviceStatusData,
-            DeviceMasterByUser.device_id == DeviceStatusData.device_id,
+            DeviceMasterByUser.device_uuid == DeviceStatusData.device_id,
         )
         if params['status'] == 'connected':
-            query = query.filter(DeviceStatusData.last_received_time >= cutoff)
+            query = query.filter(DeviceStatusData.status > 0)
         elif params['status'] == 'disconnected':
             query = query.filter(
                 or_(
-                    DeviceStatusData.last_received_time == None,
-                    DeviceStatusData.last_received_time < cutoff,
+                    DeviceStatusData.status == None,
+                    DeviceStatusData.status == 0,
                 )
             )
 
     total = query.count()
-    page = params.get('page', 1)
+    page = max(1, params.get('page', 1))
     per_page = params.get('per_page', _ITEM_PER_PAGE)
     offset = (page - 1) * per_page
 
@@ -128,6 +119,7 @@ def create_device(data: dict, user_id: int):
         device_name=data.get('device_name'),
         device_type_id=data.get('device_type_id'),
         device_model=data.get('device_model'),
+        device_inventory_id=data.get('device_inventory_id', 1),
         sim_id=data.get('sim_id'),
         mac_address=data.get('mac_address'),
         device_location=data.get('device_location'),
@@ -235,8 +227,16 @@ def delete_device(device, deleter_id: int) -> None:
             {}
         )
 
+    # DeviceMaster（実テーブル）を更新して delete_flag / modifier / update_date を反映させる
+    master = DeviceMaster.query.filter_by(
+        device_uuid=device.device_uuid, delete_flag=False
+    ).first()
+    if master is not None:
+        master.delete_flag = True
+        master.modifier = deleter_id
+
+    # テスト環境では v_device_master_by_user も実テーブルのため直接更新する
     device.delete_flag = True
-    device.modifier = deleter_id
 
     try:
         db.session.commit()
@@ -253,20 +253,10 @@ def delete_device(device, deleter_id: int) -> None:
         raise
 
 
-def _get_device_status_label(last_received_time) -> str:
-    if last_received_time is None:
+def _get_device_status_label(status) -> str:
+    if status is None or status == 0:
         return '未接続'
-    try:
-        interval = current_app.config.get(
-            'DEVICE_DATA_INTERVAL_SECONDS', _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-        )
-    except RuntimeError:
-        interval = _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-    now = datetime.now(timezone.utc)
-    elapsed = (now - last_received_time).total_seconds()
-    if elapsed <= interval * 2:
-        return '接続済み'
-    return '未接続'
+    return '接続済み'
 
 
 def generate_devices_csv(devices: list) -> bytes:
@@ -275,7 +265,7 @@ def generate_devices_csv(devices: list) -> bytes:
     writer.writerow([
         'デバイスID', 'デバイス名', 'デバイス種別', '設置場所', '所属組織', '証明書期限', 'ステータス',
     ])
-    for device, org_name, type_name, last_received_time in devices:
+    for device, org_name, type_name, status in devices:
         cert = device.certificate_expiration_date
         writer.writerow([
             device.device_uuid or '',
@@ -284,7 +274,7 @@ def generate_devices_csv(devices: list) -> bytes:
             device.device_location or '',
             org_name or '',
             cert.strftime('%Y-%m-%d') if cert else '',
-            _get_device_status_label(last_received_time),
+            _get_device_status_label(status),
         ])
     return b'\xef\xbb\xbf' + output.getvalue().encode('utf-8')
 
@@ -292,11 +282,27 @@ def generate_devices_csv(devices: list) -> bytes:
 def get_device_status_map(device_ids: list) -> dict:
     if not device_ids:
         return {}
-    rows = db.session.query(
+    # device_ids は整数 ID。device_status_data は device_uuid（文字列）をキーに持つため
+    # DeviceMaster 経由で UUID を取得してから status を引く。
+    uuid_rows = db.session.query(
+        DeviceMaster.device_id,
+        DeviceMaster.device_uuid,
+    ).filter(DeviceMaster.device_id.in_(device_ids)).all()
+
+    uuid_to_int_id = {row.device_uuid: row.device_id for row in uuid_rows}
+    if not uuid_to_int_id:
+        return {}
+
+    status_rows = db.session.query(
         DeviceStatusData.device_id,
-        DeviceStatusData.last_received_time,
-    ).filter(DeviceStatusData.device_id.in_(device_ids)).all()
-    return {device_id: _get_device_status_label(ts) for device_id, ts in rows}
+        DeviceStatusData.status,
+    ).filter(DeviceStatusData.device_id.in_(list(uuid_to_int_id.keys()))).all()
+
+    result = {dev_id: '未接続' for dev_id in device_ids}
+    for dev_uuid, status in status_rows:
+        if dev_uuid in uuid_to_int_id:
+            result[uuid_to_int_id[dev_uuid]] = _get_device_status_label(status)
+    return result
 
 
 def get_device_form_options(user_id: int):
@@ -311,7 +317,7 @@ def get_all_devices_for_export(params: dict, user_id: int) -> list:
         DeviceMasterByUser,
         OrganizationMaster.organization_name,
         DeviceTypeMaster.device_type_name,
-        DeviceStatusData.last_received_time,
+        DeviceStatusData.status,
     ).outerjoin(
         OrganizationMaster,
         DeviceMasterByUser.organization_id == OrganizationMaster.organization_id,
@@ -320,7 +326,7 @@ def get_all_devices_for_export(params: dict, user_id: int) -> list:
         DeviceMasterByUser.device_type_id == DeviceTypeMaster.device_type_id,
     ).outerjoin(
         DeviceStatusData,
-        DeviceMasterByUser.device_id == DeviceStatusData.device_id,
+        DeviceMasterByUser.device_uuid == DeviceStatusData.device_id,
     ).filter(
         DeviceMasterByUser.user_id == user_id,
         DeviceMasterByUser.delete_flag == False,
@@ -351,20 +357,13 @@ def get_all_devices_for_export(params: dict, user_id: int) -> list:
             DeviceMasterByUser.certificate_expiration_date <= params['certificate_expiration_date']
         )
     if params.get('status'):
-        try:
-            interval = current_app.config.get(
-                'DEVICE_DATA_INTERVAL_SECONDS', _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-            )
-        except RuntimeError:
-            interval = _DEFAULT_DEVICE_DATA_INTERVAL_SECONDS
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=interval * 2)
         if params['status'] == 'connected':
-            query = query.filter(DeviceStatusData.last_received_time >= cutoff)
+            query = query.filter(DeviceStatusData.status > 0)
         elif params['status'] == 'disconnected':
             query = query.filter(
                 or_(
-                    DeviceStatusData.last_received_time == None,
-                    DeviceStatusData.last_received_time < cutoff,
+                    DeviceStatusData.status == None,
+                    DeviceStatusData.status == 0,
                 )
             )
 
