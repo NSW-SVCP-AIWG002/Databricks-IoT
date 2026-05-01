@@ -1,14 +1,14 @@
-# 顧客作成ダッシュボード棒グラフ（年）ガジェット - ワークフロー仕様書
+# 顧客作成ダッシュボード棒グラフ（年比較）ガジェット - ワークフロー仕様書
 
 ## 📑 目次
 
-- [顧客作成ダッシュボード棒グラフ（年）ガジェット - ワークフロー仕様書](#顧客作成ダッシュボード棒グラフ年ガジェット---ワークフロー仕様書)
+- [顧客作成ダッシュボード棒グラフ（年比較）ガジェット - ワークフロー仕様書](#顧客作成ダッシュボード棒グラフ年比較ガジェット---ワークフロー仕様書)
   - [📑 目次](#-目次)
   - [概要](#概要)
   - [使用するFlaskルート一覧](#使用するflaskルート一覧)
   - [ルート呼び出しマッピング](#ルート呼び出しマッピング)
-    - [棒グラフ（年）ガジェット](#棒グラフ年ガジェット)
-    - [棒グラフ（年）ガジェット登録モーダル](#棒グラフ年ガジェット登録モーダル)
+    - [棒グラフ（年比較）ガジェット](#棒グラフ年比較ガジェット)
+    - [棒グラフ（年比較）ガジェット登録モーダル](#棒グラフ年比較ガジェット登録モーダル)
   - [ワークフロー一覧](#ワークフロー一覧)
     - [ガジェット初期表示](#ガジェット初期表示)
       - [処理フロー](#処理フロー)
@@ -19,6 +19,7 @@
       - [処理フロー](#処理フロー-1)
       - [Flaskルート](#flaskルート-1)
       - [バリデーション](#バリデーション-1)
+      - [自動更新](#自動更新)
       - [処理詳細（サーバーサイド）](#処理詳細サーバーサイド-1)
     - [ガジェット登録モーダル表示](#ガジェット登録モーダル表示)
       - [処理フロー](#処理フロー-2)
@@ -52,7 +53,7 @@
 
 ## 概要
 
-このドキュメントは、顧客作成ダッシュボード棒グラフ（年）機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
+このドキュメントは、顧客作成ダッシュボード棒グラフ（年比較）機能のユーザー操作に対する処理フロー、データベース処理、エラーハンドリングの詳細を記載します。
 
 **このドキュメントの役割:**
 - ✅ ユーザー操作のトリガー条件
@@ -74,10 +75,10 @@
 
 | No | ルート名 | エンドポイント | メソッド | 用途 | レスポンス形式 | 備考 |
 |----|---------|---------------|---------|------|---------------|------|
-| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（棒グラフ（年）ガジェットを埋め込み） | HTML | 共通ルート |
+| 1 | 顧客作成ダッシュボード表示 | `/analysis/customer-dashboard` | GET | 初期表示（棒グラフ（年比較）ガジェットを埋め込み） | HTML | 共通ルート |
 | 2 | ガジェットデータ取得 | `/analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | POST | ガジェットのグラフ表示用データ取得 | JSON (AJAX) | ガジェット種別共通ルート |
-| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/bar-chart-year/create` | GET | 棒グラフ（年）ガジェット登録モーダル表示 | HTML（モーダル） | - |
-| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/bar-chart-year/register` | POST | 棒グラフ（年）ガジェット登録処理 | JSON (AJAX) | - |
+| 3 | ガジェット登録画面 | `/analysis/customer-dashboard/gadgets/bar-chart-year/create` | GET | 棒グラフ（年比較）ガジェット登録モーダル表示 | HTML（モーダル） | - |
+| 4 | ガジェット登録実行 | `/analysis/customer-dashboard/gadgets/bar-chart-year/register` | POST | 棒グラフ（年比較）ガジェット登録処理 | JSON (AJAX) | - |
 | 5 | CSVエクスポート | `/analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | GET | ガジェットのグラフデータをCSVファイルとしてダウンロード | CSV | - |
 
 **注:**
@@ -92,21 +93,20 @@
 
 ## ルート呼び出しマッピング
 
-### 棒グラフ（年）ガジェット
+### 棒グラフ（年比較）ガジェット
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
 | 画面初期表示 | URL直接アクセス | `GET /analysis/customer-dashboard` | - | HTML（ガジェット含む） | エラーページ表示 |
 | 年選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid, base_year, base_month` | JSON | ガジェット内エラー表示 |
 | 基準月選択 | ドロップダウン選択 | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid, base_year, base_month` | JSON | ガジェット内エラー表示 |
-| 自動更新（60秒毎） | setInterval | `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` | `gadget_uuid, base_year, base_month` | JSON | ガジェット内エラー表示 |
 | CSVエクスポートボタン押下 | ボタンクリック | `GET /analysis/customer-dashboard/gadgets/<gadget_uuid>?export=csv` | `gadget_uuid, base_year, base_month` | CSVダウンロード | エラートースト表示 |
 
-### 棒グラフ（年）ガジェット登録モーダル
+### 棒グラフ（年比較）ガジェット登録モーダル
 
 | ユーザー操作 | トリガー | 呼び出すルート | パラメータ | レスポンス | エラー時の挙動 |
 |-------------|---------|-------------|-----------|-----------|---------------|
-| ガジェット種別選択（棒グラフ（年）） | ガジェット追加モーダルでの選択 | `GET /analysis/customer-dashboard/gadgets/bar-chart-year/create` | - | HTML（登録モーダル） | エラーページ表示 |
+| ガジェット種別選択（棒グラフ（年比較）） | ガジェット追加モーダルでの選択 | `GET /analysis/customer-dashboard/gadgets/bar-chart-year/create` | - | HTML（登録モーダル） | エラーページ表示 |
 | 登録ボタン押下 | フォーム送信 | `POST /analysis/customer-dashboard/gadgets/bar-chart-year/register` | `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` | JSON (AJAX) | エラートースト表示 |
 
 ---
@@ -139,13 +139,13 @@
 
 [共通ワークフロー仕様書](../common/workflow-specification.md) のダッシュボード初期表示の処理詳細（①〜⑩）と同様の処理を実行します。
 
-棒グラフ（年）ガジェット固有の追加処理はありません。
+棒グラフ（年比較）ガジェット固有の追加処理はありません。
 
 ---
 
 ### ガジェットデータ取得
 
-**トリガー:** 画面初期表示時 / 年選択時 / 基準月選択時 / 自動更新時
+**トリガー:** 画面初期表示時 / 年選択時 / 基準月選択時
 
 **前提条件:**
 - `gadget_uuid` が有効なガジェットを指している
@@ -182,8 +182,12 @@ flowchart TD
     CheckGoldQuery -->|失敗| Error500
 
     ItemQuery --> CheckItemQuery{DBクエリ結果}
-    CheckItemQuery -->|成功| Format[データ整形<br>labels/values配列生成]
+    CheckItemQuery -->|成功| SummaryQuery[集約方法名取得<br>DB gold_summary_method_master]
     CheckItemQuery -->|失敗| Error500
+
+    SummaryQuery --> CheckSummaryQuery{DBクエリ結果}
+    CheckSummaryQuery -->|成功| Format[データ整形<br>labels/values配列生成]
+    CheckSummaryQuery -->|失敗| Error500
 
     Format --> ReturnData[JSONデータ返却]
 
@@ -209,6 +213,10 @@ flowchart TD
 |------|--------|-----------------|
 | 年 | 許容値（現在年を含む直近10年以内） | 有効な年を入力してください |
 | 月 | 許容値（1~12） | 有効な月を入力してください |
+
+#### 自動更新
+
+棒グラフ（年比較）ガジェットは自動更新の対象外とします。ただし `POST /analysis/customer-dashboard/gadgets/<gadget_uuid>/data` 内で呼ばれるガジェットデータ取得のガジェット個別ハンドラーは実装します。
 
 #### 処理詳細（サーバーサイド）
 
@@ -342,9 +350,26 @@ WHERE
 
 ---
 
-**⑤ データ整形**
+**⑤ 集約方法名取得**
 
-取得データを ECharts 棒グラフ（年）用の `labels` / `values` 配列に変換します。
+**使用テーブル:** gold_summary_method_master
+
+**SQL詳細:** 
+```sql
+SELECT
+  summary_method_name
+FROM
+  gold_summary_method_master
+WHERE
+  summary_method_id = :summary_method_id
+  AND delete_flag = FALSE
+```
+
+---
+
+**⑥ データ整形**
+
+取得データを ECharts 棒グラフ（年比較）用の `labels` / `values` 配列に変換します。
 
 ```python
 # services/customer_dashboard/bar_chart_year.py
@@ -353,7 +378,7 @@ WHERE
 
 ---
 
-**⑥ レスポンス形式**
+**⑦ レスポンス形式**
 
 基準月=1
 ```json
@@ -368,7 +393,7 @@ WHERE
       },
       {
         "name": "2025/01~2025/12",
-        "values": [10.5, 12.3, 9.8, ...]
+        "values": [10.5, null, 9.8, ...]  // データがない月には `null` を入力すること
       },
       {
         "name": "2026/01~2026/12",
@@ -393,7 +418,7 @@ WHERE
       },
       {
         "name": "2025/06~2026/05",
-        "values": [10.5, 12.3, 9.8, ...]
+        "values": [10.5, null, 9.8, ...]  // データがない月には `null` を入力すること
       },
       {
         "name": "2026/06~2027/05",
@@ -416,12 +441,12 @@ WHERE
 
 ---
 
-**⑦ 実装例**
+**⑧ 実装例**
 
 ```python
 # views/analysis/customer_dashboard/bar_chart_year.py
 def handle_gadget_data(gadget_uuid):
-    """棒グラフ（年）ガジェットデータ取得（AJAX）"""
+    """棒グラフ（年比較）ガジェットデータ取得（AJAX）"""
 
 ```
 
@@ -474,7 +499,7 @@ flowchart TD
     CheckSummaryMethodQuery -->|失敗| Error500
 
     GadgetTypeQuery --> CheckGadgetTypeQuery{DBクエリ結果}
-    CheckGadgetTypeQuery -->|成功| Response[棒グラフ（年）ガジェット登録モーダル<br>HTMLレスポンス返却]
+    CheckGadgetTypeQuery -->|成功| Response[棒グラフ（年比較）ガジェット登録モーダル<br>HTMLレスポンス返却]
     CheckGadgetTypeQuery -->|失敗| Error500
 
     Error404 --> End([処理完了])
@@ -486,7 +511,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 棒グラフ（年）ガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/bar-chart-year/create` | パラメータ: なし |
+| 棒グラフ（年比較）ガジェット登録画面 | `GET /analysis/customer-dashboard/gadgets/bar-chart-year/create` | パラメータ: なし |
 
 #### バリデーション
 
@@ -630,7 +655,7 @@ WHERE
 ```python
 # views/analysis/customer_dashboard/bar_chart_year.py
 def handle_gadget_create(gadget_type):
-    """棒グラフ（年）ガジェット登録モーダル表示"""
+    """棒グラフ（年比較）ガジェット登録モーダル表示"""
     setting = get_dashboard_user_setting(g.current_user.user_id)
     if setting is None:
         abort(404)
@@ -642,7 +667,7 @@ def handle_gadget_create(gadget_type):
     try:
         context = get_bar_chart_year_create_context(g.current_user.user_id)
     except Exception as e:
-        logger.error(f'棒グラフ（年）登録モーダル表示エラー: {str(e)}')
+        logger.error(f'棒グラフ（年比較）登録モーダル表示エラー: {str(e)}')
         abort(500)
 
     gadget_type_info = get_gadget_type_info(gadget_type)
@@ -724,7 +749,7 @@ flowchart TD
 
 | ルート | エンドポイント | 詳細 |
 |-------|---------------|------|
-| 棒グラフ（年）ガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/bar-chart-year/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` |
+| 棒グラフ（年比較）ガジェット登録実行 | `POST /analysis/customer-dashboard/gadgets/bar-chart-year/register` | フォームデータ: `title, device_mode, device_id, group_id, summary_method_id, measurement_item_id, min_value, max_value, gadget_size` |
 
 #### バリデーション
 
@@ -823,7 +848,7 @@ INSERT INTO dashboard_gadget_master (
 ```python
 # views/analysis/customer_dashboard/bar_chart_year.py
 def handle_gadget_register(gadget_type):
-    """棒グラフ（年）ガジェット登録実行"""
+    """棒グラフ（年比較）ガジェット登録実行"""
     form = BarChartGadgetForm()
     # device_id / measurement_item_id / group_id / summary_method_id はJS動的ロードのため送信値をそのまま choices に設定
     submitted_device_id = request.form.get('device_id', type=int) or 0
@@ -841,7 +866,7 @@ def handle_gadget_register(gadget_type):
             setting = get_dashboard_user_setting(g.current_user.user_id)
             groups = get_dashboard_groups(setting.dashboard_id) if setting else []
         except Exception as e:
-            logger.error(f'棒グラフ（年）ガジェット登録コンテキスト取得エラー: {str(e)}')
+            logger.error(f'棒グラフ（年比較）ガジェット登録コンテキスト取得エラー: {str(e)}')
             abort(500)
         return render_template(
             'analysis/customer_dashboard/gadgets/modals/bar_chart_year.html',
@@ -880,7 +905,7 @@ def handle_gadget_register(gadget_type):
     except NotFoundError:
         abort(404)
     except Exception as e:
-        logger.error(f'棒グラフ（年）ガジェット登録エラー: {str(e)}')
+        logger.error(f'棒グラフ（年比較）ガジェット登録エラー: {str(e)}')
         abort(500)
 ```
 
@@ -993,17 +1018,29 @@ flowchart TD
 |--------|--------|-----|------|
 | 1 | デバイス名 | デバイス名 | |
 | 2 | 月 | 月（グラフX軸） | M |
-| 3 | 凡例名1 | センサー値（グラフY軸） | 数値（小数点2桁） |
-| 4 | 凡例名2 | センサー値（グラフY軸） | 数値（小数点2桁） |
-| 5 | 凡例名3 | センサー値（グラフY軸） | 数値（小数点2桁） |
+| 3 | 凡例1の年 | 月に対応する凡例1の年 | YYYY |
+| 4 | 凡例名1 | センサー値（グラフY軸） | 数値（小数点2桁） |
+| 5 | 凡例2の年 | 月に対応する凡例2の年 | YYYY |
+| 6 | 凡例名2 | センサー値（グラフY軸） | 数値（小数点2桁） |
+| 7 | 凡例3の年 | 月に対応する凡例3の年 | YYYY |
+| 8 | 凡例名3 | センサー値（グラフY軸） | 数値（小数点2桁） |
 
 **CSVサンプル**
 
+- 基準月=1
 ```csv
-デバイス名,月,2024/01～2024/12,2025/01～2025/12,2026/01～2026/12
-DEV-001,1,25.50,15.50,10.50
-DEV-001,2,25.51,15.51,10.51
-DEV-001,3,25.52,15.52,10.52
+デバイス名,月,凡例1の年,凡例1の値,凡例2の年,凡例2の値,凡例3の年,凡例3の値
+DEV-001,1,2024,25.50,2025,15.50,2026,10.50
+DEV-001,2,2024,25.51,2025,15.51,2026,10.51
+DEV-001,3,2024,25.52,2025,15.52,2026,10.52
+```
+
+- 基準月=11
+- ```csv
+デバイス名,月,凡例1の年,凡例1の値,凡例2の年,凡例2の値,凡例3の年,凡例3の値
+DEV-001,11,2024,25.50,2025,15.50,2026,10.50
+DEV-001,12,2024,25.51,2025,15.51,2026,10.51
+DEV-001,1,2025,25.52,2026,15.52,2027,10.52
 ```
 
 ---
@@ -1013,7 +1050,7 @@ DEV-001,3,25.52,15.52,10.52
 ```python
 # views/analysis/customer_dashboard/bar_chart_year.py
 def handle_gadget_csv_export(gadget_uuid):
-    """棒グラフ（年）ガジェット CSVエクスポート"""
+    """棒グラフ（年比較）ガジェット CSVエクスポート"""
     if request.args.get('export') != 'csv':
         abort(404)
 
@@ -1067,7 +1104,7 @@ def handle_gadget_csv_export(gadget_uuid):
         )
 
     except Exception as e:
-        logger.error(f'棒グラフ（年）CSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
+        logger.error(f'棒グラフ（年比較）CSVエクスポートエラー: gadget_uuid={gadget_uuid}, error={str(e)}')
         abort(500)
 ```
 
