@@ -23,6 +23,7 @@ from iot_app.services.mail_history_service import (
     get_default_date_range,
     get_mail_history_detail,
     get_mail_history_list,
+    get_mail_recipients,
     get_mail_type_by_id,
     get_mail_type_choices,
     get_sort_column,
@@ -251,30 +252,27 @@ def mail_history_detail(mail_history_uuid: str):
 
     try:
         mail_history = get_mail_history_detail(mail_history_uuid, organization_id)
+
+        if mail_history is None:
+            logger.warning('メール通知履歴が見つかりません', extra={'mail_history_uuid': mail_history_uuid})
+            abort(404)
+
+        logger.info('メール通知履歴詳細取得成功', extra={'mail_history_id': mail_history.mail_history_id})
+
+        # メール種別名を取得
+        mail_type_record = get_mail_type_by_id(mail_history.mail_type)
+        mail_type_name = mail_type_record.mail_type_name if mail_type_record else str(mail_history.mail_type)
+        mail_type_badge_class = _MAIL_TYPE_BADGE_CLASS.get(mail_history.mail_type, 'info')
+
+        # mail_recipient テーブルから宛先一覧を取得してカンマ区切り文字列に変換
+        recipients = get_mail_recipients(mail_history.mail_history_id)
+        recipients_str = ', '.join(r.recipient_email for r in recipients)
+
+        logger.info('宛先取得成功', extra={'count': len(recipients)})
+
     except Exception:
         logger.error('メール通知履歴詳細取得失敗', extra={'mail_history_uuid': mail_history_uuid})
         abort(500)
-
-    if mail_history is None:
-        logger.warning('メール通知履歴が見つかりません', extra={'mail_history_uuid': mail_history_uuid})
-        abort(404)
-
-    logger.info('メール通知履歴詳細取得成功', extra={'mail_history_id': mail_history.mail_history_id})
-
-    # メール種別名を取得
-    mail_type_record = get_mail_type_by_id(mail_history.mail_type)
-    mail_type_name = mail_type_record.mail_type_name if mail_type_record else str(mail_history.mail_type)
-    mail_type_badge_class = _MAIL_TYPE_BADGE_CLASS.get(mail_history.mail_type, 'info')
-
-    # recipients JSON → カンマ区切り文字列に変換
-    recipients_data = mail_history.recipients or {}
-    if isinstance(recipients_data, dict):
-        recipients_list = recipients_data.get('to', [])
-    elif isinstance(recipients_data, list):
-        recipients_list = recipients_data
-    else:
-        recipients_list = []
-    recipients_str = ', '.join(str(r) for r in recipients_list)
 
     return render_template(
         'notice/mail_history/detail_modal.html',

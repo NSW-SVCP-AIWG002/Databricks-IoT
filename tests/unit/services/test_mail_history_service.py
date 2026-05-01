@@ -37,11 +37,19 @@ def make_mail_history_mock(**kwargs):
     m.mail_history_uuid = kwargs.get('mail_history_uuid', 'test-uuid-001')
     m.mail_type = kwargs.get('mail_type', 1)
     m.sender_email = kwargs.get('sender_email', 'sender@example.com')
-    m.recipients = kwargs.get('recipients', {'to': ['recipient@example.com']})
     m.subject = kwargs.get('subject', 'テスト件名')
     m.body = kwargs.get('body', 'テスト本文')
     m.sent_at = kwargs.get('sent_at', datetime(2026, 4, 10, 12, 0, 0))
     m.organization_id = kwargs.get('organization_id', 1)
+    return m
+
+
+def make_mail_recipient_mock(**kwargs):
+    """MailRecipient モックを生成するヘルパー"""
+    m = Mock()
+    m.mail_history_id = kwargs.get('mail_history_id', 1)
+    m.user_id = kwargs.get('user_id', 10)
+    m.recipient_email = kwargs.get('recipient_email', 'recipient@example.com')
     return m
 
 
@@ -871,11 +879,11 @@ class TestGetMailHistoryDetail:
     def test_returned_record_has_no_missing_detail_fields(self, MockModel):
         """機能固有: 詳細取得レコードのフロント表示項目が全て欠損なし"""
         # Arrange: 詳細モーダル・view が参照する全フィールドを明示設定したモックレコード
+        # 宛先(recipient_email)は mail_recipient テーブルから別途取得するため本テストの対象外
         mock_history = make_mail_history_mock(
             mail_history_id=1,
             mail_type=1,
             sender_email='sender@example.com',
-            recipients={'to': ['recipient@example.com']},
             sent_at=datetime(2026, 4, 10, 12, 0, 0),
             subject='テスト件名',
             body='テスト本文',
@@ -891,7 +899,76 @@ class TestGetMailHistoryDetail:
         assert result.mail_history_id is not None
         assert result.mail_type is not None
         assert result.sender_email is not None
-        assert result.recipients is not None
         assert result.sent_at is not None
         assert result.subject is not None
         assert result.body is not None
+
+
+# ============================================================
+# 7. get_mail_recipients
+# 観点: 2.1 正常系処理, 3.1.1 検索条件指定, 3.1.4 検索結果戻り値ハンドリング
+# ============================================================
+
+@pytest.mark.unit
+class TestGetMailRecipients:
+    """get_mail_recipients - メール宛先一覧取得
+    観点: 2.1 正常系処理, 3.1.1 検索条件指定, 3.1.4 検索結果戻り値ハンドリング
+    """
+
+    @patch(f'{MODULE}.MailRecipient')
+    def test_returns_recipients_when_found(self, MockModel):
+        """2.1.1: 正常系 - 宛先レコードのリストを返す"""
+        # Arrange: 宛先2件を返すようにモック設定
+        mock_recipients = [
+            make_mail_recipient_mock(user_id=10, recipient_email='a@example.com'),
+            make_mail_recipient_mock(user_id=11, recipient_email='b@example.com'),
+        ]
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = mock_recipients
+        from iot_app.services.mail_history_service import get_mail_recipients
+
+        # Act
+        result = get_mail_recipients(1)
+
+        # Assert: 設定したモックレコードのリストが返ること
+        assert result == mock_recipients
+
+    @patch(f'{MODULE}.MailRecipient')
+    def test_returns_empty_when_no_recipients(self, MockModel):
+        """3.1.4.2: 宛先が存在しない場合は空リストを返す"""
+        # Arrange: DB に該当レコードなし
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.mail_history_service import get_mail_recipients
+
+        # Act
+        result = get_mail_recipients(999)
+
+        # Assert: 空リストが返ること
+        assert result == []
+
+    @patch(f'{MODULE}.MailRecipient')
+    def test_filters_by_mail_history_id(self, MockModel):
+        """3.1.1.1: mail_history_id で宛先を絞り込む"""
+        # Arrange
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.mail_history_service import get_mail_recipients
+
+        # Act
+        get_mail_recipients(42)
+
+        # Assert: filter_by が mail_history_id=42 で呼ばれること
+        MockModel.query.filter_by.assert_called_once_with(mail_history_id=42)
+
+    @patch(f'{MODULE}.MailRecipient')
+    def test_orders_by_user_id_asc(self, MockModel):
+        """機能固有: user_id ASC でソートされる"""
+        # Arrange: user_id カラムの .asc() が呼ばれることを検証
+        mock_user_id_col = MagicMock()
+        MockModel.user_id = mock_user_id_col
+        MockModel.query.filter_by.return_value.order_by.return_value.all.return_value = []
+        from iot_app.services.mail_history_service import get_mail_recipients
+
+        # Act
+        get_mail_recipients(1)
+
+        # Assert: user_id カラムの .asc() が呼ばれること
+        mock_user_id_col.asc.assert_called_once()

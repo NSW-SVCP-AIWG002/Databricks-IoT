@@ -1117,7 +1117,7 @@ def require_mail_history_access():
         return decorated_function
     return decorator
 
-@notice_bp.route('/mail-history', methods=['GET'])
+@notice_bp.route('/notice/mail-history', methods=['GET'])
 @require_mail_history_access()
 def mail_history_list():
     # 認証はmiddleware.pyで一元管理。g.current_userにユーザー情報が格納済み

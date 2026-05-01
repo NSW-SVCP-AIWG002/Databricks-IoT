@@ -26,13 +26,27 @@ class MailHistory(db.Model):
         nullable=False,
     )
     sender_email = db.Column(db.String(254), nullable=False)
-    recipients = db.Column(db.JSON, nullable=False)
     subject = db.Column(db.String(500), nullable=False)
     body = db.Column(db.Text, nullable=False)
     sent_at = db.Column(db.DateTime, nullable=False)
-    user_id = db.Column(db.Integer, nullable=True)
     organization_id = db.Column(db.Integer, nullable=True)
     create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
     creator = db.Column(db.Integer, nullable=False)
     update_date = db.Column(db.DateTime, nullable=True)
     modifier = db.Column(db.Integer, nullable=True)
+
+
+class MailRecipient(db.Model):
+    """メール宛先"""
+    __tablename__ = 'mail_recipient'
+
+    mail_history_id = db.Column(
+        db.Integer,
+        db.ForeignKey('mail_history.mail_history_id'),
+        primary_key=True,
+        nullable=False,
+    )
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    recipient_email = db.Column(db.String(254), nullable=False)
+    create_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    creator = db.Column(db.Integer, nullable=False)

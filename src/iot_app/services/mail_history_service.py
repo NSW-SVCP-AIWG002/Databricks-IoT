@@ -17,7 +17,7 @@ from sqlalchemy import or_
 
 from iot_app import db
 from iot_app.common.logger import get_logger
-from iot_app.models.notification import MailHistory, MailTypeMaster
+from iot_app.models.notification import MailHistory, MailRecipient, MailTypeMaster
 from iot_app.models.sort_item import SortItemMaster
 
 logger = get_logger(__name__)
@@ -144,6 +144,23 @@ def get_mail_history_list(
     records = query.limit(per_page).offset(offset).all()
 
     return records, total
+
+
+def get_mail_recipients(mail_history_id: int) -> list:
+    """指定されたメール送信履歴IDの宛先一覧を取得する（user_id 昇順）
+
+    Args:
+        mail_history_id: メール送信履歴ID
+
+    Returns:
+        MailRecipient レコードのリスト
+    """
+    return (
+        MailRecipient.query
+        .filter_by(mail_history_id=mail_history_id)
+        .order_by(MailRecipient.user_id.asc())
+        .all()
+    )
 
 
 def get_mail_history_detail(
