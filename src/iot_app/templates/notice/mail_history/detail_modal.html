@@ -1,0 +1,69 @@
+<div class="modal modal--fit">
+  <div class="modal__header">
+    <h2 class="modal__title">メール通知履歴詳細</h2>
+  </div>
+  <div class="modal__body">
+
+    {# (5.1) メール種別 #}
+    <div class="form-group">
+      <label class="form-label">メール種別</label>
+      <span class="table__badge table__badge--{{ mail_type_badge_class }}">
+        {{ mail_type_name }}
+      </span>
+    </div>
+
+    {# (5.2) 送信元メールアドレス #}
+    <div class="form-group">
+      <label class="form-label">送信元メールアドレス</label>
+      <p>{{ mail_history.sender_email }}</p>
+    </div>
+
+    {# (5.3) 送信先メールアドレス #}
+    <div class="form-group">
+      <label class="form-label">送信先メールアドレス</label>
+      <p>{{ recipients_str if recipients_str else '（なし）' }}</p>
+    </div>
+
+    {# (5.4) 送信日時 #}
+    <div class="form-group">
+      <label class="form-label">送信日時</label>
+      <p>
+        {% if mail_history.sent_at %}
+          {{ mail_history.sent_at.strftime('%Y/%m/%d %H:%M') }}
+        {% endif %}
+      </p>
+    </div>
+
+    {# (5.5) メール件名 #}
+    <div class="form-group">
+      <label class="form-label">メール件名</label>
+      <p>{{ mail_history.subject }}</p>
+    </div>
+
+    {# (5.6) メール本文 #}
+    <div class="form-group">
+      <label class="form-label">メール本文</label>
+      <div class="mail-body">{{ mail_history.body }}</div>
+    </div>
+
+  </div>
+  <div class="modal__footer">
+    {# (5.7) 閉じるボタン #}
+    <button class="button button--secondary" onclick="closeMailHistoryModal()">閉じる</button>
+  </div>
+</div>
+
+<style>
+.mail-body {
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: var(--spacing-3);
+  background-color: var(--color-gray-50);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+</style>

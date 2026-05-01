@@ -273,14 +273,14 @@
 - BEMクラス: `.table__badge`
 - スタイル:
   - アラート通知: 赤色バッジ（`.table__badge--danger`）
-  - 招待メール: 青色バッジ（`.table__badge--primary`）
+  - 招待メール: 青色バッジ（`.table__badge--info`）
   - パスワードリセット: 黄色バッジ（`.table__badge--warning`）
   - システム通知: 緑色バッジ（`.table__badge--success`）
 
 **HTML例:**
 ```html
 <span class="table__badge table__badge--danger">アラート通知</span>
-<span class="table__badge table__badge--primary">招待メール</span>
+<span class="table__badge table__badge--info">招待メール</span>
 ```
 
 **CSS定義（画面固有）:**
@@ -344,7 +344,7 @@
 | 項目 | 内容 |
 |------|------|
 | タイトル | 「メール通知履歴詳細」 |
-| サイズ | 中（600px幅） |
+| サイズ | コンテンツに合わせた自動幅（`modal--fit`） |
 | 閉じる方法 | 閉じるボタンのみ |
 
 **要素構成図:**
@@ -439,7 +439,7 @@
 **HTML例:**
 ```html
 <div class="modal-overlay" id="mailHistoryModal">
-  <div class="modal modal--medium">
+  <div class="modal modal--fit">
     <div class="modal__header">
       <h2 class="modal__title">メール通知履歴詳細</h2>
     </div>
